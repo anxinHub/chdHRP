@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.hr.dao.sc.HrPageDesignMapper">
+
+	<resultMap id="hrPageDesign" type="com.chd.hrp.hr.entity.sc.HrPageDesign">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="template_code" column="template_code" />
+		<result property="table_type_code" column="table_type_code" />
+		<result property="table_type_name" column="table_type_name" />
+		<result property="page_code" column="page_code" />
+		<result property="page_name" column="page_name" />
+		<result property="is_stop" column="is_stop" />
+		<result property="is_innr" column="is_innr" />
+		<result property="page_json" column="page_json" />
+		<result property="page_sort" column="page_sort" />
+		<result property="note" column="note" />
+	</resultMap>
+
+	<resultMap type="java.util.Map" id="treeMap">
+		<result property="id" column="id"/>
+		<result property="text" column="text"/>
+		<result property="pid" column="pid"/>
+		<result property="table_type_code" column="table_type_code"/>
+		<result property="page_code" column="page_code"/>
+		<result property="page_name" column="page_name"/>
+	</resultMap>
+	
+    <insert id="addHrPageDesign" useGeneratedKeys="true">
+       insert into hr_page_design
+				  (group_id,
+				   hos_id,
+				   template_code,
+				   table_type_code,
+				   page_code,
+				   page_name,
+				   is_stop,
+				   is_innr,
+				   page_json,
+				   page_sort,
+				   note)
+				values
+				  (#{group_id},
+				   #{hos_id},
+				   #{template_code},
+				   #{table_type_code},
+				   #{page_code},
+				   #{page_name},
+				   #{is_stop},
+				   #{is_innr},
+				   #{page_json},
+				   #{page_sort},
+				   #{note})
+    </insert>
+    
+    <update id="updateHrPageDesign" parameterType="java.util.Map">
+          update hr_page_design
+		   <trim prefix="SET" suffixOverrides=",">
+		   	<if test="template_code != null and template_code != ''">
+				template_code = #{template_code},
+			</if>
+			<if test="page_name != null and page_name != ''">
+				page_name = #{page_name},
+			</if>
+			<if test="is_stop != null and is_stop != ''">
+				is_stop = #{is_stop},
+			</if>
+			<if test="is_innr != null and is_innr != ''">
+				is_innr = #{is_innr},
+			</if>
+			<if test="page_json != null and page_json != ''">
+				page_json = #{page_json},
+			</if>
+			<if test="page_sort != null and page_sort != ''">
+				page_sort = #{page_sort},
+			</if>
+			<if test="note != null and note != ''">
+				note = #{note},
+			</if>
+		   </trim>
+		 where group_id = #{group_id}
+		   and hos_id = #{hos_id}
+		   and table_type_code = #{table_type_code}
+		   and page_code = #{page_code}
+    </update>
+	
+	<delete id="deleteHrPageDesign" parameterType="java.util.Map">
+	   delete from hr_page_design
+	   <where> group_id = #{group_id}
+		   and hos_id = #{hos_id}
+		    and table_type_code = #{table_type_code}
+		   <if test="page_code != null and page_code != ''">
+			and page_code = #{page_code}
+			</if>
+	   </where>
+	</delete>
+	
+	<select id="queryHrPageDesignMaxSortNo" resultType="int" parameterType="java.util.Map">
+			 select 
+			  decode(max(page_sort),null,1,max(page_sort)+1) page_sort
+			 from hr_page_design hpd
+			 where hpd.group_id = #{group_id}
+			   and hpd.hos_id = #{hos_id}
+			   and hpd.table_type_code = #{table_type_code}
+	</select>
+	
+	<select id="queryHrPageDesignTree" parameterType="java.util.Map" resultMap="treeMap"  useCache="false" flushCache="true">
+		       select t.id, t.text, t.pid, t.table_sort, t.page_sort,table_type_code,page_code,page_name
+	          from (select type_tab_code id,
+	                       type_tab_name text,
+	                       null          pid,
+	                       table_sort,
+	                       null page_sort,
+						   type_tab_code table_type_code,
+						   null page_code,
+						   null page_name
+	                  from hr_table_type
+	                union all
+	                select page_code id,
+	                       page_code || '【' || page_name || '】' text,
+	                       table_type_code pid,
+	                       null,
+	                       page_sort,
+						   table_type_code,
+						   page_code,
+						   page_name
+	                  from hr_page_design
+	                 <where> group_id = #{group_id}
+	                     and  hos_id = #{hos_id}
+		                <if test="key != null and key != ''">
+						  and (page_code like #{key}||'%'
+						  or page_name like #{key}||'%')
+						</if>
+		              </where>
+	                  ) t
+	         order by table_sort, page_sort
+   </select>
+	
+	
+	<select id="queryHrPageDesignByCode" resultMap="hrPageDesign"  parameterType="java.util.Map" >
+	        select hpd.group_id,
+			       hpd.hos_id,
+			       hpd.template_code,
+			       hpd.table_type_code,
+			       hty.type_tab_name table_type_name,
+			       hpd.page_code,
+			       hpd.page_name,
+			       hpd.is_stop,
+			       hpd.is_innr,
+			       hpd.page_json,
+			       hpd.page_sort,
+			       hpd.note
+			  from hr_page_design hpd
+			  left join hr_table_type hty
+              on hpd.table_type_code = hty.type_tab_code
+			  where hpd.group_id = #{group_id}
+			  and hpd.hos_id = #{hos_id}
+			  and hpd.table_type_code = #{table_type_code}
+			  and hpd.page_code = #{page_code}
+	</select>
+	
+	<select id="queryHrPageDesignExport" resultMap="hrPageDesign"  parameterType="java.util.Map" useCache="false" flushCache="true">
+	      select   hpd.group_id,
+			       hpd.hos_id,
+			       hpd.template_code,
+			       hpd.table_type_code,
+			       hty.type_tab_name table_type_name,
+			       hpd.page_code,
+			       hpd.page_name,
+			       hpd.is_stop,
+			       hpd.is_innr,
+			       hpd.page_json,
+			       hpd.page_sort,
+			       hpd.note
+			  from  hr_table_type hty
+			  left join hr_page_design hpd
+	        on hpd.table_type_code = hty.type_tab_code
+	        and  hpd.group_id = #{group_id}
+	        and hpd.hos_id = #{hos_id}
+		<where>
+         <if test="table_type_code != null and table_type_code != ''">
+		  and hpd.table_type_code = #{table_type_code}
+		</if>
+        <if test="page_code != null and page_code != ''">
+		  and hpd.page_code = #{page_code}
+		</if>
+		</where>
+	    order by hpd.group_id,hpd.hos_id,hpd.table_type_code,hpd.page_code
+	</select>
+	
+</mapper>
+

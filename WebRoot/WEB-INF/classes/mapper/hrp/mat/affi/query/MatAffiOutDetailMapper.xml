@@ -1,0 +1,1792 @@
+<?xml version="1.0" encoding="UTF-8" ?>  
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.mat.dao.affi.query.MatAffiOutDetailMapper">
+	<resultMap type="java.util.Map" id="matAffiOutDetailMap">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="out_id" column="out_id"/>
+		<result property="out_no" column="out_no"/>
+		<result property="confirm_date" column="confirm_date"/>
+		<result property="bus_type_code" column="bus_type_code"/>
+		<result property="bus_type_name" column="bus_type_name"/>
+		<result property="dept_code" column="dept_code"/>
+		<result property="dept_name" column="dept_name"/>
+		<result property="state" column="state"/> 
+		<result property="inv_code" column="inv_code"/>  
+		<result property="inv_name" column="inv_name"/>
+		<result property="inv_model" column="inv_model"/>
+		<result property="unit_code" column="unit_code"/>
+		<result property="unit_name" column="unit_name"/>
+		<result property="price" column="price"/>
+		<result property="amount" column="amount"/>
+		<result property="amount_money" column="amount_money"/>
+		<result property="mat_type_code" column="mat_type_code"/>
+		<result property="mat_type_name" column="mat_type_name"/>
+		<result property="field_desc" column="field_desc"/>
+		<result property="inv_id" column="inv_id"/>
+		<result property="inv_no" column="inv_no"/>
+		<result property="store_id" column="store_id"/>
+		
+		<result property="in_no" column="in_no"/>
+		<result property="in_date" column="in_date"/>
+		<result property="sup_name" column="sup_name"/>
+		<result property="fac_name" column="fac_name"/>
+		<result property="store_name" column="store_name"/>
+	</resultMap>
+	
+	
+	<!-- 
+		2016/12/21 lxj
+		代销:查询出库明细
+	 -->
+	<select id="queryMatAffiOutDetail" parameterType="java.util.Map" resultMap="matAffiOutDetailMap">
+		with temp1 as(
+		  	<if test="bus_type_code!=null or  tran_code==null">
+		  	    select
+		        mao.group_id,mao.hos_id,mao.copy_code,mao.out_id,mao.out_no,mao.confirm_date,mbt.bus_type_code,mbt.bus_type_name,
+		        hdd.dept_code,hdd.dept_name,mao.state,mid.inv_code,mid.inv_name,mid.inv_model,hu.unit_code,hu.unit_name,maod.price,maod.amount,
+		        maod.amount_money,mtd.mat_type_code,mtd.mat_type_name,msl.field_desc,maod.inv_id,maod.inv_no,mao.store_id,
+		        hfd.fac_name,hstd.store_name,sup.sup_name,mid.agent_name
+		      from mat_affi_out_detail maod
+		      left join mat_affi_out mao
+		      on 
+		           maod.group_id = mao.group_id
+		           and maod.hos_id = mao.hos_id
+		           and maod.copy_code = mao.copy_code
+		           and maod.out_id = mao.out_id
+		           and maod.out_no = mao.out_no
+		      left join mat_bus_type mbt
+		      on
+		           mao.bus_type_code = mbt.bus_type_code
+		      left join hos_dept_dict hdd
+		      on
+		           mao.group_id = hdd.group_id
+		           and mao.hos_id = hdd.hos_id
+		           and mao.dept_id = hdd.dept_id
+		           and mao.dept_no = hdd.dept_no
+		           and hdd.is_stop = 0
+		      left join mat_inv_dict mid
+		      on   
+		           maod.group_id = mid.group_id
+		           and maod.hos_id = mid.hos_id
+		           and maod.copy_code = mid.copy_code
+		           and maod.inv_id = mid.inv_id
+		           and maod.inv_no = mid.inv_no
+		      left join hos_unit hu
+		      on
+		           mid.group_id = hu.group_id
+		           and mid.hos_id = hu.hos_id
+		           and mid.unit_code = hu.unit_code
+		           and hu.is_stop = 0
+		      left join mat_type_dict mtd
+		      on
+		           mid.group_id = mtd.group_id
+		           and mid.hos_id = mtd.hos_id
+		           and mid.copy_code = mtd.copy_code
+		           and mid.mat_type_id = mtd.mat_type_id
+		           and mid.mat_type_no = mtd.mat_type_no
+		           and mtd.is_stop = 0
+		      LEFT JOIN mat_sys_list msl 
+		      ON msl.field_value = mao.state
+		        AND msl.table_code = 'mat_affi_out'
+		        AND msl.field_code = 'STATE' 
+		     left join hos_fac_dict hfd
+				on hfd.group_id=mid.group_id
+				and hfd.hos_id=mid.hos_id
+				and hfd.fac_id=mid.fac_id
+				and hfd.is_stop=0
+				and hfd.is_mat=1
+			left join hos_store_dict hstd
+				on hstd.group_id=mao.group_id
+				and hstd.hos_id=mao.hos_id
+				and hstd.store_id=mao.store_id
+				and hstd.is_stop=0
+				and hstd.is_mat=1
+		    left join (
+			   select distinct
+			     maid.group_id,maid.hos_id,maid.copy_code,
+			     maid.inv_id,maid.batch_no,maid.batch_sn,
+			     maid.bar_code,maid.price,hsud.sup_name,hsud.sup_id 
+			  from mat_affi_in mai
+			  left join mat_affi_in_detail maid
+			  on maid.group_id=mai.group_id
+			  and maid.hos_id=mai.hos_id
+			  and maid.copy_code=mai.copy_code
+			  and maid.in_id=mai.in_id
+			  left join hos_sup_dict hsud
+			  on hsud.group_id=mai.group_id
+			  and hsud.hos_id=mai.hos_id
+			  and hsud.sup_id=mai.sup_id
+			  and hsud.is_stop=0
+			  and hsud.is_mat=1
+			  where mai.bus_type_code in (1,27)
+			) sup 
+			on maod.group_id=sup.group_id
+			and maod.hos_id=sup.hos_id
+			and maod.copy_code=sup.copy_code
+			and maod.inv_id=sup.inv_id
+			and maod.batch_no=sup.batch_no
+			and maod.batch_sn=sup.batch_sn
+			and maod.bar_code=sup.bar_code
+			and maod.price=sup.price
+
+		    
+		    
+		      <where>
+		      mao.state=3
+		       and to_char(mid.mat_type_id) in ( select vus.perm_code from v_user_data_perm vus
+		        where vus.group_id =  #{group_id,jdbcType=INTEGER}
+		        and vus.hos_id = #{hos_id,jdbcType=INTEGER}
+		        and vus.table_code = 'MAT_TYPE_DICT'
+		        <if test="user_id !=null and user_id !='' ">
+					and vus.user_id = #{user_id,jdbcType=INTEGER}
+				</if>
+		        and vus.is_read = 1
+		        and vus.is_write = 1 
+		        )
+		        
+		      		<if test="group_id != null and group_id != ''">
+			           and mao.group_id = #{group_id}
+		      		</if>
+		      		<if test="hos_id != null and hos_id != ''">
+			           and mao.hos_id = #{hos_id}
+		      		</if>
+		      		<if test="copy_code != null and copy_code != '' ">
+			           and mao.copy_code = #{copy_code}
+		      		</if>
+		      		<if test="begin_confirm_date != null and begin_confirm_date != '' and end_confirm_date != null and end_confirm_date != '' ">
+			           and mao.confirm_date between to_date(#{begin_confirm_date},'yyyy/MM/dd') and to_date(#{end_confirm_date},'yyyy/MM/dd')
+		      		</if>
+		      		<if test="begin_out_date != null and begin_out_date != '' and end_out_date != null and end_out_date != '' ">
+		      		   and mao.out_date between to_date(#{begin_out_date},'yyyy/MM/dd') and to_date(#{end_out_date},'yyyy/MM/dd')
+		      		</if>
+					<!-- 只显示有权限的库房信息 -->
+					and to_char(mao.store_id) in (
+						select perm_code from v_user_data_perm  
+						where group_id = #{group_id,jdbcType=INTEGER}
+							and hos_id = #{hos_id,jdbcType=INTEGER}
+							and table_code = 'HOS_STORE_DICT'
+							and user_id = #{user_id,jdbcType=INTEGER}
+							and is_read = 1 and is_write = 1 
+					)
+		      		<if test="store_id != null and store_id != '' ">
+			           and mao.store_id = #{store_id}
+		      		</if>
+		      		<if test="store_no != null and store_no != '' ">
+			           and mao.store_no = #{store_no}
+		      		</if>
+		      		<if test="mat_type_id != null and mat_type_id != '' ">
+			           and mtd.mat_type_id in ${mat_type_id}
+		      		</if>
+		      		<if test="mat_type_no != null and mat_type_no != '' ">
+			           and mtd.mat_type_no = #{mat_type_no}
+		      		</if>
+		      		<if test="dept_id != null and dept_id != '' ">
+			           and mao.dept_id = #{dept_id}
+		      		</if>
+		      		<if test="dept_no != null and dept_no != '' ">
+			           and mao.dept_no = #{dept_no}
+		      		</if>
+		      		<if test="is_charge != null and is_charge != '' ">
+			           and mid.is_charge = #{is_charge}
+		      		</if>
+		      		<if test="inv_id != null and inv_id != '' ">
+				and  (
+				       mid.inv_id  like '%${inv_id}%'
+					or mid.inv_code like '%${inv_id}%'
+					or upper(mid.inv_name) like '%${inv_id}%'
+				    or upper(mid.inv_model) like '%${inv_id}%'
+					or upper(mid.spell_code) like '%${inv_id}%'
+					or upper(mid.wbx_code) like '%${inv_id}%'
+					or upper(mid.spell_code) like '%${inv_id}%'
+					or lower(mid.spell_code) like '%${inv_id}%'
+					or lower(mid.wbx_code) like '%${inv_id}%'
+					or lower(mid.inv_name) like '%${inv_id}%'
+				      )  
+			           
+		      		</if>
+		      		<if test="inv_no != null and inv_no != '' ">
+			           and maod.inv_no = #{inv_no}
+		      		</if>
+		      		<if test="out_no != null and out_no != '' ">
+			           and mao.out_no like '%${out_no}%'
+		      		</if>
+		      		<if test="inv_model != null and inv_model != ''">
+					and (mid.inv_model like '%${inv_model}%'
+					 or mid.inv_name like '%${inv_model}%'
+				         or mid.inv_code like '%${inv_model}%'
+					     or upper(mid.spell_code) like '%${inv_model}%'
+					     or upper(mid.wbx_code) like '%${inv_model}%'
+					     or lower(mid.spell_code) like '%${inv_model}%'
+					     or lower(mid.wbx_code) like '%${inv_model}%'
+					     )
+					</if>
+					<if test="sup_id!=null and sup_id!=''">
+						and sup.sup_id=#{sup_id}
+					</if>
+					<if test='set_or_store_id!=null and set_or_store_id!="" and set_or_store!=null and set_or_store=="1"'>
+					and mao.store_id =#{set_or_store_id}
+				</if>
+				<if test='set_or_store_id!=null and set_or_store_id!="" and (set_or_store==null or set_or_store!="1")'>
+					and mao.store_id in (
+						select mss.store_id
+						from mat_store_detail mss
+						where mss.set_id=#{set_or_store_id}
+					)
+				</if>
+				<if test="bus_type_code==null or bus_type_code==''">
+					and mao.bus_type_code  in (28,30)
+			  	</if>
+				<if test="bus_type_code!=null and bus_type_code!=''">
+					and mao.bus_type_code  in  (${bus_type_code})
+			  	</if>
+			  	<if test="agent_name!=null and agent_name!=''">
+					and mid.agent_name like '%${agent_name}%'
+				</if>
+		      </where>
+		  	</if>
+		  	<if test="(bus_type_code==null and  tran_code==null) or (bus_type_code!=null and  tran_code!=null)">
+		  		union all
+		  	</if>
+		  	<if test="bus_type_code==null or tran_code!=null">
+		  	    select
+		        mao.group_id,mao.hos_id,mao.copy_code,mao.out_id,matr.tran_no as out_no,mao.confirm_date,mbt.bus_type_code,mbt.bus_type_name,
+		        in_store.store_code as dept_code,in_store.store_name as dept_name,mao.state,mid.inv_code,mid.inv_name,mid.inv_model,hu.unit_code,hu.unit_name,maod.price,maod.amount,
+		        maod.amount_money,mtd.mat_type_code,mtd.mat_type_name,msl.field_desc,maod.inv_id,maod.inv_no,mao.store_id,
+		        hfd.fac_name,hstd.store_name,sup.sup_name,mid.agent_name
+		      from mat_affi_out_detail maod
+		      left join mat_affi_out mao
+		      on 
+		           maod.group_id = mao.group_id
+		           and maod.hos_id = mao.hos_id
+		           and maod.copy_code = mao.copy_code
+		           and maod.out_id = mao.out_id
+		           and maod.out_no = mao.out_no
+		      left join mat_bus_type mbt
+		      on
+		           mao.bus_type_code = mbt.bus_type_code
+		      left join hos_dept_dict hdd
+		      on
+		           mao.group_id = hdd.group_id
+		           and mao.hos_id = hdd.hos_id
+		           and mao.dept_id = hdd.dept_id
+		           and mao.dept_no = hdd.dept_no
+		           and hdd.is_stop = 0
+		      left join mat_inv_dict mid
+		      on   
+		           maod.group_id = mid.group_id
+		           and maod.hos_id = mid.hos_id
+		           and maod.copy_code = mid.copy_code
+		           and maod.inv_id = mid.inv_id
+		           and maod.inv_no = mid.inv_no
+		      left join hos_unit hu
+		      on
+		           mid.group_id = hu.group_id
+		           and mid.hos_id = hu.hos_id
+		           and mid.unit_code = hu.unit_code
+		           and hu.is_stop = 0
+		      left join mat_type_dict mtd
+		      on
+		           mid.group_id = mtd.group_id
+		           and mid.hos_id = mtd.hos_id
+		           and mid.copy_code = mtd.copy_code
+		           and mid.mat_type_id = mtd.mat_type_id
+		           and mid.mat_type_no = mtd.mat_type_no
+		           and mtd.is_stop = 0
+		      LEFT JOIN mat_sys_list msl 
+		      ON msl.field_value = mao.state
+		        AND msl.table_code = 'mat_affi_out'
+		        AND msl.field_code = 'STATE' 
+		     left join hos_fac_dict hfd
+				on hfd.group_id=mid.group_id
+				and hfd.hos_id=mid.hos_id
+				and hfd.fac_id=mid.fac_id
+				and hfd.is_stop=0
+				and hfd.is_mat=1
+			left join hos_store_dict hstd
+				on hstd.group_id=mao.group_id
+				and hstd.hos_id=mao.hos_id
+				and hstd.store_id=mao.store_id
+				and hstd.is_stop=0
+				and hstd.is_mat=1
+		    left join (
+			   select distinct
+			     maid.group_id,maid.hos_id,maid.copy_code,
+			     maid.inv_id,maid.batch_no,maid.batch_sn,
+			     maid.bar_code,maid.price,hsud.sup_name,hsud.sup_id 
+			  from mat_affi_in mai
+			  left join mat_affi_in_detail maid
+			  on maid.group_id=mai.group_id
+			  and maid.hos_id=mai.hos_id
+			  and maid.copy_code=mai.copy_code
+			  and maid.in_id=mai.in_id
+			  left join hos_sup_dict hsud
+			  on hsud.group_id=mai.group_id
+			  and hsud.hos_id=mai.hos_id
+			  and hsud.sup_id=mai.sup_id
+			  and hsud.is_stop=0
+			  and hsud.is_mat=1
+			  where mai.bus_type_code in (1,27)
+			) sup 
+			on maod.group_id=sup.group_id
+			and maod.hos_id=sup.hos_id
+			and maod.copy_code=sup.copy_code
+			and maod.inv_id=sup.inv_id
+			and maod.batch_no=sup.batch_no
+			and maod.batch_sn=sup.batch_sn
+			and maod.bar_code=sup.bar_code
+			and maod.price=sup.price
+	  		left join mat_affi_tran_rela matr
+	        on matr.group_id=mao.group_id
+	        and matr.hos_id=mao.hos_id
+	        and matr.copy_code=mao.copy_code
+	        and matr.out_id=mao.out_id
+	        left join mat_affi_in mai
+	        on mai.group_id=matr.group_id
+	        and mai.hos_id=matr.hos_id
+	        and mai.copy_code=matr.copy_code
+	        and mai.in_id=matr.in_id
+	        left join hos_store_dict in_store
+	        on in_store.group_id=mai.group_id
+	        and in_store.hos_id=mai.hos_id
+	        and in_store.store_id=mai.store_id
+	        and in_store.is_stop=0
+		    
+		    
+		      <where>
+		      mao.state=3
+		       and to_char(mid.mat_type_id) in ( select vus.perm_code from v_user_data_perm vus
+		        where vus.group_id =  #{group_id,jdbcType=INTEGER}
+		        and vus.hos_id = #{hos_id,jdbcType=INTEGER}
+		        and vus.table_code = 'MAT_TYPE_DICT'
+		        <if test="user_id !=null and user_id !='' ">
+					and vus.user_id = #{user_id,jdbcType=INTEGER}
+				</if>
+		        and vus.is_read = 1
+		        and vus.is_write = 1 
+		        )
+		        
+		      		<if test="group_id != null and group_id != ''">
+			           and mao.group_id = #{group_id}
+		      		</if>
+		      		<if test="hos_id != null and hos_id != ''">
+			           and mao.hos_id = #{hos_id}
+		      		</if>
+		      		<if test="copy_code != null and copy_code != '' ">
+			           and mao.copy_code = #{copy_code}
+		      		</if>
+		      		<if test="begin_confirm_date != null and begin_confirm_date != '' and end_confirm_date != null and end_confirm_date != '' ">
+			           and mao.confirm_date between to_date(#{begin_confirm_date},'yyyy/MM/dd') and to_date(#{end_confirm_date},'yyyy/MM/dd')
+		      		</if>
+		      		<if test="begin_out_date != null and begin_out_date != '' and end_out_date != null and end_out_date != '' ">
+		      		   and mao.out_date between to_date(#{begin_out_date},'yyyy/MM/dd') and to_date(#{end_out_date},'yyyy/MM/dd')
+		      		</if>
+					<!-- 只显示有权限的库房信息 -->
+					and to_char(mao.store_id) in (
+						select perm_code from v_user_data_perm  
+						where group_id = #{group_id,jdbcType=INTEGER}
+							and hos_id = #{hos_id,jdbcType=INTEGER}
+							and table_code = 'HOS_STORE_DICT'
+							and user_id = #{user_id,jdbcType=INTEGER}
+							and is_read = 1 and is_write = 1 
+					)
+		      		<if test="store_id != null and store_id != '' ">
+			           and mao.store_id = #{store_id}
+		      		</if>
+		      		<if test="store_no != null and store_no != '' ">
+			           and mao.store_no = #{store_no}
+		      		</if>
+		      		<if test="mat_type_id != null and mat_type_id != '' ">
+			           and mtd.mat_type_id in ${mat_type_id}
+		      		</if>
+		      		<if test="mat_type_no != null and mat_type_no != '' ">
+			           and mtd.mat_type_no = #{mat_type_no}
+		      		</if>
+		      		<if test="dept_id != null and dept_id != '' ">
+			           and mao.dept_id = #{dept_id}
+		      		</if>
+		      		<if test="dept_no != null and dept_no != '' ">
+			           and mao.dept_no = #{dept_no}
+		      		</if>
+		      		<if test="is_charge != null and is_charge != '' ">
+			           and mid.is_charge = #{is_charge}
+		      		</if>
+		      		<if test="inv_id != null and inv_id != '' ">
+				and  (
+				       mid.inv_id  like '%${inv_id}%'
+					or mid.inv_code like '%${inv_id}%'
+					or upper(mid.inv_name) like '%${inv_id}%'
+				    or upper(mid.inv_model) like '%${inv_id}%'
+					or upper(mid.spell_code) like '%${inv_id}%'
+					or upper(mid.wbx_code) like '%${inv_id}%'
+					or upper(mid.spell_code) like '%${inv_id}%'
+					or lower(mid.spell_code) like '%${inv_id}%'
+					or lower(mid.wbx_code) like '%${inv_id}%'
+					or lower(mid.inv_name) like '%${inv_id}%'
+				      )  
+			           
+		      		</if>
+		      		<if test="inv_no != null and inv_no != '' ">
+			           and maod.inv_no = #{inv_no}
+		      		</if>
+		      		<if test="out_no != null and out_no != '' ">
+			           and mao.out_no like '%${out_no}%'
+		      		</if>
+		      		<if test="inv_model != null and inv_model != ''">
+					and (mid.inv_model like '%${inv_model}%'
+					 or mid.inv_name like '%${inv_model}%'
+				         or mid.inv_code like '%${inv_model}%'
+					     or upper(mid.spell_code) like '%${inv_model}%'
+					     or upper(mid.wbx_code) like '%${inv_model}%'
+					     or lower(mid.spell_code) like '%${inv_model}%'
+					     or lower(mid.wbx_code) like '%${inv_model}%'
+					     )
+					</if>
+					<if test="sup_id!=null and sup_id!=''">
+						and sup.sup_id=#{sup_id}
+					</if>
+					<if test='set_or_store_id!=null and set_or_store_id!="" and set_or_store!=null and set_or_store=="1"'>
+					and mao.store_id =#{set_or_store_id}
+				</if>
+				<if test='set_or_store_id!=null and set_or_store_id!="" and (set_or_store==null or set_or_store!="1")'>
+					and mao.store_id in (
+						select mss.store_id
+						from mat_store_detail mss
+						where mss.set_id=#{set_or_store_id}
+					)
+				</if>
+				<if test="agent_name!=null and agent_name!=''">
+					and mid.agent_name like '%${agent_name}%'
+				</if>
+				
+				and mao.bus_type_code='32'
+		      </where>
+		  	</if>
+		      
+		),
+		temp as (
+			select 
+			        group_id,hos_id,copy_code,out_id,to_char(out_no) out_no,confirm_date,bus_type_code,bus_type_name,
+			        dept_code,dept_name,state,inv_code,inv_name,inv_model,unit_code,unit_name,price,amount,
+			        amount_money,mat_type_code,mat_type_name,field_desc,inv_id,inv_no,store_id,fac_name,store_name,sup_name,agent_name
+			from temp1
+			order by confirm_date,out_no,out_id
+		)
+		select 
+		        group_id,hos_id,copy_code,out_id,to_char(out_no) out_no,confirm_date,bus_type_code,bus_type_name,
+		        dept_code,dept_name,state,inv_code,inv_name,inv_model,unit_code,unit_name,price,amount,
+		        amount_money,mat_type_code,mat_type_name,field_desc,inv_id,inv_no,store_id,fac_name,store_name,sup_name,agent_name
+		from temp
+		union all
+		select null,null,null,null,'合计',null,null,null,
+		       null,null,null,null,null,null,null,null,null,null,
+		       sum(amount_money)  amount_money,null,null,null,null,null,null,null,null,null,null
+		from temp     
+	</select>
+	<!-- 2018-03-16 代销材料出库汇总查询 liusiqi -->
+	<select id="queryMatAffiOutInvCollection" parameterType="java.util.Map" resultMap="matAffiOutDetailMap">
+		with temp1 as(
+		     	<if test="bus_type_code!=null or  tran_code==null">
+			      select
+			        mao.group_id,mao.hos_id,mao.copy_code,hdd.dept_name,mid.inv_code,
+			        mid.inv_name,mid.inv_model,hu.unit_code,hu.unit_name,maod.price,
+			        sum(nvl(maod.amount,0)) amount,sum(nvl(maod.amount_money,0)) amount_money,mtd.mat_type_code,mtd.mat_type_name,maod.inv_id,
+			        maod.inv_no,mao.store_id,hfd.fac_name,hstd.store_name,sup.sup_name,mid.agent_name
+			      from mat_affi_out_detail maod
+			      left join mat_affi_out mao
+			      on 
+			           maod.group_id = mao.group_id
+			           and maod.hos_id = mao.hos_id
+			           and maod.copy_code = mao.copy_code
+			           and maod.out_id = mao.out_id
+			           and maod.out_no = mao.out_no
+			      left join hos_dept_dict hdd
+			      on
+			           mao.group_id = hdd.group_id
+			           and mao.hos_id = hdd.hos_id
+			           and mao.dept_id = hdd.dept_id
+			           and mao.dept_no = hdd.dept_no
+			           and hdd.is_stop = 0
+			      left join mat_inv_dict mid
+			      on   
+			           maod.group_id = mid.group_id
+			           and maod.hos_id = mid.hos_id
+			           and maod.copy_code = mid.copy_code
+			           and maod.inv_id = mid.inv_id
+			           and maod.inv_no = mid.inv_no
+			      left join hos_unit hu
+			      on
+			           mid.group_id = hu.group_id
+			           and mid.hos_id = hu.hos_id
+			           and mid.unit_code = hu.unit_code
+			           and hu.is_stop = 0
+			      left join mat_type_dict mtd
+			      on
+			           mid.group_id = mtd.group_id
+			           and mid.hos_id = mtd.hos_id
+			           and mid.copy_code = mtd.copy_code
+			           and mid.mat_type_id = mtd.mat_type_id
+			           and mid.mat_type_no = mtd.mat_type_no
+			           and mtd.is_stop = 0
+			     left join hos_fac_dict hfd
+					on hfd.group_id=mid.group_id
+					and hfd.hos_id=mid.hos_id
+					and hfd.fac_id=mid.fac_id
+					and hfd.is_stop=0
+					and hfd.is_mat=1
+				left join hos_store_dict hstd
+					on hstd.group_id=mao.group_id
+					and hstd.hos_id=mao.hos_id
+					and hstd.store_id=mao.store_id
+					and hstd.is_stop=0
+					and hstd.is_mat=1
+			    left join (
+				   select distinct
+				     maid.group_id,maid.hos_id,maid.copy_code,
+				     maid.inv_id,maid.batch_no,maid.batch_sn,
+				     maid.bar_code,maid.price,hsud.sup_name ,hsud.sup_id
+				  from mat_affi_in mai
+				  left join mat_affi_in_detail maid
+				  on maid.group_id=mai.group_id
+				  and maid.hos_id=mai.hos_id
+				  and maid.copy_code=mai.copy_code
+				  and maid.in_id=mai.in_id
+				  left join hos_sup_dict hsud
+				  on hsud.group_id=mai.group_id
+				  and hsud.hos_id=mai.hos_id
+				  and hsud.sup_id=mai.sup_id
+				  and hsud.is_stop=0
+				  and hsud.is_mat=1
+				  where mai.bus_type_code in (1,27)
+				) sup 
+				on maod.group_id=sup.group_id
+				and maod.hos_id=sup.hos_id
+				and maod.copy_code=sup.copy_code
+				and maod.inv_id=sup.inv_id
+				and maod.batch_no=sup.batch_no
+				and maod.batch_sn=sup.batch_sn
+				and maod.bar_code=sup.bar_code
+				and maod.price=sup.price
+					
+			    <where>
+			       mao.state=3
+			       and to_char(mid.mat_type_id) in ( 
+			       select vus.perm_code from v_user_data_perm vus
+			        where vus.group_id =  #{group_id,jdbcType=INTEGER}
+			        and vus.hos_id = #{hos_id,jdbcType=INTEGER}
+			        and vus.table_code = 'MAT_TYPE_DICT'
+			        <if test="user_id !=null and user_id !='' ">
+						and vus.user_id = #{user_id,jdbcType=INTEGER}
+					</if>
+			        and vus.is_read = 1
+			        and vus.is_write = 1 
+			        )
+			    <if test="agent_name!=null and agent_name!=''">
+					and mid.agent_name like '%${agent_name}%'
+				</if>    
+	      		<if test="group_id != null and group_id != ''">
+		           and mao.group_id = #{group_id}
+	      		</if>
+	      		<if test="hos_id != null and hos_id != ''">
+		           and mao.hos_id = #{hos_id}
+	      		</if>
+	      		<if test="copy_code != null and copy_code != '' ">
+		           and mao.copy_code = #{copy_code}
+	      		</if>
+	      		<if test="begin_confirm_date != null and begin_confirm_date != '' and end_confirm_date != null and end_confirm_date != '' ">
+		           and mao.confirm_date between to_date(#{begin_confirm_date},'yyyy/MM/dd') and to_date(#{end_confirm_date},'yyyy/MM/dd')
+	      		</if>
+	      		<if test="begin_out_date != null and begin_out_date != '' and end_out_date != null and end_out_date != '' ">
+	      		   and mao.out_date between to_date(#{begin_out_date},'yyyy/MM/dd') and to_date(#{end_out_date},'yyyy/MM/dd')
+	      		</if>
+				<!-- 只显示有权限的库房信息 -->
+				and to_char(mao.store_id) in (
+					select perm_code from v_user_data_perm  
+					where group_id = #{group_id,jdbcType=INTEGER}
+						and hos_id = #{hos_id,jdbcType=INTEGER}
+						and table_code = 'HOS_STORE_DICT'
+						and user_id = #{user_id,jdbcType=INTEGER}
+						and is_read = 1 and is_write = 1 
+				)
+	      		<if test="store_id != null and store_id != '' ">
+		           and mao.store_id = #{store_id}
+	      		</if>
+	      		<if test="store_no != null and store_no != '' ">
+		           and mao.store_no = #{store_no}
+	      		</if>
+	      		<if test="mat_type_id != null and mat_type_id != '' ">
+		           and mtd.mat_type_id in ${mat_type_id}
+	      		</if>
+	      		<if test="mat_type_no != null and mat_type_no != '' ">
+		           and mtd.mat_type_no = #{mat_type_no}
+	      		</if>
+	      		<if test="dept_id != null and dept_id != '' ">
+		           and mao.dept_id = #{dept_id}
+	      		</if>
+	      		<if test="dept_no != null and dept_no != '' ">
+		           and mao.dept_no = #{dept_no}
+	      		</if>
+	      		<if test="is_charge != null and is_charge != '' ">
+		           and mid.is_charge = #{is_charge}
+	      		</if>
+	      		<if test="inv_id != null and inv_id != '' ">
+				and  (
+				    mid.inv_id  like '%${inv_id}%'
+					or mid.inv_code like '%${inv_id}%'
+					or upper(mid.inv_name) like '%${inv_id}%'
+				    or upper(mid.inv_model) like '%${inv_id}%'
+					or upper(mid.spell_code) like '%${inv_id}%'
+					or upper(mid.wbx_code) like '%${inv_id}%'
+					or upper(mid.spell_code) like '%${inv_id}%'
+					or lower(mid.spell_code) like '%${inv_id}%'
+					or lower(mid.wbx_code) like '%${inv_id}%'
+					or lower(mid.inv_name) like '%${inv_id}%'
+			      )  
+		           
+	      		</if>
+	      		<if test="inv_no != null and inv_no != '' ">
+		           and maod.inv_no = #{inv_no}
+	      		</if>
+	      		<if test="out_no != null and out_no != '' ">
+		           and mao.out_no like '%${out_no}%'
+	      		</if>
+	      		<if test="inv_model != null and inv_model != ''">
+				and (mid.inv_model like '%${inv_model}%'
+				 or mid.inv_name like '%${inv_model}%'
+			         or mid.inv_code like '%${inv_model}%'
+				     or upper(mid.spell_code) like '%${inv_model}%'
+				     or upper(mid.wbx_code) like '%${inv_model}%'
+				     or lower(mid.spell_code) like '%${inv_model}%'
+				     or lower(mid.wbx_code) like '%${inv_model}%'
+				     )
+				</if>
+				<if test="sup_id!=null and sup_id!=''">
+					and sup.sup_id=#{sup_id}
+				</if>
+				<if test='set_or_store_id!=null and set_or_store_id!="" and set_or_store!=null and set_or_store=="1"'>
+					and mao.store_id =#{set_or_store_id}
+				</if>
+				<if test='set_or_store_id!=null and set_or_store_id!="" and (set_or_store==null or set_or_store!="1")'>
+					and mao.store_id in (
+						select mss.store_id
+						from mat_store_detail mss
+						where mss.set_id=#{set_or_store_id}
+					)
+				</if>
+				<if test="bus_type_code==null or bus_type_code==''">
+					and mao.bus_type_code  in (28,30)
+			  	</if>
+				<if test="bus_type_code!=null and bus_type_code!=''">
+					and mao.bus_type_code  in  (${bus_type_code})
+			  	</if>
+			 </where>
+			 group by
+			 	mao.group_id,mao.hos_id,mao.copy_code,hdd.dept_name,mid.inv_code,
+		        mid.inv_name,mid.inv_model,hu.unit_code,hu.unit_name,maod.price,
+		        mtd.mat_type_code,mtd.mat_type_name,maod.inv_id,
+		        maod.inv_no,mao.store_id,hfd.fac_name,hstd.store_name,sup.sup_name,mid.agent_name
+		      </if>
+		     <if test="(bus_type_code==null and  tran_code==null) or (bus_type_code!=null and  tran_code!=null)">
+		  		union all
+		  	</if>
+		  	<if test="bus_type_code==null or tran_code!=null">
+		  		select
+			        mao.group_id,mao.hos_id,mao.copy_code,in_store.store_name as dept_name,mid.inv_code,
+			        mid.inv_name,mid.inv_model,hu.unit_code,hu.unit_name,maod.price,
+			        sum(nvl(maod.amount,0)) amount,sum(nvl(maod.amount_money,0)) amount_money,mtd.mat_type_code,mtd.mat_type_name,maod.inv_id,
+			        maod.inv_no,mao.store_id,hfd.fac_name,hstd.store_name,sup.sup_name,mid.agent_name
+			      from mat_affi_out_detail maod
+			      left join mat_affi_out mao
+			      on 
+			           maod.group_id = mao.group_id
+			           and maod.hos_id = mao.hos_id
+			           and maod.copy_code = mao.copy_code
+			           and maod.out_id = mao.out_id
+			           and maod.out_no = mao.out_no
+			      left join hos_dept_dict hdd
+			      on
+			           mao.group_id = hdd.group_id
+			           and mao.hos_id = hdd.hos_id
+			           and mao.dept_id = hdd.dept_id
+			           and mao.dept_no = hdd.dept_no
+			           and hdd.is_stop = 0
+			      left join mat_inv_dict mid
+			      on   
+			           maod.group_id = mid.group_id
+			           and maod.hos_id = mid.hos_id
+			           and maod.copy_code = mid.copy_code
+			           and maod.inv_id = mid.inv_id
+			           and maod.inv_no = mid.inv_no
+			      left join hos_unit hu
+			      on
+			           mid.group_id = hu.group_id
+			           and mid.hos_id = hu.hos_id
+			           and mid.unit_code = hu.unit_code
+			           and hu.is_stop = 0
+			      left join mat_type_dict mtd
+			      on
+			           mid.group_id = mtd.group_id
+			           and mid.hos_id = mtd.hos_id
+			           and mid.copy_code = mtd.copy_code
+			           and mid.mat_type_id = mtd.mat_type_id
+			           and mid.mat_type_no = mtd.mat_type_no
+			           and mtd.is_stop = 0
+			     left join hos_fac_dict hfd
+					on hfd.group_id=mid.group_id
+					and hfd.hos_id=mid.hos_id
+					and hfd.fac_id=mid.fac_id
+					and hfd.is_stop=0
+					and hfd.is_mat=1
+				left join hos_store_dict hstd
+					on hstd.group_id=mao.group_id
+					and hstd.hos_id=mao.hos_id
+					and hstd.store_id=mao.store_id
+					and hstd.is_stop=0
+					and hstd.is_mat=1
+			    left join (
+				   select distinct
+				     maid.group_id,maid.hos_id,maid.copy_code,
+				     maid.inv_id,maid.batch_no,maid.batch_sn,
+				     maid.bar_code,maid.price,hsud.sup_name ,hsud.sup_id
+				  from mat_affi_in mai
+				  left join mat_affi_in_detail maid
+				  on maid.group_id=mai.group_id
+				  and maid.hos_id=mai.hos_id
+				  and maid.copy_code=mai.copy_code
+				  and maid.in_id=mai.in_id
+				  left join hos_sup_dict hsud
+				  on hsud.group_id=mai.group_id
+				  and hsud.hos_id=mai.hos_id
+				  and hsud.sup_id=mai.sup_id
+				  and hsud.is_stop=0
+				  and hsud.is_mat=1
+				  where mai.bus_type_code in (1,27)
+				) sup 
+				on maod.group_id=sup.group_id
+				and maod.hos_id=sup.hos_id
+				and maod.copy_code=sup.copy_code
+				and maod.inv_id=sup.inv_id
+				and maod.batch_no=sup.batch_no
+				and maod.batch_sn=sup.batch_sn
+				and maod.bar_code=sup.bar_code
+				and maod.price=sup.price
+				
+				left join mat_affi_tran_rela matr
+		        on matr.group_id=mao.group_id
+		        and matr.hos_id=mao.hos_id
+		        and matr.copy_code=mao.copy_code
+		        and matr.out_id=mao.out_id
+		        left join mat_affi_in mai
+		        on mai.group_id=matr.group_id
+		        and mai.hos_id=matr.hos_id
+		        and mai.copy_code=matr.copy_code
+		        and mai.in_id=matr.in_id
+		        left join hos_store_dict in_store
+		        on in_store.group_id=mai.group_id
+		        and in_store.hos_id=mai.hos_id
+		        and in_store.store_id=mai.store_id
+		        and in_store.is_stop=0
+					
+			    <where>
+			       mao.state=3
+			       and to_char(mid.mat_type_id) in ( 
+			       select vus.perm_code from v_user_data_perm vus
+			        where vus.group_id =  #{group_id,jdbcType=INTEGER}
+			        and vus.hos_id = #{hos_id,jdbcType=INTEGER}
+			        and vus.table_code = 'MAT_TYPE_DICT'
+			        <if test="user_id !=null and user_id !='' ">
+						and vus.user_id = #{user_id,jdbcType=INTEGER}
+					</if>
+			        and vus.is_read = 1
+			        and vus.is_write = 1 
+			        )
+			    <if test="agent_name!=null and agent_name!=''">
+					and mid.agent_name like '%${agent_name}%'
+				</if>    
+	      		<if test="group_id != null and group_id != ''">
+		           and mao.group_id = #{group_id}
+	      		</if>
+	      		<if test="hos_id != null and hos_id != ''">
+		           and mao.hos_id = #{hos_id}
+	      		</if>
+	      		<if test="copy_code != null and copy_code != '' ">
+		           and mao.copy_code = #{copy_code}
+	      		</if>
+	      		<if test="begin_confirm_date != null and begin_confirm_date != '' and end_confirm_date != null and end_confirm_date != '' ">
+		           and mao.confirm_date between to_date(#{begin_confirm_date},'yyyy/MM/dd') and to_date(#{end_confirm_date},'yyyy/MM/dd')
+	      		</if>
+	      		<if test="begin_out_date != null and begin_out_date != '' and end_out_date != null and end_out_date != '' ">
+	      		   and mao.out_date between to_date(#{begin_out_date},'yyyy/MM/dd') and to_date(#{end_out_date},'yyyy/MM/dd')
+	      		</if>
+				<!-- 只显示有权限的库房信息 -->
+				and to_char(mao.store_id) in (
+					select perm_code from v_user_data_perm  
+					where group_id = #{group_id,jdbcType=INTEGER}
+						and hos_id = #{hos_id,jdbcType=INTEGER}
+						and table_code = 'HOS_STORE_DICT'
+						and user_id = #{user_id,jdbcType=INTEGER}
+						and is_read = 1 and is_write = 1 
+				)
+	      		<if test="store_id != null and store_id != '' ">
+		           and mao.store_id = #{store_id}
+	      		</if>
+	      		<if test="store_no != null and store_no != '' ">
+		           and mao.store_no = #{store_no}
+	      		</if>
+	      		<if test="mat_type_id != null and mat_type_id != '' ">
+		           and mtd.mat_type_id in ${mat_type_id}
+	      		</if>
+	      		<if test="mat_type_no != null and mat_type_no != '' ">
+		           and mtd.mat_type_no = #{mat_type_no}
+	      		</if>
+	      		<if test="dept_id != null and dept_id != '' ">
+		           and mao.dept_id = #{dept_id}
+	      		</if>
+	      		<if test="dept_no != null and dept_no != '' ">
+		           and mao.dept_no = #{dept_no}
+	      		</if>
+	      		<if test="is_charge != null and is_charge != '' ">
+		           and mid.is_charge = #{is_charge}
+	      		</if>
+	      		<if test="inv_id != null and inv_id != '' ">
+				and  (
+				    mid.inv_id  like '%${inv_id}%'
+					or mid.inv_code like '%${inv_id}%'
+					or upper(mid.inv_name) like '%${inv_id}%'
+				    or upper(mid.inv_model) like '%${inv_id}%'
+					or upper(mid.spell_code) like '%${inv_id}%'
+					or upper(mid.wbx_code) like '%${inv_id}%'
+					or upper(mid.spell_code) like '%${inv_id}%'
+					or lower(mid.spell_code) like '%${inv_id}%'
+					or lower(mid.wbx_code) like '%${inv_id}%'
+					or lower(mid.inv_name) like '%${inv_id}%'
+			      )  
+		           
+	      		</if>
+	      		<if test="inv_no != null and inv_no != '' ">
+		           and maod.inv_no = #{inv_no}
+	      		</if>
+	      		<if test="out_no != null and out_no != '' ">
+		           and mao.out_no like '%${out_no}%'
+	      		</if>
+	      		<if test="inv_model != null and inv_model != ''">
+				and (mid.inv_model like '%${inv_model}%'
+				 or mid.inv_name like '%${inv_model}%'
+			         or mid.inv_code like '%${inv_model}%'
+				     or upper(mid.spell_code) like '%${inv_model}%'
+				     or upper(mid.wbx_code) like '%${inv_model}%'
+				     or lower(mid.spell_code) like '%${inv_model}%'
+				     or lower(mid.wbx_code) like '%${inv_model}%'
+				     )
+				</if>
+				<if test="sup_id!=null and sup_id!=''">
+					and sup.sup_id=#{sup_id}
+				</if>
+				<if test='set_or_store_id!=null and set_or_store_id!="" and set_or_store!=null and set_or_store=="1"'>
+					and mao.store_id =#{set_or_store_id}
+				</if>
+				<if test='set_or_store_id!=null and set_or_store_id!="" and (set_or_store==null or set_or_store!="1")'>
+					and mao.store_id in (
+						select mss.store_id
+						from mat_store_detail mss
+						where mss.set_id=#{set_or_store_id}
+					)
+				</if>
+				
+				    and mao.bus_type_code='32'
+				
+				
+	     </where>
+	     group by
+	       mao.group_id,mao.hos_id,mao.copy_code,in_store.store_name,mid.inv_code,
+	          mid.inv_name,mid.inv_model,hu.unit_code,hu.unit_name,maod.price,
+	          mtd.mat_type_code,mtd.mat_type_name,maod.inv_id,
+	          maod.inv_no,mao.store_id,hfd.fac_name,hstd.store_name,sup.sup_name,mid.agent_name
+		  	</if>
+		),
+		temp as (
+		 select 
+		        group_id,hos_id,copy_code,dept_name,to_char(inv_code) as inv_code,
+		        inv_name,inv_model,unit_code,unit_name,price,
+		        amount,amount_money,mat_type_code,mat_type_name,inv_id,
+		        inv_no,store_id,fac_name,store_name,sup_name,agent_name
+	     from temp1
+		 order by store_name,inv_name
+		)
+		select 
+		        group_id,hos_id,copy_code,dept_name,to_char(inv_code) as inv_code,
+		        inv_name,inv_model,unit_code,unit_name,price,
+		        amount,amount_money,mat_type_code,mat_type_name,inv_id,
+		        inv_no,store_id,fac_name,store_name,sup_name,agent_name
+	    from temp
+		union all
+		select null,null,null,null,'合计',
+		       null,null,null,null,null,
+		       sum(amount),sum(amount_money),null,null,null,
+		       null,null,null,null,null,null
+		from temp     
+	</select>
+	
+	<!-- 
+		2016/12/21 lxj
+		代销:出库明细-供应商信息 
+	-->
+	<select id="queryMatAffiOutSupMessage" parameterType="java.util.Map" resultMap="matAffiOutDetailMap">
+		with temp as(
+			select mid.inv_id,mid.inv_no,mid.in_no,mim.in_date,hsd.sup_name,maod.amount,maod.price,maod.amount_money
+			from mat_affi_out_detail maod
+			left join mat_affi_in_detail mid
+			on
+			     maod.group_id = mid.group_id
+			     and maod.hos_id = mid.hos_id
+			     and maod.copy_code = mid.copy_code
+			     and maod.inv_id = mid.inv_id
+			     and maod.batch_no = mid.batch_no
+			     and maod.batch_sn = mid.batch_sn
+			     and maod.bar_code = mid.bar_code
+			left join mat_affi_in mim
+			on
+			     mid.group_id = mim.group_id
+			     and mid.hos_id = mim.hos_id
+			     and mid.copy_code = mim.copy_code
+			     and mid.in_id = mim.in_id
+			left join hos_sup_dict hsd
+			on
+			     mim.group_id = hsd.group_id
+			     and mim.hos_id = hsd.hos_id
+			     and mim.sup_id = hsd.sup_id
+			     <if test="show_history == 1">
+				 and mim.sup_no = hsd.sup_no
+				</if>
+				<if test="show_history == 0">
+				 and hsd.is_stop = 0
+				</if>
+			where
+			     maod.group_id = #{group_id,jdbcType=INTEGER}
+			     and maod.hos_id = #{hos_id,jdbcType=INTEGER}
+			     and maod.copy_code = #{copy_code,jdbcType=VARCHAR}
+			     and maod.out_id = #{out_id,jdbcType=INTEGER}
+			     and maod.inv_id = #{inv_id,jdbcType=INTEGER}
+			     and mim.bus_type_code &lt;&gt; '12'
+			     and mim.store_id = #{store_id,jdbcType=INTEGER}
+				<!-- 只显示有权限的库房信息 -->
+				and mim.store_id in (
+					select perm_code from v_user_data_perm  
+					where group_id = #{group_id,jdbcType=INTEGER}
+						and hos_id = #{hos_id,jdbcType=INTEGER}
+						and table_code = 'HOS_STORE_DICT'
+						and user_id = #{user_id,jdbcType=INTEGER}
+						and is_read = 1 and is_write = 1 
+				)
+		)
+		select 
+			inv_id,inv_no,to_char(in_no) in_no,in_date,sup_name
+	      	,amount,price,amount_money
+		from temp 
+		union all
+		select 
+			null,null,to_char('合计') in_no,null,null,
+			sum(amount) as amount,null,sum(amount_money) as amount_money
+		from temp
+		
+	</select>
+	
+	<!-- 植入介入材料出库报表 -->
+	<select id="queryMatAffiOutImplant" parameterType="java.util.Map" resultType="java.util.Map" >
+		with d_tmp as (
+			 select 
+           maod.group_id,maod.hos_id,maod.copy_code,maod.out_id,maod.out_no,mao.out_date,mao.brief,hsd.store_code,hsd.store_name,
+			     mid.inv_code,mid.inv_name,mid.inv_model,hu.unit_name,maod.price,hfd.fac_name,
+			     mic.cert_code,maod.batch_no,mic.start_date,mic.end_date,maod.inva_date,mam.fac_date,hsdd.sup_code,hsdd.sup_name,
+          sum(maod.amount) amount, 
+          sum(maod.amount_money) amount_money
+        from  mat_affi_out mao
+        left join mat_affi_out_detail maod on maod.group_id = mao.group_id
+        and maod.hos_id = mao.hos_id
+        and maod.copy_code = mao.copy_code
+        and maod.out_id = mao.out_id 
+        left join hos_store_dict hsd on mao.group_id = hsd.group_id
+        and mao.hos_id = hsd.hos_id
+        and mao.store_id = hsd.store_id
+        and mao.store_no = hsd.store_no 
+        left join mat_inv_dict mid on maod.group_id = mid.group_id
+        and maod.hos_id = mid.hos_id
+        and maod.copy_code = mid.copy_code
+        and maod.inv_id = mid.inv_id
+        and maod.inv_no = mid.inv_no 
+        left join hos_fac_dict hfd on mid.group_id = hfd.group_id
+        and mid.hos_id = hfd.hos_id
+        and mid.fac_id = hfd.fac_id
+        and mid.fac_no = hfd.fac_no 
+        left join hos_unit hu on mid.group_id = hu.group_id
+        and mid.hos_id = hu.hos_id
+        and mid.unit_code = hu.unit_code
+        and hu.is_stop = 0 
+       left join mat_affi_in_detail mam on maod.group_id = mam.group_id
+        and maod.hos_id = mam.hos_id
+        and maod.copy_code = mam.copy_code
+        and maod.inv_id = mam.inv_id
+        and maod.inv_no = mam.inv_no
+        and maod.batch_no = mam.batch_no
+        and maod.batch_sn = mam.batch_sn
+        and maod.bar_code = mam.bar_code 
+        and maod.price = mam.price
+        left join mat_affi_in mai on mam.group_id = mai.group_id
+        and mam.hos_id = mai.hos_id
+        and mam.copy_code = mai.copy_code
+        and mam.in_id = mai.in_id
+        
+       left join hos_sup_dict hsdd on maod.group_id = hsdd.group_id
+        and maod.hos_id = hsdd.hos_id
+        and maod.sup_id = hsdd.sup_id
+        and maod.sup_no = hsdd.sup_no 
+        
+     left join (
+     	select group_id, hos_id, copy_code, inv_id, max(cert_id) cert_id
+     	from mat_inv_cert_rela
+     	group by group_id, hos_id, copy_code, inv_id
+     ) micr on maod.group_id = micr.group_id
+      and maod.hos_id = micr.hos_id
+      and maod.copy_code = micr.copy_code
+      and maod.inv_id = micr.inv_id
+     
+          left join mat_inv_cert mic on micr.group_id = mic.group_id
+        and micr.hos_id = mic.hos_id
+        and micr.copy_code = mic.copy_code
+        and micr.cert_id = mic.cert_id
+     
+			<where>
+				<if test="group_id !=null and group_id !='' ">
+					and maod.group_id = #{group_id,jdbcType=INTEGER}
+				</if>
+				<if test="hos_id !=null and hos_id !='' ">
+					and maod.hos_id = #{hos_id,jdbcType=INTEGER}
+				</if>
+				<if test="copy_code !=null and copy_code !='' ">
+					and maod.copy_code = #{copy_code,jdbcType=VARCHAR}
+				</if>
+				<if test="state !=null and state !='' ">
+					and mao.state = #{state,jdbcType=INTEGER}
+				</if>
+				<if test="sup_id !=null and sup_id !='' ">
+					and maod.sup_id = #{sup_id,jdbcType=INTEGER}
+				</if>
+				<!-- 只显示有权限的库房信息 -->
+				and to_char(mao.store_id) in (
+					select perm_code from v_user_data_perm  
+					where group_id = #{group_id,jdbcType=INTEGER}
+						and hos_id = #{hos_id,jdbcType=INTEGER}
+						and table_code = 'HOS_STORE_DICT'
+						and user_id = #{user_id,jdbcType=INTEGER}
+						and is_read = 1 and is_write = 1 
+				)
+				<if test="store_id !=null and store_id !='' ">
+					and mao.store_id = #{store_id,jdbcType=INTEGER}
+				</if>
+				<if test="out_no !=null and out_no !='' ">
+					and mao.out_no like '${out_no}%'
+				</if>
+				<if test="inv_code != null and inv_code != ''">
+						and (
+							mid.inv_code like '%${inv_code}%' or 
+							mid.inv_name like '%${inv_code}%' or
+							mid.bid_code like '%${inv_code}%' or
+							mid.spell_code like '%${inv_code}%' or 
+							mid.wbx_code like '%${inv_code}%' or
+							mid.alias like '%${inv_code}%'
+						)
+				</if>
+				<if test="is_involved !=null and is_involved !='' ">
+					and mid.is_involved = #{is_involved,jdbcType=INTEGER}
+				</if>
+				<if test="is_implant !=null and is_implant !='' ">
+					and mid.is_implant = #{is_implant,jdbcType=INTEGER}
+				</if>
+				<if test="begin_date != null and begin_date !='' and end_date != null and end_date !='' ">
+					and to_char(mao.out_date,'yyyy-MM-dd') between #{begin_date} and #{end_date}
+				</if>
+				     <!-- and mai.bus_type_code = '27' -->
+				       and mao.bus_type_code=28
+			</where>
+			  group by   maod.group_id,maod.hos_id,maod.copy_code,maod.out_id,maod.out_no,mao.out_date,mao.brief,hsd.store_code,hsd.store_name,
+			     mid.inv_code,mid.inv_name,mid.inv_model,hu.unit_name,maod.price,hfd.fac_name,
+			     mic.cert_code,maod.batch_no,mic.start_date,mic.end_date,maod.inva_date,mam.fac_date,hsdd.sup_code,hsdd.sup_name
+		),s_tmp as (
+	        select  null group_id,null hos_id,null copy_code,null out_id,'合计' out_no,null out_date,null brief,null store_code,null store_name,
+	            null inv_code,null inv_name,null inv_model,null unit_name,null price,null amount,null fac_date,null sup_code,null sup_name,
+	            sum(amount_money) amount_money,null fac_name,null cert_code,null batch_no,null start_date,null end_date,null inva_date
+	        from d_tmp
+	    )
+	  
+	    select group_id,hos_id,copy_code,out_no,out_id,out_date,sup_code,sup_name,inv_code,inv_name,
+	          inv_model,unit_name,price,amount,amount_money,batch_no,inva_date,
+	          cert_code,start_date,end_date,fac_name,brief,fac_date
+	    from (
+	          select group_id,hos_id,to_char(copy_code) as copy_code,out_id,to_char(out_no) as out_no,out_date,sup_code,sup_name,inv_code,inv_name,inv_model,unit_name,
+	            	price,amount,amount_money,fac_date,batch_no,inva_date,cert_code,start_date,end_date,fac_name,brief
+	          from d_tmp
+	          union all
+	          select  group_id,hos_id,to_char(copy_code) as copy_code,out_id,out_no,out_date,sup_code,sup_name,inv_code,inv_name,inv_model,unit_name,
+	            	price,amount,amount_money,fac_date,batch_no,inva_date,cert_code,start_date,end_date,fac_name,brief
+	          from s_tmp
+	      )  cc
+	      order by cc.out_date, cc.out_no,  cc.inv_code
+	</select>
+	
+	
+	<!-- 打印 -->
+	<select id="queryMatApplyCountPrint" parameterType="java.util.Map" resultType="java.util.Map" >
+		with d_tmp as (
+			 select 
+           maod.group_id,maod.hos_id,maod.copy_code,maod.out_id,maod.out_no,mao.out_date,mao.brief,hsd.store_code,hsd.store_name,
+			     mid.inv_code,mid.inv_name,mid.inv_model,hu.unit_name,maod.price,hfd.fac_name,
+			     micr.cert_code,maod.batch_no,mic.start_date,mic.end_date,maod.inva_date,mam.fac_date,hsdd.sup_code,hsdd.sup_name,
+          sum(maod.amount) amount, 
+          sum(maod.amount_money) amount_money
+        from  mat_affi_out mao
+        left join mat_affi_out_detail maod on maod.group_id = mao.group_id
+        and maod.hos_id = mao.hos_id
+        and maod.copy_code = mao.copy_code
+        and maod.out_id = mao.out_id 
+        left join hos_store_dict hsd on mao.group_id = hsd.group_id
+        and mao.hos_id = hsd.hos_id
+        and mao.store_id = hsd.store_id
+        and mao.store_no = hsd.store_no 
+        left join mat_inv_dict mid on maod.group_id = mid.group_id
+        and maod.hos_id = mid.hos_id
+        and maod.copy_code = mid.copy_code
+        and maod.inv_id = mid.inv_id
+        and maod.inv_no = mid.inv_no 
+        left join hos_fac_dict hfd on mid.group_id = hfd.group_id
+        and mid.hos_id = hfd.hos_id
+        and mid.fac_id = hfd.fac_id
+        and mid.fac_no = hfd.fac_no 
+        left join hos_unit hu on mid.group_id = hu.group_id
+        and mid.hos_id = hu.hos_id
+        and mid.unit_code = hu.unit_code
+        and hu.is_stop = 0 
+       left join mat_affi_in_detail mam on maod.group_id = mam.group_id
+        and maod.hos_id = mam.hos_id
+        and maod.copy_code = mam.copy_code
+        and maod.inv_id = mam.inv_id
+        and maod.inv_no = mam.inv_no
+        and maod.batch_no = mam.batch_no
+        and maod.batch_sn = mam.batch_sn
+        and maod.bar_code = mam.bar_code 
+        and maod.price = mam.price
+        left join mat_affi_in mai on mam.group_id = mai.group_id
+        and mam.hos_id = mai.hos_id
+        and mam.copy_code = mai.copy_code
+        and mam.in_id = mai.in_id
+        
+       left join hos_sup_dict hsdd on maod.group_id = hsdd.group_id
+        and maod.hos_id = hsdd.hos_id
+        and maod.sup_id = hsdd.sup_id
+        and maod.sup_no = hsdd.sup_no 
+        
+     left join mat_inv_cert_rela micr on maod.group_id = micr.group_id
+      and maod.hos_id = micr.hos_id
+      and maod.copy_code = micr.copy_code
+      and maod.inv_id = micr.inv_id
+     
+          left join mat_inv_cert mic on micr.group_id = mic.group_id
+        and micr.hos_id = mic.hos_id
+        and micr.copy_code = mic.copy_code
+        and micr.cert_id = mic.cert_id
+     
+			<where>
+				<if test="group_id !=null and group_id !='' ">
+					and maod.group_id = #{group_id,jdbcType=INTEGER}
+				</if>
+				<if test="hos_id !=null and hos_id !='' ">
+					and maod.hos_id = #{hos_id,jdbcType=INTEGER}
+				</if>
+				<if test="copy_code !=null and copy_code !='' ">
+					and maod.copy_code = #{copy_code,jdbcType=VARCHAR}
+				</if>
+				<if test="state !=null and state !='' ">
+					and mao.state = #{state,jdbcType=INTEGER}
+				</if>
+				<if test="sup_id !=null and sup_id !='' ">
+					and maod.sup_id = #{sup_id,jdbcType=INTEGER}
+				</if>
+				<!-- 只显示有权限的库房信息 -->
+				and to_char(mao.store_id) in (
+					select perm_code from v_user_data_perm  
+					where group_id = #{group_id,jdbcType=INTEGER}
+						and hos_id = #{hos_id,jdbcType=INTEGER}
+						and table_code = 'HOS_STORE_DICT'
+						and user_id = #{user_id,jdbcType=INTEGER}
+						and is_read = 1 and is_write = 1 
+				)
+				<if test="store_id !=null and store_id !='' ">
+					and mao.store_id = #{store_id,jdbcType=INTEGER}
+				</if>
+				<if test="out_no !=null and out_no !='' ">
+					and mao.out_no like '${out_no}%'
+				</if>
+				<if test="inv_code != null and inv_code != ''">
+						and (
+							mid.inv_code like '%${inv_code}%' or 
+							mid.inv_name like '%${inv_code}%' or
+							mid.bid_code like '%${inv_code}%' or
+							mid.spell_code like '%${inv_code}%' or 
+							mid.wbx_code like '%${inv_code}%' or
+							mid.alias like '%${inv_code}%'
+						)
+				</if>
+				<if test="is_involved !=null and is_involved !='' ">
+					and mid.is_involved = #{is_involved,jdbcType=INTEGER}
+				</if>
+				<if test="is_implant !=null and is_implant !='' ">
+					and mid.is_implant = #{is_implant,jdbcType=INTEGER}
+				</if>
+				<if test="begin_date != null and begin_date !='' and end_date != null and end_date !='' ">
+					and to_char(mao.out_date,'yyyy-MM-dd') between #{begin_date} and #{end_date}
+				</if>
+				     and mai.bus_type_code = '27'
+			</where>
+			  group by   maod.group_id,maod.hos_id,maod.copy_code,maod.out_id,maod.out_no,mao.out_date,mao.brief,hsd.store_code,hsd.store_name,
+			     mid.inv_code,mid.inv_name,mid.inv_model,hu.unit_name,maod.price,hfd.fac_name,
+			     micr.cert_code,maod.batch_no,mic.start_date,mic.end_date,maod.inva_date,mam.fac_date,hsdd.sup_code,hsdd.sup_name
+		),s_tmp as (
+	        select  null group_id,null hos_id,null copy_code,null out_id,'合计' out_no,null out_date,null brief,null store_code,null store_name,
+	            null inv_code,null inv_name,null inv_model,null unit_name,null price,null amount,null fac_date,null sup_code,null sup_name,
+	            sum(amount_money) amount_money,null fac_name,null cert_code,null batch_no,null start_date,null end_date,null inva_date
+	        from d_tmp
+	    )
+	  
+	    select group_id,hos_id,copy_code,out_no,out_id,out_date,sup_code,sup_name,inv_code,inv_name,
+	          inv_model,unit_name,price,amount,amount_money,batch_no,inva_date,
+	          cert_code,start_date,end_date,fac_name,brief,fac_date
+	    from (
+	          select group_id,hos_id,to_char(copy_code) as copy_code,out_id,to_char(out_no) as out_no,out_date,sup_code,sup_name,inv_code,inv_name,inv_model,unit_name,
+	            	price,amount,amount_money,fac_date,batch_no,inva_date,cert_code,start_date,end_date,fac_name,brief
+	          from d_tmp
+	          union all
+	          select  group_id,hos_id,to_char(copy_code) as copy_code,out_id,out_no,out_date,sup_code,sup_name,inv_code,inv_name,inv_model,unit_name,
+	            	price,amount,amount_money,fac_date,batch_no,inva_date,cert_code,start_date,end_date,fac_name,brief
+	          from s_tmp
+	      )  cc
+	      order by cc.out_date, cc.out_no,  cc.inv_code
+	</select>
+	<!-- 材料库存分布查询(供应商) -->
+	<select id="queryMatAffiStockRoutingBySup" parameterType="java.util.Map" resultType="java.util.Map" >
+		with temp_re as( select  
+tem7.store_code,		
+tem7.store_name,
+tem8.sup_name,
+tem6.bid_code,
+tem1.inv_id, 
+tem6.inv_code,
+tem6.inv_name,
+tem6.inv_model,
+tem9.unit_name,
+tem1.batch_no,
+tem1.price,
+sum(nvl(tem2.bf_amount, 0) - nvl(tem3.bf_amount, 0)) as last_hold,
+sum(nvl(tem4.bf_amount, 0)) as in_amount,
+sum(nvl(tem5.bf_amount, 0)) as out_amount,
+sum(nvl(tem2.bf_amount, 0) - nvl(tem3.bf_amount, 0) + nvl(tem4.bf_amount, 0) - nvl(tem5.bf_amount, 0)) as this_hold
+
+from 
+(
+select distinct a.store_id,a.sup_id,b.inv_id,b.batch_no,b.batch_sn,b.price from mat_affi_in a
+left join mat_affi_in_detail b 
+on a.in_id=b.in_id
+where a.store_id=#{store_id,jdbcType=INTEGER}
+and a.group_id=#{group_id,jdbcType=INTEGER}
+and a.hos_id=#{hos_id,jdbcType=INTEGER}
+and a.copy_code=#{copy_code,jdbcType=VARCHAR}
+<if test="batch_no !=null and batch_no !='' ">
+	and b.batch_no = #{batch_no,jdbcType=VARCHAR}
+</if>
+and a.state>=3
+<if test="sup_id !=null and sup_id !='' ">
+					and a.sup_id = #{sup_id,jdbcType=INTEGER}
+</if>
+and a.confirm_date &lt; = to_date(#{end_confirm_date},'yyyy-MM-dd') 
+) tem1
+left join 
+(
+select a.store_id,b.inv_id,b.batch_no,b.batch_sn,b.price,sum(b.amount) bf_amount from mat_affi_in a
+left join mat_affi_in_detail b 
+on a.in_id=b.in_id
+where a.store_id=#{store_id,jdbcType=INTEGER}
+and a.group_id=#{group_id,jdbcType=INTEGER}
+and a.hos_id=#{hos_id,jdbcType=INTEGER}
+and a.copy_code=#{copy_code,jdbcType=VARCHAR}
+and a.state>=3
+<if test="batch_no !=null and batch_no !='' ">
+	and b.batch_no = #{batch_no,jdbcType=VARCHAR}
+</if>
+<if test="sup_id !=null and sup_id !='' ">
+					and a.sup_id = #{sup_id,jdbcType=INTEGER}
+</if>
+and a.confirm_date &lt;  to_date(#{begin_confirm_date},'yyyy-MM-dd') 
+group by a.store_id,b.inv_id,b.batch_no,b.batch_sn,b.price
+) tem2 
+ on tem1.store_id=tem2.store_id
+and tem1.inv_id=tem2.inv_id
+and tem1.batch_no=tem2.batch_no
+and tem1.batch_sn=tem2.batch_sn
+and tem1.price=tem2.price
+left join 
+(
+select a.store_id,b.inv_id,b.batch_no,b.batch_sn,b.price,sum(b.amount) bf_amount from mat_affi_out a
+left join mat_affi_out_detail b 
+on a.out_id=b.out_id
+where a.store_id=#{store_id,jdbcType=INTEGER}
+and a.group_id=#{group_id,jdbcType=INTEGER}
+and a.hos_id=#{hos_id,jdbcType=INTEGER}
+and a.copy_code=#{copy_code,jdbcType=VARCHAR}
+and a.state>=3
+<if test="batch_no !=null and batch_no !='' ">
+	and b.batch_no = #{batch_no,jdbcType=VARCHAR}
+</if>
+and a.confirm_date &lt;  to_date(#{begin_confirm_date},'yyyy-MM-dd') 
+group by a.store_id,b.inv_id,b.batch_no,b.batch_sn,b.price
+) tem3
+ on tem1.store_id=tem3.store_id
+and tem1.inv_id=tem3.inv_id
+and tem1.batch_no=tem3.batch_no
+and tem1.batch_sn=tem3.batch_sn
+and tem1.price=tem3.price
+left join 
+(
+select a.store_id,b.inv_id,b.batch_no,b.batch_sn,b.price,sum(b.amount) bf_amount from mat_affi_in a
+left join mat_affi_in_detail b 
+on a.in_id=b.in_id
+where a.store_id=#{store_id,jdbcType=INTEGER}
+and a.group_id=#{group_id,jdbcType=INTEGER}
+and a.hos_id=#{hos_id,jdbcType=INTEGER}
+and a.copy_code=#{copy_code,jdbcType=VARCHAR}
+and a.state>=3
+<if test="batch_no !=null and batch_no !='' ">
+	and b.batch_no = #{batch_no,jdbcType=VARCHAR}
+</if>
+<if test="sup_id !=null and sup_id !='' ">
+					and a.sup_id = #{sup_id,jdbcType=INTEGER}
+</if>
+and a.confirm_date between to_date(#{begin_confirm_date},'yyyy-MM-dd') and  to_date(#{end_confirm_date},'yyyy-MM-dd')
+group by a.store_id,b.inv_id,b.batch_no,b.batch_sn,b.price
+) tem4
+ on tem1.store_id=tem4.store_id
+and tem1.inv_id=tem4.inv_id
+and tem1.batch_no=tem4.batch_no
+and tem1.batch_sn=tem4.batch_sn
+and tem1.price=tem4.price
+left join 
+(
+select a.store_id,b.inv_id,b.batch_no,b.batch_sn,b.price,sum(b.amount) bf_amount from mat_affi_out a
+left join mat_affi_out_detail b 
+on a.out_id=b.out_id
+where a.store_id=#{store_id,jdbcType=INTEGER}
+and a.group_id=#{group_id,jdbcType=INTEGER}
+and a.hos_id=#{hos_id,jdbcType=INTEGER}
+and a.copy_code=#{copy_code,jdbcType=VARCHAR}
+and a.state>=3
+<if test="batch_no !=null and batch_no !='' ">
+	and b.batch_no = #{batch_no,jdbcType=VARCHAR}
+</if>
+and a.confirm_date between to_date(#{begin_confirm_date},'yyyy-MM-dd') and  to_date(#{end_confirm_date},'yyyy-MM-dd')
+group by a.store_id,b.inv_id,b.batch_no,b.batch_sn,b.price
+) tem5 
+ on tem1.store_id=tem5.store_id
+and tem1.inv_id=tem5.inv_id
+and tem1.batch_no=tem5.batch_no
+and tem1.batch_sn=tem5.batch_sn
+and tem1.price=tem5.price
+left join mat_inv tem6
+on tem6.group_id=#{group_id,jdbcType=INTEGER}
+and tem6.hos_id=#{hos_id,jdbcType=INTEGER}
+and tem6.copy_code=#{copy_code,jdbcType=VARCHAR}
+and tem1.inv_id=tem6.inv_id
+left join hos_store tem7
+on tem7.group_id=#{group_id,jdbcType=INTEGER}
+and tem7.hos_id=#{hos_id,jdbcType=INTEGER}
+and tem1.store_id=tem7.store_id
+left join hos_sup tem8 
+on tem8.group_id=#{group_id,jdbcType=INTEGER}
+and tem8.hos_id=#{hos_id,jdbcType=INTEGER}
+and tem1.sup_id=tem8.sup_id
+left join hos_unit tem9
+on  tem9.group_id=#{group_id,jdbcType=INTEGER}
+and tem9.hos_id=#{hos_id,jdbcType=INTEGER}
+and tem6.unit_code=tem9.unit_code
+where 
+1=1
+
+<if test="inv_code != null and inv_code != ''">
+				and (
+					tem6.inv_code like '%${inv_code}%' or 
+					tem6.inv_name like '%${inv_code}%' or
+					tem6.bid_code like '%${inv_code}%' or
+					tem6.spell_code like '%${inv_code}%' or 
+					tem6.wbx_code like '%${inv_code}%' or
+					tem6.alias like '%${inv_code}%'
+				)
+</if>
+
+group by 
+tem7.store_code,
+tem7.store_name,
+tem8.sup_name,
+tem6.bid_code,
+tem1.inv_id, 
+tem6.inv_code,
+tem6.inv_name,
+tem6.inv_model,
+tem9.unit_name,
+tem1.batch_no,
+tem1.price
+order by tem7.store_code,tem6.inv_code	
+)	
+
+select to_char(store_code) as store_code,
+       to_char(store_name) as store_name,
+       to_char(sup_name) as sup_name,
+       to_char(bid_code) as bid_code,
+       to_char(inv_id) as inv_id,
+       to_char(inv_code) as inv_code,
+       to_char(inv_name) as inv_name,
+       to_char(inv_model) as inv_model,
+       to_char(unit_name) as unit_name,
+       to_char(batch_no) as batch_no ,
+       to_char(price) as price,
+       last_hold,
+       in_amount,
+       out_amount,
+       this_hold
+  from temp_re
+union all
+select '' as store_code,
+       '' as store_name,
+       to_char('合计') as sup_name,
+       '' as bid_code,
+       '' as inv_id,
+       '' as inv_code,
+       '' as inv_name,
+       '' as inv_model,
+       '' as unit_name,
+       '' as batch_no,
+       '' as price,
+       sum(last_hold) as last_hold,
+       sum(in_amount) as in_amount,
+       sum(out_amount) as out_amount,
+       sum(this_hold) as this_hold
+  from temp_re
+	</select>
+	
+		<!-- 代销入库台账查询 -->
+	<select id="queryMatAffiOutCertDetail" parameterType="java.util.Map" resultType="java.util.Map" >
+		select group_id,hos_id,copy_code,in_id,in_no,in_date,bus_type_name,sup_code,sup_name,inv_code,inv_name,
+			inv_model,unit_code,unit_name,price,amount,amount_money,fac_date,batch_no,inva_date,
+			disinfect_no,stocker,stocker_name,examiner_name,cert_code,start_date,end_date,fac_code,fac_name,
+			product_no,pcert_start_date,pcert_end_date,business_no,cert_start_date,cert_end_date
+		from (
+			select mim.group_id,mim.hos_id,mim.copy_code,mim.in_id,mim.in_no,mim.in_date,mbt.bus_type_name,--bb.order_date,
+				hsd.sup_code,hsd.sup_name,mdd.inv_code,mdd.inv_name,
+		       	mdd.inv_model,mdd.unit_code,hu.unit_name,mid.price,mid.amount,mid.amount_money,mid.fac_date,mid.batch_no,mid.inva_date,
+		        mid.disinfect_no,mim.stocker,hed.emp_name stocker_name,mim.examiner,hd.emp_name examiner_name,
+		        mic.cert_code,mic.start_date,mic.end_date,hfd.fac_code,hfd.fac_name,
+		        hsp.product_no,hsp.cert_start_date pcert_start_date,hsp.cert_end_date pcert_end_date,
+		        hsbb.business_no,hsbb.cert_start_date,hsbb.cert_end_date
+			from MAT_AFFI_IN_DETAIL  mid
+			left join MAT_AFFI_IN mim on mid.group_id=mim.group_id and mid.hos_id=mim.hos_id and mid.copy_code=mim.copy_code
+			     and mid.in_id=mim.in_id
+			join hos_sup_dict hsd on mim.group_id=hsd.group_id and mim.hos_id=hsd.hos_id and mim.sup_id=hsd.sup_id 
+				<if test="show_history == 1">
+		       		and mim.sup_no=hsd.sup_no
+		      	</if>
+		      	<if test="show_history == 0">
+		        	and hsd.is_stop=0
+		      	</if>
+			left join mat_inv_dict mdd on mid.group_id=mdd.group_id and mid.hos_id=mdd.hos_id and mid.copy_code=mdd.copy_code
+			     and mid.inv_id=mdd.inv_id 
+		       	 and mid.inv_no=mdd.inv_no
+			left join hos_unit hu on mdd.group_id=hu.group_id and mdd.hos_id=hu.hos_id and mdd.unit_code=hu.unit_code and hu.is_stop=0
+			left join hos_emp_dict hed on mim.group_id=hed.group_id and mim.hos_id=hed.hos_id and mim.stocker=hed.emp_id
+			     and hed.is_stop=0
+			left join hos_emp_dict hd on mim.group_id=hd.group_id and mim.hos_id=hd.hos_id and mim.examiner=hd.emp_id
+			     and hd.is_stop=0
+			left join mat_inv_cert mic on mid.group_id = mic.group_id and mid.hos_id=mic.hos_id and mid.copy_code=mic.copy_code
+			     and mid.cert_id=mic.cert_id 
+			left join hos_fac_dict hfd on mdd.group_id=hfd.group_id and mdd.hos_id=hfd.hos_id and mdd.fac_id=hfd.fac_id
+			     and mdd.fac_no = hfd.fac_no
+			left join mat_bus_type mbt on mbt.bus_type_code=mim.bus_type_code
+			left join hos_sup_product hsp on hsd.group_id=hsp.group_id and hsd.hos_id=hsp.hos_id
+           		 and hsd.sup_id=hsp.sup_id and mdd.fac_id=hsp.fac_id and hsp.cert_state =1 
+       		left join hos_sup_business hsbb on hsd.group_id=hsbb.group_id and hsd.hos_id=hsbb.hos_id
+           		 and hsd.sup_id =hsbb.sup_id  and hsbb.cert_state = 1
+			 <where>
+				<if test="group_id !=null and group_id !='' ">
+					and mim.group_id = #{group_id,jdbcType=INTEGER}
+				</if>
+				<if test="hos_id !=null and hos_id !='' ">
+					and mim.hos_id = #{hos_id,jdbcType=INTEGER}
+				</if>
+				<if test="copy_code !=null and copy_code !='' ">
+					and mim.copy_code = #{copy_code,jdbcType=VARCHAR}
+				</if>
+				<if test="state !=null and state !='' ">
+					and mim.state = #{state,jdbcType=INTEGER}
+				</if>
+				<!-- 只显示有权限的库房信息 -->
+				and to_char(mim.store_id) in (
+					select perm_code from v_user_data_perm  
+					where group_id = #{group_id,jdbcType=INTEGER}
+						and hos_id = #{hos_id,jdbcType=INTEGER}
+						and table_code = 'HOS_STORE_DICT'
+						and user_id = #{user_id,jdbcType=INTEGER}
+						and is_read = 1 and is_write = 1 
+				)
+				<if test="store_id !=null and store_id !='' ">
+					and mim.store_id = #{store_id,jdbcType=INTEGER}
+				</if>
+				<if test="sup_id !=null and sup_id !='' ">
+					and mim.sup_id = #{sup_id,jdbcType=INTEGER}
+				</if>
+				<if test="in_no !=null and in_no !='' ">
+					and mim.in_no like '${in_no}%'
+				</if>
+				<if test="inv_code != null and inv_code != ''">
+						and (
+							mdd.inv_code like '%${inv_code}%' or 
+							mdd.inv_name like '%${inv_code}%' or
+							mdd.inv_model like '%${inv_code}%' or
+							mdd.bid_code like '%${inv_code}%' or
+							mdd.spell_code like '%${inv_code}%' or 
+							mdd.wbx_code like '%${inv_code}%' or
+							mdd.alias like '%${inv_code}%'
+						)
+				</if>
+				<if test="begin_date != null and begin_date !='' and end_date != null and end_date !='' ">
+					and to_char(mim.in_date,'yyyy-MM-dd') between #{begin_date} and #{end_date}
+				</if>
+				and to_char(mdd.mat_type_id) in (
+					select perm_code from v_user_data_perm  
+					where group_id = #{group_id,jdbcType=INTEGER}
+						and hos_id = #{hos_id,jdbcType=INTEGER}
+						and table_code = 'MAT_TYPE_DICT'
+						and user_id = #{user_id,jdbcType=INTEGER}
+						and is_read = 1 and is_write = 1 
+				)
+			</where>
+			union all
+			select null group_id,null hos_id,null copy_code,null in_id,null in_no,null in_date,null bus_type_name,--bb.order_date,
+				null sup_code,null sup_name,null inv_code,null inv_name,
+		       	null inv_model,null unit_code,null unit_name,null price,null amount,sum(mid.amount_money) amount_money,
+		       	null fac_date,null batch_no,null inva_date,
+		        null disinfect_no,null stocker, null  stocker_name,null examiner,null examiner_name,
+		        null cert_code,null start_date,null end_date,null fac_code,null fac_name,
+		        null product_no,null pcert_start_date,null pcert_end_date,null business_no,null cert_start_date,null cert_end_date
+			from MAT_AFFI_IN_DETAIL  mid
+			left join MAT_AFFI_IN mim on mid.group_id=mim.group_id and mid.hos_id=mim.hos_id and mid.copy_code=mim.copy_code
+			     and mid.in_id=mim.in_id
+			left join mat_inv_dict mdd on mid.group_id=mdd.group_id and mid.hos_id=mdd.hos_id and mid.copy_code=mdd.copy_code
+			     and mid.inv_id=mdd.inv_id 
+		       	and mid.inv_no=mdd.inv_no
+		      	
+			<where>
+				<if test="group_id !=null and group_id !='' ">
+					and mim.group_id = #{group_id,jdbcType=INTEGER}
+				</if>
+				<if test="hos_id !=null and hos_id !='' ">
+					and mim.hos_id = #{hos_id,jdbcType=INTEGER}
+				</if>
+				<if test="copy_code !=null and copy_code !='' ">
+					and mim.copy_code = #{copy_code,jdbcType=VARCHAR}
+				</if>
+				<if test="state !=null and state !='' ">
+					and mim.state = #{state,jdbcType=INTEGER}
+				</if>
+				
+				<if test="store_id !=null and store_id !='' ">
+					and mim.store_id = #{store_id,jdbcType=INTEGER}
+				</if>
+				<if test="sup_id !=null and sup_id !='' ">
+					and mim.sup_id = #{sup_id,jdbcType=INTEGER}
+				</if>
+				<if test="in_no !=null and in_no !='' ">
+					and mim.in_no like '${in_no}%'
+				</if>
+				<if test="inv_code != null and inv_code != ''">
+						and (
+							mdd.inv_code like '%${inv_code}%' or 
+							mdd.inv_name like '%${inv_code}%' or
+							mdd.bid_code like '%${inv_code}%' or
+							mdd.spell_code like '%${inv_code}%' or 
+							mdd.wbx_code like '%${inv_code}%' or
+							mdd.alias like '%${inv_code}%'
+						)
+				</if>
+				<if test="begin_date != null and begin_date !='' and end_date != null and end_date !='' ">
+					and to_char(mim.in_date,'yyyy-MM-dd') between #{begin_date} and #{end_date}
+				</if>
+				and to_char(mdd.mat_type_id) in (
+					select perm_code from v_user_data_perm  
+					where group_id = #{group_id,jdbcType=INTEGER}
+						and hos_id = #{hos_id,jdbcType=INTEGER}
+						and table_code = 'MAT_TYPE_DICT'
+						and user_id = #{user_id,jdbcType=INTEGER}
+						and is_read = 1 and is_write = 1 
+				)
+			</where>
+		)  cc
+		order by cc.in_date, cc.in_date,cc.in_id, cc.sup_code, cc.inv_code
+	</select>
+	
+		<!-- 代销入库台账打印 -->
+	<select id="queryMatAffiOutCertDetailPrint" parameterType="java.util.Map" resultType="java.util.Map" >
+		select group_id,hos_id,copy_code,in_id,in_no,in_date,bus_type_name,sup_code,sup_name,inv_code,inv_name,
+			inv_model,unit_code,unit_name,price,amount,amount_money,fac_date,batch_no,inva_date,
+			disinfect_no,stocker,stocker_name,examiner_name,cert_code,start_date,end_date,fac_code,fac_name
+		from (
+			select mim.group_id,mim.hos_id,mim.copy_code,mim.in_id,mim.in_no,mim.in_date,mbt.bus_type_name,--bb.order_date,
+				hsd.sup_code,hsd.sup_name,mdd.inv_code,mdd.inv_name,
+		       	mdd.inv_model,mdd.unit_code,hu.unit_name,mid.price,mid.amount,mid.amount_money,mid.fac_date,mid.batch_no,mid.inva_date,
+		        mid.disinfect_no,mim.stocker,hed.emp_name stocker_name,mim.examiner,hd.emp_name examiner_name,
+		        mic.cert_code,mic.start_date,mic.end_date,hfd.fac_code,hfd.fac_name
+			from MAT_AFFI_IN_DETAIL  mid
+			left join MAT_AFFI_IN mim on mid.group_id=mim.group_id and mid.hos_id=mim.hos_id and mid.copy_code=mim.copy_code
+			     and mid.in_id=mim.in_id
+			join hos_sup_dict hsd on mim.group_id=hsd.group_id and mim.hos_id=hsd.hos_id and mim.sup_id=hsd.sup_id 
+				<if test="show_history == 1">
+		       		and mim.sup_no=hsd.sup_no
+		      	</if>
+		      	<if test="show_history == 0">
+		        	and hsd.is_stop=0
+		      	</if>
+			left join mat_inv_dict mdd on mid.group_id=mdd.group_id and mid.hos_id=mdd.hos_id and mid.copy_code=mdd.copy_code
+			     and mid.inv_id=mdd.inv_id 
+		       	 and mid.inv_no=mdd.inv_no
+			left join hos_unit hu on mdd.group_id=hu.group_id and mdd.hos_id=hu.hos_id and mdd.unit_code=hu.unit_code and hu.is_stop=0
+			left join hos_emp_dict hed on mim.group_id=hed.group_id and mim.hos_id=hed.hos_id and mim.stocker=hed.emp_id
+			     and hed.is_stop=0
+			left join hos_emp_dict hd on mim.group_id=hd.group_id and mim.hos_id=hd.hos_id and mim.examiner=hd.emp_id
+			     and hd.is_stop=0
+			left join mat_inv_cert mic on mid.group_id = mic.group_id and mid.hos_id=mic.hos_id and mid.copy_code=mic.copy_code
+			     and mid.cert_id=mic.cert_id 
+			left join hos_fac_dict hfd on mdd.group_id=hfd.group_id and mdd.hos_id=hfd.hos_id and mdd.fac_id=hfd.fac_id
+			     and mdd.fac_no = hfd.fac_no
+			left join mat_bus_type mbt on mbt.bus_type_code=mim.bus_type_code
+			 <where>
+				<if test="group_id !=null and group_id !='' ">
+					and mim.group_id = #{group_id,jdbcType=INTEGER}
+				</if>
+				<if test="hos_id !=null and hos_id !='' ">
+					and mim.hos_id = #{hos_id,jdbcType=INTEGER}
+				</if>
+				<if test="copy_code !=null and copy_code !='' ">
+					and mim.copy_code = #{copy_code,jdbcType=VARCHAR}
+				</if>
+				<if test="state !=null and state !='' ">
+					and mim.state = #{state,jdbcType=INTEGER}
+				</if>
+				<!-- 只显示有权限的库房信息 -->
+				and to_char(mim.store_id) in (
+					select perm_code from v_user_data_perm  
+					where group_id = #{group_id,jdbcType=INTEGER}
+						and hos_id = #{hos_id,jdbcType=INTEGER}
+						and table_code = 'HOS_STORE_DICT'
+						and user_id = #{user_id,jdbcType=INTEGER}
+						and is_read = 1 and is_write = 1 
+				)
+				<if test="store_id !=null and store_id !='' ">
+					and mim.store_id = #{store_id,jdbcType=INTEGER}
+				</if>
+				<if test="sup_id !=null and sup_id !='' ">
+					and mim.sup_id = #{sup_id,jdbcType=INTEGER}
+				</if>
+				<if test="in_no !=null and in_no !='' ">
+					and mim.in_no like '${in_no}%'
+				</if>
+				<if test="inv_code != null and inv_code != ''">
+						and (
+							mdd.inv_code like '%${inv_code}%' or 
+							mdd.inv_name like '%${inv_code}%' or
+							mdd.inv_model like '%${inv_code}%' or
+							mdd.bid_code like '%${inv_code}%' or
+							mdd.spell_code like '%${inv_code}%' or 
+							mdd.wbx_code like '%${inv_code}%' or
+							mdd.alias like '%${inv_code}%'
+						)
+				</if>
+				<if test="begin_date != null and begin_date !='' and end_date != null and end_date !='' ">
+					and to_char(mim.in_date,'yyyy-MM-dd') between #{begin_date} and #{end_date}
+				</if>
+				and to_char(mdd.mat_type_id) in (
+					select perm_code from v_user_data_perm  
+					where group_id = #{group_id,jdbcType=INTEGER}
+						and hos_id = #{hos_id,jdbcType=INTEGER}
+						and table_code = 'MAT_TYPE_DICT'
+						and user_id = #{user_id,jdbcType=INTEGER}
+						and is_read = 1 and is_write = 1 
+				)
+			</where>
+			union all
+			select null group_id,null hos_id,null copy_code,null in_id,null in_no,null in_date,null bus_type_name,--bb.order_date,
+				null sup_code,null sup_name,null inv_code,null inv_name,
+		       	null inv_model,null unit_code,null unit_name,null price,null amount,sum(mid.amount_money) amount_money,
+		       	null fac_date,null batch_no,null inva_date,
+		        null disinfect_no,null stocker, null  stocker_name,null examiner,null examiner_name,
+		        null cert_code,null start_date,null end_date,null fac_code,null fac_name
+			from MAT_AFFI_IN_DETAIL  mid
+			left join MAT_AFFI_IN mim on mid.group_id=mim.group_id and mid.hos_id=mim.hos_id and mid.copy_code=mim.copy_code
+			     and mid.in_id=mim.in_id
+			left join mat_inv_dict mdd on mid.group_id=mdd.group_id and mid.hos_id=mdd.hos_id and mid.copy_code=mdd.copy_code
+			     and mid.inv_id=mdd.inv_id 
+		       	and mid.inv_no=mdd.inv_no
+		      	
+			<where>
+				<if test="group_id !=null and group_id !='' ">
+					and mim.group_id = #{group_id,jdbcType=INTEGER}
+				</if>
+				<if test="hos_id !=null and hos_id !='' ">
+					and mim.hos_id = #{hos_id,jdbcType=INTEGER}
+				</if>
+				<if test="copy_code !=null and copy_code !='' ">
+					and mim.copy_code = #{copy_code,jdbcType=VARCHAR}
+				</if>
+				<if test="state !=null and state !='' ">
+					and mim.state = #{state,jdbcType=INTEGER}
+				</if>
+				
+				<if test="store_id !=null and store_id !='' ">
+					and mim.store_id = #{store_id,jdbcType=INTEGER}
+				</if>
+				<if test="sup_id !=null and sup_id !='' ">
+					and mim.sup_id = #{sup_id,jdbcType=INTEGER}
+				</if>
+				<if test="in_no !=null and in_no !='' ">
+					and mim.in_no like '${in_no}%'
+				</if>
+				<if test="inv_code != null and inv_code != ''">
+						and (
+							mdd.inv_code like '%${inv_code}%' or 
+							mdd.inv_name like '%${inv_code}%' or
+							mdd.bid_code like '%${inv_code}%' or
+							mdd.spell_code like '%${inv_code}%' or 
+							mdd.wbx_code like '%${inv_code}%' or
+							mdd.alias like '%${inv_code}%'
+						)
+				</if>
+				<if test="begin_date != null and begin_date !='' and end_date != null and end_date !='' ">
+					and to_char(mim.in_date,'yyyy-MM-dd') between #{begin_date} and #{end_date}
+				</if>
+				and to_char(mdd.mat_type_id) in (
+					select perm_code from v_user_data_perm  
+					where group_id = #{group_id,jdbcType=INTEGER}
+						and hos_id = #{hos_id,jdbcType=INTEGER}
+						and table_code = 'MAT_TYPE_DICT'
+						and user_id = #{user_id,jdbcType=INTEGER}
+						and is_read = 1 and is_write = 1 
+				)
+			</where>
+		)  cc
+		order by cc.in_date, cc.in_date,cc.in_id, cc.sup_code, cc.inv_code
+	</select>
+	
+</mapper>

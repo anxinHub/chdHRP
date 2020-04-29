@@ -1,0 +1,681 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.mat.dao.dura.check.MatDuraCheckStoreMapper">
+
+	<resultMap id="matDuraCheckStore" type="java.util.Map">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="check_id" column="check_id" />
+		<result property="check_no" column="check_no" />
+		<result property="year" column="year"/>
+		<result property="month" column="month"/>
+		<result property="store_id" column="store_id" />
+		<result property="store_no" column="store_no" />
+		<result property="store_code" column="store_code" />
+		<result property="store_name" column="store_name" />
+		<result property="emp_id" column="emp_id" />
+		<result property="emp_code" column="emp_code" />
+		<result property="emp_name" column="emp_name" />
+		<result property="maker" column="maker" />
+		<result property="maker_name" column="maker_name" />
+		<result property="make_date" column="make_date" />
+		<result property="checker" column="checker" />
+		<result property="checker_name" column="checker_name" />
+		<result property="check_date" column="check_date" />
+		<result property="brif" column="brif" />
+		<result property="state" column="state" />
+	</resultMap>
+
+	<resultMap id="matDuraCheckStoreD" type="java.util.Map">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="check_id" column="check_id" />
+		<result property="detail_id" column="detail_id" />
+		<result property="inv_id" column="inv_id" />
+		<result property="inv_no" column="inv_no" />
+		<result property="inv_code" column="inv_code" />
+		<result property="inv_name" column="inv_name" />
+		<result property="inv_model" column="inv_model" />
+		<result property="unit_name" column="unit_name" />
+		<result property="fac_name" column="fac_name" />
+		<result property="price" column="price" />
+		<result property="cur_amount" column="cur_amount" />
+		<result property="chk_amount" column="chk_amount" />
+        <result property="amount" column="amount" />
+        <result property="amount_money" column="amount_money" />
+		<result property="bar_code" column="bar_code" />
+		<result property="note" column="note" />
+	</resultMap>
+
+	<resultMap id="matDuraCheckStoreForConfirm" type="java.util.Map">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="year" column="year" />
+		<result property="month" column="month" />
+		<result property="check_id" column="check_id" />
+		<result property="check_no" column="check_no" />
+		<result property="store_id" column="store_id" />
+		<result property="detail_id" column="detail_id" />
+		<result property="inv_id" column="inv_id" />
+		<result property="inv_no" column="inv_no" />
+		<result property="inv_code" column="inv_code" />
+		<result property="inv_name" column="inv_name" />
+		<result property="price" column="price" />
+		<result property="amount" column="amount" />
+		<result property="amount_money" column="amount_money" />
+		<result property="bar_code" column="bar_code" />
+	</resultMap>
+
+	<!-- 获取一个主表序列 -->
+	<select id="queryMainSeq" resultType="java.lang.Long" useCache="false" flushCache="true">
+		SELECT MAT_DURA_STORE_CHECK_SEQ.nextval FROM DUAL
+	</select>
+
+	<!-- 获取一个明细表序列 -->
+	<select id="queryDetailSeq" resultType="java.lang.Long" useCache="false" flushCache="true">
+		SELECT MAT_DURA_STORE_CHECK_D_SEQ.nextval FROM DUAL
+	</select>
+
+	<select id="query" resultMap="matDuraCheckStore" parameterType="java.util.Map">
+		SELECT a.group_id, a.hos_id, a.copy_code, a.check_id, a.check_no, a.brif, a.make_date, 
+			a.store_id, a.store_no, c.store_code, c.store_name, a.emp_id, b.emp_code, b.emp_name, 
+			a.maker, e.user_name maker_name, a.checker, f.user_name checker_name, a.check_date, a.state  
+		FROM mat_dura_store_check a 
+		LEFT JOIN hos_emp_dict b
+			ON a.group_id = b.group_id AND a.hos_id = b.hos_id 
+			AND a.emp_id = b.emp_id AND b.is_stop = 0 
+		LEFT JOIN hos_store_dict c
+			ON a.group_id = c.group_id AND a.hos_id = c.hos_id 
+			AND a.store_id = c.store_id 
+			<if test="show_history != null and show_history == 1">
+				AND a.store_no = c.store_no
+			</if>
+			<if test="show_history == null or show_history == ''">
+				AND c.is_stop = 0
+			</if> 
+		LEFT JOIN sys_user e 
+			ON a.group_id = e.group_id AND a.hos_id = e.hos_id 
+			AND a.maker = e.user_id 
+		LEFT JOIN sys_user f 
+			ON a.group_id = f.group_id AND a.hos_id = f.hos_id 
+			AND a.checker = f.user_id 
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			<if test="begin_make_date != null and begin_make_date != ''">
+				AND a.make_date &gt;= #{begin_make_date,jdbcType=DATE} 
+			</if>
+			<if test="end_make_date != null and end_make_date != ''">
+				AND a.make_date &lt;= #{end_make_date,jdbcType=DATE} 
+			</if>
+			<if test="begin_check_date != null and begin_check_date != ''">
+				AND a.check_date &gt;= #{begin_check_date,jdbcType=DATE} 
+			</if>
+			<if test="end_check_date != null and end_check_date != ''">
+				AND a.check_date &lt;= #{end_check_date,jdbcType=DATE} 
+			</if>
+			<if test="store_id != null and store_id != ''">
+				AND a.store_id = #{store_id,jdbcType=INTEGER}
+			</if>
+		order by check_id desc
+	</select>
+
+	<!-- 主表添加 -->
+	<insert id="addMain" parameterType="java.util.Map">
+		INSERT INTO mat_dura_store_check (
+			group_id, hos_id, copy_code, check_id, check_no,  year, month,store_id, store_no, 
+			emp_id, maker, make_date, state, brif
+			<if test="checker != null and checker != ''">, checker</if>
+			<if test="check_date != null and check_date != ''">, check_date</if>
+		) VALUES (
+			#{group_id,jdbcType=INTEGER},
+			#{hos_id,jdbcType=INTEGER},
+			#{copy_code,jdbcType=VARCHAR},
+			#{check_id,jdbcType=BIGINT},
+			#{check_no,jdbcType=VARCHAR},
+            #{year,jdbcType=VARCHAR},
+            #{month,jdbcType=VARCHAR},
+			#{store_id,jdbcType=INTEGER},
+			#{store_no,jdbcType=INTEGER},
+			#{emp_id,jdbcType=INTEGER},
+			#{maker,jdbcType=INTEGER},
+			#{make_date,jdbcType=DATE},
+			#{state,jdbcType=INTEGER},
+			#{brif,jdbcType=VARCHAR}
+			<if test="checker != null and checker != ''">, #{checker,jdbcType=INTEGER}</if>
+			<if test="check_date != null and check_date != ''">, #{check_date,jdbcType=DATE}</if>
+		)
+	</insert>
+
+	<!-- 批量插入主表数据 -->
+	<insert id="addMainBatch" parameterType="java.util.List">
+		INSERT INTO mat_dura_store_check (
+			group_id, hos_id, copy_code, check_id, check_no, year, month, store_id, store_no, 
+			emp_id, maker, make_date, state, brif, checker, check_date 
+		)
+		<foreach collection="list" item="item" index="index" separator="union all">
+			SELECT
+				#{item.group_id,jdbcType=INTEGER},
+				#{item.hos_id,jdbcType=INTEGER},
+				#{item.copy_code,jdbcType=VARCHAR},
+				#{item.check_id,jdbcType=BIGINT},
+				#{item.check_no,jdbcType=VARCHAR},
+				#{item.year,jdbcType=VARCHAR},
+				#{item.month,jdbcType=VARCHAR},
+				#{item.store_id,jdbcType=INTEGER},
+				#{item.store_no,jdbcType=INTEGER},
+				#{item.emp_id,jdbcType=INTEGER},
+				#{item.maker,jdbcType=INTEGER},
+				#{item.make_date,jdbcType=DATE},
+				#{item.state,jdbcType=INTEGER},
+				#{item.brif,jdbcType=VARCHAR},
+				#{item.checker,jdbcType=INTEGER},
+				#{item.check_date,jdbcType=DATE}
+			FROM DUAL
+		</foreach>
+	</insert>
+	
+	<!-- 明细表添加（批量） -->
+	<insert id="addDetail" parameterType="java.util.List">
+		INSERT INTO mat_dura_store_check_d (
+			group_id, hos_id, copy_code, check_id, detail_id, inv_id, inv_no, 
+			price, cur_amount, chk_amount, bar_code, note
+		)
+		<foreach collection="list" item="item" index="index" separator="union all">
+			select
+				#{item.group_id,jdbcType=INTEGER},
+				#{item.hos_id,jdbcType=INTEGER},
+				#{item.copy_code,jdbcType=VARCHAR},
+				#{item.check_id,jdbcType=BIGINT},
+				#{item.detail_id,jdbcType=BIGINT},
+				#{item.inv_id,jdbcType=INTEGER},
+				#{item.inv_no,jdbcType=VARCHAR},
+				#{item.price,jdbcType=NUMERIC},
+				#{item.cur_amount,jdbcType=NUMERIC},
+				#{item.chk_amount,jdbcType=NUMERIC},
+				#{item.bar_code,jdbcType=VARCHAR}, 
+				#{item.note,jdbcType=VARCHAR} 
+			from dual
+		</foreach>
+	</insert>
+
+	<!-- 主表修改 -->
+	<update id="updateMain" parameterType="java.util.Map">
+		UPDATE mat_dura_store_check
+		<trim prefix="set" suffixOverrides=",">
+			<if test="store_id != null and store_id != ''">
+				store_id = #{store_id,jdbcType=INTEGER},
+			</if>
+			<if test="store_no != null and store_no != ''">
+				store_no = #{store_no,jdbcType=INTEGER},
+			</if>
+			<if test="emp_id != null and emp_id != ''">
+				emp_id = #{emp_id,jdbcType=INTEGER},
+			</if>
+			<if test="make_date != null and make_date != ''">
+				make_date = #{make_date,jdbcType=DATE},
+			</if>
+			<if test="brif != null">
+				brif = #{brif,jdbcType=VARCHAR},
+			</if>
+		</trim>
+		WHERE group_id =#{group_id,jdbcType=INTEGER}
+			AND hos_id =#{hos_id,jdbcType=INTEGER}
+			AND copy_code =#{copy_code,jdbcType=VARCHAR}
+			AND check_id =#{check_id,jdbcType=BIGINT}
+	</update>
+
+	<!-- 明细表修改（批量） -->
+	<update id="updateDetail" parameterType="java.util.List">
+		<foreach collection="list" item="item" index="index" open="begin" close=";end;" separator=";">
+			UPDATE mat_dura_store_check_d
+			<trim prefix="set" suffixOverrides=",">
+				<if test="item.inv_id != null and item.inv_id != ''">
+					inv_id = #{item.inv_id,jdbcType=INTEGER},
+				</if>
+				<if test="item.inv_no != null and item.inv_no != ''">
+					inv_no = #{item.inv_no,jdbcType=INTEGER},
+				</if>
+				<if test="item.price != null and item.price != ''">
+					price = #{item.price,jdbcType=NUMERIC},
+				</if>
+				<if test="item.cur_amount != null and item.cur_amount != ''">
+					cur_amount = #{item.cur_amount,jdbcType=NUMERIC},
+				</if>
+				<if test="item.chk_amount != null and item.chk_amount != ''">
+					chk_amount = #{item.chk_amount,jdbcType=NUMERIC},
+				</if>
+				<if test="item.bar_code != null and item.bar_code != ''">
+					bar_code = #{item.bar_code,jdbcType=VARCHAR},
+				</if>
+				<if test="item.note != null">
+					note = #{item.note,jdbcType=VARCHAR},
+				</if>
+			</trim>
+			WHERE group_id = #{item.group_id,jdbcType=INTEGER}
+				AND hos_id = #{item.hos_id,jdbcType=INTEGER}
+				AND copy_code = #{item.copy_code,jdbcType=VARCHAR}
+				AND check_id = #{item.check_id,jdbcType=BIGINT}
+				AND detail_id = #{item.detail_id,jdbcType=BIGINT}
+		</foreach>
+	</update>
+
+	<!-- 主表删除 -->
+	<delete id="deleteMain" parameterType="java.util.Map">
+		DELETE FROM mat_dura_store_check
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND check_id = #{check_id,jdbcType=BIGINT}
+	</delete>
+
+	<!-- 明细表删除 -->
+	<delete id="deleteDetail" parameterType="java.util.Map">
+		DELETE FROM mat_dura_store_check_d
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND check_id = #{check_id,jdbcType=BIGINT}
+	</delete>
+
+	<!-- 主表批量删除 -->
+	<delete id="deleteMainBatch" parameterType="java.util.List">
+		DELETE FROM mat_dura_store_check
+		WHERE
+		<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+			group_id = #{item.group_id,jdbcType=INTEGER}
+			AND hos_id = #{item.hos_id,jdbcType=INTEGER}
+			AND copy_code = #{item.copy_code,jdbcType=VARCHAR}
+			AND check_id = #{item.check_id,jdbcType=BIGINT}
+		</foreach>
+	</delete>
+
+	<!-- 明细表批量删除 -->
+	<delete id="deleteDetailBatch" parameterType="java.util.List">
+		DELETE FROM mat_dura_store_check_d
+		WHERE
+		<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+			group_id = #{item.group_id,jdbcType=INTEGER}
+			AND hos_id = #{item.hos_id,jdbcType=INTEGER}
+			AND copy_code = #{item.copy_code,jdbcType=VARCHAR}
+			AND check_id = #{item.check_id,jdbcType=BIGINT}
+		</foreach>
+	</delete>
+
+	<!-- 用于主表加载 -->
+	<select id="queryMainByCode" resultMap="matDuraCheckStore" parameterType="java.util.Map">
+		SELECT
+			a.group_id, a.hos_id, a.copy_code, a.check_id, a.check_no,
+			a.store_id, a.store_no, b.store_code, b.store_name, a.emp_id, c.emp_code, 
+			c.emp_name, a.make_date, a.brif, a.state, d.user_name maker_name, 
+			e.user_name checker_name 
+		FROM mat_dura_store_check a
+		LEFT JOIN hos_store_dict b
+			ON a.group_id = b.group_id AND a.hos_id = b.hos_id
+			AND a.store_id = b.store_id
+			<if test="show_history == 1">
+				AND a.store_no = b.store_no
+			</if>
+			<if test="show_history == null or show_history == 0">
+				AND b.is_stop = 0
+			</if>
+		LEFT JOIN hos_emp_dict c
+			ON a.group_id = c.group_id AND a.hos_id = c.hos_id
+			AND a.emp_id = c.emp_id AND c.is_stop = 0
+		LEFT JOIN sys_user d 
+			ON a.group_id = d.group_id AND a.hos_id = d.hos_id 
+			AND a.maker = d.user_id 
+		LEFT JOIN sys_user e 
+			ON a.group_id = e.group_id AND a.hos_id = e.hos_id 
+			AND a.checker = e.user_id 
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND a.check_id = #{check_id,jdbcType=BIGINT}
+	</select>
+
+	<!-- 用于明细表加载 -->
+	<select id="queryDetailByCode" resultMap="matDuraCheckStoreD" parameterType="java.util.Map">
+		SELECT
+			a.group_id, a.hos_id, a.copy_code, a.check_id, a.detail_id, a.inv_id, a.inv_no, 
+			b.inv_code, b.bid_code, b.inv_name, b.inv_model, c.unit_name, d.fac_name, 
+			a.price, a.cur_amount, a.price * a.cur_amount cur_money, a.chk_amount, 
+			a.price * a.chk_amount chk_money, a.chk_amount - a.cur_amount amount, 
+			a.price * (a.chk_amount - a.cur_amount) amount_money, a.bar_code, a.note 
+		FROM mat_dura_store_check_d a 
+		LEFT JOIN mat_inv_dict b 
+			ON a.group_id = b.group_id AND a.hos_id = b.hos_id 
+			AND a.copy_code = b.copy_code AND a.inv_id = b.inv_id 
+			<if test="show_history == 1"> 
+				AND a.inv_no = b.inv_no 
+			</if> 
+			<if test="show_history == 0"> 
+				AND b.is_stop = 0 
+			</if> 
+		LEFT JOIN hos_unit c 
+			ON b.group_id = c.group_id
+			AND b.hos_id = c.hos_id
+			AND b.unit_code = c.unit_code
+		LEFT JOIN hos_fac_dict d
+			ON b.group_id = d.group_id AND b.hos_id = d.hos_id
+			AND b.fac_id = d.fac_id
+			<if test="show_history == 1">
+				AND b.fac_no = d.fac_no
+			</if>
+			<if test="show_history == 0">
+				AND d.is_stop = 0
+			</if>
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND a.check_id = #{check_id,jdbcType=BIGINT}
+	</select>
+	
+	<!-- 审核或消审有待修改传入包含list的Map -->
+	<update id="auditOrUnAuditBatch" parameterType="java.util.List">
+		<foreach collection="list" index="index" item="item" open="begin" separator=";" close=";end;">
+			UPDATE mat_dura_store_check set
+				state = #{item.state,jdbcType=INTEGER},
+				checker = #{item.checker,jdbcType=INTEGER},
+				check_date = #{item.check_date,jdbcType=DATE}
+			WHERE
+				group_id = #{item.group_id,jdbcType=INTEGER}
+				AND hos_id = #{item.hos_id,jdbcType=INTEGER}
+				AND copy_code = #{item.copy_code,jdbcType=VARCHAR}
+				AND check_id = #{item.check_id,jdbcType=BIGINT}
+		</foreach>
+	</update>
+	
+	<!-- 确认 -->
+	<update id="confirmBatch" parameterType="java.util.List">
+		<foreach collection="list" index="index" item="item" open="begin"
+			separator=";" close=";end;">
+			update mat_dura_store_check set
+				<!--year = #{item.year,jdbcType=VARCHAR},
+				month = #{item.month,jdbcType=VARCHAR}, -->
+				state = #{item.state,jdbcType=INTEGER}<!-- ,
+				confirmer = #{item.confirmer,jdbcType=INTEGER},
+				confirm_date = #{item.confirm_date,jdbcType=DATE} -->
+			WHERE
+				group_id = #{item.group_id,jdbcType=INTEGER}
+				AND hos_id = #{item.hos_id,jdbcType=INTEGER}
+				AND copy_code = #{item.copy_code,jdbcType=VARCHAR}
+				AND check_id = #{item.check_id,jdbcType=BIGINT}
+		</foreach>
+	</update>
+	
+	<!-- 判断是否存在不等于该状态的单据 -->
+	<select id="existsState" parameterType="java.util.Map" resultType="java.lang.Integer">
+		SELECT COUNT(*) 
+		FROM mat_dura_store_check 
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND check_id = #{check_id,jdbcType=BIGINT}
+			AND state &lt;&gt; #{check_state,jdbcType=INTEGER}
+	</select>
+	
+	<!-- 批量判断是否存在不等于该状态的单据 -->
+	<select id="existsStateBatch" parameterType="java.util.List" resultType="java.lang.Integer">
+		SELECT COUNT(*) 
+		FROM mat_dura_store_check 
+		WHERE
+		<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+			group_id = #{item.group_id,jdbcType=INTEGER}
+			AND hos_id = #{item.hos_id,jdbcType=INTEGER}
+			AND copy_code = #{item.copy_code,jdbcType=VARCHAR}
+			AND check_id = #{item.check_id,jdbcType=BIGINT}
+			AND state &lt;&gt; #{item.check_state,jdbcType=INTEGER}
+		</foreach>
+	</select>
+	
+	<!-- 获取要确认的明细数据 -->
+	<select id="queryDetailListForConfirm" parameterType="java.util.List" resultMap="matDuraCheckStoreForConfirm">
+		SELECT a.group_id, a.hos_id, a.copy_code, a.check_id, a.check_no, a.store_id, a.emp_id,  
+			b.detail_id, b.inv_id, b.inv_no, c.inv_code, c.inv_name, b.price, b.chk_amount - b.cur_amount amount, 
+			b.price * (b.chk_amount - cur_amount) amount_money, b.bar_code 
+		FROM mat_dura_store_check a
+		LEFT JOIN mat_dura_store_check_d b
+			ON a.group_id = b.group_id AND a.hos_id = b.hos_id 
+			AND a.copy_code = b.copy_code AND a.check_id = b.check_id 
+		LEFT JOIN mat_inv_dict c 
+			ON b.group_id = c.group_id AND b.hos_id = b.hos_id 
+			AND b.copy_code = c.copy_code AND b.inv_id = c.inv_id 
+			AND c.is_stop = 0
+		WHERE
+			b.chk_amount - b.cur_amount &lt;&gt; 0
+		and	
+		<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+			a.group_id = #{item.group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{item.hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{item.copy_code,jdbcType=VARCHAR}
+			AND a.check_id = #{item.check_id,jdbcType=BIGINT}
+		</foreach>
+	</select>
+	
+	<!-- 主表模板打印 -->
+	<select id="queryMainForPrintTemlate" parameterType="java.util.Map" resultType="java.util.Map" >
+		SELECT a.group_id, a.hos_id, a.copy_code, a.check_id, a.check_no, a.brif, 
+			to_char(a.make_date, 'yyyy-MM-dd hh24:mi:ss') make_date, a.store_id, a.store_no, 
+			b.store_code, b.store_name, a.emp_id, c.emp_no, c.emp_code, c.emp_name, 
+			a.maker, e.user_name maker_name, a.checker, f.user_name checker_name, 
+			to_char(a.check_date, 'yyyy-MM-dd hh24:mi:ss') check_date, case a.state 
+				when 1 then '新建'
+				when 2 then '审核'
+				else '已确认'
+			end as STATE,  
+		FROM mat_dura_store_check a 
+		LEFT JOIN hos_store_dict b
+			ON a.group_id = b.group_id AND a.hos_id = b.hos_id 
+			AND a.store_id = b.store_id AND a.store_no = b.store_no
+		LEFT JOIN hos_emp_dict c
+			ON a.group_id = c.group_id AND a.hos_id = c.hos_id 
+			AND a.emp_id = c.emp_id AND c.is_stop = 0
+		LEFT JOIN sys_user e 
+			ON a.group_id = e.group_id AND a.hos_id = e.hos_id 
+			AND a.maker = e.user_id 
+		LEFT JOIN sys_user f 
+			ON a.group_id = f.group_id AND a.hos_id = f.hos_id 
+			AND a.checker = f.user_id 
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND a.check_id=#{check_id,jdbcType=BIGINT}	
+	</select>
+	
+	<!-- 主表模板批量打印 -->
+	<select id="queryMainForPrintTemlateBatch" parameterType="java.util.Map" resultType="java.util.Map" >
+		SELECT a.check_id id, a.group_id, a.hos_id, a.copy_code, a.check_no, a.brif, 
+			to_char(a.make_date, 'yyyy-MM-dd hh24:mi:ss') make_date, a.store_id, a.store_no, 
+			b.store_code, b.store_name, a.emp_id, c.emp_no, c.emp_code, c.emp_name, 
+			a.maker, e.user_name maker_name, a.checker, f.user_name checker_name, 
+			to_char(a.check_date, 'yyyy-MM-dd hh24:mi:ss') check_date, case a.state 
+				when 1 then '新建'
+				when 2 then '审核'
+				else '已确认'
+			end as STATE,  
+		FROM mat_dura_store_check a 
+		LEFT JOIN hos_store_dict b
+			ON a.group_id = b.group_id AND a.hos_id = b.hos_id 
+			AND a.store_id = b.store_id AND a.store_no = b.store_no
+		LEFT JOIN hos_emp_dict c
+			ON a.group_id = c.group_id AND a.hos_id = c.hos_id 
+			AND a.emp_id = c.emp_id AND c.is_stop = 0
+		LEFT JOIN sys_user e 
+			ON a.group_id = e.group_id AND a.hos_id = e.hos_id 
+			AND a.maker = e.user_id 
+		LEFT JOIN sys_user f 
+			ON a.group_id = f.group_id AND a.hos_id = f.hos_id 
+			AND a.checker = f.user_id 
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND a.check_id in  (${paraId})
+		ORDER BY a.check_id desc	
+	</select>
+	
+	<!-- 明细表模板打印 -->
+	<select id="queryDetailForPrintTemlate" parameterType="java.util.Map" resultType="java.util.Map" >
+		SELECT
+			a.check_id id, a.group_id, a.hos_id, a.copy_code, a.detail_id, a.inv_id, a.inv_no, 
+			b.inv_code,b.bid_code, b.inv_name, b.inv_model, c.unit_name, d.fac_name, a.price, 
+			a.cur_amount, a.price * a.cur_amount cur_money, 
+			a.chk_amount, a.price * a.chk_amount chk_money, 
+			a.chk_amount - a.cur_amount amount, <!-- 盈亏数量 -->
+			a.price * (a.chk_amount - a.cur_amount) amount_money, <!-- 盈亏金额 --> 
+			a.bar_code, a.note 
+		FROM mat_dura_store_check_d a 
+		LEFT JOIN mat_inv_dict b 
+			ON a.group_id = b.group_id AND a.hos_id = b.hos_id 
+			AND a.copy_code = b.copy_code AND a.inv_id = b.inv_id 
+			AND a.inv_no = b.inv_no 
+		LEFT JOIN hos_unit c 
+			ON b.group_id = c.group_id AND b.hos_id = c.hos_id
+			AND b.unit_code = c.unit_code
+		LEFT JOIN hos_fac_dict d
+			ON b.group_id = d.group_id AND b.hos_id = d.hos_id
+			AND b.fac_id = d.fac_id AND b.fac_no = d.fac_no
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			<if test="p_num ==1">
+				AND a.check_id in (${paraId})
+			</if>
+			<if test="p_num ==0">
+				AND a.check_id=#{check_id,jdbcType=BIGINT}
+			</if>	
+		ORDER BY a.detail_id
+	</select>
+	
+	<select id="queryMatInvByBalance" parameterType="java.util.Map" resultType="java.util.Map" >
+		select mdsb.group_id,
+		       mdsb.hos_id,
+		       mdsb.copy_code,
+		       mdsb.inv_id,
+		       mi.inv_no,
+		       mi.bid_code,
+		       mi.inv_code,
+		       mi.inv_name,
+		       mi.inv_model,
+		       mi.unit_code,
+		       hu.unit_name,
+		       mi.fac_id,
+       		   hf.fac_code,
+       		   hf.fac_name,
+		       mdsb.price,
+		       mdsb.bar_code,
+		       mdsb.left_amount cur_amount,
+		       mdsb.left_amount chk_amount,
+		       0 amount,
+		       0 amount_money
+		  from mat_dura_store_balance mdsb
+		  left join mat_inv_dict mi
+		    on mdsb.group_id = mi.group_id
+		   and mdsb.hos_id = mi.hos_id
+		   and mdsb.copy_code = mi.copy_code
+		   and mdsb.inv_id = mi.inv_id
+		   and mi.is_stop = 0
+		  left join hos_unit hu
+		    on mi.group_id = hu.group_id
+		   and mi.hos_id = hu.hos_id
+		   and mi.unit_code = hu.unit_code
+		  left join hos_fac hf
+		    on mi.group_id = hf.group_id
+		   and mi.hos_id = hf.hos_id 
+		   and mi.fac_id = hf.fac_id 
+		<where>
+			<if test="group_id != null and group_id != ''">
+				AND mdsb.group_id = #{group_id, jdbcType=INTEGER} 
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND mdsb.hos_id = #{hos_id, jdbcType=INTEGER} 
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				AND mdsb.copy_code = #{copy_code, jdbcType=VARCHAR} 
+			</if>
+			<if test="store_id != null and store_id != ''">
+				AND mdsb.store_id = #{store_id, jdbcType=INTEGER} 
+			</if>
+		</where>		   
+	</select>
+	
+	<select id="queryMatDuraInvChoiceByStore" parameterType="java.util.Map" resultType="java.util.Map" >
+		select mi.group_id,
+		       mi.hos_id,
+		       mi.copy_code,
+		       mi.inv_no,
+		       mi.inv_id,
+		       mi.bid_code,
+		       mi.inv_code,
+		       mi.inv_name,
+		       mi.inv_model,
+		       mi.unit_code,
+		       hu.unit_name,
+		       mi.fac_id,
+		       hf.fac_code,
+		       hf.fac_name,
+		       mi.plan_price price,
+		       null          bar_code,
+		       0             cur_amount,
+		       0             chk_amount,
+		       0             amount,
+		       0             amount_money
+		  from mat_inv_dict mi
+		  left join hos_unit hu
+		    on mi.group_id = hu.group_id
+		   and mi.hos_id = hu.hos_id
+		   and mi.unit_code = hu.unit_code
+		  left join hos_fac hf
+		    on mi.group_id = hf.group_id
+		   and mi.hos_id = hf.hos_id 
+		   and mi.fac_id = hf.fac_id 
+		<where>
+			mi.is_dura = 1
+			and mi.is_stop = 0
+			and not exists (
+		       select 1 from mat_dura_store_balance mdsb
+		        where group_id = #{group_id, jdbcType=INTEGER} 
+				  and hos_id = #{hos_id, jdbcType=INTEGER} 
+				  and copy_code = #{copy_code, jdbcType=VARCHAR} 
+				  and store_id = #{store_id, jdbcType=INTEGER} 
+				  and mdsb.inv_id = mi.inv_id
+		   	) 
+			<if test="group_id != null and group_id != ''">
+				AND mi.group_id = #{group_id, jdbcType=INTEGER} 
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND mi.hos_id = #{hos_id, jdbcType=INTEGER} 
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				AND mi.copy_code = #{copy_code, jdbcType=VARCHAR} 
+			</if>
+			<if test="store_id != null and store_id != ''">
+				AND exists (
+					select 1 from mat_store_inv msi
+					where group_id = #{group_id, jdbcType=INTEGER} 
+					  and hos_id = #{hos_id, jdbcType=INTEGER} 
+					  and copy_code = #{copy_code, jdbcType=VARCHAR} 
+					  and store_id = #{store_id, jdbcType=INTEGER} 
+					  and msi.inv_id = mi.inv_id
+				)
+			</if>
+			<if test="inv_code != null and inv_code != ''">
+				and (
+					mi.inv_code like '%${inv_code}%' or 
+					mi.inv_name like '%${inv_code}%' or
+					mi.spell_code like lower('%${inv_code}%') or
+					mi.spell_code like upper('%${inv_code}%') or
+					mi.wbx_code like lower('%${inv_code}%') or
+					mi.wbx_code like upper('%${inv_code}%') 
+				)
+			</if>
+			<if test="mat_type_id != null and mat_type_id != ''">
+				and mi.mat_type_id = #{mat_type_id, jdbcType=INTEGER}
+			</if>
+		</where>	   
+	</select>
+</mapper>
+

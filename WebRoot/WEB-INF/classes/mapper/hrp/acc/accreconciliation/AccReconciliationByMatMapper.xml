@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.acc.dao.accreconciliation.AccReconciliationByMatMapper">
+ 
+	<select id="queryAccReconciliationByMat" resultType="java.util.Map"
+		parameterType="java.util.Map">
+		with a_table as(<!--查询本期发生（财务）-->
+		select asj.subj_code,asj.subj_name_all,sum(avd.debit)
+		debit,sum(avd.credit)
+		credit,mtd.mat_type_id,mtd.mat_type_no,mtd.mat_type_name,asj.subj_dire from
+		acc_vouch_detail avd
+		left join acc_vouch av on av.vouch_id=avd.vouch_id
+		and avd.group_id=av.group_id and avd.hos_id=av.hos_id
+		and avd.copy_code=av.copy_code
+		inner join acc_subj asj on avd.group_id=asj.group_id
+		and avd.hos_id=asj.hos_id and avd.copy_code=asj.copy_code
+		and avd.acc_year = asj.acc_year and avd.subj_code=asj.subj_code
+		inner join acc_busi_map abm on abm.group_id = asj.group_id
+		and abm.hos_id = asj.hos_id
+		and abm.copy_code = asj.copy_code
+		and abm.subj_code = asj.subj_code
+		and abm.acc_year = asj.acc_year
+		and abm.meta_code = '0402'
+		inner join MAT_TYPE_DICT mtd
+		on abm.sub_type_id = to_char(mtd.MAT_TYPE_ID)
+		and abm.group_id = mtd.group_id
+		and abm.hos_id = mtd.hos_id
+		and abm.copy_code = mtd.copy_code
+		where avd.group_id = #{group_id}
+			AND avd.hos_id = #{hos_id}
+			AND avd.copy_code = #{copy_code}
+			AND avd.acc_year = #{acc_year}
+			AND av.acc_month = #{acc_month}
+		group by
+		asj.subj_code,asj.subj_name_all,mtd.mat_type_id,mtd.mat_type_no,mtd.mat_type_name,asj.subj_dire
+		),b_table as(<!--查询本期实物账（物流）-->
+		select mat_type_id,mat_type_no,sum(nvl(in_money,0)) as in_money,sum(nvl(out_money,0)) as out_money
+          from(
+            --入库数据
+            select d.mat_type_id,d.mat_type_no, sum(nvl(a.amount_money,0)) as in_money, 0 out_money
+            from mat_in_detail a
+            left join mat_in_main b
+              on a.group_id = b.group_id
+              and a.hos_id = b.hos_id
+              and a.copy_code = b.copy_code
+              and a.in_id = b.in_id
+            left join mat_inv c
+              on a.group_id = c.group_id
+              and a.hos_id = c.hos_id
+              and a.copy_code = c.copy_code
+              and a.inv_id = c.inv_id
+            left join mat_type_dict d
+              on a.group_id = d.group_id
+              and a.hos_id = d.hos_id
+              and a.copy_code = d.copy_code
+              and c.mat_type_id = d.mat_type_id
+              and d.is_stop = 0
+              and d.is_last=1
+            where a.group_id = #{group_id}
+              and a.hos_id =#{hos_id}
+              and a.copy_code = #{copy_code}
+              and b.state >= 3
+              and b.year || b.month = #{acc_year}||#{acc_month}
+            group by d.mat_type_id,d.mat_type_no
+            --出库数据
+            union all
+            select d.mat_type_id,d.mat_type_no,0 in_money,sum(nvl(a.amount_money,0)) as out_money
+            from mat_out_detail a
+            left join mat_out_main b
+              on a.group_id = b.group_id
+              and a.hos_id = b.hos_id
+              and a.copy_code = b.copy_code
+              and a.out_id = b.out_id
+            left join mat_inv c
+              on a.group_id = c.group_id
+              and a.hos_id = c.hos_id
+              and a.copy_code = c.copy_code
+              and a.inv_id = c.inv_id
+            left join mat_type_dict d
+              on a.group_id = d.group_id
+              and a.hos_id = d.hos_id
+              and a.copy_code = d.copy_code
+              and c.mat_type_id = d.mat_type_id
+              and d.is_stop = 0
+              and d.is_last=1
+            where a.group_id = #{group_id}
+              and a.hos_id =#{hos_id}
+              and a.copy_code = #{copy_code}
+              and b.state >= 3
+              and b.year || b.month = #{acc_year}||#{acc_month}
+            group by d.mat_type_id,d.mat_type_no
+            ) data
+          group by mat_type_id,mat_type_no
+		),c_table as(<!--查询累计发生（财务）-->
+		select asj.subj_code,asj.subj_name_all,sum(avd.debit)
+		debit,sum(avd.credit) credit,mtd.mat_type_id,mtd.mat_type_no from
+		acc_vouch_detail avd
+		left join acc_vouch av on av.vouch_id=avd.vouch_id
+		and avd.group_id=av.group_id and avd.hos_id=av.hos_id
+		and avd.copy_code=av.copy_code
+		inner join acc_subj asj on avd.group_id=asj.group_id
+		and avd.hos_id=asj.hos_id and avd.copy_code=asj.copy_code
+		and avd.acc_year = asj.acc_year and avd.subj_code=asj.subj_code
+		inner join acc_busi_map abm 
+		on abm.group_id = asj.group_id
+		and abm.hos_id = asj.hos_id
+		and abm.copy_code = asj.copy_code
+		and abm.acc_year = asj.acc_year
+		and abm.subj_code = asj.subj_code
+		and abm.meta_code = '0402'
+		inner join MAT_TYPE_DICT mtd
+		on abm.sub_type_id = to_char(mtd.MAT_TYPE_ID)
+		and abm.group_id = mtd.group_id
+		and abm.hos_id = mtd.hos_id
+		and abm.copy_code = mtd.copy_code
+		where avd.group_id = #{group_id}
+			AND avd.hos_id = #{hos_id}
+			AND avd.copy_code = #{copy_code}
+			AND avd.acc_year = #{acc_year}
+			AND av.acc_year=#{acc_year} and av.acc_month between '01' and #{acc_month}
+		group by
+		asj.subj_code,asj.subj_name_all,mtd.mat_type_id,mtd.mat_type_no
+		),d_table as(<!--查询累计发生（物流）-->
+		select mtd.mat_type_id,mtd.mat_type_no,sum(mib.in_money)
+		in_money,sum(mib.out_money) out_money from mat_inv_balance mib
+		left join mat_inv_dict mid on
+		mib.group_id=mid.group_id and mib.hos_id=mid.hos_id
+		and mib.copy_code=mid.copy_code and mib.inv_id=mid.inv_id
+		left join mat_type_dict mtd on
+		mtd.group_id=mid.group_id and mtd.hos_id=mid.hos_id
+		and mtd.copy_code=mid.copy_code and mtd.mat_type_id=mid.mat_type_id
+		where mib.year||''|| mib.month &lt;=#{acc_year}||''||#{acc_month}
+		group by mtd.mat_type_id,mtd.mat_type_no
+		)
+		 select a.subj_code, a.subj_name_all,a.subj_dire
+	      , case 
+	        when a.subj_dire = 0 then al.bal_os + c.debit - c.credit
+	        else al.bal_os - c.debit + c.credit
+	      end as acc_bal
+	      , sum(nvl(d.in_money, 0)) - sum(nvl(d.out_money, 0)) as mat_bal
+	      , a.debit, a.credit, sum(b.in_money) as in_money
+	      , sum(b.out_money) as out_money
+	      , case 
+	        when a.subj_dire =0 then al.bal_os+ c.debit - c.credit + a.debit - a.credit
+	        else al.bal_os - c.debit + c.credit - a.debit + a.credit
+	      end as acc_end
+	      , sum(nvl(d.in_money, 0)) - sum(nvl(d.out_money, 0)) + sum(b.in_money) - sum(b.out_money) as mat_end
+	      , to_char(wm_concat(DISTINCT a.mat_type_name)) as mat_type_name
+	    from a_table a
+	    left join b_table b on a.mat_type_no = b.mat_type_no
+	    and a.mat_type_id = b.mat_type_id 
+	    left join c_table c on a.subj_code = c.subj_code 
+    	and a.mat_type_no = c.mat_type_no and a.mat_type_id = c.mat_type_id 
+	    left join d_table d on a.mat_type_no = d.mat_type_no
+	    and a.mat_type_id = d.mat_type_id 
+	    left join acc_leder al on a.subj_code= al.subj_code 
+	    and al.acc_year=#{acc_year} and al.acc_month='00'
+	    group by a.subj_code, a.subj_name_all, a.debit, a.credit,c.debit, c.credit,al.bal_os,a.subj_dire
+	</select>
+
+</mapper>
+

@@ -1,0 +1,3438 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.acc.dao.vouch.SuperVouchMapper">
+  
+	<!--添加凭证主表  useGeneratedKeys="true"--> 
+	<insert id="saveSuperVouchByMain" parameterType="java.util.Map">
+		INSERT INTO ACC_VOUCH(vouch_id,group_id,hos_id,copy_code,acc_year,acc_month,vouch_type_code,vouch_no,vouch_date,
+		vouch_att_num,create_user,create_date,state,vouch_id_cx,busi_type_code,sign_flag) 
+		VALUES (#{vouch_id} ,#{group_id},#{hos_id},#{copy_code},#{acc_year},#{acc_month},#{vouch_type_code},#{vouch_no},#{vouch_date},
+		#{vouch_att_num},#{create_user},#{create_date},#{state},#{vouch_id_cx},#{busi_type_code},#{sign_flag}) 
+	</insert>
+	
+	
+	<!--修改凭证主表  useGeneratedKeys="true"-->
+	<update id="updateSuperVouchByMain" parameterType="java.util.Map">
+		update ACC_VOUCH set 
+		acc_year=#{acc_year},
+		acc_month=#{acc_month},
+		vouch_type_code=#{vouch_type_code},
+		vouch_no=#{vouch_no},
+		vouch_date=#{vouch_date},
+		vouch_att_num=#{vouch_att_num},
+		create_user=#{create_user},
+		create_date=#{create_date},
+		state=#{state},
+		sign_flag=#{sign_flag}
+		where group_id=#{group_id} and hos_id=#{hos_id} and copy_code=#{copy_code} and vouch_id=#{vouch_id}
+	</update>
+	
+	<!-- 保存凭证明细表 -->
+	<insert id="saveSuperVouchByDetail" parameterType="java.util.List">
+		INSERT INTO ACC_VOUCH_DETAIL (vouch_detail_id,vouch_id,group_id,hos_id,copy_code,acc_year,
+		subj_code,vouch_row,summary,debit,credit,debit_w,credit_w)
+		<foreach collection="list" item="item" index="index" separator=" union all ">
+			select
+				#{item.vouch_detail_id},#{item.vouch_id},#{item.group_id},#{item.hos_id},#{item.copy_code},#{item.acc_year},
+				#{item.subj_code},#{item.vouch_row},#{item.summary},#{item.debit},#{item.credit},#{item.debit_w},#{item.credit_w}
+			from dual
+		</foreach>
+	</insert>
+
+	<!-- 根据vouch_id删除凭证明细表 -->
+	<delete id="deleteSuperVouchByDetail" parameterType="java.util.Map">
+		DELETE FROM acc_vouch_detail WHERE group_id=#{group_id} and hos_id=#{hos_id} and copy_code=#{copy_code} and vouch_id=#{vouch_id}
+	</delete>
+
+	<!-- 保存凭证辅助核算表 -->
+	<insert id="saveSuperVouchByCheck" parameterType="java.util.List">
+		INSERT INTO ACC_VOUCH_CHECK (
+			vouch_check_id,vouch_id,vouch_detail_id,group_id,hos_id,copy_code,acc_year,occur_date,
+			${column}
+			summary,subj_code,debit,credit,debit_w,credit_w,is_init,sort_code		
+			)
+		<foreach collection="list" item="item" index="index" separator=" union all ">
+			select
+				#{item.vouch_check_id},#{item.vouch_id},#{item.vouch_detail_id},#{item.group_id},#{item.hos_id},#{item.copy_code},#{item.acc_year},#{item.occur_date},
+				${item.column_value}
+				#{item.summary},#{item.subj_code},#{item.debit},#{item.credit},#{item.debit_w},#{item.credit_w},0,#{item.sort_code}
+			from dual
+		</foreach>
+	</insert>
+	
+	<!-- 批量删除需要修改的辅助核算 -->
+	<delete id="deleteSuperVouchByCheck" parameterType="java.util.List">
+		DELETE FROM ACC_VOUCH_CHECK WHERE group_id=#{group_id} and hos_id=#{hos_id} and copy_code=#{copy_code} and vouch_id=#{vouch_id}
+		and vouch_detail_id in 
+		<foreach collection="list" index="index" item="item" open="(" separator="," close=")">
+			${item}
+		</foreach>
+	</delete>
+	
+	<!-- 删除当前凭证不存在分录的辅助核算 -->
+	<delete id="deleteSuperVouchCheckByNotDetail" parameterType="java.util.Map">
+		 delete from acc_vouch_check c where not exists(
+		    select 1 from acc_vouch_detail d where c.group_id=d.group_id and c.hos_id=d.hos_id and c.copy_code=d.copy_code
+		    and c.vouch_id=d.vouch_id and c.vouch_detail_id=d.vouch_detail_id
+	    ) and c.group_id=#{group_id} and c.hos_id=#{hos_id} and c.copy_code=#{copy_code} and c.vouch_id=#{vouch_id}
+	</delete>
+	
+	
+	<!-- 删除当前凭证不存在分录的现金流量 -->
+	<delete id="deleteSuperVouchCashByNotDetail" parameterType="java.util.Map">
+		 delete from acc_cash_flow c where not exists(
+		    select 1 from acc_vouch_detail d where c.group_id=d.group_id and c.hos_id=d.hos_id and c.copy_code=d.copy_code
+		    and c.vouch_id=d.vouch_id and c.vouch_detail_id=d.vouch_detail_id
+	    ) and c.group_id=#{group_id} and c.hos_id=#{hos_id} and c.copy_code=#{copy_code} and c.vouch_id=#{vouch_id}
+	</delete>
+	
+	<!-- 没有保存分录，根据vouch_id删除凭证辅助核算表 -->
+	<delete id="deleteSuperVouchByCheckAndVouchId" parameterType="java.util.Map">
+		DELETE FROM ACC_VOUCH_CHECK WHERE group_id=#{group_id} and hos_id=#{hos_id} and copy_code=#{copy_code} and vouch_id=#{vouch_id}
+	</delete>
+	
+		
+	<!-- 保存现金流量标注表 -->
+	<insert id="saveSuperVouchByCash" parameterType="java.util.List">
+		INSERT INTO ACC_CASH_FLOW (
+		cash_id,vouch_id,vouch_detail_id,group_id,hos_id,copy_code,
+		cash_item_id,cash_money,create_user,create_date,summary,sort_code
+		)
+		<foreach collection="list" item="item" index="index" separator=" union all ">
+			select
+				#{item.cash_id},#{item.vouch_id},#{item.vouch_detail_id},#{item.group_id},#{item.hos_id},#{item.copy_code},
+				#{item.cash_item_id},#{item.cash_money},#{item.create_user},#{item.create_date},#{item.summary},#{item.sort_code}
+			from dual
+		</foreach>
+	</insert>
+	
+
+	<!-- 批量删除需要修改的现金流量 -->
+	<delete id="deleteSuperVouchByCash" parameterType="java.util.List">
+		DELETE FROM ACC_CASH_FLOW WHERE group_id=#{group_id} and hos_id=#{hos_id} and copy_code=#{copy_code} and vouch_id=#{vouch_id}
+		and vouch_detail_id in
+		<foreach collection="list" index="index" item="item" open="(" separator="," close=")">
+			${item}
+		</foreach>
+	</delete>
+	
+	<!-- 没有保存分录，根据vouch_id删除现金流量标注表 -->
+	<delete id="deleteSuperVouchByCashAndVouchId" parameterType="java.util.Map">
+		DELETE FROM ACC_CASH_FLOW WHERE group_id=#{group_id} and hos_id=#{hos_id} and copy_code=#{copy_code} and vouch_id=#{vouch_id} 
+	</delete>
+	
+
+	<!-- 根据vouch_id删除差异标注表 -->
+	<delete id="deleteSuperVouchByDiff" parameterType="java.util.Map">
+		DELETE FROM ACC_VOUCH_DIFF WHERE group_id=#{group_id} and hos_id=#{hos_id} and copy_code=#{copy_code} and vouch_id=#{vouch_id}
+	</delete>
+	
+	<!-- 保存凭证差异标注表 -->
+	<insert id="saveSuperVouchByDiff" parameterType="java.util.List">
+		INSERT INTO ACC_VOUCH_DIFF(vouch_id,group_id,hos_id,copy_code,acc_year,acc_month,diff_date,
+		diff_id,diff_item_code,summary,diff_money,is_auto)
+		<foreach collection="list" item="item" index="index" separator=" union all ">
+			select
+				#{map.vouch_id},#{map.group_id},#{map.hos_id},#{map.copy_code},#{map.acc_year},#{map.acc_month},#{map.vouch_date},
+				#{item.diff_id},#{item.diff_item_code},#{item.summary},#{item.diff_money},0
+			from dual
+		</foreach>
+	</insert>
+	
+	<update id="updateSuperVouchBySignFlag" parameterType="java.util.Map">
+		update acc_vouch set SIGN_FLAG=#{sign_flag} 
+		where group_id=#{group_id} and hos_id=#{hos_id} and copy_code=#{copy_code} and vouch_id=#{vouch_id}
+	</update>
+
+	<!-- 删除凭证操作：删除凭证相关联的表 -->
+	<select id="deleteSuperVouchByVouchId" statementType="CALLABLE" parameterType="java.util.Map">
+		<![CDATA[
+		{call acc_super_vouch_del(
+	        #{vouch_id},#{group_id},#{hos_id},#{copy_code},#{user_id},
+	        #{reNote,mode=OUT,jdbcType=VARCHAR}
+		)}
+		]]>
+	</select>
+	
+	<!-- 添加分录的时候，科目性质03、04、05银行、应收、应付科目，在没有辅助核算的情况下，以分录数据默认添加一条数据用来做账龄分析、往来核销、出纳对账，查询原来的vouch_check_id -->
+	<select id="queryCheckIdByDetailId" parameterType="java.util.Map" resultType="java.util.Map">
+		select c.vouch_detail_id "vouch_detail_id",vouch_check_id "vouch_check_id" from acc_vouch_check c 
+		where c.group_id=#{group_id} and c.hos_id=#{hos_id} and c.copy_code=#{copy_code} and c.vouch_id=#{vouch_id} 
+	</select>
+
+
+	<!-- 凭证加载、上张下张跳转：根据vouch_id or vouch_no or acc_year or acc_month查询凭证主表 -->
+	<select id="querySuperVouchByMain" parameterType="java.util.Map" resultType="com.chd.hrp.acc.entity.superVouch.SuperVouchMain">
+		${jump_sel1}
+		select v.group_id,v.hos_id,v.copy_code,v.vouch_id,v.acc_year,v.acc_month,v.vouch_type_code,t.vouch_type_name,v.vouch_no,to_char(v.vouch_date,'yyyy-MM-dd') vouch_date,v.vouch_att_num,v.state,
+		v.create_user create_user,u1.user_name create_name,v.cash_user cash_user,u2.user_name cash_name,
+		v.audit_user audit_user,u3.user_name audit_name,v.acc_user acc_user,u4.user_name acc_name,
+		v.note,v.busi_type_code
+		from  acc_vouch v
+		left join acc_vouch_type t on v.group_id=t.group_id and v.hos_id=t.hos_id and v.copy_code=t.copy_code and v.vouch_type_code=t.vouch_type_code
+		left join sys_user u1 on v.create_user=u1.user_id
+		left join sys_user u2 on v.cash_user=u2.user_id
+		left join sys_user u3 on v.audit_user=u3.user_id
+		left join sys_user u4 on v.acc_user=u4.user_id
+		<where> 
+			<choose>
+				<when test="vouch_id != null and vouch_id != ''">
+					and v.vouch_id=#{vouch_id}
+				</when>
+				<otherwise>
+					v.group_id=#{group_id} and v.hos_id=#{hos_id} and v.copy_code=#{copy_code}
+				</otherwise>
+			</choose>
+			<if test="vouch_type_code != null and vouch_type_code != ''">
+					AND v.vouch_type_code = #{vouch_type_code}
+			</if>
+			<if test="vouch_no != null and vouch_no != '' ">
+					and to_number(v.vouch_no) ${jump_fh} #{vouch_no}
+			</if>
+			<if test="acc_year != null and acc_year != ''">
+					and v.acc_year=#{acc_year}
+			</if>
+			<if test="acc_month != null and acc_month != ''">
+					and v.acc_month=#{acc_month}
+			</if>
+		</where>
+		${jump_sel2}
+	</select>
+
+
+	<resultMap id="superVouchDetailList"  type="java.util.Map">
+        <result property="did" column="did"/>        
+        <result property="summary" column="summary"/>  
+        <result property="subj_code" column="subj_code"/> 
+        <result property="subj_name" column="subj_name"/>
+        <result property="is_check" column="is_check"/>
+        <result property="is_cash" column="is_cash"/>
+        <result property="subj_nature_code" column="subj_nature_code"/>
+        <result property="subj_type_code" column="subj_type_code"/>
+        <result property="subj_dire" column="subj_dire"/>
+        <result property="debit" column="debit"/>
+        <result property="credit" column="credit"/>
+        <result property="is_bill" column="is_bill"/>
+        <result property="vouch_row" column="vouch_row"/>
+        <result property="kind_code" column="kind_code"/>
+        <result property="subj_level" column="subj_level"/>
+	</resultMap>
+	<!-- 凭证加载、上张下张跳转：根据vouch_id dor vouch_no or acc_year or acc_month 查询凭证明细表 -->
+	<select id="querySuperVouchByDetail"  parameterType="java.util.Map"  resultMap="superVouchDetailList">
+		select d.vouch_detail_id did,d.summary,d.subj_code,s.subj_code||' '||s.subj_name_all subj_name,
+		s.is_check,s.is_cash,s.subj_nature_code,s.subj_type_code,s.subj_dire,s.subj_level,
+		d.debit,d.credit,s.is_bill,vouch_row,s.kind_code
+		from acc_vouch_detail d
+		left join acc_subj s on d.group_id=s.group_id and d.hos_id=s.hos_id and d.copy_code=s.copy_code and d.acc_year=s.acc_year and d.subj_code=s.subj_code
+		where d.vouch_id=#{vouch_id}
+		order by ${order_by}
+	</select>
+	
+	
+	<!--根据vouch_id or vouch_detail_id查询凭证辅助核算表、现金流量表-->
+	<select id="querySuperVouchByCheckCash" parameterType="java.util.Map" resultType="java.util.Map">
+				
+		with t1 as(
+		select rownum rownum1, a.vouch_check_id cid,a.subj_code, a.summary
+		  , case  when a.debit &lt;&gt; 0 then a.debit else a.credit end as money, 
+		  a.con_no, a.check_no, a.business_no
+		  , to_char(a.occur_date, 'yyyy-MM-dd') as occur_date
+		  , to_char(a.due_date, 'yyyy-MM-dd') as due_date, a.pay_type_code
+		  , a.pay_type_code || ' ' || p.pay_name as pay_name
+		  , a.paper_type_code || ' ' || t.type_name as paper_type_code
+		  ,t.is_wb,a.sort_code
+		  ${sel_sql}
+		from acc_vouch_check a
+		left join acc_pay_type p on a.group_id = p.group_id and a.hos_id = p.hos_id and a.copy_code = p.copy_code and a.pay_type_code = p.pay_code 
+		left join acc_paper_type t on a.group_id = t.group_id and a.hos_id = t.hos_id and a.copy_code = t.copy_code and a.paper_type_code = t.type_code
+		${left_sql} 
+		where a.group_id = #{group_id}
+		  and a.hos_id = #{hos_id}
+		  and a.copy_code = #{copy_code}
+		  and a.vouch_id = #{vouch_id} 
+		  and a.vouch_detail_id = #{vouch_detail_id}
+		),
+		t2 as( 
+		select rownum rownum1,c.cash_item_id, i.cash_item_code || ' ' || i.cash_item_name as cash_name,i.cash_dire as cash_dire,
+         c.sort_code
+		from acc_cash_flow c 
+		left join acc_cash_item i on i.group_id = c.group_id and i.hos_id = c.hos_id and i.copy_code = c.copy_code and i.cash_item_id = c.cash_item_id 
+		where c.group_id = #{group_id}
+		  and c.hos_id = #{hos_id}
+		  and c.copy_code = #{copy_code}
+		  and c.vouch_id = #{vouch_id}
+		  and c.vouch_detail_id = #{vouch_detail_id}
+		)
+		select * from t1 left join t2  on t1.rownum1=t2.rownum1 
+		order by t1.sort_code,t2.sort_code
+	</select>
+	
+	
+	<!-- 根据vouch_id or vouch_detail_id查询凭证辅助核算表 -->
+	<select id="querySuperVouchByCheck"  parameterType="java.util.Map"  resultType="java.util.Map">
+		
+		select a.vouch_check_id cid,a.subj_code,a.summary,
+		case when a.debit &lt;&gt;0 then a.debit else a.credit end money, 
+		a.con_no,a.check_no,a.business_no,to_char(a.occur_date,'yyyy-MM-dd') occur_date,to_char(a.due_date,'yyyy-MM-dd') due_date,
+		a.pay_type_code,a.pay_type_code||' '||p.pay_name pay_name,
+		a.paper_type_code||' '||t.type_name paper_type_code 
+		${sel_sql}
+		from acc_vouch_check a		
+		left join acc_pay_type p on a.group_id=p.group_id and a.hos_id=p.hos_id and a.copy_code=p.copy_code and a.pay_type_code=p.pay_code
+		left join acc_paper_type t on a.group_id=t.group_id and a.hos_id=t.hos_id and a.copy_code=t.copy_code and a.paper_type_code=t.type_code
+		${left_sql}
+		where a.group_id =#{group_id} and a.hos_id = #{hos_id} and a.copy_code = #{copy_code} 		
+		AND  a.vouch_id=#{vouch_id} and a.vouch_detail_id=#{vouch_detail_id}
+		order by a.sort_code asc
+	</select>
+	 
+	<!-- 根据vouch_detail_id查询现金流量表 -->
+	<select id="querySuperVouchByCash"  parameterType="java.util.Map"  resultType="java.util.Map">
+		select f.cash_id,#{subj_code} subj_code,f.cash_item_id,c.cash_item_code||' '||c.cash_item_name cash_name,f.summary,f.cash_money money,c.cash_dire from acc_cash_flow f
+		left join acc_cash_item c on f.cash_item_id=c.cash_item_id and f.group_id=c.group_id and f.hos_id=c.hos_id and f.copy_code=c.copy_code
+		where f.group_id=#{group_id} and f.hos_id=#{hos_id} and f.copy_code=#{copy_code} and f.vouch_id=#{vouch_id} and f.vouch_detail_id=#{vouch_detail_id}
+	</select>
+	
+	
+	<!-- 根据vouch_id查询差异标注表 -->
+	<select id="querySuperVouchByDiff"  parameterType="java.util.Map"  resultType="java.util.Map">
+		select f.diff_id "diff_id",f.diff_item_code "diff_item_code",
+		f.diff_item_code||' '||c.diff_item_name||'（'||(case c.diff_dire when 0 then '借' else '贷' end)||'）' "diff_item_name",
+		f.summary "summary",f.diff_money "money",f.is_auto "is_auto"
+		from ACC_VOUCH_DIFF f
+		left join ACC_DIFF_ITEM c on f.group_id=c.group_id and f.hos_id=c.hos_id and f.copy_code=c.copy_code and f.diff_item_code=c.diff_item_code
+		where f.group_id=#{group_id} and f.hos_id=#{hos_id} and f.copy_code=#{copy_code} and f.vouch_id=#{vouch_id}
+		order by f.diff_id
+	</select>
+	
+	<!-- 凭证制单取所有相关参数 -->
+	<resultMap id="accVouchParaList"  type="java.util.Map">
+        <result property="para_code" column="para_code"/>        
+        <result property="para_value" column="para_value"/>     
+        <!--result property="note" column="note"/-->
+	</resultMap>
+	<select id="queryVouchParaList" parameterType="java.util.Map" resultMap="accVouchParaList">
+	  
+        SELECT para_code,para_value FROM acc_para 
+	        WHERE mod_code = #{mod_code} and  group_id = #{group_id} and hos_id = #{hos_id} and  copy_code = #{copy_code} 
+		    <if test="para_code != null and para_code != ''">
+				and para_code in (${para_code})
+			</if>
+	</select>
+	
+	<!-- 根据系统参数010取凭证类型 -->
+	<resultMap id="superVouvchType" type="com.chd.hrp.acc.entity.HrpAccSelect">
+		<result property="id" column="id" />
+		<result property="text" column="text" />
+	</resultMap>
+	<select id="querySuperVouchTypeByPerm" resultMap="superVouvchType">
+		SELECT v.VOUCH_TYPE_CODE id,v.VOUCH_TYPE_NAME text FROM ACC_VOUCH_TYPE v
+		where v.group_id = #{group_id} and v.hos_id = #{hos_id} and v.copy_code = #{copy_code}
+		<if test='p010 != null  and p010 != "" and p010 == "1"'>
+				and exists(select 1 from v_user_data_perm p 
+				where p.table_code='ACC_VOUCH_TYPE' and p.group_id=v.group_id and p.hos_id=v.hos_id and p.copy_code=v.copy_code 
+				and p.perm_code=v.vouch_type_code and p.is_write=1 and p.user_id=#{user_id})
+		</if>
+		order by v.VOUCH_TYPE_CODE
+	</select>
+	
+	<!-- 凭证制单-分录-科目下拉框字典加载 -->
+	<resultMap id="superVouchSubjList"  type="java.util.Map">
+        <result property="id" column="id"/>        
+        <result property="name" column="name"/>     
+        <result property="spell_code" column="spell_code"/>
+        <result property="wbx_code" column="wbx_code"/>
+        <result property="subj_nature_code" column="subj_nature_code"/>
+        <result property="is_check" column="is_check"/>
+        <result property="is_cash" column="is_cash"/>
+        <result property="subj_type_code" column="subj_type_code"/>
+        <result property="subj_dire" column="subj_dire"/>
+        <result property="is_bill" column="is_bill"/>
+        <result property="out_code" column="out_code"/>
+        <result property="kind_code" column="kind_code"/>
+        <result property="subj_dire" column="subj_dire"/>
+        <result property="subj_level" column="subj_level"/>
+	</resultMap>
+	<select id="queryAccVouchSubjDict" parameterType="java.util.Map" resultMap="superVouchSubjList">
+		select subj_code id,subj_code ||' '||subj_name_all name,spell_code,wbx_code,is_check,
+		is_cash,subj_nature_code,subj_type_code,subj_dire,is_bill,out_code,kind_code,subj_dire,subj_level
+		from acc_subj 
+		where group_id=#{group_id} and hos_id=#{hos_id} and copy_code=#{copy_code} and acc_year=#{acc_year}
+		and is_last=1 and is_stop = 0
+		<if test="key != null and key != ''">
+				and (
+				subj_code like '${key}%' or subj_name like '%${key}%'
+				or spell_code like '${key}%' or wbx_code like '${key}%'
+				)
+		</if>
+		order by subj_code asc	
+	</select>
+	
+	<!-- 凭证制单-选择科目树 -->
+	<select id="queryAccVcouchSubjTree"  parameterType="java.util.Map"  resultType="java.util.Map">
+		select * from (
+			select t.subj_type_code "id",'0' "pId",
+			0 "subj_id", '0' "subj_code",to_char(t.subj_type_name ) "name",to_char('') "subj_name_all",
+			to_char('') "spell_code",to_char('') "wbx_code",0 "is_check",0 "is_cash",'' "subj_nature_code",0 "subj_dire",0 "is_bill",0 "is_last",0 "subj_level"
+			from acc_subj_type t  
+			where t.group_id=#{group_id} and t.hos_id=#{hos_id} and t.copy_code=#{copy_code}
+			<if test="kind_code != null and kind_code != ''">
+				and t.kind_code=#{kind_code}
+			</if>
+			order by t.subj_type_code
+		)
+		
+		union all 
+		
+		select * from (
+			select s.subj_code id,
+			case when LOWER(s.super_code)='top' then s.subj_type_code else s.super_code end pid,
+			s.subj_id,s.subj_code,to_char(s.subj_code||' '||s.subj_name) name,to_char(s.subj_code ||' '||s.subj_name_all) subj_name_all,
+			to_char(s.spell_code) spell_code,to_char(s.wbx_code) wbx_code,s.is_check,s.is_cash,s.subj_nature_code,s.subj_dire,s.is_bill,s.is_last,s.subj_level
+			from acc_subj s
+			where s.group_id=#{group_id} and s.hos_id=#{hos_id} and s.copy_code=#{copy_code} and s.acc_year=#{acc_year}
+			and s.is_stop=0 
+			<if test="kind_code != null and kind_code != ''">
+				and s.kind_code=#{kind_code}
+			</if>
+			order by s.subj_code
+		)
+	</select>
+	
+	<!-- 凭证制单-取当前年度最大凭证日期 -->
+	<select id="queryMaxVouchDate"  parameterType="java.util.Map"  resultType="String">
+	
+		select to_char(max(vouch_date),'yyyy-MM-dd') vouch_date from ACC_VOUCH  
+		where group_id = #{group_id} AND hos_id = #{hos_id} AND copy_code = #{copy_code}
+		<if test="acc_month != null and acc_month != ''">
+				AND acc_year=#{acc_year} and acc_month=#{acc_month} 
+		</if>
+	</select>
+	
+	<!-- 凭证制单-queryVouchFlow -->
+	<select id="queryVouchFlow"  parameterType="java.util.Map"  resultType="java.util.Map">
+		select node_id,parent_node_id from acc_vouch_flow 
+		where group_id=#{group_id} AND hos_id = #{hos_id} AND copy_code = #{copy_code} 
+	</select>
+	
+	
+	<!-- 凭证制单-根据凭证类型、会计期间/凭证日期取最大凭证号 -->
+	<select id="queryMaxVouchNo"  parameterType="java.util.Map"  resultType="String">
+	
+		select max(to_number(VOUCH_NO)) from ACC_VOUCH  
+		where group_id = #{group_id,jdbcType=NUMERIC} AND hos_id = #{hos_id,jdbcType=NUMERIC} AND copy_code = #{copy_code,jdbcType=VARCHAR}
+		and acc_year=#{acc_year,jdbcType=VARCHAR} and acc_month=#{acc_month,jdbcType=VARCHAR} AND vouch_type_code = #{vouch_type_code,jdbcType=VARCHAR}
+		<if test="vouch_date != null and vouch_date != ''">
+				and vouch_date=to_date(#{vouch_date},'yyyy-MM-dd')
+		</if>
+	</select>
+	
+	
+	<!-- 取小于凭证日期最大凭证号、取大于凭证日期最小凭证号，003序时控制判断使用 -->
+	<select id="queryMaxMinNoByVouchDate"  parameterType="java.util.Map"  resultType="String">
+	
+		select max(vouch_no) vouch_no from acc_vouch 
+		where group_id=#{group_id} and hos_id=#{hos_id} and copy_code=#{copy_code} 
+		and acc_year=#{acc_year} and acc_month=#{acc_month} and vouch_type_code=#{vouch_type_code} 
+		and vouch_date&lt;to_date(#{vouch_date},'yyyy-MM-dd')
+		union all
+		select min(vouch_no) vouch_no from acc_vouch 
+		where group_id=#{group_id} and hos_id=#{hos_id} and copy_code=#{copy_code} 
+		and acc_year=#{acc_year} and acc_month=#{acc_month} and vouch_type_code=#{vouch_type_code}  
+		and vouch_date&gt;to_date(#{vouch_date},'yyyy-MM-dd')
+		
+	</select>
+	
+	
+	<!-- 凭证制单-分录、辅助核算-摘要下拉框字典 -->
+	<select id="queryVouchSummaryDict"  parameterType="java.util.Map"  resultType="String">
+
+		SELECT summary FROM ACC_VOUCH_SUMMARY 
+		where group_id =#{group_id} and hos_id = #{hos_id} and copy_code = #{copy_code} and user_id=#{user_id}
+		<if test="key != null and key != ''">
+			and  summary like '%${key}%'
+		</if>
+		order by sort_code asc
+	</select>
+	
+	
+	<!-- 凭证制单-辅助核算-核算类型加载 -->
+	<resultMap id="superVouchCheckList"  type="java.util.Map">
+        <result property="check_id" column="check_id"/>        
+        <result property="check_type_name" column="check_type_name"/>     
+        <result property="column_check" column="column_check"/>
+        <result property="column_id" column="column_id"/>
+        <result property="column_no" column="column_no"/>
+        <result property="column_code" column="column_code"/>
+        <result property="column_name" column="column_name"/>
+        <result property="check_table" column="check_table"/>
+        <result property="check_type_code" column="check_type_code"/>
+        <result property="is_change" column="is_change"/>
+        <result property="is_sys" column="is_sys"/>
+	</resultMap>
+	<select id="queryVouchCheckType" parameterType="java.util.Map" resultMap="superVouchCheckList">
+		SELECT asubj.check1 check_id, act1.check_type_name, act1.column_check, act1.column_id,act1.is_sys, 
+		act1.column_no, act1.column_code, act1.column_name, act1.check_table,act1.is_change,asubj.check_type_code1 check_type_code,asubj.out_code
+		FROM ACC_SUBJ asubj 
+		inner join ACC_CHECK_TYPE act1 on asubj.GROUP_ID = act1.GROUP_ID AND asubj.HOS_ID = act1.HOS_ID 
+		AND asubj.COPY_CODE = act1.COPY_CODE AND asubj.check1 = act1.CHECK_TYPE_ID 
+		WHERE asubj.group_id = #{group_id} and asubj.hos_id = #{hos_id} and asubj.copy_code = #{copy_code} and asubj.acc_year=#{acc_year}
+	    and asubj.subj_code = #{subj_code}
+		
+		union all
+		select asubj.check2 check_id, act2.check_type_name, act2.column_check,act2.column_id,act2.is_sys, 
+		act2.column_no, act2.column_code,act2.column_name, act2.check_table,act2.is_change,asubj.check_type_code2 check_type_code,asubj.out_code
+		FROM ACC_SUBJ asubj 
+		inner join ACC_CHECK_TYPE act2 on asubj.GROUP_ID = act2.GROUP_ID AND asubj.HOS_ID = act2.HOS_ID 
+		AND asubj.COPY_CODE = act2.COPY_CODE AND asubj.check2 = act2.CHECK_TYPE_ID 
+		WHERE asubj.group_id = #{group_id} and asubj.hos_id = #{hos_id} and asubj.copy_code = #{copy_code} and asubj.acc_year=#{acc_year}
+	    and asubj.subj_code = #{subj_code}
+		
+		union all
+		select asubj.check3 check_id,act3.check_type_name, act3.column_check, act3.column_id,act3.is_sys, 
+		act3.column_no, act3.column_code, act3.column_name, act3.check_table,act3.is_change,asubj.check_type_code3 check_type_code ,asubj.out_code
+		FROM ACC_SUBJ asubj 
+		inner join ACC_CHECK_TYPE act3 on asubj.GROUP_ID = act3.GROUP_ID AND asubj.HOS_ID = act3.HOS_ID 
+		AND asubj.COPY_CODE = act3.COPY_CODE AND asubj.check3 = act3.CHECK_TYPE_ID 
+		WHERE asubj.group_id = #{group_id} and asubj.hos_id = #{hos_id} and asubj.copy_code = #{copy_code} and asubj.acc_year=#{acc_year}
+	    and asubj.subj_code = #{subj_code}
+		
+		union all
+		select  asubj.check4 check_id, act4.check_type_name, act4.column_check,act4.column_id,act4.is_sys, 
+		act4.column_no, act4.column_code,act4.column_name, act4.check_table,act4.is_change,asubj.check_type_code4 check_type_code ,asubj.out_code
+		FROM ACC_SUBJ asubj 
+		inner join ACC_CHECK_TYPE act4 on asubj.GROUP_ID = act4.GROUP_ID AND asubj.HOS_ID = act4.HOS_ID 
+		AND asubj.COPY_CODE = act4.COPY_CODE AND asubj.check4 = act4.CHECK_TYPE_ID 		
+	    WHERE asubj.group_id = #{group_id} and asubj.hos_id = #{hos_id} and asubj.copy_code = #{copy_code} and asubj.acc_year=#{acc_year}
+	    and asubj.subj_code = #{subj_code}
+	</select>
+	
+	
+	<!-- 凭证制单-辅助核算-下拉框字典 -->
+	<resultMap id="accVouchCheckItemDict"  type="java.util.Map">
+        <result property="id" column="id"/>
+        <result property="no" column="no"/>
+        <result property="name" column="name"/>
+        <result property="spell_code" column="spell_code"/>
+        <result property="wbx_code" column="wbx_code"/>
+        <result property="type" column="type"/>  
+        <result property="out_code" column="out_code"/>
+        <result property="idno" column="idno"/>   
+	</resultMap>
+	<select id="queryVouchCheckItemDict" parameterType="java.util.Map" resultMap="accVouchCheckItemDict">
+		select ${code}||' '||${name} name,${id} id,
+		<choose>
+			<when test="no != null and no !='' ">
+				${no} no,${id}||'@'||a.${no} idno,
+			</when>
+			<otherwise>
+				'' no,${id} idno,
+			</otherwise>
+		</choose>  
+		${type} spell_code,wbx_code	from ${check_table} a
+		where group_id=#{group_id} and hos_id=#{hos_id} and is_stop = 0 
+		<if test="copy_code != null and copy_code != ''">
+				and copy_code=#{copy_code} 
+		</if>
+		<if test="acc_year != null and acc_year != '' ">
+				and acc_year=#{acc_year} 
+		</if>
+		<if test="check_type_id != null and check_type_id != ''">
+				and check_type_id=#{check_type_id} 
+		</if>
+		<if test="check_type_code != null and check_type_code != ''">
+				${check_type_code}
+		</if>
+		<if test="is_last != null and is_last != ''">
+				and is_last=#{is_last}
+		</if>		
+		<if test="key != null and key != ''">
+				and (
+					#{code} like '${key}%' or #{name} like '%${key}%'
+					or spell_code like '${key}%' or wbx_code like '${key}%'
+				)
+		</if>
+		<if test="other_where != null and other_where != ''">
+				${other_where}
+		</if>
+		<if test="column_check_import != null and column_check_import != ''">
+			and exists(
+				select 1 from acc_check_type p where p.group_id=#{group_id} and p.hos_id=#{hos_id} and p.copy_code=#{copy_code} and a.check_type_id=p.check_type_id
+				and p.column_check=#{column_check_import} 
+				)
+		</if>
+		order by ${sort} asc	
+	</select>
+	
+	<!-- 差异项目 -->
+	<select id="queryVouchDiffItemDict" parameterType="java.util.Map" resultMap="accVouchCheckItemDict">
+		select diff_item_code || ' ' || diff_item_name ||'（'||(case a.diff_dire when 0 then '借' else '贷' end)||'）' as name, 
+		diff_item_code as id, spell_code, wbx_code
+		from ACC_DIFF_ITEM a
+		where group_id = #{group_id}
+		  and hos_id = #{hos_id}
+		  and is_stop = 0
+		  and copy_code = #{copy_code}
+		order by DIFF_ITEM_CODE asc
+	</select>
+	
+	<!-- 科目字典下拉框-现金流量-科目项 -->
+	<select id="queryVouchCashItemDict" parameterType="java.util.Map" resultMap="accVouchCheckItemDict">
+		select  ${no} no,
+				${code}||' '||${name} name,
+				${id} id,
+				cash_dire type,
+				spell_code,
+				wbx_code 
+		from ${check_table}
+			where 
+			is_stop=0 
+			and group_id=#{group_id} 
+			and hos_id=#{hos_id} 
+		<if test="copy_code != null and copy_code != ''">
+				and copy_code=#{copy_code} 
+		</if>
+		<if test="is_last != null and is_last != ''">
+				and is_last=#{is_last}
+		</if>		
+		<if test="other_where != null and other_where != ''">
+				${other_where}
+		</if>
+		<if test="key != null and key != ''">
+				and (
+					${code} like '${key}%' or ${name} like '%${key}%'
+					or spell_code like '${key}%' or wbx_code like '${key}%'
+				)
+		</if>
+		order by ${sort} asc	
+	</select>
+	
+	<!-- 科目字典下拉框-结算方式-科目项 -->
+	<select id="queryVouchCountItemDict" parameterType="java.util.Map" resultMap="accVouchCheckItemDict">
+		select  ${no} no,
+				${code}||' '||${name} name,
+				${id} id,
+				${type} spell_code,
+				wbx_code 
+		from ${check_table}
+			where 
+			is_stop=0 
+			and group_id=#{group_id} 
+			and hos_id=#{hos_id} 
+		<if test="copy_code != null and copy_code != ''">
+				and copy_code=#{copy_code} 
+		</if>
+		<if test="is_last != null and is_last != ''">
+				and is_last=#{is_last}
+		</if>
+		<if test="check_type_code != null and check_type_code != ''">
+				${check_type_code}
+		</if>		
+		<if test="other_where != null and other_where != ''">
+				${other_where}
+		</if>
+		<if test="key != null and key != ''">
+				and (
+					${code} like '${key}%' or ${name} like '%${key}%'
+					or spell_code like '${key}%' or wbx_code like '${key}%'
+				)
+		</if>
+		order by ${sort} asc	
+	</select>
+	
+	
+	<!-- 科目字典下拉框-票据类型-科目项 -->
+	<select id="queryVouchNoteItemDict" parameterType="java.util.Map" resultMap="accVouchCheckItemDict">
+		select  ${no} no,
+				${code}||' '||${name} name,
+				${id} id,
+				${type} spell_code,
+				wbx_code 
+		from ${check_table}
+			where 
+			is_stop=0 
+			and group_id=#{group_id} 
+			and hos_id=#{hos_id} 
+		<if test="copy_code != null and copy_code != ''">
+				and copy_code=#{copy_code} 
+		</if>
+		<if test="is_last != null and is_last != ''">
+				and is_last=#{is_last}
+		</if>		
+		<if test="other_where != null and other_where != ''">
+				${other_where}
+		</if>
+		<if test="key != null and key != ''">
+				and (
+					${code} like '${key}%' or ${name} like '%${key}%'
+					or spell_code like '${key}%' or wbx_code like '${key}%'
+				)
+		</if>
+		order by ${sort} asc	
+	</select>
+	
+	
+	<!-- 系统辅助核算-下拉框-类型科目项 以column_check包含check分类-->
+	<select id="queryVouchCheckSysItemDict" parameterType="java.util.Map" resultMap="accVouchCheckItemDict">
+		select
+			<choose>
+				<when test="no!=null and no!=''">
+					a.${no} no,a.${id}||'@'||a.${no} idno,
+				</when>
+				<otherwise>
+					a.${id} idno,
+				</otherwise>
+			</choose>  
+			a.${code}||' '||a.${name} 
+			<if test='is_show=="emp_dept_name"'>
+			||'('||b.dept_name||')'
+			</if>
+			<if test='is_show=="proj_emp_name"'>
+			||'('||c.emp_name||''||hpu.use_name||''||hpt.type_name||')'
+			</if>
+			as name,
+			<if test="out_code!=null and out_code !=''">
+			ada.out_code,
+			</if>
+			a.${id} id,
+			a.${type} spell_code,
+			a.wbx_code 
+		from ${check_table} a
+		<if test='is_show=="emp_dept_name"'>
+				left join hos_dept b on a.group_id = b.group_id and a.hos_id = b.hos_id	and a.dept_id = b.dept_id 
+		</if>
+		<if test="out_code!=null and out_code !=''">
+				left join acc_dept_attr ada on a.group_id = ada.group_id and a.hos_id = ada.hos_id	
+				and a.dept_id = ada.dept_id 
+		</if>
+		<if test='is_show=="proj_emp_name"'>
+				left join acc_proj_attr b on a.group_id = b.group_id and a.hos_id = b.hos_id and a.proj_id = b.proj_id 
+				left join hos_emp c on b.group_id = c.group_id and b.hos_id = c.hos_id and b.con_emp_id = c.emp_id 
+				left join hos_proj_use hpu on hpu.group_id = b.group_id and hpu.hos_id = b.hos_id and hpu.use_code = b.use_code
+				left join hos_proj_type hpt on hpt.group_id = a.group_id and hpt.hos_id = a.hos_id and hpt.type_code = a.type_code  
+		</if>
+		where a.group_id=#{group_id}  and a.hos_id=#{hos_id} and a.is_stop = 0  and a.is_disable=0
+		<if test="copy_code != null and copy_code != ''">
+				and a.copy_code=#{copy_code} 
+		</if>
+		<if test="acc_year != null and acc_year != '' ">
+				and a.acc_year=#{acc_year} 
+		</if>
+		<if test="is_last != null and is_last != ''">
+				and a.is_last=#{is_last}
+		</if>
+		<if test="check_type_code != null and check_type_code != ''">
+				${check_type_code}
+		</if>
+		<if test="key != null and key != ''">
+				and (
+					a.${code} like '${key}%' or a.${name} like '%${key}%'
+					or a.spell_code like '${key}%' or a.wbx_code like '${key}%'
+				)
+		</if>
+		order by ${sort} asc	
+	</select>
+	
+	
+	<!-- 凭证制单-辅助核算-票据号下拉框字典加载-->
+	<select id="queryVouchCheckNoDict" parameterType="java.util.Map" resultMap="accVouchCheckItemDict">
+		select ${id} id,'' no,${code} name,'' spell_code,'' wbx_code
+		from ${check_table} 
+		where group_id=#{group_id} and hos_id=#{hos_id} and copy_code=#{copy_code} and type_code=#{paper_type_code}
+		and state1=2 and IS_CHECK=0
+		<if test="key != null and key != ''">
+				and ${code} like '%${key}%' 
+		</if>		
+		order by ${sort} asc	
+	</select>
+	
+	<!--根据凭证流程操作签字、审核、记账-->
+	<update id="updateVouchStateByFlow" parameterType="java.util.Map">
+		update ACC_VOUCH set 		
+		state=#{nex_state}
+		<if test='flag=="next"'>
+           	<if test="cash_user!=null and cash_user!='' ">
+	            ,cash_user = #{cash_user}
+	            ,cashe_date = #{cashe_date}
+	        </if>
+	        <if test="audit_user!=null and audit_user!='' ">
+	            ,audit_user = #{audit_user}
+	            ,audit_date = #{audit_date}
+	        </if>
+	        <if test="acc_user!=null and acc_user!='' ">
+	            ,acc_user = #{acc_user}
+	            ,acc_date = #{acc_date}
+	        </if>
+        </if>
+        <if test='flag=="pre"'>
+           	<if test='cur_state=="2" '>
+	            ,cash_user = null
+	            ,cashe_date = null
+	        </if>
+	        <if test='cur_state=="3" '>
+	            ,audit_user = null
+	            ,audit_date = null
+	        </if>
+	         <if test='cur_state=="99" '>
+	            ,acc_user = null
+	            ,acc_date = null
+	        </if>
+        </if>
+		where group_id=#{group_id} and hos_id=#{hos_id} and copy_code=#{copy_code} and vouch_id=#{vouch_id}
+	</update>
+	
+	
+	<!-- 凭证审批流判断操作权限 -->
+	<select id="queryVouchFlowByPerm" parameterType="java.util.Map" resultType="java.lang.Integer">
+		
+	    select count(1) from v_user_perm 
+		where group_id=#{group_id} and hos_id=#{hos_id} and copy_code=#{copy_code}
+		and user_id=#{user_id} and mod_code=#{mod_code} and perm_code=#{perm_code}
+	</select>
+	
+	
+	<!-- 凭证制单保存，验证分录金额是否与辅助核算金额一致 -->
+	<select id="queryVouchDedailAndCheckByMoney" parameterType="java.util.Map" resultType="String">		
+	   select subj_name||'：'||money1||' ≠ '||money2  from (
+		  select s.subj_code||' '||s.subj_name_all subj_name,(d.debit+d.credit) as money1,c.money2 
+		  from acc_vouch_detail d
+		  inner join 
+		  (
+			  select vouch_detail_id,sum(debit+credit) money2 from acc_vouch_check  
+			  where vouch_id=#{vouch_id} and group_id=#{group_id} and hos_id=#{hos_id} and copy_code=#{copy_code}
+			  group by vouch_detail_id
+		  ) c on d.vouch_detail_id=c.vouch_detail_id 
+		  left join acc_subj s on d.group_id=s.group_id and d.hos_id=s.hos_id and d.copy_code=s.copy_code and d.acc_year=s.acc_year and d.subj_code=s.subj_code  
+		  where d.group_id=#{group_id} and d.hos_id=#{hos_id} and d.copy_code=#{copy_code} and d.vouch_id=#{vouch_id}
+		) al where al.money1!=al.money2
+	</select>
+	
+	<!-- 凭证制单保存，验证分录金额是否与现金流量标注金额一致 -->
+	<select id="queryVouchDedailAndCashByMoney" parameterType="java.util.Map" resultType="String">		
+	     select subj_name||'：'||money1||' ≠ '||money2  from (
+		  select s.subj_code||' '||s.subj_name_all subj_name,(d.debit+d.credit) as money1,c.money2  
+		  from acc_vouch_detail d
+		  inner join 
+		  (
+			  select f.vouch_detail_id,sum(f.cash_money) money2 from acc_cash_flow f 
+			  where f.group_id=#{group_id} and f.hos_id=#{hos_id} and f.copy_code=#{copy_code} and f.vouch_id=#{vouch_id}
+			  and exists(
+			  		select 1 from acc_vouch_detail vd where vd.group_id=#{group_id} and vd.hos_id=#{hos_id} and vd.copy_code=#{copy_code} 
+			  		and vd.vouch_id = f.vouch_id and vd.vouch_detail_id=f.vouch_detail_id
+			  		)
+			  group by f.vouch_detail_id
+		  ) c on d.vouch_detail_id=c.vouch_detail_id 
+		  left join acc_subj s on d.group_id=s.group_id and d.hos_id=s.hos_id and d.copy_code=s.copy_code and d.acc_year=s.acc_year and d.subj_code=s.subj_code 
+		  where d.group_id=#{group_id} and d.hos_id=#{hos_id} and d.copy_code=#{copy_code} and d.vouch_id=#{vouch_id}
+		) al where al.money1!=al.money2
+	</select>
+	
+	
+	<!-- 凭证制单保存，验证分录金额是否与现金流量标注方向一致 -->
+	<select id="queryVouchDedailAndCashByDire" parameterType="java.util.Map" resultType="String">		
+	     select subj_name||'='||(case when cash_dire=0 then '流入' else '流出' end) from (
+			  select s.subj_code||' '||s.subj_name_all subj_name,c.cash_dire,d.debit,d.credit
+			  from acc_vouch_detail d
+			  inner join (
+			        select f.vouch_detail_id,t.cash_dire from acc_cash_flow f 
+			        inner join acc_cash_item t 
+			        on f.group_id=t.group_id and f.hos_id=t.hos_id and f.copy_code=t.copy_code and f.cash_item_id=t.cash_item_id
+			        where f.group_id=#{group_id} and f.hos_id=#{hos_id} and f.copy_code=#{copy_code}
+			        and f.vouch_id=#{vouch_id}
+			        group by f.vouch_detail_id,t.cash_dire
+		  )c on d.vouch_detail_id=c.vouch_detail_id 
+		  left join acc_subj s on d.group_id=s.group_id and d.hos_id=s.hos_id and d.copy_code=s.copy_code and d.acc_year=s.acc_year and d.subj_code=s.subj_code 
+		  where d.group_id=#{group_id} and d.hos_id=#{hos_id} and d.copy_code=#{copy_code} and d.vouch_id=#{vouch_id} 
+		)a1 where (cash_dire=0 and credit!=0) or (cash_dire=1 and debit!=0)
+	</select>
+	
+	
+	<!-- 根据凭证ID、科目ID判断辅助核算是否为空-->
+	<select id="queryVouchCheckExists" parameterType="java.util.Map" resultType="String">	
+		
+		select distinct s.subj_code||' '||s.subj_name from acc_vouch_check c 
+		inner join acc_subj s on c.group_id=s.group_id and c.hos_id=s.hos_id and c.copy_code=s.copy_code and s.acc_year=#{acc_year} and c.subj_code=s.subj_code  
+		where c.group_id=#{group_id} and c.hos_id=#{hos_id} and c.copy_code=#{copy_code} and c.vouch_id=#{vouch_id} and c.subj_code=#{subj_code}
+		${exis_sql}
+		
+	</select>
+	
+	<!-- 判断分录是否出纳对账 -->
+	<select id="queryVouchByTellVeri" parameterType="java.util.Map" resultType="String">	
+		
+		select distinct a.subj_code from acc_tell_veri v 
+		inner join acc_vouch_detail a on v.group_id=a.group_id and v.hos_id=a.hos_id and v.vouch_check_id=a.vouch_detail_id
+		where a.group_id=#{group_id} and a.hos_id=#{hos_id} and a.copy_code=#{copy_code} and a.vouch_id=#{vouch_id}
+		
+	</select>
+	
+	<!-- 判断辅助核算是否单位银行对账 -->
+	<select id="queryVouchByBankVeri" parameterType="java.util.Map" resultType="String">	
+		
+		select distinct a.subj_code from acc_bank_veri v 
+		inner join acc_vouch_check a on v.group_id=a.group_id and v.hos_id=a.hos_id and v.vouch_check_id=a.vouch_check_id
+		where a.group_id=#{group_id} and a.hos_id=#{hos_id} and a.copy_code=#{copy_code} and a.vouch_id=#{vouch_id}
+		
+	</select>
+	
+	<!-- 判断辅助核算是否往来核销 -->
+	<select id="queryVouchByVeri" parameterType="java.util.Map" resultType="String">	
+		
+		select a.subj_code from acc_vouch_veri v 
+		inner join acc_vouch_check a on v.group_id=a.group_id and v.hos_id=a.hos_id and v.debit_check_id=a.vouch_check_id 
+		where a.group_id=#{group_id} and a.hos_id=#{hos_id} and a.copy_code=#{copy_code} and a.vouch_id=#{vouch_id}
+		union 
+		select a.subj_code from acc_vouch_veri v 
+		inner join acc_vouch_check a on v.group_id=a.group_id and v.hos_id=a.hos_id and v.credit_check_id=a.vouch_check_id
+		where a.group_id=#{group_id} and a.hos_id=#{hos_id} and a.copy_code=#{copy_code} and a.vouch_id=#{vouch_id}
+		
+	</select>
+	
+	<!-- 凭证打印，查询主表 -->
+	<select id="queryVouchPrintMain" parameterType="java.util.Map" resultType="java.util.Map">		
+	  select vouch_type_name, vouch_no, vouch_date, vouch_att_num, 
+		create_name,cash_name,audit_name,acc_name,note,hos_name,copy_name,
+		debit_sum,debit_sum as credit_sum,debit_sum as debit_sum_capital,
+		budg_debit_sum,budg_debit_sum as budg_credit_sum,budg_debit_sum as budg_debit_sum_capital
+		from (
+			SELECT t.vouch_type_name, v.vouch_no, to_char(v.vouch_date, 'yyyy-MM-dd') AS vouch_date, v.vouch_att_num, u1.user_name AS create_name
+			  , u2.user_name AS cash_name, u3.user_name AS audit_name, u4.user_name AS acc_name, v.note, h.hos_name,hc.copy_name
+			,(select SUM(d.debit) from acc_vouch_detail d 
+			inner join acc_subj s on d.group_id=s.group_id and d.hos_id=s.hos_id and d.copy_code=s.copy_code and d.acc_year=s.acc_year and d.subj_code=s.subj_code 
+			where d.vouch_id=v.vouch_id and d.group_id=v.group_id and d.hos_id=v.hos_id and d.copy_code=v.copy_code and s.kind_code='01'
+			) debit_sum
+			,(select SUM(d.debit) from acc_vouch_detail d 
+			inner join acc_subj s on d.group_id=s.group_id and d.hos_id=s.hos_id and d.copy_code=s.copy_code and d.acc_year=s.acc_year and d.subj_code=s.subj_code 
+			where d.vouch_id=v.vouch_id and d.group_id=v.group_id and d.hos_id=v.hos_id and d.copy_code=v.copy_code and s.kind_code='02'
+			) budg_debit_sum 
+			FROM acc_vouch v
+			left join acc_vouch_type t on v.group_id=t.group_id and v.hos_id=t.hos_id and v.copy_code=t.copy_code and v.vouch_type_code=t.vouch_type_code
+			left join sys_user u1 on v.create_user=u1.user_id
+			left join sys_user u2 on v.cash_user=u2.user_id
+			left join sys_user u3 on v.audit_user=u3.user_id
+			left join sys_user u4 on v.acc_user=u4.user_id
+			left join hos_info h on v.group_id=h.group_id and  v.hos_id=h.hos_id
+			left join hos_copy hc on v.group_id=hc.group_id and v.hos_id=hc.hos_id and v.copy_code=hc.copy_code 
+		    where v.group_id=#{group_id} and v.hos_id=#{hos_id} and v.copy_code=#{copy_code} 
+			and v.vouch_id=#{vouch_id}
+		)t
+	</select>
+	
+	<!-- 凭证打印，查询明细表 -->
+	<select id="queryVouchPrintDetail" parameterType="java.util.Map" resultType="java.util.Map">		
+	   
+		select v.vouch_id as id,d.summary,s.subj_code,s.subj_name,s.subj_name_all,
+		case when d.debit=0 then NULL else d.debit end debit,
+		case when d.credit=0 then NULL else d.credit end credit,d.vouch_detail_id as did,
+		s.is_check,s.is_check,s.check1,s.check2,s.check3,s.check4,s.kind_code
+		from acc_vouch v
+		inner join acc_vouch_detail d on v.vouch_id=d.vouch_id and v.group_id=d.group_id and v.hos_id=d.hos_id and v.copy_code=d.copy_code
+		left join acc_subj s on s.group_id=d.group_id and s.hos_id=d.hos_id and s.copy_code=d.copy_code and s.acc_year=d.acc_year and s.subj_code=d.subj_code 
+		where v.group_id=#{group_id} and v.hos_id=#{hos_id} and v.copy_code=#{copy_code} 
+		and v.vouch_id=#{vouch_id}
+		order by s.kind_code,d.vouch_row
+	</select>
+	
+	
+	<!-- 凭证打印、批量打印查询主表，按财务预算会计科目分凭证打印 -->
+	<select id="querySuperVouchPrintBatch_kind" parameterType="java.util.Map" resultType="java.util.Map">
+		
+	  	select vouch_id as id, vouch_type_name, vouch_no, vouch_date, vouch_att_num
+		  , create_name, cash_name, audit_name, acc_name, note
+		  , hos_name, copy_name, debit_sum, debit_sum as credit_sum, debit_sum as debit_sum_capital
+		  , case kind_code when '02' then '预算' else '财务' end kind_name 
+		from (
+		  select v.vouch_id||'-'||s.kind_code vouch_id, t.vouch_type_name, v.vouch_no
+		    , to_char(v.vouch_date, 'yyyy-MM-dd') as vouch_date, v.vouch_att_num
+		    , u1.user_name as create_name, u2.user_name as cash_name, u3.user_name as audit_name, u4.user_name as acc_name, v.note
+		    , h.hos_name, hc.copy_name
+		    ,sum(d.debit) as debit_sum,s.kind_code
+		  from acc_vouch v
+		  inner join acc_vouch_detail d on d.group_id = v.group_id
+		        and d.hos_id = v.hos_id
+		        and d.copy_code = v.copy_code and  d.vouch_id = v.vouch_id
+		  left join acc_subj s on s.group_id = d.group_id and s.hos_id = d.hos_id and s.copy_code = d.copy_code
+		  and s.acc_year = d.acc_year and d.subj_code = s.subj_code 
+		  left join acc_vouch_type t on v.group_id = t.group_id
+		  and v.hos_id = t.hos_id
+		  and v.copy_code = t.copy_code
+		  and v.vouch_type_code = t.vouch_type_code 
+		  left join sys_user u1 on v.create_user = u1.user_id 
+		  left join sys_user u2 on v.cash_user = u2.user_id 
+		  left join sys_user u3 on v.audit_user = u3.user_id 
+		  left join sys_user u4 on v.acc_user = u4.user_id 
+		  left join hos_info h on v.group_id = h.group_id
+		  and v.hos_id = h.hos_id 
+		  left join hos_copy hc on v.group_id = hc.group_id
+		  and v.hos_id = hc.hos_id
+		  and v.copy_code = hc.copy_code 
+		  where v.group_id=#{group_id} and v.hos_id=#{hos_id} and v.copy_code=#{copy_code} 
+			AND v.vouch_date between to_date(#{vouch_date_b},'yyyy-MM-dd') and to_date(#{vouch_date_e},'yyyy-MM-dd')
+			and v.vouch_type_code=#{vouch_type_code}
+			<if test="vouch_id != null and vouch_id != ''">
+				AND v.vouch_id=#{vouch_id}
+			</if>		
+			<if test="vouch_no_b != null and vouch_no_b != ''">
+				AND to_number(v.vouch_no) &gt;= #{vouch_no_b}
+			</if>
+			<if test="vouch_no_e != null and vouch_no_e != ''">
+				AND to_number(v.vouch_no) &lt;= #{vouch_no_e}
+			</if>
+		    <if test="create_user != null and create_user != ''">
+				AND v.create_user = #{create_user}
+			</if>
+			<if test="subj_code != null and subj_code != ''">
+				AND exists(
+			    select 1 from acc_vouch_detail d 
+			    where 
+			        d.group_id = v.group_id
+			        AND d.hos_id = v.hos_id
+			        AND d.copy_code = v.copy_code
+			       	and d.vouch_id = v.vouch_id
+			       and d.subj_code like '${subj_code}%'
+			    ) 
+			</if>
+		  group by v.vouch_id, t.vouch_type_name, v.vouch_no
+		    , to_char(v.vouch_date, 'yyyy-MM-dd'), v.vouch_att_num
+		    , u1.user_name, u2.user_name, u3.user_name, u4.user_name, v.note
+		    , h.hos_name, hc.copy_name,s.kind_code
+		    order by to_number(v.vouch_no),s.kind_code
+		) t
+		
+	</select>
+	
+	
+	<!-- 凭证批量打印,按财务预算会计科目分栏式打印，查询主表 -->
+	<select id="querySuperVouchPrintBatch" parameterType="java.util.Map" resultType="java.util.Map">		
+	  select vouch_id as id,vouch_type_name, vouch_no, vouch_date, vouch_att_num,
+		create_name,cash_name,audit_name,acc_name,note,hos_name,copy_name,
+		debit_sum,debit_sum as credit_sum,debit_sum as debit_sum_capital,
+		budg_debit_sum,budg_debit_sum as budg_credit_sum,budg_debit_sum as budg_debit_sum_capital
+		from (
+			SELECT v.vouch_id,t.vouch_type_name, v.vouch_no, to_char(v.vouch_date, 'yyyy-MM-dd') AS vouch_date, v.vouch_att_num, u1.user_name AS create_name
+			  , u2.user_name AS cash_name, u3.user_name AS audit_name, u4.user_name AS acc_name, v.note, h.hos_name,hc.copy_name
+			,(select SUM(d.debit) from acc_vouch_detail d 
+			inner join acc_subj s on d.group_id=s.group_id and d.hos_id=s.hos_id and d.copy_code=s.copy_code and d.acc_year=s.acc_year and d.subj_code=s.subj_code 
+			where d.vouch_id=v.vouch_id and d.group_id=v.group_id and d.hos_id=v.hos_id and d.copy_code=v.copy_code and s.kind_code='01'
+			) debit_sum
+			,(select SUM(d.debit) from acc_vouch_detail d 
+			inner join acc_subj s on d.group_id=s.group_id and d.hos_id=s.hos_id and d.copy_code=s.copy_code and d.acc_year=s.acc_year and d.subj_code=s.subj_code 
+			where d.vouch_id=v.vouch_id and d.group_id=v.group_id and d.hos_id=v.hos_id and d.copy_code=v.copy_code and s.kind_code='02'
+			) budg_debit_sum 
+			FROM acc_vouch v
+			left join acc_vouch_type t on v.group_id=t.group_id and v.hos_id=t.hos_id and v.copy_code=t.copy_code and v.vouch_type_code=t.vouch_type_code
+			left join sys_user u1 on v.create_user=u1.user_id
+			left join sys_user u2 on v.cash_user=u2.user_id
+			left join sys_user u3 on v.audit_user=u3.user_id
+			left join sys_user u4 on v.acc_user=u4.user_id
+			left join hos_info h on v.group_id=h.group_id and  v.hos_id=h.hos_id
+			left join hos_copy hc on v.group_id=hc.group_id and v.hos_id=hc.hos_id and v.copy_code=hc.copy_code 
+		    where v.group_id=#{group_id} and v.hos_id=#{hos_id} and v.copy_code=#{copy_code} 
+			AND v.vouch_date between to_date(#{vouch_date_b},'yyyy-MM-dd') and to_date(#{vouch_date_e},'yyyy-MM-dd')
+			and v.vouch_type_code=#{vouch_type_code}			
+			<if test="vouch_no_b != null and vouch_no_b != ''">
+				AND to_number(v.vouch_no) &gt;= #{vouch_no_b}
+			</if>
+			<if test="vouch_no_e != null and vouch_no_e != ''">
+				AND to_number(v.vouch_no) &lt;= #{vouch_no_e}
+			</if>
+		    <if test="create_user != null and create_user != ''">
+				AND v.create_user = #{create_user}
+			</if>
+			<if test="subj_code != null and subj_code != ''">
+				AND exists(
+			    select 1 from acc_vouch_detail d 
+			    where 
+			        d.group_id = v.group_id
+			        AND d.hos_id = v.hos_id
+			        AND d.copy_code = v.copy_code
+			       	and d.vouch_id = v.vouch_id
+			       and d.subj_code like '${subj_code}%'
+			    ) 
+			</if>
+			 order by to_number(v.vouch_no)
+		)t
+		
+	</select>
+	
+	<!-- 凭证批量打印，查询明细表 -->
+	<select id="querySuperVouchPrintBatch_detail" parameterType="java.util.Map" resultType="java.util.Map">		
+	
+		  SELECT v.vouch_id ${kind_code} as id,d.summary, d.subj_code, s.subj_name, s.subj_name_all, 
+		  CASE WHEN d.debit = 0 THEN NULL ELSE d.debit END AS debit,
+		  CASE WHEN d.credit = 0 THEN NULL ELSE d.credit END AS credit,d.vouch_detail_id as did,
+		  s.is_check,s.check1,s.check2,s.check3,s.check4,s.kind_code
+		  FROM acc_vouch v
+		  INNER JOIN acc_vouch_detail d ON v.vouch_id = d.vouch_id AND v.group_id = d.group_id AND v.hos_id = d.hos_id AND v.copy_code = d.copy_code 
+		  LEFT JOIN acc_subj s ON s.group_id = d.group_id AND s.hos_id = d.hos_id AND s.copy_code = d.copy_code and s.acc_year=d.acc_year and d.subj_code=s.subj_code 
+		  where v.group_id=#{group_id} and v.hos_id=#{hos_id} and v.copy_code=#{copy_code} 
+		  AND v.vouch_date between to_date(#{vouch_date_b},'yyyy-MM-dd') and to_date(#{vouch_date_e},'yyyy-MM-dd')
+			and v.vouch_type_code=#{vouch_type_code}
+			<if test="vouch_id != null and vouch_id != ''">
+				AND v.vouch_id=#{vouch_id}
+			</if>		
+			<if test="vouch_no_b != null and vouch_no_b != ''">
+				AND to_number(v.vouch_no) &gt;= #{vouch_no_b}
+			</if>
+			<if test="vouch_no_e != null and vouch_no_e != ''">
+				AND to_number(v.vouch_no) &lt;= #{vouch_no_e}
+			</if>
+		    <if test="create_user != null and create_user != ''">
+				AND v.create_user = #{create_user}
+			</if>
+			<if test="subj_code != null and subj_code != ''">			
+			    AND exists(
+			    select 1 from acc_vouch_detail d 
+			    where 
+			        d.group_id = v.group_id
+			        AND d.hos_id = v.hos_id
+			        AND d.copy_code = v.copy_code
+			        and d.vouch_id = v.vouch_id
+			       and d.subj_code like '${subj_code}%'
+			    ) 			    
+			</if>
+		  order by to_number(v.vouch_no),s.kind_code,d.vouch_row
+	</select>
+	
+	<!-- 凭证打印，查询辅助核算 -->
+	<select id="querySuperVouchCheckPrint" parameterType="java.util.Map" resultType="java.util.Map">		
+	
+		  SELECT v.vouch_id ${kind_code} as id,a.summary, s.subj_code,
+		  <!-- 判断科目是否带票据核销 如果带，打印票据号以及结算方式；否则不打印 -->
+		  case when s.is_bill =1 then s.subj_name||'（'||${selSql}||'）'|| '（' || apt.pay_name ||' '||a.check_no|| '）' 
+		  else s.subj_name||'（'||${selSql}||'）' end subj_name, 
+		  <!-- 判断科目是否带票据核销 如果带，打印票据号以及结算方式；否则不打印 -->
+		   case when s.is_bill =1 then s.subj_name_all||'（'||${selSql}||'）'|| '（' || apt.pay_name ||' '||a.check_no|| '）' 
+		  else s.subj_name_all||'（'||${selSql}||'）' end subj_name_all, 
+		  CASE WHEN a.debit = 0 THEN NULL ELSE a.debit END AS debit,
+		  CASE WHEN a.credit = 0 THEN NULL ELSE a.credit END AS credit,s.kind_code,a.vouch_check_id did
+		  FROM acc_vouch_check a
+		  inner join acc_vouch v on a.vouch_id=v.vouch_id and a.group_id = v.group_id AND a.hos_id = v.hos_id AND a.copy_code = v.copy_code 		 
+		  LEFT JOIN acc_subj s ON s.group_id = a.group_id AND s.hos_id = a.hos_id AND s.copy_code = a.copy_code and s.acc_year=a.acc_year and s.subj_code = a.subj_code 
+		  left join acc_pay_type apt on apt.group_id = a.group_id and apt.hos_id = a.hos_id and apt.copy_code = a.copy_code and apt.pay_code = a.pay_type_code 	
+		  ${leftSql}
+		  where v.group_id=#{group_id} and v.hos_id=#{hos_id} and v.copy_code=#{copy_code} 
+		  and a.vouch_detail_id=#{did}
+		  order by a.sort_code
+	</select>
+	
+	
+	<!-- 点击凭证分录，查询科目余额 -->
+	<select id="querySuperVouchSubjBalance" parameterType="java.util.Map" resultType="java.util.Map">		
+		
+		with t1 as (
+		    select end_os from acc_leder
+		    where group_id = #{group_id}
+		      and hos_id = #{hos_id}
+		      and copy_code = #{copy_code}
+		      and acc_year = #{acc_year}
+		      and acc_month = '00'
+		      and subj_code = #{subj_code}
+		),
+		t2 as(
+		  select sum(d.debit) as debit, sum(d.credit) as credit,acc_month
+		  from acc_vouch_detail d
+		  inner join acc_vouch v on d.group_id=v.group_id and d.hos_id=v.hos_id and d.copy_code=v.copy_code and d.vouch_id=v.vouch_id
+		  where d.group_id=#{group_id} and d.hos_id=#{hos_id} and d.copy_code=#{copy_code} and v.state &gt;= 1 and d.subj_code=#{subj_code} 
+		  <if test='p_028 =="0"'>
+		    	and v.acc_year &gt;=#{acc_year}
+		  </if>
+		  <if test='p_028 =="1"'>
+		    	and v.acc_year=#{acc_year}
+				and v.acc_month &lt;=#{acc_month}
+		  </if>
+		  <if test='p_028 =="2"'>
+		    	and v.acc_year=#{acc_year}
+				and v.vouch_date &lt;=to_date(#{vouch_date},'yyyy-MM-dd')
+		  </if>
+		  group by acc_month 
+		)
+		
+		/*期初余额：年初账+凭证期初余额*/
+		select to_char(nvl((select end_os from t1), 0) 
+		+nvl(case 
+			when #{subj_dire}=0 then (select sum(debit - credit) from t2 where acc_month &lt;#{acc_month}) 
+			else (select  sum(credit-debit) from t2 where acc_month &lt;#{acc_month}) 
+			end, 0), '999,999,990.00') "bal_os",
+		/*本期发生：凭证发生额*/
+		to_char(nvl((select debit from t2 where acc_month=#{acc_month}), 0), '999,999,990.00') "this_od",
+		to_char(nvl((select credit from t2 where acc_month=#{acc_month}), 0), '999,999,990.00') "this_oc",
+		/*期末余额：年初账+凭证余额*/
+		to_char(nvl((select end_os from t1), 0) 
+		+nvl(case 
+			when #{subj_dire}=0 then (select sum(debit-credit) from t2) 
+			else (select  sum(credit-debit) from t2) end, 0), '999,999,990.00') "end_os"
+		from dual
+		 
+	</select>
+	
+	<!-- 点击辅助核算，展示辅助核算余额 -->
+	<select id="querySuperVouchCheckBalance" parameterType="java.util.Map" resultType="java.util.Map">
+		with t1 as (
+		    select sum(end_os) end_os from acc_leder_check
+		    where group_id = #{group_id}
+		      and hos_id = #{hos_id}
+		      and copy_code = #{copy_code}
+		      and acc_year = #{acc_year}
+		      and acc_month = '00'
+		      and subj_code = #{subj_code}
+		      ${checkSql}
+		),
+		t2 as(
+		  select sum(d.debit) as debit, sum(d.credit) as credit,acc_month
+		  from acc_vouch_check d
+		  inner join acc_vouch v on d.group_id=v.group_id and d.hos_id=v.hos_id and d.copy_code=v.copy_code and d.vouch_id=v.vouch_id
+		  where d.group_id=#{group_id} and d.hos_id=#{hos_id} and d.copy_code=#{copy_code} and v.state &gt;= 1 
+		  and d.subj_code=#{subj_code} ${checkSql}
+		  <if test='p_028 =="0"'>
+		    	and v.acc_year &gt;=#{acc_year}
+		  </if>
+		  <if test='p_028 =="1"'>
+		    	and v.acc_year=#{acc_year}
+				and v.acc_month &lt;=#{acc_month}
+		  </if>
+		  <if test='p_028 =="2"'>
+		    	and v.acc_year=#{acc_year}
+				and v.vouch_date &lt;=to_date(#{vouch_date},'yyyy-MM-dd')
+		  </if>
+		  group by acc_month 
+		)
+		
+		/*期初余额：年初账+凭证期初余额*/
+		select to_char(nvl((select end_os from t1), 0) 
+		+nvl(case 
+			when #{subj_dire}=0 then (select sum(debit - credit) from t2 where acc_month &lt;#{acc_month}) 
+			else (select  sum(credit-debit) from t2 where acc_month &lt;#{acc_month}) 
+			end, 0), '999,999,990.00') "bal_os",
+		/*本期发生：凭证发生额*/
+		to_char(nvl((select debit from t2 where acc_month=#{acc_month}), 0), '999,999,990.00') "this_od",
+		to_char(nvl((select credit from t2 where acc_month=#{acc_month}), 0), '999,999,990.00') "this_oc",
+		/*期末余额：年初账+凭证余额*/
+		to_char(nvl((select end_os from t1), 0) 
+		+nvl(case 
+			when #{subj_dire}=0 then (select sum(debit-credit) from t2) 
+			else (select  sum(credit-debit) from t2) end, 0), '999,999,990.00') "end_os"
+		from dual
+		
+	</select>
+	
+	<!-- 更新票据核销状态 -->
+	<update id="updateSuperVouchByCheckNo" parameterType="java.util.Map">
+		begin
+			update ACC_PAPER_DETAIL set is_check=0,vouch_id=null
+			where group_id=#{group_id} and hos_id=#{hos_id} and copy_code=#{copy_code} and vouch_id=#{vouch_id};
+		
+			update ACC_PAPER_DETAIL set CHECK_USER_ID=#{create_user},CHECK_DATE=#{create_date},is_check=1,vouch_id=#{vouch_id}
+			where group_id=#{group_id} and hos_id=#{hos_id} and copy_code=#{copy_code} and is_check=0
+			and exists(select 1 from acc_vouch_check c where  c.group_id=#{group_id} and c.hos_id=#{hos_id} and c.copy_code=#{copy_code} 
+			and c.vouch_id=#{vouch_id} and c.paper_type_code=ACC_PAPER_DETAIL.type_code and c.check_no=ACC_PAPER_DETAIL.PAPER_NUM);
+		end;
+	</update>
+	
+	<!-- 添加凭证日志表，业务系统自动生成凭证，老的处理方式 -->
+	<insert id="saveSuperVouchByAutoLog" parameterType="java.util.Map">
+		INSERT INTO ${busi_log_table}(group_id,hos_id,copy_code,acc_year,busi_type_code,
+		business_no,vouch_id,template_code,create_date,create_user)
+		<foreach collection="busi_no" item="item" index="index" separator=" union all ">
+			select
+				#{group_id},#{hos_id},#{copy_code},#{acc_year},#{busi_type_code},
+				#{item},#{vouch_id},#{template_code},#{create_date},#{create_user}
+			from dual
+		</foreach>
+	</insert>
+	
+	<!-- 添加凭证日志表，期末处理、工资转账凭证 -->
+	<insert id="saveSuperVouchByQimoLog" parameterType="java.util.Map">
+		INSERT INTO acc_vouch_source (group_id,hos_id,copy_code,acc_year,acc_month,vouch_id,busi_type_code,busi_no)
+		values(#{group_id},#{hos_id},#{copy_code},#{acc_year},#{acc_month},#{vouch_id},#{busi_type_code},#{busi_no})	
+	</insert>
+	
+	<!-- 出纳凭证回写出纳登记表 -->
+	<update id="updateSuperVouchByAccTell" parameterType="java.util.Map">
+		update acc_tell set vouch_id=#{vouch_id} 
+		where  group_id=#{group_id} and hos_id=#{hos_id} and copy_code=#{copy_code} 
+		and tell_id in
+		<foreach collection="busi_no" index="index" item="item" open="(" separator="," close=")">    
+            ${item}    
+        </foreach>  
+	</update>
+	
+	<!-- 凭证复制-begin -->
+	<!-- 取当前账套下所有辅助核算字段 -->
+	<select id="queryAccCheckTypeColumnCheck" parameterType="java.util.Map" resultType="java.util.Map">
+
+		SELECT is_sys "is_sys",is_change "is_change",check_type_id "check_type_id",column_id "column_id",column_no "column_no",
+		column_check "column_check",check_table "check_table",column_code "column_code",column_name "column_name"
+		FROM ACC_CHECK_TYPE
+		where group_id = #{group_id} AND hos_id = #{hos_id} AND copy_code = #{copy_code}
+	</select>
+	
+	<!-- 复制凭证主表 -->
+	<insert id="copySuperVouchMain" parameterType="java.util.Map">
+
+		INSERT INTO ACC_VOUCH(vouch_id,group_id,hos_id,copy_code,acc_year,acc_month,vouch_type_code,vouch_no,vouch_date,vouch_att_num,
+		create_user,create_date,state,vouch_id_cx,vouch_cx_state,busi_type_code) 
+		select #{vouch_id_new},group_id,hos_id,copy_code,#{acc_year},#{acc_month},vouch_type_code,#{vouch_no},#{vouch_date},vouch_att_num,
+		#{create_user},#{create_date},1,#{vouch_id_cx},#{vouch_cx_state},''
+		from acc_vouch
+		where group_id =#{group_id} and hos_id = #{hos_id}
+		and copy_code = #{copy_code} and acc_year=#{old_acc_year}
+		and vouch_id =#{vouch_id}
+	</insert>
+	
+	<!--凭证复制、 查询要复制的凭证信息 -->
+	<select id="queryCopyAccVouchByVouchId" parameterType="java.util.Map" resultType="java.util.Map">
+		select to_char(vouch_date,'yyyy-MM-dd') vouch_date,vouch_type_code,state from acc_vouch 
+		where group_id =#{group_id} and hos_id = #{hos_id} and copy_code = #{copy_code} and vouch_id=#{vouch_id} 
+		
+	</select>
+	
+	<!--凭证复制、 查询要复制的凭证明细 -->
+	<select id="queryCopyAccVouchDetailByVouchId" parameterType="java.util.Map" resultType="String">
+	select vouch_detail_id from acc_vouch_detail 
+	where group_id =#{group_id} and hos_id = #{hos_id} and copy_code = #{copy_code} and vouch_id =#{vouch_id}
+	</select>
+	
+	<!-- 凭证复制、查询要复制的辅助核算 -->
+	<select id="queryCopyAccVouchCheckByVouchId" parameterType="java.util.Map" resultType="java.util.Map">
+		select c.vouch_detail_id,c.vouch_check_id,s.subj_nature_code from ACC_VOUCH_CHECK c
+		inner join acc_subj s on s.group_id=c.group_id and s.hos_id=c.hos_id and s.copy_code=c.copy_code and s.acc_year=c.acc_year and s.subj_code=c.subj_code
+		where c.group_id =#{group_id} and c.hos_id = #{hos_id} and c.copy_code = #{copy_code} and c.vouch_id =#{vouch_id} 
+		
+	</select>
+	
+	<!-- 凭证复制、查询要复制的现金流量 -->
+	<select id="queryCopyAccVouchCashByVouchId" parameterType="java.util.Map" resultType="java.util.Map">
+		select vouch_detail_id,cash_id from acc_cash_flow 
+		where group_id =#{group_id} and hos_id = #{hos_id} and copy_code = #{copy_code} and vouch_id=#{vouch_id} 
+		
+	</select>
+	
+	<!-- 复制凭证明细表 -->
+	<insert id="copySuperVouchDetail" parameterType="java.util.List">
+		INSERT INTO ACC_VOUCH_DETAIL (vouch_detail_id,vouch_id,group_id,hos_id,copy_code,acc_year,subj_code,vouch_row,summary,
+		debit,credit,debit_w,credit_w)
+		<foreach collection="list" item="item" index="index" separator=" union all ">
+			select #{item.vouch_detail_id_new},#{item.vouch_id_new},d.group_id,d.hos_id,d.copy_code,#{item.acc_year},d.subj_code,d.vouch_row,d.summary,
+			case when #{item.copy_type} = '1' then -d.debit else d.debit end,
+			case when #{item.copy_type} = '1' then -d.credit else d.credit end,
+			case when #{item.copy_type} = '1' then -d.debit_w else d.debit_w end,
+			case when #{item.copy_type} = '1' then -d.credit_w else d.credit_w end
+			from acc_vouch_detail d
+			where d.group_id = #{item.group_id} and d.hos_id = #{item.hos_id} and d.copy_code = #{item.copy_code} 
+			and d.vouch_id =#{item.vouch_id} and d.vouch_detail_id =#{item.vouch_detail_id}
+		</foreach>
+	</insert>
+	
+	<!-- 复制凭证辅助核算表 -->
+	<insert id="copySuperVouchCheck" parameterType="java.util.List">
+		<foreach collection="list" item="item" index="index" open="begin" close=";end;" separator=";" >
+		INSERT INTO ACC_VOUCH_CHECK (
+		vouch_check_id,vouch_id,vouch_detail_id,group_id,hos_id,copy_code,acc_year,
+		subj_code,summary,con_no,business_no,occur_date,due_date
+		${item.column_name} ,is_init,
+		debit,credit,debit_w,credit_w,sort_code
+		)
+		select #{item.vouch_check_id_new},#{item.vouch_id_new},#{item.vouch_detail_id_new},
+		d.group_id,d.hos_id,d.copy_code,#{item.acc_year},
+		d.subj_code,summary,con_no,business_no,#{item.occur_date},#{item.due_date}
+		${item.column_name}, 0,
+		case when #{item.copy_type} ='1' then -debit else debit end,
+		case when #{item.copy_type} = '1' then -credit else credit end,
+		case when #{item.copy_type} = '1' then -debit_w else debit_w end,
+		case when #{item.copy_type} = '1' then -credit_w else credit_w end,d.sort_code
+		from ACC_VOUCH_CHECK d 
+		where d.group_id=#{item.group_id} and d.hos_id =#{item.hos_id} and d.copy_code=#{item.copy_code}
+		and d.acc_year=#{item.old_acc_year} and d.vouch_id =#{item.vouch_id} and d.vouch_detail_id =#{item.vouch_detail_id}
+		and d.vouch_check_id =#{item.vouch_check_id}	
+		</foreach>
+	</insert>
+	
+	<!-- 复制现金流量标注表 -->
+	<insert id="copySuperVouchCash" parameterType="java.util.List">
+		<foreach collection="list" item="item" index="index" open="begin" close=";end;" separator=";" >
+		INSERT INTO ACC_CASH_FLOW (
+		cash_id,vouch_detail_id,group_id,hos_id,copy_code,summary,
+		cash_item_id,create_user,create_date,vouch_id,cash_money
+		)
+		select #{item.cash_id_new},#{item.vouch_detail_id_new},group_id,hos_id,copy_code,summary,
+		cash_item_id,#{item.create_user},#{item.create_date},#{item.vouch_id_new},
+		case when #{item.copy_type} = '1' then -cash_money else cash_money end
+		from ACC_CASH_FLOW 
+		where group_id=#{item.group_id} and hos_id =#{item.hos_id} and copy_code=#{item.copy_code}
+		and vouch_id=#{item.vouch_id} and vouch_detail_id =#{item.vouch_detail_id} and cash_id =#{item.cash_id}	
+		</foreach>
+	</insert>
+	
+	<!-- 复制差异标注 -->
+	<insert id="copySuperVouchDiff" parameterType="java.util.Map">
+		insert into acc_vouch_diff(group_id,hos_id,copy_code,diff_id,vouch_id,acc_year,acc_month,diff_item_code,diff_date,diff_money,is_auto,summary)
+        select #{group_id},#{hos_id},#{copy_code},diff_id,#{vouch_id_new},#{acc_year},#{acc_month},diff_item_code,#{vouch_date},
+        case when #{copy_type} = '1' then diff_money*-1 else diff_money end,
+        is_auto,summary 
+        from acc_vouch_diff where group_id=#{group_id} and hos_id =#{hos_id} and copy_code=#{copy_code} and vouch_id=#{vouch_id}
+	</insert>
+
+	<!-- 根据业务表的编码复制辅助核算项表 -->
+	<insert id="copyAccCheckItemByBusi" parameterType="java.util.Map">
+		insert into acc_check_item(CHECK_ITEM_ID, CHECK_TYPE_ID, GROUP_ID, HOS_ID, COPY_CODE, CHECK_ITEM_CODE, CHECK_ITEM_NAME,SPELL_CODE, WBX_CODE, sort_code,IS_STOP)
+		select ACC_CHECK_ITEM_SEQ.nextval, #{check_type_id}, group_id,hos_id,copy_code,${z_dict_code},${z_dict_name} ${z_spell_code} ${z_wbx_code} ${z_sort_code},0 
+		from BUDG_PAYMENT_ITEM  
+		where not exists( 
+		        select 1 from acc_check_item m     
+		        where BUDG_PAYMENT_ITEM.group_id=m.group_id and BUDG_PAYMENT_ITEM.hos_id=BUDG_PAYMENT_ITEM.hos_id and BUDG_PAYMENT_ITEM.copy_code=m.copy_code
+		        and m.check_type_id=#{check_type_id} and ${z_dict_code}=m.check_item_code  
+		)
+		and group_id=#{group_id} and hos_id=#{hos_id} and copy_code=#{copy_code}
+	</insert>
+	<!-- 凭证复制-end -->
+	
+	<!-- 根据核算类型column_check查找字典对应表，自动生成凭证自定义核算关联系统字典表 -->
+	<select id="queryAccCheckTypeZCode" parameterType="java.util.Map" resultType="java.util.Map">
+		select a.group_id "group_id",a.hos_id "hos_id",a.copy_code "copy_code",
+		a.check_type_id "check_type_id",a.z_code "z_code",b.z_busi_id "z_busi_id",b.z_busi_code "z_busi_code",b.z_busi_name "z_busi_name",
+		z_dict_code "z_dict_code",z_dict_name "z_dict_name",z_spell_code "z_spell_code",z_wbx_code "z_wbx_code",z_sort_code "z_sort_code"
+		 from acc_check_type a
+		inner join ACC_BUSI_ZCHECK b on a.group_id=b.group_id and a.hos_id=b.hos_id and a.copy_code=b.copy_code and a.Z_CODE=b.Z_CODE
+		where a.group_id =#{group_id} and a.hos_id = #{hos_id} and a.copy_code = #{copy_code} and a.column_check=#{column_check}
+		and instr(b.busi_type_code, #{busi_type_code}) > 0 
+		and rownum=1
+	</select>
+	
+	
+	<!-- 凭证模板处理  begin -->
+	<!-- 添加凭证模板主表 -->
+	<insert id="insertAccVouchTemplate" parameterType="java.util.Map">
+		insert into ACC_TEMPLATE(GROUP_ID,HOS_ID, COPY_CODE, TEMPLATE_CODE, TEMPLATE_NAME, VOUCH_TYPE_CODE, VOUCH_ATT_NUM,SORT_CODE, USER_ID,NOTE)
+		values(#{group_id},#{hos_id},#{copy_code},#{template_code},#{template_name},#{vouch_type_code},#{vouch_att_num},#{sort_code}，#{user_id},#{note})
+	</insert>
+	
+	<!-- 添加用户数据表-凭证模板 -->
+	<insert id="insertUserPermbyTemplate" parameterType="java.util.Map">
+		insert into SYS_USER_PERM_DATA(GROUP_ID,HOS_ID, COPY_CODE,acc_year, user_id, mod_code, table_code,perm_code, is_read,is_write)
+		values(#{group_id},#{hos_id},#{copy_code},'0',#{user_id},'01','ACC_TEMPLATE',#{template_code},1,1)
+	</insert>
+	
+	<!-- 添加凭证模板明细表 -->
+	<insert id="insertAccVouchTemplateDetail" parameterType="java.util.Map">
+		insert into ACC_TEMPLATE_DETAIL(GROUP_ID,HOS_ID, COPY_CODE, TEMPLATE_CODE, VOUCH_DETAIL_ID, VOUCH_ROW, SUBJ_CODE, SUMMARY,DEBIT,CREDIT,DEBIT_W,CREDIT_W)
+		select d.group_id,d.hos_id,d.copy_code,#{template_code},d.vouch_detail_id,d.vouch_row,d.subj_code,d.summary,d.debit,d.credit,d.debit_w,d.credit_w 
+		from acc_vouch_detail d 
+		where d.group_id=#{group_id} and d.hos_id=#{hos_id} and d.copy_code=#{copy_code} and d.vouch_id=#{vouch_id}
+	</insert>
+	
+	<!-- 添加凭证模板明细表-批量 -->
+	<insert id="insertAccVouchTemplateDetailBatch" parameterType="java.util.List">
+		INSERT INTO ACC_TEMPLATE_DETAIL (GROUP_ID,HOS_ID, COPY_CODE, TEMPLATE_CODE, VOUCH_DETAIL_ID, VOUCH_ROW, SUBJ_CODE, SUMMARY,DEBIT,CREDIT,DEBIT_W,CREDIT_W)
+		<foreach collection="list" item="item" index="index" separator=" union all ">
+			select
+				#{item.group_id},#{item.hos_id},#{item.copy_code},#{item.template_code},#{item.vouch_detail_id},#{item.vouch_row},
+				#{item.subj_code},#{item.summary},#{item.debit},#{item.credit},#{item.debit_w},#{item.credit_w}
+			from dual
+		</foreach>
+	</insert>
+	
+	
+	<!-- 添加凭证模板辅助核算表 -->
+	<insert id="insertAccVouchTemplateCheck" parameterType="java.util.Map">
+		insert into ACC_TEMPLATE_CHECK(GROUP_ID,HOS_ID, COPY_CODE, TEMPLATE_CODE, VOUCH_DETAIL_ID, VOUCH_CHECK_ID, SUBJ_CODE, SUMMARY,DEBIT,CREDIT,DEBIT_W,CREDIT_W,CON_NO,PAPER_TYPE_CODE,CHECK_NO,BUSINESS_NO,OCCUR_DATE,DUE_DATE 
+		${column_name} ,PAY_TYPE_CODE,SORT_CODE
+		)
+		select d.group_id,d.hos_id,d.copy_code,#{template_code},d.vouch_detail_id,d.VOUCH_CHECK_ID,d.subj_code,d.summary,d.debit,d.credit,d.debit_w,d.credit_w,d.CON_NO,d.PAPER_TYPE_CODE,d.CHECK_NO,d.BUSINESS_NO,d.OCCUR_DATE,d.DUE_DATE 
+		${column_name} ,d.PAY_TYPE_CODE,d.SORT_CODE  
+		from acc_vouch_check d 
+		where d.group_id=#{group_id} and d.hos_id=#{hos_id} and d.copy_code=#{copy_code} and d.vouch_id=#{vouch_id}
+	</insert>
+	
+	<!-- 添加凭证模板辅助核算表-批量 -->
+	<insert id="insertAccVouchTemplateCheckBatch" parameterType="java.util.List">
+		INSERT INTO ACC_TEMPLATE_CHECK (group_id,hos_id,copy_code,template_code,vouch_detail_id,vouch_check_id,sort_code,
+			${column}
+			summary,subj_code,debit,credit,debit_w,credit_w		
+			)
+		<foreach collection="list" item="item" index="index" separator=" union all ">
+			select
+				#{item.group_id},#{item.hos_id},#{item.copy_code},#{item.template_code},#{item.vouch_detail_id},#{item.vouch_check_id},#{item.sort_code},
+				${item.column_value}
+				#{item.summary},#{item.subj_code},#{item.debit},#{item.credit},#{item.debit_w},#{item.credit_w}
+			from dual
+		</foreach>
+	</insert>
+	
+	
+	<!-- 添加凭证模板现金流量表 -->
+	<insert id="insertAccVouchTemplateCash" parameterType="java.util.Map">
+		insert into ACC_TEMPLATE_CASH(GROUP_ID,HOS_ID, COPY_CODE, TEMPLATE_CODE, VOUCH_DETAIL_ID, CASH_ID, SUMMARY,CASH_ITEM_ID,CASH_MONEY,SORT_CODE)
+		select d.group_id,d.hos_id,d.copy_code,#{template_code},d.vouch_detail_id,d.CASH_ID,d.summary,d.CASH_ITEM_ID,d.CASH_MONEY,d.SORT_CODE
+		from acc_cash_flow d 
+		where d.group_id=#{group_id} and d.hos_id=#{hos_id} and d.copy_code=#{copy_code} and d.vouch_id=#{vouch_id}
+	</insert>
+	
+	<!-- 添加凭证模板现金流量表-批量 -->
+	<insert id="insertAccVouchTemplateCashBatch" parameterType="java.util.List">
+		INSERT INTO ACC_TEMPLATE_CASH (GROUP_ID,HOS_ID, COPY_CODE, TEMPLATE_CODE, VOUCH_DETAIL_ID, CASH_ID, SUMMARY,CASH_ITEM_ID,CASH_MONEY,SORT_CODE)
+		<foreach collection="list" item="item" index="index" separator=" union all ">
+			select
+				#{item.group_id},#{item.hos_id},#{item.copy_code},#{item.template_code},#{item.vouch_detail_id},#{item.cash_id},#{item.summary},#{item.cash_item_id},#{item.cash_money}
+				,#{item.sort_code}
+			from dual
+		</foreach>
+	</insert>
+	
+	
+	<!-- 删除凭证模板主表 -->
+	<delete id="deleteAccVouchTemplate" parameterType="java.util.Map">
+		DELETE FROM ACC_TEMPLATE WHERE group_id=#{group_id} and hos_id=#{hos_id} and copy_code=#{copy_code} 
+		and template_code in(${template_code})
+	</delete>
+	
+	<!-- 删除用户数据表-凭证模板 -->
+	<delete id="deleteUserPermbyTemplate" parameterType="java.util.Map">
+	begin
+		DELETE FROM SYS_USER_PERM_DATA WHERE group_id=#{group_id} and hos_id=#{hos_id} and copy_code=#{copy_code} 
+		and table_code='ACC_TEMPLATE'
+		and perm_code in(${template_code});
+		
+		DELETE FROM SYS_ROLE_PERM_DATA WHERE group_id=#{group_id} and hos_id=#{hos_id} and copy_code=#{copy_code}
+		and table_code='ACC_TEMPLATE' 
+		and perm_code in(${template_code});
+	end;
+	</delete>
+	
+	<!-- 删除凭证模板明细表 -->
+	<delete id="deleteAccVouchTemplateDetail" parameterType="java.util.Map">
+		DELETE FROM ACC_TEMPLATE_DETAIL WHERE group_id=#{group_id} and hos_id=#{hos_id} and copy_code=#{copy_code} 
+		and template_code in(${template_code})
+	</delete>
+	
+	<!-- 删除凭证模板辅助核算表 -->
+	<delete id="deleteAccVouchTemplateCheck" parameterType="java.util.Map">
+		DELETE FROM ACC_TEMPLATE_CHECK WHERE group_id=#{group_id} and hos_id=#{hos_id} and copy_code=#{copy_code} 
+		and template_code in(${template_code})
+	</delete>
+	
+	<!-- 删除凭证模板现金流量表 -->
+	<delete id="deleteAccVouchTemplateCash" parameterType="java.util.Map">
+		DELETE FROM ACC_TEMPLATE_CASH WHERE group_id=#{group_id} and hos_id=#{hos_id} and copy_code=#{copy_code} 
+		and template_code in(${template_code})
+	</delete>
+	
+	<!-- 取模板页面-查询模板主表 -->
+	<select id="queryAccTemplateMain" parameterType="java.util.Map" resultType="java.util.Map">
+		select a.template_code,a.template_name,a.vouch_type_code,t.vouch_type_name,a.sort_code,nvl(a.note,' ') note,a.user_id,u.user_name from acc_template a
+		left join acc_vouch_type t on a.group_id=t.group_id and a.hos_id=t.hos_id and a.copy_code=t.copy_code and a.vouch_type_code=t.vouch_type_code
+		left join sys_user u on a.group_id=u.group_id and a.hos_id=u.hos_id and a.user_id=u.user_id
+		where a.group_id =#{group_id} and a.hos_id = #{hos_id} and a.copy_code = #{copy_code} 
+		<if test='p009 != null  and p009 != "" and p009 == "1"'>
+				and exists(select 1 from v_user_data_perm p 
+				where p.table_code='ACC_TEMPLATE' and p.group_id=a.group_id and p.hos_id=a.hos_id and p.copy_code=a.copy_code 
+				and p.perm_code=a.template_code and p.is_read=1 and p.user_id=#{user_id})
+		</if>
+		<if test="temp_code != null and temp_code != ''">
+		 and (a.template_code like '${temp_code}%' or 
+		 a.template_name like '%${temp_code}%')
+		</if>
+		order by a.sort_code,a.template_code
+	</select>
+	
+	<!-- 查询用户凭证模板的数据权限 -->
+	<select id="queryAccTemplateByPerm" parameterType="java.util.Map" resultType="java.util.Map">
+		select a.template_code "template_code",p.is_read "is_read",p.is_write "is_write" 
+		from acc_template a 
+		left join SYS_user_PERM_DATA p on a.group_id=p.group_id and a.hos_id=p.hos_id and a.copy_code=p.copy_code 		 
+		and p.table_code='ACC_TEMPLATE' and a.template_code=p.perm_code and p.user_id=#{user_id}
+		where a.group_id=#{group_id} and a.hos_id=#{hos_id} and a.copy_code=#{copy_code} 
+		and a.template_code in(${template_code}) 
+	</select>
+	
+	<!-- 取模板页面-修改模板主表 -->
+	<update id="updateAccTemplateMain" parameterType="java.util.Map" >
+		update acc_template a set template_name=#{template_name},
+		<if test="vouch_type_name != null and vouch_type_name != ''">
+				vouch_type_code=(select t.vouch_type_code from acc_vouch_type t where a.group_id=t.group_id and a.hos_id=t.hos_id and a.copy_code=t.copy_code and t.vouch_type_name=#{vouch_type_name}),
+		</if>
+		<if test="vouch_type_code != null and vouch_type_code != ''">
+				vouch_type_code=#{vouch_type_code},
+		</if>
+		<if test="vouch_att_num != null and vouch_att_num != ''">
+				vouch_att_num=#{vouch_att_num},
+		</if>
+		note=#{note}
+		where a.group_id =#{group_id} and a.hos_id = #{hos_id} and a.copy_code = #{copy_code} and template_code=#{template_code}
+		
+	</update>
+	
+	<!-- 取模板页面-置顶 -->
+	<update id="updateAccTemplateMainBySort" parameterType="java.util.Map" >
+		begin
+						
+			update acc_template set sort_code=sort_code+10		
+			where group_id =#{group_id} and hos_id = #{hos_id} and copy_code = #{copy_code} and sort_code &lt;#{sort_code,jdbcType=INTEGER};
+			
+			update acc_template set sort_code=10
+			where group_id =#{group_id} and hos_id = #{hos_id} and copy_code = #{copy_code} and template_code=#{template_code};
+			
+		end;
+	</update>
+	
+	<!-- 取模板页面-查询模板主表 -->
+	<select id="queryAccTemplateMainByCode" parameterType="java.util.Map" resultType="java.util.Map">
+		select a.template_code "template_code",a.vouch_type_code "vouch_type_code",
+		case when ${is_money}=1 then a.vouch_att_num else 0 end "att_num" from acc_template a		
+		where a.group_id =#{group_id} and a.hos_id = #{hos_id} and a.copy_code = #{copy_code} 
+		AND a.template_code = #{template_code}
+	</select>
+	
+	<!--取模板-查询凭证模板明细表--> 
+	<select id="queryAccTemplateDetail" parameterType="java.util.Map" resultType="java.util.Map">
+		select a.vouch_detail_id "did",a.subj_code "subj_code",a.summary "summary",a.vouch_row "vouch_row",
+		a.debit,a.credit,s.subj_code||' '||s.subj_name_all "subj_name",
+		case when a.debit &lt;&gt; 0 then 0 when a.credit &lt;&gt; 0 then 1 else s.subj_dire end  as "subj_dire" ,
+		s.subj_type_code "subj_type_code",s.subj_nature_code "subj_nature_code",s.subj_level "subj_level", 
+		s.is_check "is_check",s.is_cash "is_cash",s.is_bill "is_bill",s.kind_code "kind_code"
+		from acc_template_detail a
+		inner join acc_subj s on a.group_id=s.group_id and a.hos_id=s.hos_id and a.copy_code=s.copy_code and s.acc_year=#{acc_year} and a.subj_code=s.subj_code 
+		where a.group_id =#{group_id} and a.hos_id = #{hos_id} and a.copy_code = #{copy_code} 		
+		AND a.template_code = #{template_code}
+		order by ${order_by}
+	</select>
+	
+	<!--取模板-查询凭证模板辅助核算表-->
+	<select id="queryAccTemplateCheck" parameterType="java.util.Map" resultType="java.util.Map">
+		select a.subj_code,a.summary,
+		case when a.debit &lt;&gt;0 then a.debit else a.credit end money,
+		a.con_no,a.check_no,a.business_no,to_char(a.occur_date,'yyyy-MM-dd') occur_date,to_char(a.due_date,'yyyy-MM-dd') due_date,
+		a.pay_type_code,a.pay_type_code||' '||p.pay_name pay_name,
+		a.paper_type_code||' '||t.type_name paper_type_code 
+		${sel_sql}
+		from acc_template_check a
+		left join acc_pay_type p on a.group_id=p.group_id and a.hos_id=p.hos_id and a.copy_code=p.copy_code and a.pay_type_code=p.pay_code
+		left join acc_paper_type t on a.group_id=t.group_id and a.hos_id=t.hos_id and a.copy_code=t.copy_code and a.paper_type_code=t.type_code
+		${left_sql}
+		where a.group_id =#{group_id} and a.hos_id = #{hos_id} and a.copy_code = #{copy_code} 		
+		AND a.template_code = #{template_code} and a.vouch_detail_id=#{did}
+		order by a.sort_code
+	</select>
+	 
+	<!--取模板-查询凭证模板现金流量表-->
+	<select id="queryAccTemplateCash" parameterType="java.util.Map" resultType="java.util.Map">
+		select a.summary,a.cash_item_id,#{subj_code} subj_code,i.cash_item_code||' '||i.cash_item_name cash_name,
+		a.cash_money money,i.cash_dire
+		from acc_template_cash a		
+		left join acc_cash_item i on i.group_id=a.group_id and i.hos_id=a.hos_id and i.copy_code=a.copy_code and i.cash_item_id=a.cash_item_id
+		where a.group_id =#{group_id} and a.hos_id = #{hos_id} and a.copy_code = #{copy_code} 		
+		AND a.template_code = #{template_code} and a.vouch_detail_id=#{did}
+		ORDER BY a.sort_code
+	</select>
+	
+	<!--取模板-查询凭证模板辅助核算、现金流量表-->
+	<select id="queryAccTemplateCheckCash" parameterType="java.util.Map" resultType="java.util.Map">
+		
+		with t1 as(
+			select rownum rownum1,s.subj_code,a.summary,
+			case when a.debit &lt;&gt;0 then a.debit else a.credit end money,
+			a.con_no,a.check_no,a.business_no,to_char(a.occur_date,'yyyy-MM-dd') occur_date,to_char(a.due_date,'yyyy-MM-dd') due_date,
+			a.pay_type_code,a.pay_type_code||' '||p.pay_name pay_name,a.sort_code,
+			a.paper_type_code||' '||t.type_name paper_type_code 
+			${sel_sql}			 
+			from acc_template_check a  
+			inner join acc_subj s on a.group_id=s.group_id and a.hos_id=s.hos_id and a.copy_code=s.copy_code and s.acc_year=#{acc_year}	and a.subj_code=s.subj_code 		
+			left join acc_pay_type p on a.group_id=p.group_id and a.hos_id=p.hos_id and a.copy_code=p.copy_code and a.pay_type_code=p.pay_code
+			left join acc_paper_type t on a.group_id=t.group_id and a.hos_id=t.hos_id and a.copy_code=t.copy_code and a.paper_type_code=t.type_code
+			${left_sql}
+			where a.group_id =#{group_id} and a.hos_id = #{hos_id} and a.copy_code = #{copy_code} 		
+			AND a.template_code = #{template_code} and a.vouch_detail_id=#{did}
+		),
+		t2 as(
+		select rownum rownum1,c.cash_item_id, i.cash_item_code || ' ' || i.cash_item_name as cash_name,i.cash_dire,c.sort_code
+		from acc_template_cash c 
+		left join acc_cash_item i on i.group_id = c.group_id and i.hos_id = c.hos_id and i.copy_code = c.copy_code and i.cash_item_id = c.cash_item_id 
+		where c.group_id = #{group_id}
+		  and c.hos_id = #{hos_id}
+		  and c.copy_code = #{copy_code}
+		  and c.template_code = #{template_code}
+		  and c.vouch_detail_id = #{did}
+		)
+		select * from t1 left join t2  on t1.rownum1=t2.rownum1 order by t1.sort_code,t2.sort_code
+		
+		
+	</select>
+	
+	<!-- 保存凭证摘要模板 -->
+	<insert id="saveAccVouchSummary" parameterType="java.util.Map" >
+		insert into ACC_VOUCH_SUMMARY(GROUP_ID,HOS_ID,COPY_CODE,sid,USER_ID,SUMMARY,SORT_CODE)
+		values(#{group_id},#{hos_id},#{copy_code},#{sid},#{user_id},#{summary},#{sort_code})
+	</insert>
+	
+	<!-- 摘要维护页面-查询摘要 -->
+	<select id="queryAccVouchSummary" parameterType="java.util.Map" resultType="java.util.Map">
+		select a.sid "sid",a.summary "summary",sort_code "sort_code",user_id "user_id" from ACC_VOUCH_SUMMARY a		
+		where a.group_id =#{group_id} and a.hos_id = #{hos_id} and a.copy_code = #{copy_code} 
+		AND a.user_id = #{user_id}
+		order by sort_code
+	</select>
+	
+	<!-- 摘要维护-删除凭证摘要模板 -->
+	<delete id="deleteAccVouchSummary" parameterType="java.util.Map" >
+		delete from ACC_VOUCH_SUMMARY
+		where group_id =#{group_id} and hos_id = #{hos_id} and copy_code = #{copy_code} and user_id=#{user_id} 
+		<if test="summary != null and summary != ''">
+			and summary=#{summary}
+		</if>
+		<if test="sidStr != null and sidStr != ''">
+			and sid in(${sidStr})
+		</if>
+	</delete>
+	
+	<!-- 摘要维护页面-修改摘要 -->
+	<update id="updateAccVouchSummaryBySid" parameterType="java.util.Map" >
+		update ACC_VOUCH_SUMMARY set summary=#{summary}
+		where group_id =#{group_id} and hos_id = #{hos_id} and copy_code = #{copy_code} and user_id=#{user_id} and sid=#{sid}
+	</update>
+	
+	<!-- 摘要维护页面-置顶 -->
+	<update id="updateAccVouchSummaryBySort" parameterType="java.util.Map">
+		begin
+			update ACC_VOUCH_SUMMARY set sort_code=sort_code+10		
+			where group_id =#{group_id} and hos_id = #{hos_id} and copy_code = #{copy_code} and user_id=#{user_id} and sort_code &lt;#{sort_code,jdbcType=INTEGER};
+			
+			update ACC_VOUCH_SUMMARY set sort_code=10
+			where group_id =#{group_id} and hos_id = #{hos_id} and copy_code = #{copy_code} and user_id=#{user_id} and sid=#{sid};
+		end;
+	</update>
+	
+	<!-- 凭证模板处理  end -->
+	
+	<!-- 判断审核人、出纳人、记账人是否是当前用户 -->
+	<select id="queryAccVouchExistsUser" parameterType="java.util.Map" resultType="java.lang.Integer">
+		select count(1) from ACC_VOUCH a		
+		where a.group_id =#{group_id} and a.hos_id = #{hos_id} and a.copy_code = #{copy_code} 
+		AND a.vouch_id = #{vouch_id}
+		<if test='cur_state=="99"'>
+			and acc_user=#{user_id}
+		</if>
+		<if test='cur_state=="3"'>
+			and audit_user=#{user_id}
+		</if>
+		<if test='cur_state=="2"'>
+			and cash_user=#{user_id}
+		</if>
+	</select>
+	
+	<resultMap id="accUpLoad" type="java.util.Map">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="vouch_id" column="vouch_id" />
+		<result property="att_name_n" column="att_name_n" />
+		<result property="att_name_o" column="att_name_o" />
+		<result property="att_path" column="att_path" />
+		<result property="att_size" column="att_size" />
+		<result property="create_user" column="create_user" />
+		<result property="create_date" column="create_date" />
+		<result property="create_name" column="create_name" />
+		<result property="att_type" column="att_type" />
+		<result property="invo_num" column="invo_num" />
+		<result property="invo_date" column="invo_date" />
+		<result property="invo_money" column="invo_money" />
+	</resultMap>
+	
+	<select id="queryFile" parameterType="java.util.Map" resultMap="accUpLoad">
+		select
+	       ava.group_id,
+	       ava.hos_id,
+	       ava.copy_code,
+	       ava.vouch_id,
+	       ava.att_name_n,
+	       ava.att_name_o,
+	       ava.att_path,
+	       ava.att_size,
+	       ava.create_user,
+	       to_char(ava.create_date, 'yyyy-MM-dd hh24:mi:ss') create_date,
+	       su.user_name as create_name,
+	       ava.att_type,
+	       ava.invo_num,
+	       ava.invo_date,
+	       ava.invo_money
+		from ACC_VOUCH_ATT ava
+			left join sys_user su on ava.group_id=su.group_id and 
+			ava.hos_id=su.hos_id and ava.create_user=su.user_id
+		WHERE 
+		ava.group_id = #{group_id,jdbcType=INTEGER}   and 
+		ava.hos_id = #{hos_id,jdbcType=INTEGER}   and 
+		ava.copy_code = #{copy_code,jdbcType=VARCHAR}   and 
+		ava.vouch_id = #{vouch_id,jdbcType=INTEGER}  
+		order by ava.create_date	
+	</select>
+	
+	<select id="queryByCodeFile" resultMap="accUpLoad"  parameterType="java.util.Map" >
+	
+		select
+	       ava.group_id,
+	       ava.hos_id,
+	       ava.copy_code,
+	       ava.vouch_id,
+	       ava.att_name_n,
+	       ava.att_name_o,
+	       ava.att_path,
+	       ava.att_size,
+	       ava.create_user,
+	       ava.create_date,
+	       su.user_name as create_name,
+	       ava.att_type,
+	       ava.invo_num,
+	       ava.invo_date,
+	       ava.invo_money
+		from ACC_VOUCH_ATT ava
+			left join sys_user su on ava.group_id=su.group_id and 
+			ava.hos_id=su.hos_id and ava.create_user=su.user_id
+		WHERE 
+		ava.group_id = #{group_id,jdbcType=INTEGER}   and 
+		ava.hos_id = #{hos_id,jdbcType=INTEGER}   and 
+		ava.copy_code = #{copy_code,jdbcType=VARCHAR}   and 
+		ava.vouch_id=#{vouch_id} and 
+		ava.att_name_n = #{att_name_n,jdbcType=VARCHAR}  
+
+	</select>
+	
+	<insert id="addFile" useGeneratedKeys="true" >	
+		 
+		INSERT INTO ACC_VOUCH_ATT (
+			group_id, 
+			hos_id, 
+			copy_code, 
+			vouch_id, 
+			att_name_n,
+			att_name_o,
+			att_path,
+			att_size,
+			create_user,
+			create_date,
+			att_type
+			<if test="invo_num != null and invo_num != ''">
+			,
+			invo_num
+			</if>
+			<if test="invo_date != null and invo_date != ''">
+			,
+			invo_date
+			</if>
+			<if test="invo_money != null and invo_money != ''">
+			,
+			invo_money
+			</if>
+		) VALUES (
+			#{group_id,jdbcType=INTEGER},
+			#{hos_id,jdbcType=INTEGER},
+			#{copy_code,jdbcType=VARCHAR},
+			#{vouch_id,jdbcType=INTEGER},
+			#{att_name_n,jdbcType=VARCHAR},
+			#{att_name_o,jdbcType=VARCHAR},
+			#{att_path,jdbcType=VARCHAR},
+			#{att_size,jdbcType=INTEGER},
+			#{create_user,jdbcType=INTEGER},
+			#{create_date,jdbcType=TIMESTAMP},
+			#{att_type,jdbcType=INTEGER}
+			<if test="invo_num != null and invo_num != ''">
+			,
+			#{invo_num,jdbcType=VARCHAR}
+			</if>
+			<if test="invo_date != null and invo_date != ''">
+			,
+			to_date(#{invo_date},'yyyy-MM-dd')
+			</if>
+			<if test="invo_money != null and invo_money != ''">
+			,
+			#{invo_money,jdbcType=INTEGER}
+			</if>
+		)
+	</insert>
+	
+	<delete id="deleteBatchFile" parameterType="java.util.List" >
+		DELETE FROM ACC_VOUCH_ATT
+		WHERE 
+		<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+			group_id = #{item.group_id,jdbcType=INTEGER}
+			and hos_id = #{item.hos_id,jdbcType=INTEGER}
+			and copy_code = #{item.copy_code,jdbcType=VARCHAR}
+			and att_name_n = #{item.att_name_n,jdbcType=VARCHAR}
+			and vouch_id = #{item.vouch_id,jdbcType=INTEGER}
+		</foreach>
+	</delete>
+	
+	<select id="queryFileDel" parameterType="java.util.Map" resultMap="accUpLoad">
+		select
+	       group_id,
+	       hos_id,
+	       copy_code,
+	       vouch_id,
+	       att_name_n,
+	       att_name_o,
+	       att_path,
+	       att_size,
+	       create_user,
+	       to_char(create_date, 'yyyy-MM-dd hh24:mi:ss') create_date,
+	       att_type,
+	       invo_num,
+	       invo_date,
+	       invo_money
+		from ACC_VOUCH_ATT 
+			
+		WHERE 
+		group_id = #{group_id,jdbcType=INTEGER}   and 
+		hos_id = #{hos_id,jdbcType=INTEGER}   and 
+		copy_code = #{copy_code,jdbcType=VARCHAR}   and 
+			vouch_id = #{vouch_id,jdbcType=INTEGER}  
+		
+	</select>
+	
+	
+	<!-- 判断是否自动生成凭证，自动凭证判断通用-->
+	<select id="queryAutoVouchIsCreate" parameterType="java.util.Map" resultType="java.lang.Integer">
+		
+		select count(*) from ${busi_log_table} l
+		where l.group_id =#{group_id} AND l.hos_id =#{hos_id} AND l.copy_code = #{copy_code} and l.busi_type_code=#{busi_type_code}
+		and l.business_no in(
+			select business_no from ACC_BUSI_LOG_TEMP t where t.group_id=l.group_id and t.hos_id=l.hos_id 
+			and t.copy_code=l.copy_code and t.busi_type_code=l.busi_type_code and t.create_date=#{create_date}
+		)
+		
+	</select>
+	
+	<!-- 保存自动凭证主表- -->
+	<insert id="saveAutoVouch" parameterType="java.util.Map">
+	
+		INSERT INTO ACC_AUTO_VOUCH(group_id,hos_id,copy_code,vouch_id,vouch_type_code,vouch_date,vouch_att_num,busi_type_code,create_date) 
+		VALUES (#{group_id},#{hos_id},#{copy_code},#{vouch_id},#{vouch_type_code},#{vouch_date},#{vouch_att_num},#{busi_type_code},sysdate)
+		
+	</insert>
+	
+	<!-- 保存自动凭证明细表- -->
+	<insert id="saveAutoVouchDetail" parameterType="java.util.List">
+	
+		INSERT INTO ACC_AUTO_DETAIL(group_id,hos_id,copy_code,vouch_id,vouch_row,subj_code,summary,debit,credit,debit_w,credit_w) 
+		<foreach collection="list" item="item" index="index" separator=" union all ">
+			select
+				#{item.group_id},#{item.hos_id},#{item.copy_code},#{item.vouch_id},#{item.vouch_row},
+				#{item.subj_code},#{item.summary},#{item.debit},#{item.credit},0,0
+			from dual
+		</foreach>
+	</insert>
+	
+	<!-- 处理自动凭证明细表的摘要- -->
+	<update id="updateAutoVouchDetailSummary" parameterType="java.util.Map">
+	<![CDATA[
+	
+	declare
+	  TYPE ref_type IS REF CURSOR;--定义游标指针
+	  v_cursor ref_type;--定义游标变量
+	    
+	  v_group_id number;
+	  v_hos_id number;
+	  v_copy_code varchar2(20);
+	  v_vouch_id number;
+	  v_acc_year varchar2(20);
+	  v_mod_code varchar2(20);
+	  v_busi_type_code varchar2(20);
+	  v_template_code varchar2(50);
+	  v_subj_code varchar2(200);
+	  v_summary varchar2(200);
+	  v_check_summary varchar2(200);
+	  v_vouch_row number;
+	  v_count number;
+	  v_check1 number;
+	  v_check2 number;
+	  v_check3 number;
+	  v_check4 number;
+	  v_check_type_id number;
+	  v_check_table varchar2(100);
+	  v_column_check varchar2(50);
+	  v_column_id varchar2(50);
+	  v_column_name varchar2(200);
+	  v_is_change number;
+	  v_is_sys number;
+	  v_check_value numeric(18,0);
+	  v_check_name varchar2(200);
+	  v_check_name1 varchar2(200);
+	    
+	  begin
+	      v_group_id:=#{group_id};
+		  v_hos_id:=#{hos_id};
+		  v_copy_code:=#{copy_code};
+		  v_acc_year:=#{acc_year};
+		  v_vouch_id:=#{vouch_id};
+		  v_mod_code:=#{mod_code};
+		  v_busi_type_code:=#{busi_type_code};
+	      v_template_code:=#{template_code};
+	      
+	      /*处理金额为0的数据*/
+	      delete from ACC_AUTO_CHECK where group_id =v_group_id and hos_id = v_hos_id and copy_code = v_copy_code AND vouch_id = v_vouch_id and credit=0 and debit=0;
+	      delete from acc_auto_detail where group_id =v_group_id and hos_id = v_hos_id and copy_code = v_copy_code AND vouch_id = v_vouch_id and credit=0 and debit=0;
+        
+      open v_cursor for
+           select d.vouch_row,d.summary,d.subj_code,s.check1,s.check2,s.check3,s.check4
+           from acc_auto_detail d 
+           inner join acc_subj s on d.group_id=s.group_id and d.hos_id=s.hos_id and d.copy_code=s.copy_code 
+           and s.acc_year=v_acc_year and d.subj_code=s.subj_code
+           where d.group_id = v_group_id  and d.hos_id = v_hos_id  and d.copy_code = v_copy_code 
+           and d.vouch_id=v_vouch_id and instr(d.summary,'[')>0 and instr(d.summary,']')>0;
+      loop
+      fetch v_cursor into v_vouch_row,v_summary,v_subj_code,v_check1,v_check2,v_check3,v_check4;
+      exit when v_cursor%notfound;
+           
+           --处理负数
+           if(instr(v_summary,'[*-1]')>0) then
+                 update acc_auto_detail set debit=debit*-1,credit=credit*-1 
+                 where group_id=v_group_id and hos_id = v_hos_id and copy_code = v_copy_code and vouch_id=v_vouch_id and vouch_row=v_vouch_row;
+                 
+                 update acc_auto_check set debit=debit*-1,credit=credit*-1 
+                 where group_id=v_group_id and hos_id = v_hos_id and copy_code = v_copy_code and vouch_id=v_vouch_id and vouch_row=v_vouch_row;
+           end if;
+      
+           if(nvl(v_check1,0)=0) then
+                continue;
+           end if;     
+      
+      	   select count(1) into v_count 
+           from acc_auto_check where group_id=v_group_id and hos_id = v_hos_id and copy_code = v_copy_code and vouch_id=v_vouch_id and vouch_row=v_vouch_row;
+           if(v_count=0) then
+                continue;
+           end if;
+      
+           --[供应商]摘要=供应商
+           v_check_summary:= substr(v_summary,instr(v_summary,'[')+1,instr(v_summary,']')-2);
+           
+           --按[]里面的值取辅助核算
+           select count(1) into v_count from acc_check_type 
+           where group_id = v_group_id  and hos_id = v_hos_id  and copy_code = v_copy_code and check_type_name=v_check_summary
+           and check_type_id in(v_check1,v_check2,v_check3,v_check4);
+           if(v_count>0) then
+                 select check_type_id,check_table,column_check,is_sys,is_change,column_id,column_name 
+                 into v_check_type_id,v_check_table,v_column_check,v_is_sys,v_is_change,v_column_id,v_column_name 
+                 from acc_check_type 
+                 where group_id = v_group_id  and hos_id = v_hos_id  and copy_code = v_copy_code and check_type_name=v_check_summary 
+                 and check_type_id in(v_check1,v_check2,v_check3,v_check4) and rownum=1;
+           else 
+                 --按check1取辅助核算
+                 select check_type_id,check_table,column_check,is_sys,is_change,column_id,column_name 
+                 into v_check_type_id,v_check_table,v_column_check,v_is_sys,v_is_change,v_column_id,v_column_name
+                 from acc_check_type 
+                 where group_id = v_group_id  and hos_id = v_hos_id  and copy_code = v_copy_code and check_type_id=v_check1;
+           end if;
+           
+           if(v_is_change=1) then
+                  v_column_check:=v_column_check||'_id';
+           end if;
+        
+           execute immediate '
+           select check_value from (
+           select '||v_column_check||' as check_value from acc_auto_check where group_id = '||v_group_id||'  and hos_id = '||v_hos_id||'  and copy_code = '''||v_copy_code||''' 
+           and vouch_id='||v_vouch_id||' and vouch_row='||v_vouch_row||' and '||v_column_check||' is not null
+           order by vouch_check_id
+           ) where rownum=1 ' into v_check_value;
+           
+           
+           if(v_is_change=1) then
+         
+                 execute immediate '
+                 select '||v_column_name||' from '||v_check_table||' where group_id = '||v_group_id||'  and hos_id = '||v_hos_id||'  
+                 and '||v_column_id||'='||v_check_value||' and is_stop=0 and rownum=1
+                 ' into v_check_name;
+           
+           elsif(v_is_sys=1) then
+                
+                execute immediate '
+                select '||v_column_name||' from '||v_check_table||' where group_id = '||v_group_id||'  and hos_id = '||v_hos_id||' 
+                and '||v_column_id||'='||v_check_value||' and rownum=1
+                ' into v_check_name;    
+           
+           else
+                execute immediate '
+                select '||v_column_name||' from '||v_check_table||' where group_id = '||v_group_id||'  and hos_id = '||v_hos_id||'  and copy_code = '''||v_copy_code||''' 
+                and '||v_column_id||'='||v_check_value||' and check_type_id='||v_check_type_id||' and rownum=1
+                ' into v_check_name;
+                
+           end if;
+           --dbms_output.put_line(v_check_name);
+          
+           if(nvl(v_check_name,'!abc')!='!abc') then
+                 
+                --更新分录的摘要
+                update acc_auto_detail set summary=replace(summary,'['||v_check_summary||']','['||v_check_name||']') 
+                where group_id=v_group_id and hos_id = v_hos_id and copy_code = v_copy_code and vouch_id=v_vouch_id and vouch_row=v_vouch_row;
+           
+           		--保留第一条辅助核算的摘要
+                if(nvl(v_check_name1,'!abc')='!abc') then
+                     v_check_name1:=v_check_name;
+                end if;
+                
+           end if;
+                      
+      end loop;
+      close v_cursor;
+      
+      --处理[]站位符
+      update acc_auto_detail set summary=replace(summary,substr(v_summary,instr(v_summary,'['),instr(v_summary,']')),'') 
+      where group_id=v_group_id and hos_id = v_hos_id and copy_code = v_copy_code and vouch_id=v_vouch_id;
+      --处理[]站位符
+      update acc_auto_check set summary=replace(summary,substr(v_summary,instr(v_summary,'['),instr(v_summary,']')),'') 
+      where group_id=v_group_id and hos_id = v_hos_id and copy_code = v_copy_code and vouch_id=v_vouch_id;
+      
+      --处理[*-1]站位符
+      update acc_auto_detail set summary=replace(summary,'[*-1]','') 
+      where group_id=v_group_id and hos_id = v_hos_id and copy_code = v_copy_code and vouch_id=v_vouch_id;
+      --处理[*-1]站位符
+      update acc_auto_check set summary=replace(summary,'[*-1]','') 
+      where group_id=v_group_id and hos_id = v_hos_id and copy_code = v_copy_code and vouch_id=v_vouch_id;
+      
+      --更新第一条分录的摘要
+      if(nvl(v_check_name1,'!abc')!='!abc') then
+            update acc_auto_detail set summary='['||v_check_name1||']'||summary 
+            where group_id=v_group_id and hos_id = v_hos_id and copy_code = v_copy_code and vouch_id=v_vouch_id and vouch_row=1
+            and instr(summary,'[')=0 and instr(summary,']')=0;
+      end if;
+    end;
+
+		
+	]]>
+		
+	</update>	
+	
+	<!-- 保存自动凭证-辅助核算表acc_auto_check-->
+	<insert id="saveAccAutoCheck" parameterType="java.util.Map">
+	
+		insert into acc_auto_check(GROUP_ID,HOS_ID,COPY_CODE,VOUCH_ID,VOUCH_ROW,VOUCH_CHECK_ID,SUBJ_CODE,SUMMARY,
+		DEBIT,CREDIT,DEBIT_W,CREDIT_W ${column} )
+		SELECT #{group_id},#{hos_id},#{copy_code},#{vouch_id},#{vouch_row},rownum,t1.subj_code,#{summary},
+		case ${direction} when 0 then t1.amount_money else 0 end debit,
+		case ${direction} when 1 then t1.amount_money else 0 end credit,
+		0,0 ${sel_sql}
+		FROM (
+			${vouch_sql}
+			${left_sql}
+		 	${where_sql}
+		 	${group_sql}
+		) t1 ${order_sql}		
+		
+	</insert>
+	
+	<!-- 保存自动凭证-辅助核算表acc_auto_check-->
+	<insert id="saveAccAutoCheckByTermend" parameterType="java.util.Map">
+		insert into acc_auto_check(
+			group_id, hos_id, copy_code, vouch_id, vouch_row, vouch_check_id, subj_code, 
+			summary, debit, credit, debit_w, credit_w ${column} 
+		)
+		select * from(
+		<foreach collection="list" item="item" index="index" separator=" union all ">
+			select
+				#{item.group_id}, #{item.hos_id}, #{item.copy_code}, #{item.vouch_id}, #{item.vouch_row}, 
+				#{item.vouch_check_id}, #{item.subj_code}, #{item.summary}, #{item.debit}, #{item.credit}, 
+				#{item.debit_w}, #{item.credit_w} ${column_value}
+			from dual
+		</foreach>
+		) tmp
+	</insert>
+	
+	<!-- 保存自动凭证- 物流系统-付款单   现金流量表增加固定的现金流量为 203 acc_auto_cash-->
+	<insert id="saveAccAutoCash" parameterType="java.util.List">
+	
+		insert into acc_auto_cash(GROUP_ID,HOS_ID,COPY_CODE,VOUCH_ID,VOUCH_ROW,cash_id,CASH_ITEM_ID,SUMMARY,CASH_MONEY )
+		<foreach collection="list" item="item" index="index" separator=" union all ">
+			select
+				#{item.group_id},#{item.hos_id},#{item.copy_code},#{item.vouch_id},#{item.vouch_row},#{item.cash_id},
+				#{item.cash_item_id},#{item.summary},#{item.cash_money} 
+			from dual
+		</foreach>
+<!-- 		values (#{group_id},#{hos_id},#{copy_code},#{vouch_id},#{vouch_row},#{cash_item_id},#{summary},#{cash_money}) -->
+		
+	</insert>
+	
+	<!-- 查询自动凭证辅助核算表第一条数据的供应商名称 -->
+	<select id="queryAutoVouchCheckByCheck6" parameterType="java.util.Map" resultType="String">
+	
+		select b.sup_name from ACC_AUTO_CHECK a 
+		inner join hos_sup_dict b on a.group_id=b.group_id and a.hos_id=b.hos_id and a.check6_id=b.sup_id and a.check6_no=b.sup_no
+		where a.group_id =#{group_id} and a.hos_id = #{hos_id} and a.copy_code = #{copy_code} 		
+		AND a.vouch_id = #{vouch_id} and a.vouch_row=#{vouch_row} and a.vouch_check_id=1
+		
+	</select>
+	
+	<!-- 查询自动凭证辅助核算表汇总金额，用来判断与分录金额是否一致，主要由于3位小数导致的 -->
+	<select id="queryAutoVouchCheckSum" parameterType="java.util.Map" resultType="java.lang.Double">
+	
+		select nvl(sum(${debit_credit}),0) cmoney from ACC_AUTO_CHECK a
+		where a.group_id =#{group_id} and a.hos_id = #{hos_id} and a.copy_code = #{copy_code} 		
+		AND a.vouch_id = #{vouch_id} and vouch_row=#{vouch_row}
+		
+	</select>
+	
+	<!-- 自动凭证辅助核算表金额不等于分录金额，将差额更新到辅助核算第一条数据上 -->
+	<update id="updateAutoVouchCheckByOne" parameterType="java.util.Map">
+	
+		update ACC_AUTO_CHECK set ${debit_credit}=${debit_credit} + ${cha_money}		
+		where group_id =#{group_id} and hos_id = #{hos_id} and copy_code = #{copy_code} 		
+		AND vouch_id = #{vouch_id} and vouch_row=#{vouch_row} and vouch_check_id=1
+		
+	</update>
+	
+	<!-- 查询自动凭证主表- -->
+	<select id="queryAutoVouch" parameterType="java.util.Map" resultType="java.util.Map">
+	
+		select vouch_id "auto_id",vouch_type_code "vouch_type_code",to_char(vouch_date,'yyyy-MM-dd') "vouch_date",vouch_att_num "att_num",busi_type_code "busi_type_code" from ACC_AUTO_VOUCH 
+		where group_id=#{group_id} and hos_id=#{hos_id} and copy_code=#{copy_code} and vouch_id=#{auto_id}
+		
+	</select>
+	
+	<!-- 查询自动凭证明细表- -->
+	<select id="queryAutoVouchDetail" parameterType="java.util.Map" resultType="java.util.Map">
+	
+		select a.vouch_row "vouch_row",s.subj_code "subj_code",a.summary "summary",
+		a.debit,a.credit,
+		s.subj_code "subj_code",s.subj_code||' '||s.subj_name_all "subj_name",
+		s.subj_dire "subj_dire",s.subj_type_code "subj_type_code",s.subj_nature_code "subj_nature_code",
+		s.is_check "is_check",s.is_cash "is_cash",s.is_bill "is_bill", s.kind_code "kind_code",s.subj_level "subj_level", 
+		nvl(s.out_code,'')||','||nvl(s.kind_code,'') "other"
+		from ACC_AUTO_DETAIL a
+		left join acc_subj s on a.group_id=s.group_id and a.hos_id=s.hos_id and a.copy_code=s.copy_code and s.acc_year=#{acc_year} and a.subj_code=s.subj_code
+		where a.group_id =#{group_id} and a.hos_id = #{hos_id} and a.copy_code = #{copy_code} 		
+		AND a.vouch_id = #{auto_id}
+		order by ${order_by}
+		
+	</select>
+	
+	<!--查询自动凭证辅助核算现金流量表-->
+	<select id="queryAutoCheckCash" parameterType="java.util.Map" resultType="java.util.Map">
+		
+		with t1 as(
+			select a.vouch_check_id order_a,rownum rownum1,s.subj_code,a.summary,
+			case when a.debit &lt;&gt;0 then a.debit else a.credit end money,
+			a.con_no,a.check_no,a.business_no,to_char(a.occur_date,'yyyy-MM-dd') occur_date,to_char(a.due_date,'yyyy-MM-dd') due_date,
+			a.pay_type_code,a.pay_type_code||' '||p.pay_name pay_name,
+			a.paper_type_code||' '||t.type_name paper_type_code 
+			${sel_sql}			
+			from acc_auto_check a
+			inner join acc_subj s on a.group_id=s.group_id and a.hos_id=s.hos_id and a.copy_code=s.copy_code  and s.acc_year = #{acc_year} and a.subj_code=s.subj_code 		
+			left join acc_pay_type p on a.group_id=p.group_id and a.hos_id=p.hos_id and a.copy_code=p.copy_code and a.pay_type_code=p.pay_code
+			left join acc_paper_type t on a.group_id=t.group_id and a.hos_id=t.hos_id and a.copy_code=t.copy_code and a.paper_type_code=t.type_code
+			${left_sql}
+			where a.group_id =#{group_id} and a.hos_id = #{hos_id} and a.copy_code = #{copy_code} 		
+			AND a.vouch_id = #{auto_id} and a.vouch_row=#{vouch_row}
+			<choose>
+			<when test="order_sql != '' and order_sql != null">
+				${order_sql}
+			</when>
+			<otherwise>
+				order by a.vouch_check_id
+			</otherwise>
+		</choose>
+		),
+		t2 as(
+		select c.cash_id order_a,rownum rownum1,c.cash_item_id, i.cash_item_code || ' ' || i.cash_item_name as cash_name,i.cash_dire
+		from acc_auto_cash c 
+		left join acc_cash_item i on i.group_id = c.group_id and i.hos_id = c.hos_id and i.copy_code = c.copy_code and i.cash_item_id = c.cash_item_id 
+		where c.group_id = #{group_id}
+		  and c.hos_id = #{hos_id}
+		  and c.copy_code = #{copy_code}
+		  and c.vouch_id = #{auto_id}
+		  and c.vouch_row = #{vouch_row}
+		  order by c.cash_id
+		)
+		select * from t1 left join t2  on t1.rownum1=t2.rownum1 order by t1.order_a
+		
+	</select>
+	
+	<!--查询自动凭证辅助核算-->
+	<select id="queryAutoCheck" parameterType="java.util.Map" resultType="java.util.Map">
+		select s.subj_code,a.summary,
+		case when a.debit &lt;&gt;0 then a.debit else a.credit end money,
+		a.con_no,a.check_no,a.business_no,to_char(a.occur_date,'yyyy-MM-dd') occur_date,to_char(a.due_date,'yyyy-MM-dd') due_date,
+		a.pay_type_code,a.pay_type_code||' '||p.pay_name pay_name,
+		a.paper_type_code||' '||t.type_name paper_type_code 
+		${sel_sql}
+		from acc_auto_check a
+		inner join acc_subj s on a.group_id=s.group_id and a.hos_id=s.hos_id and a.copy_code=s.copy_code and s.acc_year = #{acc_year} and a.subj_code=s.subj_code
+		left join acc_pay_type p on a.group_id=p.group_id and a.hos_id=p.hos_id and a.copy_code=p.copy_code and a.pay_type_code=p.pay_code
+		left join acc_paper_type t on a.group_id=t.group_id and a.hos_id=t.hos_id and a.copy_code=t.copy_code and a.paper_type_code=t.type_code
+		${left_sql}
+		where a.group_id =#{group_id} and a.hos_id = #{hos_id} and a.copy_code = #{copy_code} 		
+		AND a.vouch_id = #{auto_id} and a.vouch_row=#{vouch_row}
+		<choose>
+			<when test="order_sql != '' and order_sql != null">
+				${order_sql}
+			</when>
+			<otherwise>
+				order by a.vouch_check_id
+			</otherwise>
+		</choose>
+	</select>
+	
+	<!-- 查询自动凭证现金流量表- -->
+	<select id="queryAutoVouchCash" parameterType="java.util.Map" resultType="java.util.Map">
+	
+		select  c.cash_item_id,c.summary,c.cash_money money,i.cash_item_code || ' ' || i.cash_item_name as cash_name,i.cash_dire 
+		from ACC_AUTO_CASH c
+		left join acc_cash_item i on i.group_id = c.group_id and i.hos_id = c.hos_id and i.copy_code = c.copy_code and i.cash_item_id = c.cash_item_id
+		where c.group_id=#{group_id} and c.hos_id=#{hos_id} and c.copy_code=#{copy_code} and c.vouch_id=#{auto_id} and c.vouch_row=#{vouch_row}
+		order by c.cash_id
+	</select>
+	
+	<!-- 自动凭证复制凭证日志表,删除自动凭证表、日志临时表不等于今天的临时日志或者当前vouch_id- -->
+	<insert id="saveAutoVouchLog" parameterType="java.util.Map">
+	
+	begin
+	
+		delete from acc_auto_check where vouch_id in(
+			select vouch_id from acc_auto_vouch 
+			where group_id=#{group_id} and hos_id=#{hos_id} and copy_code=#{copy_code} 
+			and (vouch_id=#{vouch_id} or to_char(create_date,'yyyy-MM-dd') &lt; to_char(sysdate-1,'yyyy-MM-dd'))
+		);
+		
+		delete from acc_auto_cash where vouch_id in(
+			select vouch_id from acc_auto_vouch 
+			where group_id=#{group_id} and hos_id=#{hos_id} and copy_code=#{copy_code} 
+			and (vouch_id=#{vouch_id} or to_char(create_date,'yyyy-MM-dd') &lt; to_char(sysdate-1,'yyyy-MM-dd'))
+		);
+		
+		delete from acc_auto_detail where vouch_id in(
+			select vouch_id from acc_auto_vouch 
+			where group_id=#{group_id} and hos_id=#{hos_id} and copy_code=#{copy_code} 
+			and (vouch_id=#{vouch_id} or to_char(create_date,'yyyy-MM-dd') &lt; to_char(sysdate-1,'yyyy-MM-dd'))
+		);
+		
+		delete from acc_auto_vouch 
+		where group_id=#{group_id} and hos_id=#{hos_id} and copy_code=#{copy_code} 
+		and (vouch_id=#{vouch_id} or to_char(create_date,'yyyy-MM-dd') &lt; to_char(sysdate-1,'yyyy-MM-dd'));
+	
+		INSERT INTO ${busi_log_table}(
+			group_id, hos_id, copy_code, acc_year, busi_type_code, business_no, vouch_id,
+			template_code,create_date,create_user<if test="acc_month_col != null and acc_month_col != ''">, ${acc_month_col}</if>
+		)
+		select group_id, hos_id, copy_code, #{acc_year}, busi_type_code, business_no, vouch_id, 
+			template_code, create_date, #{create_user}<if test="acc_month_val != null and acc_month_val != ''">, #{acc_month_val} </if>
+		from ACC_BUSI_LOG_TEMP 
+		where group_id=#{group_id} and hos_id=#{hos_id} and copy_code=#{copy_code} and vouch_id=#{vouch_id};		
+		
+		delete from ACC_BUSI_LOG_TEMP where group_id=#{group_id} and hos_id=#{hos_id} and copy_code=#{copy_code} 
+		and (vouch_id=#{vouch_id} or to_char(create_date,'yyyy-MM-dd') &lt; to_char(sysdate-1,'yyyy-MM-dd'));
+		
+	end;	
+		
+	</insert>
+	
+	<!-- 查询平行记账模板-->
+	<select id="queryAccBudgTpTree" resultType="java.util.Map">
+		SELECT a.tp_code "tp_code",a.tp_name "tp_name",u.user_name "user_name",a.note "note"
+		,b.subj_code "subj_code",b.dire "dire"	
+		FROM acc_budg_tp a
+		inner join acc_budg_tp_detail b on a.group_id=b.group_id and a.hos_id=b.hos_id and a.copy_code=b.copy_code and a.tp_code=b.tp_code and b.kind_code='01'	
+		left join sys_user u on a.group_id=u.group_id and a.hos_id=u.hos_id and a.user_id=u.user_id
+		where a.group_id=#{map.group_id} and a.hos_id=#{map.hos_id} and a.copy_code=#{map.copy_code} 
+		and a.tp_code in(
+			select b.tp_code from acc_budg_tp_detail b 
+			where a.group_id=b.group_id and a.hos_id=b.hos_id and a.copy_code=b.copy_code and a.tp_code=b.tp_code and b.kind_code='01'
+			<if test='map.is_dire=="0"'>
+				and b.subj_code in(${map.subj_code_str})
+			</if>
+			<if test='map.is_dire=="1"'>
+			and (
+				<foreach collection="list" item="item" index="index" separator=" or ">
+					<choose>
+						<when test='item.dire!=2'>
+							(b.subj_code=#{item.subj_code} and b.dire=#{item.dire})
+						</when>
+						<otherwise>
+							(b.subj_code=#{item.subj_code})
+						</otherwise>
+					</choose>
+				</foreach>
+				)
+			</if>
+		)
+		order by a.sort_code,a.tp_code
+	</select>
+	
+	<!-- 根据财务会计科目查询预算会计科目 -->
+	<select id="queryBudgSubjByAcc" resultType="java.util.Map">
+		SELECT a.acc_subj_code "acc_subj_code",a.budg_subj_code "budg_subj_code",a.budg_subj_code||' '||s.subj_name_all "budg_subj_name",
+	    s.subj_nature_code "b_nature_code",s.is_bill "b_is_bill",s.is_cash "b_is_cash",a.source_id "source_id",
+	    (select lower(t.column_check) from acc_check_type t
+	    where t.group_id=s.group_id and t.hos_id=s.hos_id and t.copy_code=s.copy_code and t.check_type_id=s.check1) "b_check1",
+	    (select lower(t.column_check) from acc_check_type t 
+	    where t.group_id=s.group_id and t.hos_id=s.hos_id and t.copy_code=s.copy_code and t.check_type_id=s.check2) "b_check2",
+	    (select lower(t.column_check) from acc_check_type t 
+	    where t.group_id=s.group_id and t.hos_id=s.hos_id and t.copy_code=s.copy_code and t.check_type_id=s.check3) "b_check3",
+	    (select lower(t.column_check) from acc_check_type t 
+	    where t.group_id=s.group_id and t.hos_id=s.hos_id and t.copy_code=s.copy_code and t.check_type_id=s.check4) "b_check4"  
+	    FROM acc_subj_acc_budg a
+	    inner join acc_subj s on a.group_id=s.group_id and a.hos_id=s.hos_id and a.copy_code=s.copy_code and s.acc_year=#{acc_year} 
+	    and a.budg_subj_code=s.subj_code 
+		where a.group_id=#{group_id} and a.hos_id=#{hos_id} and a.copy_code=#{copy_code} 
+		and a.acc_subj_code in(${subj_code})
+	</select>
+	
+	<!-- 更新科目对照 -->
+	<update id="updateBudgSubj" parameterType="java.util.Map">
+	<![CDATA[
+	
+	declare
+	  TYPE ref_type IS REF CURSOR;--定义游标指针
+	  v_cursor ref_type;--定义游标变量
+	  
+	  v_group_id number;
+	  v_hos_id number;
+	  v_copy_code varchar2(20);
+	  v_str varchar2(200);
+	  v_acc_subj_code varchar2(50);
+	  v_budg_subj_code varchar2(50);
+	  v_count number;
+	begin
+	  v_group_id:=#{group_id};
+	  v_hos_id:=#{hos_id};
+	  v_copy_code:=#{copy_code};
+	   
+	  open v_cursor for
+	       SELECT distinct REGEXP_SUBSTR (#{subj_code_str}, '[^,]+', 1,rownum) as str
+	       from dual connect by rownum<=LENGTH (#{subj_code_str}) - LENGTH (regexp_replace(#{subj_code_str}, ',', ''))+1;
+	  loop
+	  fetch v_cursor into v_str;
+	  exit when v_cursor%notfound;
+	  
+	     v_acc_subj_code:=substr(v_str,0,instr(v_str,'-')-1);
+	     v_budg_subj_code:=substr(v_str,instr(v_str,'-')+1,length(v_str));
+	     /*dbms_output.put_line(v_acc_subj_code||'-'||v_budg_subj_code);*/
+	     
+	      /*更新对照关系表*/
+	      update ACC_SUBJ_ACC_BUDG b set budg_subj_code=v_budg_subj_code 
+	      where group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code and acc_subj_code=v_acc_subj_code;                                   
+	      v_count := sql%rowcount; 
+	             
+	      /*没有插入对应关系表*/ 
+	      if(v_count=0) then
+	         insert into ACC_SUBJ_ACC_BUDG (GROUP_ID, HOS_ID, COPY_CODE, ACC_SUBJ_CODE, BUDG_SUBJ_CODE)
+	         values( v_group_id, v_hos_id, v_copy_code, v_acc_subj_code, v_budg_subj_code);
+	      end if;            
+	  end loop;
+	  close v_cursor;   
+	end;
+		
+	]]>
+	</update>
+	
+	<!-- 转换 合并需要添加的分录数据 -->
+	<select id="querySaveAutoVouchDetail" resultType="java.util.Map" >
+	select  
+		aad.group_id "group_id",
+		aad.hos_id "hos_id",
+		aad.copy_code "copy_code",
+		aad.vouch_id "vouch_id",
+		aad.summary "summary",
+		aad.subj_code "subj_code",
+		aad.credit_w "credit_w",
+		aad.debit_w "debit_w",  
+		aad.debit "debit",
+		aad.credit "credit", 
+		rownum "vouch_row"
+	from
+		(select group_id ,hos_id ,copy_code ,vouch_id ,summary ,subj_code ,sum(credit_w) credit_w,sum(debit_w) debit_w,
+				sum(debit) debit,sum(credit) credit from  
+			<foreach collection="list" separator=" union all " close=" ) " open=" ( " item="vo">
+				select
+					#{vo.group_id,jdbcType=INTEGER} group_id,
+					#{vo.hos_id,jdbcType=INTEGER} hos_id,
+					#{vo.copy_code,jdbcType=VARCHAR} copy_code,
+					#{vo.vouch_id,jdbcType=INTEGER} vouch_id,
+					#{vo.summary,jdbcType=VARCHAR} summary,
+					#{vo.subj_code,jdbcType=VARCHAR} subj_code,
+					#{vo.credit_w,jdbcType=INTEGER} credit_w,
+					#{vo.debit_w,jdbcType=INTEGER} debit_w,
+					#{vo.debit,jdbcType=INTEGER} debit,
+					#{vo.credit,jdbcType=INTEGER} credit
+				from
+					dual
+			</foreach>
+		 group by group_id,hos_id,copy_code,vouch_id,summary,subj_code order by summary,debit desc) aad
+	</select>
+	
+	<!-- 凭证制单页面，查询生成差异标注后的说明 -->
+	<select id="queryAccVouchDiffAutoTemp" parameterType="java.util.Map" resultType="String">
+		
+		select note from acc_diff_note_temp 
+		where group_id=#{group_id} and hos_id=#{hos_id} and copy_code=#{copy_code} 
+		and vouch_id=#{vouch_id} and user_id=#{create_user} and create_date=#{create_date}
+		<if test='error_level=="2"'>
+			and error_level=#{error_level}
+		</if>
+	</select>
+	
+	<!-- 查询页面，查询生成差异标注后的说明 -->
+	<select id="queryAccVouchDiffAutoTempAll" parameterType="java.util.Map" resultType="java.util.Map">
+		
+		select vouch_id "vouch_id",note "note" from acc_diff_note_temp 
+		where group_id=#{group_id} and hos_id=#{hos_id} and copy_code=#{copy_code} 
+		and user_id=#{create_user} and create_date=#{create_date}
+		order by note
+	</select>
+	
+	<!-- 凭证自动生成差异标注 -->
+	<update id="updateAccVouchDiffAuto" parameterType="java.util.Map">
+	<![CDATA[
+	
+	declare
+      TYPE ref_type IS REF CURSOR;--定义游标指针
+      v_cursor1 ref_type;--定义游标变量      
+      v_cursor2 ref_type;--定义游标变量
+      v_vouch_id acc_vouch.vouch_id%TYPE;
+      v_acc_year acc_vouch.acc_year%TYPE;
+      v_acc_month acc_vouch.acc_month%TYPE;
+      v_vouch_date acc_vouch.vouch_date%TYPE;     
+      v_vouch_type_name varchar2(20);
+           
+      p_group_id number;
+      p_hos_id number;
+      p_copy_code varchar2(20);     
+      p_user_id number;  
+      p_create_date date;
+      v_sum_04 numeric(18,2);
+      v_sum_05 numeric(18,2);
+      v_sum_06 numeric(18,2);
+      v_sum_07 numeric(18,2);
+      v_sum_cy numeric(18,2);
+      v_sum_os numeric(18,2);
+      v_sum_df numeric(18,2);
+      v_diff_item_code varchar2(20);
+      v_diff_type_code varchar2(20);
+      v_diff_item_name varchar2(200);
+      v_diff_type_name varchar2(200);
+      v_subj_type_code varchar2(100);
+	  v_busi_type_code varchar2(20);
+	  v_state number;
+      v_diff_bl numeric(18,2);
+      v_diff_money numeric(18,2);
+      v_diff_money_sum numeric(18,2);
+      v_count number;
+      v_index number;
+      v_index_loop number;
+      v_loop2 number;
+      v_busi_type number;
+      v_is_delete number;
+      v_para_046 number;
+      v_cur_ym number;
+      v_sign_flag number;
+      v_is_default number;
+      
+    begin
+      p_group_id:=#{group_id};
+      p_hos_id:=#{hos_id};
+      p_copy_code:=#{copy_code};         
+      p_user_id:=#{create_user};
+      p_create_date:=#{create_date};
+      v_sum_04:=0;
+      v_sum_05:=0;
+      v_sum_06:=0;
+      v_sum_07:=0;
+      v_sum_df:=0;
+      v_sum_os:=0;
+      
+          
+       delete from ACC_DIFF_NOTE_TEMP where group_id=p_group_id and hos_id=p_hos_id and copy_code=p_copy_code
+       and (to_char(create_date,'yyyy-MM-dd') < to_char(sysdate-1,'yyyy-MM-dd'));
+      
+       select para_value into v_para_046 from acc_para 
+       where group_id=p_group_id and hos_id=p_hos_id and copy_code=p_copy_code and para_code='046';
+       
+       select min(acc_year||acc_month) into v_cur_ym from acc_year_month 
+       where group_id=p_group_id and hos_id=p_hos_id and copy_code=p_copy_code and nvl(acc_flag,0)=0;
+      
+      /*批量处理凭证*/
+      open v_cursor1 for
+            select a.vouch_id,t.vouch_type_short||'-'||a.vouch_no,a.acc_year,a.acc_month,a.vouch_date,a.busi_type_code,a.state from acc_vouch a 
+            inner join acc_vouch_type t on a.group_id = t.group_id and a.hos_id = t.hos_id  and a.copy_code = t.copy_code 
+            and a.vouch_type_code=t.vouch_type_code
+            where a.group_id = p_group_id and a.hos_id = p_hos_id  and a.copy_code = p_copy_code           
+            and a.vouch_id in(${vouch_id});     
+      loop
+      fetch v_cursor1 into v_vouch_id,v_vouch_type_name,v_acc_year,v_acc_month,v_vouch_date,v_busi_type_code,v_state;
+      exit when v_cursor1%notfound;
+      
+           if(v_para_046=1) then
+                 if(to_number(v_acc_year||v_acc_month)<v_cur_ym) then
+                      --dbms_output.put_line(v_acc_year||v_acc_month||'，已结账');
+                      select count(1) into v_count from ACC_DIFF_NOTE_TEMP 
+                      where group_id=p_group_id and hos_id=p_hos_id and copy_code=p_copy_code and user_id=p_user_id and create_date=p_create_date
+                      and note=v_acc_year||v_acc_month||'，已结账';
+                      --只提醒一次
+                      if(v_count=0) then
+                          insert into ACC_DIFF_NOTE_TEMP(group_id,hos_id,copy_code,vouch_id,user_id,create_date,error_level,note)                    
+                          values(p_group_id,p_hos_id,p_copy_code,v_vouch_id,p_user_id,p_create_date,1,v_acc_year||v_acc_month||'，已结账');
+                      end if;
+                      continue;
+                 end if;
+           end if;
+          
+           select count(1) into v_count from acc_vouch_diff where group_id = p_group_id and hos_id = p_hos_id  and copy_code = p_copy_code and vouch_id=v_vouch_id and is_auto=0;
+           if(v_count>0) then                      
+                  --dbms_output.put_line(v_vouch_type_name||'，手工标注不自动生成');   
+                  insert into ACC_DIFF_NOTE_TEMP(group_id,hos_id,copy_code,vouch_id,user_id,create_date,error_level,note)
+                  values(p_group_id,p_hos_id,p_copy_code,v_vouch_id,p_user_id,p_create_date,1,v_vouch_type_name||'，手工标注不自动生成');
+                  continue;                        
+            end if;
+            
+           if(nvl(v_busi_type_code,'abc')='Z006') then                      
+                  --dbms_output.put_line(v_vouch_type_name||'，收支结账凭证不需要标注');   
+                  insert into ACC_DIFF_NOTE_TEMP(group_id,hos_id,copy_code,vouch_id,user_id,create_date,error_level,note)
+                  values(p_group_id,p_hos_id,p_copy_code,v_vouch_id,p_user_id,p_create_date,1,v_vouch_type_name||'，收支结账凭证不需要标注');
+				          update acc_vouch set sign_flag=2 where group_id = p_group_id and hos_id = p_hos_id  and copy_code = p_copy_code and vouch_id=v_vouch_id; 
+                  continue;                        
+            end if;
+			
+			      if(v_state=-1) then                      
+                  --dbms_output.put_line(v_vouch_type_name||'，草稿凭证不需要标注');   
+                  insert into ACC_DIFF_NOTE_TEMP(group_id,hos_id,copy_code,vouch_id,user_id,create_date,error_level,note)
+                  values(p_group_id,p_hos_id,p_copy_code,v_vouch_id,p_user_id,p_create_date,1,v_vouch_type_name||'，草稿凭证不需要标注');
+				          update acc_vouch set sign_flag=2 where group_id = p_group_id and hos_id = p_hos_id  and copy_code = p_copy_code and vouch_id=v_vouch_id;
+                  continue;                        
+            end if;
+			
+			      if(v_state=0) then                      
+                  --dbms_output.put_line(v_vouch_type_name||'，作废凭证不需要标注');   
+                  insert into ACC_DIFF_NOTE_TEMP(group_id,hos_id,copy_code,vouch_id,user_id,create_date,error_level,note)
+                  values(p_group_id,p_hos_id,p_copy_code,v_vouch_id,p_user_id,p_create_date,1,v_vouch_type_name||'，作废凭证不需要标注');
+				          update acc_vouch set sign_flag=2 where group_id = p_group_id and hos_id = p_hos_id  and copy_code = p_copy_code and vouch_id=v_vouch_id;
+                  continue;                        
+            end if;
+			
+            v_index:=0;
+            v_is_delete:=1;                      
+            v_sign_flag:=2;           
+           
+            --dbms_output.put_line(v_vouch_id);
+            
+            --判断是否包含财务、预算收支科目
+            select count(1) into v_count from acc_vouch a
+            inner join acc_vouch_detail b on a.group_id = b.group_id and a.hos_id = b.hos_id  
+            and a.copy_code = b.copy_code and a.vouch_id=b.vouch_id
+            inner join acc_subj s on s.group_id = b.group_id and s.hos_id = b.hos_id  
+            and s.copy_code = b.copy_code and s.acc_year=b.acc_year and s.subj_code=b.subj_code
+            where a.group_id = p_group_id and a.hos_id = p_hos_id  and a.copy_code = p_copy_code and a.vouch_id=v_vouch_id
+            and s.subj_type_code in('04','05','06','07');
+            
+            --没有收支科目不需要标注
+            if(v_count=0) then 
+                  --dbms_output.put_line(v_vouch_type_name||'，没有收支科目不需要标注');   
+                  update acc_vouch set sign_flag=2 where group_id = p_group_id and hos_id = p_hos_id  and copy_code = p_copy_code and vouch_id=v_vouch_id;
+                  insert into ACC_DIFF_NOTE_TEMP(group_id,hos_id,copy_code,vouch_id,user_id,create_date,error_level,note)
+                  values(p_group_id,p_hos_id,p_copy_code,v_vouch_id,p_user_id,p_create_date,1,v_vouch_type_name||'，没有收支科目不需要标注');
+                  continue;
+            end if;
+            
+            --财务收入科目
+            select nvl(sum(b.credit-b.debit),0) into v_sum_04 from acc_vouch a
+            inner join acc_vouch_detail b on a.group_id = b.group_id and a.hos_id = b.hos_id  
+            and a.copy_code = b.copy_code and a.vouch_id=b.vouch_id
+            inner join acc_subj s on s.group_id = b.group_id and s.hos_id = b.hos_id  
+            and s.copy_code = b.copy_code and s.acc_year=b.acc_year and s.subj_code=b.subj_code
+            where a.group_id = p_group_id and a.hos_id = p_hos_id  and a.copy_code = p_copy_code and a.vouch_id=v_vouch_id
+            and s.subj_type_code in('04');
+          
+            --财务支出科目         
+            select nvl(sum(b.debit-b.credit),0) into v_sum_05 from acc_vouch a
+            inner join acc_vouch_detail b on a.group_id = b.group_id and a.hos_id = b.hos_id  
+            and a.copy_code = b.copy_code and a.vouch_id=b.vouch_id
+            inner join acc_subj s on s.group_id = b.group_id and s.hos_id = b.hos_id  
+            and s.copy_code = b.copy_code and s.acc_year=b.acc_year and s.subj_code=b.subj_code
+            where a.group_id = p_group_id and a.hos_id = p_hos_id  and a.copy_code = p_copy_code and a.vouch_id=v_vouch_id
+            and s.subj_type_code in('05');           
+            
+            --预算收入科目
+            select nvl(sum(b.credit-b.debit),0) into v_sum_06 from acc_vouch a
+            inner join acc_vouch_detail b on a.group_id = b.group_id and a.hos_id = b.hos_id  
+            and a.copy_code = b.copy_code and a.vouch_id=b.vouch_id
+            inner join acc_subj s on s.group_id = b.group_id and s.hos_id = b.hos_id  
+            and s.copy_code = b.copy_code and s.acc_year=b.acc_year and s.subj_code=b.subj_code
+            where a.group_id = p_group_id and a.hos_id = p_hos_id  and a.copy_code = p_copy_code and a.vouch_id=v_vouch_id
+            and s.subj_type_code in('06');        
+            
+            --预算支出科目
+            select nvl(sum(b.debit-b.credit),0) into v_sum_07 from acc_vouch a
+            inner join acc_vouch_detail b on a.group_id = b.group_id and a.hos_id = b.hos_id  
+            and a.copy_code = b.copy_code and a.vouch_id=b.vouch_id
+            inner join acc_subj s on s.group_id = b.group_id and s.hos_id = b.hos_id  
+            and s.copy_code = b.copy_code and s.acc_year=b.acc_year and s.subj_code=b.subj_code
+            where a.group_id = p_group_id and a.hos_id = p_hos_id  and a.copy_code = p_copy_code and a.vouch_id=v_vouch_id
+            and s.subj_type_code in('07');           
+            
+            --相等不需要标注            
+            if(v_sum_04=v_sum_06 and v_sum_05=v_sum_07) then
+                  --dbms_output.put_line(v_vouch_type_name||'，收支科目的金额相等不需要标注');         
+                  update acc_vouch set sign_flag=2 where group_id = p_group_id and hos_id = p_hos_id  and copy_code = p_copy_code and vouch_id=v_vouch_id;
+                  insert into ACC_DIFF_NOTE_TEMP(group_id,hos_id,copy_code,vouch_id,user_id,create_date,error_level,note)
+                  values(p_group_id,p_hos_id,p_copy_code,v_vouch_id,p_user_id,p_create_date,1,v_vouch_type_name||'，收支科目的金额相等不需要标注');
+                  continue;                  
+            end if;
+            
+            /***********************************收入begin************************************/
+             v_index_loop:=1;
+             v_loop2:=1;
+             v_is_default:=0;
+             v_diff_money_sum:=0;
+            --按照对方科目比例进行分解到标注类别为01、03(分析对象为04、06的不同标注项目上)           
+            if(v_sum_04!=v_sum_06) then
+            
+                 --dbms_output.put_line('按照对方科目比例分摊');                                             
+                 if(v_sum_04<>0 and v_sum_06=0) then
+                 
+                       v_sum_cy:=v_sum_04;
+                       v_diff_type_code:='01';   
+                       v_diff_type_name:='当期确认为收入';
+                                           
+                 elsif(v_sum_04=0 and v_sum_06<>0) then
+                   
+                       v_sum_cy:=v_sum_06;
+                       v_diff_type_code:='03';                      
+                       v_diff_type_name:='当期确认为预算收入';
+                       
+                 elsif(v_sum_04>0 and v_sum_06>0 and v_sum_04>v_sum_06) then
+                 
+                       v_sum_cy:=v_sum_04-v_sum_06;
+                       v_diff_type_code:='01';
+                       v_diff_type_name:='当期确认为收入';    
+                                    
+                 elsif(v_sum_04>0 and v_sum_06>0 and v_sum_04<v_sum_06) then
+                 
+                       v_sum_cy:=v_sum_06-v_sum_04;
+                       v_diff_type_code:='03';
+                       v_diff_type_name:='当期确认为预算收入';
+                       
+                 elsif(v_sum_04<0 and v_sum_06<0 and abs(v_sum_04)>abs(v_sum_06)) then
+                 
+                       v_sum_cy:=v_sum_04-v_sum_06;
+                       v_diff_type_code:='01';
+                       v_diff_type_name:='当期确认为收入';
+                           
+                 elsif(v_sum_04<0 and v_sum_06<0 and abs(v_sum_04)<abs(v_sum_06)) then
+                 
+                       v_sum_cy:=v_sum_06-v_sum_04;
+                       v_diff_type_code:='03';
+                       v_diff_type_name:='当期确认为预算收入';
+                       
+                 elsif(v_sum_04>0 and v_sum_06<0) then
+                 
+                        v_index_loop:=2;
+                        v_loop2:=2;
+                                                 
+                 elsif(v_sum_04<0 and v_sum_06>0) then
+                 
+                        v_index_loop:=2;
+                        v_loop2:=2;
+                                                
+                 end if;
+                 
+                 --取对方科目的总金额
+                 while 1<=v_index_loop loop
+                  
+                      if(v_loop2=2) then
+                          if(v_index_loop=2) then                               
+                                v_diff_type_code:='01';
+                                v_diff_type_name:='当期确认为收入';
+                                v_diff_money_sum:=0;
+                                v_sum_cy:=v_sum_04;
+                          else                               
+                                v_diff_type_code:='03';
+                                v_diff_type_name:='当期确认为预算收入';
+                                v_diff_money_sum:=0;
+                                v_sum_cy:=v_sum_06;
+                          end if;
+                      end if;
+                      v_index_loop:=v_index_loop-1;
+                      
+                    
+                      select nvl(abs(sum(t1.end_os)),0) into v_sum_df from (
+                          select b.subj_code,
+                          --case when b.credit!=0 then b.credit*-1 else b.debit end end_os
+                          --case s.subj_dire when 0 then b.debit-b.credit else b.credit-b.debit end end_os
+                          b.debit+b.credit end_os
+                          from acc_vouch_detail b 
+                          inner join acc_subj s on s.group_id = b.group_id and s.hos_id = b.hos_id  
+                          and s.copy_code = b.copy_code and s.acc_year=b.acc_year and s.subj_code=b.subj_code
+                          inner join acc_diff_subj_set d on d.group_id = b.group_id and d.hos_id = b.hos_id  
+                          and d.copy_code = b.copy_code and d.diff_type_code=v_diff_type_code and b.subj_code like d.subj_code||'%'
+                          where b.group_id = p_group_id and b.hos_id = p_hos_id  and b.copy_code = p_copy_code and b.vouch_id=v_vouch_id
+                          --and s.subj_type_code in('01','02','03')
+                      ) t1;  
+                      
+                      select nvl(sum(t2.end_os),0) into v_sum_os from (
+                          select b.subj_code,
+                          case s.subj_dire when 0 then b.debit-b.credit else b.credit-b.debit end end_os
+                          from acc_vouch_detail b 
+                          inner join acc_subj s on s.group_id = b.group_id and s.hos_id = b.hos_id  
+                          and s.copy_code = b.copy_code and s.acc_year=b.acc_year and s.subj_code=b.subj_code
+                          inner join acc_diff_subj_set d on d.group_id = b.group_id and d.hos_id = b.hos_id  
+                          and d.copy_code = b.copy_code and d.diff_type_code=v_diff_type_code and b.subj_code like d.subj_code||'%'
+                          where b.group_id = p_group_id and b.hos_id = p_hos_id  and b.copy_code = p_copy_code and b.vouch_id=v_vouch_id
+                          --and s.subj_type_code in('01','02','03')
+                      ) t2; 
+                      
+                                     
+                      --没有维护对方科目，取默认项目
+                      if(v_sum_df=0) then 
+                      
+                      	  select count(1) into v_count from acc_diff_item d 
+                          where d.group_id = p_group_id and d.hos_id = p_hos_id  and d.copy_code = p_copy_code
+                          and d.diff_type_code=v_diff_type_code and d.is_default=1 and rownum=1;
+                          
+                          if(v_count>0) then 
+                      
+	                          select d.diff_item_code,d.diff_item_name into v_diff_item_code,v_diff_item_name from acc_diff_item d 
+	                          where d.group_id = p_group_id and d.hos_id = p_hos_id  and d.copy_code = p_copy_code
+	                          and d.diff_type_code=v_diff_type_code and d.is_default=1 and rownum=1;
+	                           
+	                          if(nvl(v_diff_item_code,'aaa')!='aaa') then 
+	                          
+	                             if(v_is_delete=1) then
+	                             
+	                                 delete from acc_vouch_diff where group_id = p_group_id and hos_id = p_hos_id  and copy_code = p_copy_code and vouch_id=v_vouch_id;                                
+	                                 v_is_delete:=0;
+	                                 v_sign_flag:=0;
+	                                 
+	                              end if;
+	                          
+	                              v_index:=v_index+1;                             
+	                              insert into acc_vouch_diff(group_id,hos_id,copy_code,diff_id,vouch_id,acc_year,acc_month,diff_item_code,diff_date,diff_money,is_auto,summary)
+	                              values(p_group_id,p_hos_id,p_copy_code,v_index,v_vouch_id,v_acc_year,v_acc_month,v_diff_item_code,v_vouch_date,v_sum_cy,1,v_diff_item_name);                                         
+	                              v_sign_flag:=1;
+	                              v_is_default:=1;
+	                            
+	                          end if;
+	                           
+                          end if;
+                          
+                      end if;
+                            
+                      --差异金额>对方科目总额
+                      --dbms_output.put_line(v_sum_cy||','||v_sum_df);                          
+                      if(v_is_default=0 and v_sum_df=0) then
+                      
+                            --dbms_output.put_line(v_vouch_type_name||'，分析收入科目时没有维护'||v_diff_type_name||'的对方科目');
+                            insert into ACC_DIFF_NOTE_TEMP(group_id,hos_id,copy_code,vouch_id,user_id,create_date,error_level,note)
+                            values(p_group_id,p_hos_id,p_copy_code,v_vouch_id,p_user_id,p_create_date,2,v_vouch_type_name||'，分析收入科目时没有维护'||v_diff_type_name||'的对方科目');
+                            v_sign_flag:=0;
+                            
+                      elsif(v_is_default=0 and v_sum_df!=0) then
+                      
+                             if(v_is_delete=1) then
+                             
+                                 delete from acc_vouch_diff where group_id = p_group_id and hos_id = p_hos_id  and copy_code = p_copy_code and vouch_id=v_vouch_id;                                
+                                 v_is_delete:=0;
+                                 v_sign_flag:=0;
+                                 
+                             end if;
+                            
+                            --按对方科目的比例分摊                
+                            open v_cursor2 for                
+                                select t1.diff_item_code,t1.diff_item_name,round(sum(t1.bal_os),2),round(abs(sum(t1.end_os)),2)/v_sum_df from (
+                                    select d.diff_item_code,m.diff_item_name,
+                                    --case when b.credit!=0 then b.credit*-1 else b.debit end end_os
+                                    case s.subj_dire when 0 then b.debit-b.credit else b.credit-b.debit end bal_os,
+                                    b.debit+b.credit end_os
+                                    from acc_vouch_detail b 
+                                    inner join acc_subj s on s.group_id = b.group_id and s.hos_id = b.hos_id  
+                                    and s.copy_code = b.copy_code and s.acc_year=b.acc_year and s.subj_code=b.subj_code
+                                    inner join acc_diff_subj_set d on d.group_id = b.group_id and d.hos_id = b.hos_id  
+                                    and d.copy_code = b.copy_code and d.diff_type_code=v_diff_type_code and b.subj_code like d.subj_code||'%'
+                                    inner join acc_diff_item m on d.group_id = m.group_id and d.hos_id = m.hos_id  
+                                    and d.copy_code = m.copy_code and d.diff_item_code=m.diff_item_code
+                                    where b.group_id = p_group_id and b.hos_id = p_hos_id  and b.copy_code = p_copy_code and b.vouch_id= v_vouch_id 
+                                    --and s.subj_type_code in('01','02','03')
+                                    order by d.diff_item_code
+                                ) t1
+                                group by t1.diff_item_code,t1.diff_item_name;
+                            loop
+                            fetch v_cursor2 into v_diff_item_code,v_diff_item_name,v_diff_money,v_diff_bl;
+                            
+                                                               
+                                 --分析金额!=对方科目总额按比例分摊，否则直接分摊金额
+                                 if(v_sum_cy!=v_sum_os) then
+                                      v_diff_money:=round(v_sum_cy*v_diff_bl,2);
+                                            
+                                      --最后一条更新差额
+                                      if v_cursor2%notfound then
+                                          --dbms_output.put_line(v_vouch_type_name||','||v_sum_cy||','||v_index);
+                                          v_diff_money_sum:=v_diff_money_sum-v_diff_money;                      
+                                          update acc_vouch_diff set diff_money=v_sum_cy-v_diff_money_sum
+                                          where group_id = p_group_id and hos_id = p_hos_id  and copy_code = p_copy_code and vouch_id=v_vouch_id and diff_id=v_index;                          
+                                          exit;
+                                      end if;
+                                 else 
+                                      if v_cursor2%notfound then 
+                                          exit;
+                                      end if;  
+                                 end if;
+                                    
+                                                           
+                                 v_index:=v_index+1;
+                                 v_diff_money_sum:=v_diff_money_sum+v_diff_money;
+                                 insert into acc_vouch_diff(group_id,hos_id,copy_code,diff_id,vouch_id,acc_year,acc_month,diff_item_code,diff_date,diff_money,is_auto,summary)
+                                 values(p_group_id,p_hos_id,p_copy_code,v_index,v_vouch_id,v_acc_year,v_acc_month,v_diff_item_code,v_vouch_date,v_diff_money,1,v_diff_item_name);                                 
+                                 v_sign_flag:=1;
+                                       
+                            end loop;
+                            close v_cursor2;
+                             
+                      end if;   
+                     
+                  end loop;                  
+            end if;
+            
+            /***********************************收入end************************************/
+            
+            
+            /***********************************支出begin************************************/
+            v_index_loop:=1;
+            v_loop2:=1;
+            v_is_default:=0;
+            v_diff_money_sum:=0;
+            --按照对方科目比例进行分解到标注类别为02、04(分析对象为05、07的不同标注项目上)
+            if(v_sum_05!=v_sum_07) then
+            
+                 --dbms_output.put_line('按照对方科目比例分摊');                
+                 if(v_sum_05<>0 and v_sum_07=0) then
+                 
+                       v_sum_cy:=v_sum_05;
+                       v_diff_type_code:='04';
+                       v_diff_type_name:='当期确认为费用';
+                                     
+                 elsif(v_sum_05=0 and v_sum_07<>0) then
+                 
+                       v_sum_cy:=v_sum_07;
+                       v_diff_type_code:='02';
+                       v_diff_type_name:='当期确认为预算支出';
+                 
+                 elsif(v_sum_05>0 and v_sum_07>0 and v_sum_05>v_sum_07) then
+                 
+                       v_sum_cy:=v_sum_05-v_sum_07;
+                       v_diff_type_code:='04';
+                       v_diff_type_name:='当期确认为费用';
+                                    
+                 elsif(v_sum_05>0 and v_sum_07>0 and v_sum_05<v_sum_07) then
+                 
+                       v_sum_cy:=v_sum_07-v_sum_05;
+                       v_diff_type_code:='02';
+                       v_diff_type_name:='当期确认为预算支出';
+                       
+                 elsif(v_sum_05<0 and v_sum_07<0 and abs(v_sum_05)>abs(v_sum_07)) then
+                 
+                       v_sum_cy:=v_sum_05-v_sum_07;
+                       v_diff_type_code:='04';
+                       v_diff_type_name:='当期确认为费用';
+                           
+                 elsif(v_sum_05<0 and v_sum_07<0 and abs(v_sum_05)<abs(v_sum_07)) then
+                 
+                       v_sum_cy:=v_sum_07-v_sum_05;
+                       v_diff_type_code:='02';
+                       v_diff_type_name:='当期确认为预算支出';
+                       
+                 elsif(v_sum_05>0 and v_sum_07<0) then
+                 
+                        v_index_loop:=2;
+                        v_loop2:=2;
+                        
+                 elsif(v_sum_05<0 and v_sum_07>0) then
+                 
+                        v_index_loop:=2;
+                        v_loop2:=2;
+                          
+                 end if;
+                 
+                 --取对方科目的总金额
+                 while 1<=v_index_loop loop
+                  
+                      if(v_loop2=2) then 
+                          if(v_index_loop=2) then                                
+                                v_diff_type_code:='04';
+                                v_diff_type_name:='当期确认为费用';
+                                v_diff_money_sum:=0;
+                                v_sum_cy:=v_sum_05;
+                          else                               
+                                v_diff_type_code:='02';
+                                v_diff_type_name:='当期确认为预算支出'; 
+                                v_diff_money_sum:=0;
+                                v_sum_cy:=v_sum_07;
+                          end if;
+                      end if;
+                      v_index_loop:=v_index_loop-1;
+                      
+                   
+                      select nvl(abs(sum(t1.end_os)),0) into v_sum_df from (
+                          select b.subj_code,
+                          --case when b.debit!=0 then b.debit*-1 else b.credit end end_os
+                          --case s.subj_dire when 0 then b.debit-b.credit else b.credit-b.debit end end_os
+                          b.debit+b.credit end_os
+                          from acc_vouch_detail b 
+                          inner join acc_subj s on s.group_id = b.group_id and s.hos_id = b.hos_id  
+                          and s.copy_code = b.copy_code and s.acc_year=b.acc_year and s.subj_code=b.subj_code
+                          inner join acc_diff_subj_set d on d.group_id = b.group_id and d.hos_id = b.hos_id  
+                          and d.copy_code = b.copy_code and d.diff_type_code=v_diff_type_code and b.subj_code like d.subj_code||'%'
+                          where b.group_id = p_group_id and b.hos_id = p_hos_id  and b.copy_code = p_copy_code and b.vouch_id=v_vouch_id
+                          --and s.subj_type_code in('01','02','03')
+                      ) t1; 
+                      
+                      select nvl(sum(t2.end_os),0) into v_sum_os from (
+                          select b.subj_code,
+                          case s.subj_dire when 0 then b.debit-b.credit else b.credit-b.debit end end_os
+                          from acc_vouch_detail b 
+                          inner join acc_subj s on s.group_id = b.group_id and s.hos_id = b.hos_id  
+                          and s.copy_code = b.copy_code and s.acc_year=b.acc_year and s.subj_code=b.subj_code
+                          inner join acc_diff_subj_set d on d.group_id = b.group_id and d.hos_id = b.hos_id  
+                          and d.copy_code = b.copy_code and d.diff_type_code=v_diff_type_code and b.subj_code like d.subj_code||'%'
+                          where b.group_id = p_group_id and b.hos_id = p_hos_id  and b.copy_code = p_copy_code and b.vouch_id=v_vouch_id
+                          --and s.subj_type_code in('01','02','03')
+                      ) t2;
+                      
+                                      
+                   
+                      --没有维护对方科目，取默认项目                      
+                      if(v_sum_df=0) then 
+                      
+                      	  select count(1) into v_count from acc_diff_item d 
+                          where d.group_id = p_group_id and d.hos_id = p_hos_id  and d.copy_code = p_copy_code
+                          and d.diff_type_code=v_diff_type_code and d.is_default=1 and rownum=1; 
+                      	
+                      	  if(v_count>0) then 	
+                      		
+		                          select d.diff_item_code,d.diff_item_name into v_diff_item_code,v_diff_item_name from acc_diff_item d 
+		                          where d.group_id = p_group_id and d.hos_id = p_hos_id  and d.copy_code = p_copy_code
+		                          and d.diff_type_code=v_diff_type_code and d.is_default=1 and rownum=1;
+		                           
+		                          if(nvl(v_diff_item_code,'aaa')!='aaa') then 
+		                             
+		                                 if(v_is_delete=1) then
+		                             
+		                                     delete from acc_vouch_diff where group_id = p_group_id and hos_id = p_hos_id  and copy_code = p_copy_code and vouch_id=v_vouch_id;                                
+		                                     v_is_delete:=0;
+		                                     v_sign_flag:=0;
+		                                 
+		                                 end if;
+		                           
+		                                  v_index:=v_index+1;
+		                                  insert into acc_vouch_diff(group_id,hos_id,copy_code,diff_id,vouch_id,acc_year,acc_month,diff_item_code,diff_date,diff_money,is_auto,summary)
+		                                  values(p_group_id,p_hos_id,p_copy_code,v_index,v_vouch_id,v_acc_year,v_acc_month,v_diff_item_code,v_vouch_date,v_sum_cy,1,v_diff_item_name);                                         
+		                                  v_sign_flag:=1;
+		                                  v_is_default:=1;
+		                            
+		                          end if;
+                          
+                          end if; 
+                                                   
+                      end if;
+                     
+                      --差异金额>对方科目总额                      
+                      if(v_is_default=0 and v_sum_df=0) then
+                      
+                            --dbms_output.put_line(v_vouch_type_name||'，分析支出科目时没有维护'||v_diff_type_name||'的对方科目');
+                            insert into ACC_DIFF_NOTE_TEMP(group_id,hos_id,copy_code,vouch_id,user_id,create_date,error_level,note)
+                            values(p_group_id,p_hos_id,p_copy_code,v_vouch_id,p_user_id,p_create_date,2,v_vouch_type_name||'，分析支出科目时没有维护'||v_diff_type_name||'的对方科目');
+                            v_sign_flag:=0;
+                           
+                      elsif(v_is_default=0 and v_sum_df!=0) then
+                             
+                             if(v_is_delete=1) then
+                             
+                                 delete from acc_vouch_diff where group_id = p_group_id and hos_id = p_hos_id  and copy_code = p_copy_code and vouch_id=v_vouch_id;                                
+                                 v_is_delete:=0;
+                                 v_sign_flag:=0;
+                                 
+                             end if;
+                              
+                              --按对方科目的比例分摊                
+                              open v_cursor2 for                
+                                  select t1.diff_item_code,t1.diff_item_name,round(sum(t1.bal_os),2),round(abs(sum(t1.end_os)),2)/v_sum_df from (
+                                      select d.diff_item_code,m.diff_item_name,
+                                      --case when b.debit!=0 then b.debit*-1 else b.credit end end_os
+                                      case s.subj_dire when 0 then b.debit-b.credit else b.credit-b.debit end bal_os,
+                                      b.debit+b.credit end_os
+                                      from acc_vouch_detail b 
+                                      inner join acc_subj s on s.group_id = b.group_id and s.hos_id = b.hos_id  
+                                      and s.copy_code = b.copy_code and s.acc_year=b.acc_year and s.subj_code=b.subj_code
+                                      inner join acc_diff_subj_set d on d.group_id = b.group_id and d.hos_id = b.hos_id  
+                                      and d.copy_code = b.copy_code and d.diff_type_code=v_diff_type_code and b.subj_code like d.subj_code||'%'
+                                      inner join acc_diff_item m on d.group_id = m.group_id and d.hos_id = m.hos_id  
+                                      and d.copy_code = m.copy_code and d.diff_item_code=m.diff_item_code
+                                      where b.group_id = p_group_id and b.hos_id = p_hos_id  and b.copy_code = p_copy_code and b.vouch_id= v_vouch_id 
+                                      --and s.subj_type_code in('01','02','03')
+                                      order by d.diff_item_code
+                                  ) t1
+                                  group by t1.diff_item_code,t1.diff_item_name;
+                              loop
+                              fetch v_cursor2 into v_diff_item_code,v_diff_item_name,v_diff_money,v_diff_bl;
+                                       
+                                   --分析金额!=对方科目总额按比例分摊，否则直接分摊金额
+                                   if(v_sum_cy!=v_sum_os) then
+                                        v_diff_money:=round(v_sum_cy*v_diff_bl,2); 
+                                        --dbms_output.put_line(v_index_loop||','||v_diff_item_code||','||v_sum_cy||','||v_sum_df||','||v_diff_bl||','||v_diff_money_sum);  
+                                                          
+                                        --最后一条更新差额
+                                        if v_cursor2%notfound then
+                                            v_diff_money_sum:=v_diff_money_sum-v_diff_money;                      
+                                            update acc_vouch_diff set diff_money=v_sum_cy-v_diff_money_sum
+                                            where group_id = p_group_id and hos_id = p_hos_id  and copy_code = p_copy_code and vouch_id=v_vouch_id and diff_id=v_index;                          
+                                            exit;
+                                        end if;
+                                   else
+                                        if v_cursor2%notfound then   
+                                            exit;
+                                        end if;
+                                   end if;
+                                        
+                                   v_index:=v_index+1;
+                                   v_diff_money_sum:=v_diff_money_sum+v_diff_money;
+                                   insert into acc_vouch_diff(group_id,hos_id,copy_code,diff_id,vouch_id,acc_year,acc_month,diff_item_code,diff_date,diff_money,is_auto,summary)
+                                   values(p_group_id,p_hos_id,p_copy_code,v_index,v_vouch_id,v_acc_year,v_acc_month,v_diff_item_code,v_vouch_date,v_diff_money,1,v_diff_item_name);                                         
+                                   v_sign_flag:=1;
+                                           
+                              end loop;
+                              close v_cursor2;
+                              
+                      end if;   
+                     
+                  end loop;                  
+            end if;
+            
+            /***********************************支出end************************************/
+            if(v_sign_flag=0) then
+                  --未标注
+                  update acc_vouch set sign_flag=0 where group_id = p_group_id and hos_id = p_hos_id  and copy_code = p_copy_code and vouch_id=v_vouch_id;
+            else
+            
+                select count(1) into v_count from acc_vouch_diff where group_id = p_group_id and hos_id = p_hos_id  and copy_code = p_copy_code and vouch_id=v_vouch_id;
+               
+                if(v_count>0) then
+                      --已标注
+                      update acc_vouch set sign_flag=1 where group_id = p_group_id and hos_id = p_hos_id  and copy_code = p_copy_code and vouch_id=v_vouch_id;
+                else
+                      --不需要标注
+                      update acc_vouch set sign_flag=2 where group_id = p_group_id and hos_id = p_hos_id  and copy_code = p_copy_code and vouch_id=v_vouch_id;
+                end if;
+            
+            end if;
+      end loop;
+      close v_cursor1;
+        
+    end;
+	
+	]]>
+	</update>
+	
+	<!-- 凭证保存判断差异标注 -->
+	<update id="updateAccVouchDiffNote" parameterType="java.util.Map">
+	<![CDATA[
+	
+	declare
+         
+      p_group_id number;
+      p_hos_id number;
+      p_copy_code varchar2(20);     
+      p_user_id number;  
+      p_create_date date;
+      p_error_level number;
+      p_vouch_id numeric(18,0);
+      v_sum_04 numeric(18,2);
+      v_sum_05 numeric(18,2);
+      v_sum_06 numeric(18,2);
+      v_sum_07 numeric(18,2);
+      v_sum_cy numeric(18,2);
+      v_diff_type_code varchar2(20);
+      v_diff_money numeric(18,2);
+      v_count number;
+      
+    begin
+      p_group_id:=#{group_id};
+      p_hos_id:=#{hos_id};
+      p_copy_code:=#{copy_code};     
+      p_user_id:=#{create_user};
+      p_vouch_id:=${vouch_id};
+      p_create_date:=#{create_date};
+      p_error_level:=1;
+      v_sum_04:=0;
+      v_sum_05:=0;
+      v_sum_06:=0;
+      v_sum_07:=0;
+         
+      
+      delete from ACC_DIFF_NOTE_TEMP where group_id=p_group_id and hos_id=p_hos_id and copy_code=p_copy_code
+      and (to_char(create_date,'yyyy-MM-dd') < to_char(sysdate-1,'yyyy-MM-dd'));
+          
+      --判断是否包含财务、预算收支科目
+      select count(1) into v_count from acc_vouch a
+      inner join acc_vouch_detail b on a.group_id = b.group_id and a.hos_id = b.hos_id  
+      and a.copy_code = b.copy_code and a.vouch_id=b.vouch_id
+      inner join acc_subj s on s.group_id = b.group_id and s.hos_id = b.hos_id  
+      and s.copy_code = b.copy_code and s.acc_year=b.acc_year and s.subj_code=b.subj_code
+      where a.group_id = p_group_id and a.hos_id = p_hos_id  and a.copy_code = p_copy_code and a.vouch_id=p_vouch_id
+      and s.subj_type_code in('04','05','06','07');
+        
+      --没有收支科目不需要标注
+      if(v_count=0) then 
+            --dbms_output.put_line('没有收支科目不需要标注');
+            insert into ACC_DIFF_NOTE_TEMP(group_id,hos_id,copy_code,vouch_id,user_id,create_date,error_level,note)
+            values(p_group_id,p_hos_id,p_copy_code,p_vouch_id,p_user_id,p_create_date,p_error_level,'没有收支科目不需要标注');
+            return;
+      end if;
+            
+      --财务收入科目
+      select nvl(sum(b.credit-b.debit),0) into v_sum_04 from acc_vouch a
+      inner join acc_vouch_detail b on a.group_id = b.group_id and a.hos_id = b.hos_id  
+      and a.copy_code = b.copy_code and a.vouch_id=b.vouch_id
+      inner join acc_subj s on s.group_id = b.group_id and s.hos_id = b.hos_id  
+      and s.copy_code = b.copy_code and s.acc_year=b.acc_year and s.subj_code=b.subj_code
+      where a.group_id = p_group_id and a.hos_id = p_hos_id  and a.copy_code = p_copy_code and a.vouch_id=p_vouch_id
+      and s.subj_type_code in('04');
+          
+      --财务支出科目         
+      select nvl(sum(b.debit-b.credit),0) into v_sum_05 from acc_vouch a
+      inner join acc_vouch_detail b on a.group_id = b.group_id and a.hos_id = b.hos_id  
+      and a.copy_code = b.copy_code and a.vouch_id=b.vouch_id
+      inner join acc_subj s on s.group_id = b.group_id and s.hos_id = b.hos_id  
+      and s.copy_code = b.copy_code and s.acc_year=b.acc_year and s.subj_code=b.subj_code
+      where a.group_id = p_group_id and a.hos_id = p_hos_id  and a.copy_code = p_copy_code and a.vouch_id=p_vouch_id
+      and s.subj_type_code in('05');           
+            
+      --预算收入科目
+      select nvl(sum(b.credit-b.debit),0) into v_sum_06 from acc_vouch a
+      inner join acc_vouch_detail b on a.group_id = b.group_id and a.hos_id = b.hos_id  
+      and a.copy_code = b.copy_code and a.vouch_id=b.vouch_id
+      inner join acc_subj s on s.group_id = b.group_id and s.hos_id = b.hos_id  
+      and s.copy_code = b.copy_code and s.acc_year=b.acc_year and s.subj_code=b.subj_code
+      where a.group_id = p_group_id and a.hos_id = p_hos_id  and a.copy_code = p_copy_code and a.vouch_id=p_vouch_id
+      and s.subj_type_code in('06');        
+            
+      --预算支出科目
+      select nvl(sum(b.debit-b.credit),0) into v_sum_07 from acc_vouch a
+      inner join acc_vouch_detail b on a.group_id = b.group_id and a.hos_id = b.hos_id  
+      and a.copy_code = b.copy_code and a.vouch_id=b.vouch_id
+      inner join acc_subj s on s.group_id = b.group_id and s.hos_id = b.hos_id  
+      and s.copy_code = b.copy_code and s.acc_year=b.acc_year and s.subj_code=b.subj_code
+      where a.group_id = p_group_id and a.hos_id = p_hos_id  and a.copy_code = p_copy_code and a.vouch_id=p_vouch_id
+      and s.subj_type_code in('07');           
+            
+      --相等不需要标注            
+      if(v_sum_04=v_sum_06 and v_sum_05=v_sum_07) then
+            --dbms_output.put_line('收支科目的金额相等不需要标注'); 
+            insert into ACC_DIFF_NOTE_TEMP(group_id,hos_id,copy_code,vouch_id,user_id,create_date,error_level,note)
+            values(p_group_id,p_hos_id,p_copy_code,p_vouch_id,p_user_id,p_create_date,p_error_level,'收支科目的金额相等不需要标注');
+            return;                 
+      end if;
+      
+      if(v_sum_04=0 and v_sum_06=0) then
+      
+            select count(1) into v_count
+            from acc_vouch_diff d
+            inner join acc_diff_item m on d.group_id = m.group_id and d.hos_id = m.hos_id  
+            and d.copy_code = m.copy_code and d.diff_item_code=m.diff_item_code
+            where d.group_id = p_group_id and d.hos_id = p_hos_id  and d.copy_code = p_copy_code and d.vouch_id= p_vouch_id
+            and m.diff_type_code in('01','03');  
+            
+            if(v_count>0) then
+                insert into ACC_DIFF_NOTE_TEMP(group_id,hos_id,copy_code,vouch_id,user_id,create_date,error_level,note)
+                values(p_group_id,p_hos_id,p_copy_code,p_vouch_id,p_user_id,p_create_date,p_error_level,'没有收入科目不需要标注当期确认为收入或预算收入');
+                return; 
+            end if;                
+      end if;
+      
+      if(v_sum_05=0 and v_sum_07=0) then
+      
+            select count(1) into v_count
+            from acc_vouch_diff d
+            inner join acc_diff_item m on d.group_id = m.group_id and d.hos_id = m.hos_id  
+            and d.copy_code = m.copy_code and d.diff_item_code=m.diff_item_code
+            where d.group_id = p_group_id and d.hos_id = p_hos_id  and d.copy_code = p_copy_code and d.vouch_id= p_vouch_id
+            and m.diff_type_code in('02','04');  
+            
+            if(v_count>0) then 
+                insert into ACC_DIFF_NOTE_TEMP(group_id,hos_id,copy_code,vouch_id,user_id,create_date,error_level,note)
+                values(p_group_id,p_hos_id,p_copy_code,p_vouch_id,p_user_id,p_create_date,p_error_level,'没有支出科目不需要标注当期确认为费用或预算支出');
+                return; 
+            end if;                
+      end if;
+      
+      /***********************************收入begin************************************/
+      v_sum_cy:=0;
+      if(v_sum_04<>0 and v_sum_06=0) then
+                 
+             v_sum_cy:=v_sum_04;
+             v_diff_type_code:='01';   
+             
+       elsif(v_sum_04=0 and v_sum_06<>0) then
+                     
+             v_sum_cy:=v_sum_06;
+             v_diff_type_code:='03';                      
+                     
+       elsif(v_sum_04>0 and v_sum_06>0 and v_sum_04>v_sum_06) then
+                   
+             v_sum_cy:=v_sum_04-v_sum_06;
+             v_diff_type_code:='01';          
+                                      
+       elsif(v_sum_04>0 and v_sum_06>0 and v_sum_04<v_sum_06) then
+                   
+             v_sum_cy:=v_sum_06-v_sum_04;
+             v_diff_type_code:='03';
+                         
+       elsif(v_sum_04<0 and v_sum_06<0 and abs(v_sum_04)>abs(v_sum_06)) then
+                   
+             v_sum_cy:=v_sum_04-v_sum_06;
+             v_diff_type_code:='01';
+                             
+       elsif(v_sum_04<0 and v_sum_06<0 and abs(v_sum_04)<abs(v_sum_06)) then
+                   
+             v_sum_cy:=v_sum_06-v_sum_04;
+             v_diff_type_code:='03';
+                         
+       elsif(v_sum_04>0 and v_sum_06<0) then
+       
+              v_sum_cy:=v_sum_04-v_sum_06;
+                        
+       elsif(v_sum_04<0 and v_sum_06>0) then
+             
+              v_sum_cy:=v_sum_06-v_sum_04;
+              
+       end if;
+   
+       if(v_sum_cy!=0) then
+           if((v_sum_04>0 and v_sum_06<0) or (v_sum_04<0 and v_sum_06>0)) then
+                
+               select nvl(sum(d.diff_money),0) into v_diff_money
+               from acc_vouch_diff d
+               inner join acc_diff_item m on d.group_id = m.group_id and d.hos_id = m.hos_id  
+               and d.copy_code = m.copy_code and d.diff_item_code=m.diff_item_code
+               where d.group_id = p_group_id and d.hos_id = p_hos_id  and d.copy_code = p_copy_code and d.vouch_id= p_vouch_id
+               and m.diff_type_code='01';
+               
+               if(v_diff_money!=v_sum_cy) then
+                    insert into ACC_DIFF_NOTE_TEMP(group_id,hos_id,copy_code,vouch_id,user_id,create_date,error_level,note)
+                    values(p_group_id,p_hos_id,p_copy_code,p_vouch_id,p_user_id,p_create_date,p_error_level,'收入科目的差异金额不等于当期确认为收入');
+               end if;
+               
+               select nvl(sum(d.diff_money),0) into v_diff_money
+               from acc_vouch_diff d
+               inner join acc_diff_item m on d.group_id = m.group_id and d.hos_id = m.hos_id  
+               and d.copy_code = m.copy_code and d.diff_item_code=m.diff_item_code
+               where d.group_id = p_group_id and d.hos_id = p_hos_id  and d.copy_code = p_copy_code and d.vouch_id= p_vouch_id
+               and m.diff_type_code='03';
+               
+               if(v_diff_money!=v_sum_cy) then
+                    insert into ACC_DIFF_NOTE_TEMP(group_id,hos_id,copy_code,vouch_id,user_id,create_date,error_level,note)
+                    values(p_group_id,p_hos_id,p_copy_code,p_vouch_id,p_user_id,p_create_date,p_error_level,'收入科目的差异金额不等于当期确认为预算收入');
+               end if;
+           
+           else
+             
+               select nvl(sum(d.diff_money),0) into v_diff_money
+               from acc_vouch_diff d
+               inner join acc_diff_item m on d.group_id = m.group_id and d.hos_id = m.hos_id  
+               and d.copy_code = m.copy_code and d.diff_item_code=m.diff_item_code
+               where d.group_id = p_group_id and d.hos_id = p_hos_id  and d.copy_code = p_copy_code and d.vouch_id= p_vouch_id
+               and m.diff_type_code=v_diff_type_code;
+               
+               if(v_diff_money!=v_sum_cy) then
+                    insert into ACC_DIFF_NOTE_TEMP(group_id,hos_id,copy_code,vouch_id,user_id,create_date,error_level,note)
+                    values(p_group_id,p_hos_id,p_copy_code,p_vouch_id,p_user_id,p_create_date,p_error_level,'收入科目的差异金额不等于标注金额');
+               end if;
+           
+           end if;
+       end if;
+       /***********************************收入end************************************/
+        
+       /***********************************支出begin************************************/
+       v_sum_cy:=0;
+       if(v_sum_05<>0 and v_sum_07=0) then
+                 
+             v_sum_cy:=v_sum_05;
+             v_diff_type_code:='04';
+                                     
+       elsif(v_sum_05=0 and v_sum_07<>0) then
+                 
+             v_sum_cy:=v_sum_07;
+             v_diff_type_code:='02';
+                 
+       elsif(v_sum_05>0 and v_sum_07>0 and v_sum_05>v_sum_07) then
+                 
+             v_sum_cy:=v_sum_05-v_sum_07;
+             v_diff_type_code:='04';          
+                                    
+       elsif(v_sum_05>0 and v_sum_07>0 and v_sum_05<v_sum_07) then
+                 
+             v_sum_cy:=v_sum_07-v_sum_05;
+             v_diff_type_code:='02';
+                       
+       elsif(v_sum_05<0 and v_sum_07<0 and abs(v_sum_05)>abs(v_sum_07)) then
+                 
+             v_sum_cy:=v_sum_05-v_sum_07;
+             v_diff_type_code:='04';
+                           
+       elsif(v_sum_05<0 and v_sum_07<0 and abs(v_sum_05)<abs(v_sum_07)) then
+                 
+             v_sum_cy:=v_sum_07-v_sum_05;
+             v_diff_type_code:='02';
+                       
+       elsif(v_sum_05>0 and v_sum_07<0) then
+                 
+              v_sum_cy:=v_sum_05-v_sum_07;
+                        
+       elsif(v_sum_05<0 and v_sum_07>0) then
+             
+              v_sum_cy:=v_sum_07-v_sum_05;
+                            
+       end if;
+       
+       if(v_sum_cy!=0) then
+           if((v_sum_05>0 and v_sum_07<0) or (v_sum_05<0 and v_sum_07>0)) then
+                
+               select nvl(sum(d.diff_money),0) into v_diff_money
+               from acc_vouch_diff d
+               inner join acc_diff_item m on d.group_id = m.group_id and d.hos_id = m.hos_id  
+               and d.copy_code = m.copy_code and d.diff_item_code=m.diff_item_code
+               where d.group_id = p_group_id and d.hos_id = p_hos_id  and d.copy_code = p_copy_code and d.vouch_id= p_vouch_id
+               and m.diff_type_code='02';
+               
+               if(v_diff_money!=v_sum_cy) then
+                    insert into ACC_DIFF_NOTE_TEMP(group_id,hos_id,copy_code,vouch_id,user_id,create_date,error_level,note)
+                    values(p_group_id,p_hos_id,p_copy_code,p_vouch_id,p_user_id,p_create_date,p_error_level,'支出科目的差异金额不等于当期确认为预算支出');
+               end if;
+               
+               select nvl(sum(d.diff_money),0) into v_diff_money
+               from acc_vouch_diff d
+               inner join acc_diff_item m on d.group_id = m.group_id and d.hos_id = m.hos_id  
+               and d.copy_code = m.copy_code and d.diff_item_code=m.diff_item_code
+               where d.group_id = p_group_id and d.hos_id = p_hos_id  and d.copy_code = p_copy_code and d.vouch_id= p_vouch_id
+               and m.diff_type_code='04';
+               
+               if(v_diff_money!=v_sum_cy) then
+                    insert into ACC_DIFF_NOTE_TEMP(group_id,hos_id,copy_code,vouch_id,user_id,create_date,error_level,note)
+                    values(p_group_id,p_hos_id,p_copy_code,p_vouch_id,p_user_id,p_create_date,p_error_level,'支出科目的差异金额不等于当期确认为费用');
+               end if;
+           
+           else
+             
+               select nvl(sum(d.diff_money),0) into v_diff_money
+               from acc_vouch_diff d
+               inner join acc_diff_item m on d.group_id = m.group_id and d.hos_id = m.hos_id  
+               and d.copy_code = m.copy_code and d.diff_item_code=m.diff_item_code
+               where d.group_id = p_group_id and d.hos_id = p_hos_id  and d.copy_code = p_copy_code and d.vouch_id= p_vouch_id
+               and m.diff_type_code=v_diff_type_code;
+               
+               if(v_diff_money!=v_sum_cy) then
+                    insert into ACC_DIFF_NOTE_TEMP(group_id,hos_id,copy_code,vouch_id,user_id,create_date,error_level,note)
+                    values(p_group_id,p_hos_id,p_copy_code,p_vouch_id,p_user_id,p_create_date,p_error_level,'支出科目的差异金额不等于标注金额');
+               end if;
+           
+           end if;
+       end if;
+       /***********************************支出end************************************/ 
+                      
+                      
+    end;
+	
+	]]>
+	</update>
+	
+</mapper>
+

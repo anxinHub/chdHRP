@@ -1,0 +1,459 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.acc.dao.payable.reimbursemt.BudgPaymentApplyForAccMapper">
+	
+	<select id="queryBudgPaymentApplyForAcc" parameterType="java.util.Map" resultType="java.util.Map" >
+	with tmp1 as
+ (select abnp.group_id, 
+         abnp.hos_id,
+         abnp.copy_code,
+         max(abnp.acc_year) as acc_year,
+         max(abnp.fseqno) as fseqno,
+         max(abnpr.iseqno) as iseqno,
+         abnpr.ref
+    from acc_bank_net_payment abnp
+    left join acc_bank_net_payment_rd abnpr
+      on abnp.fseqno = abnpr.fseqno
+     and abnpr.group_id = #{group_id}
+     and abnpr.hos_id = #{hos_id}
+     and abnpr.copy_code = #{copy_code}
+     <where>
+
+			abnp.group_id= #{group_id} and abnp.hos_id= #{hos_id} and abnp.copy_code= #{copy_code} 
+
+			<if test="beginDate != null and beginDate != '' and endDate !=null and endDate !=''">
+				AND abnp.trandate between
+				to_date(#{beginDate,jdbcType=DATE},'yyyy-MM-dd') and
+				to_date(#{endDate,jdbcType=DATE},'yyyy-MM-dd')
+			</if>
+			
+			<if test="fseqno != null and fseqno != ''">
+				and abnp.fseqno = #{fseqno}
+			</if>
+			<if test="apply_code != null and apply_code != ''">
+				and abnpr.ref like '%${apply_code}%'
+			</if>
+			<if test="emp_id != null and emp_id != ''">
+				and abnpr.erpsqn || '.' || abnpr.buscode = #{emp_id}
+			</if>
+		</where>
+	group by abnp.group_id, abnp.hos_id, abnp.copy_code, abnpr.ref)
+	
+		select t1.*, acc_vouch_type.vouch_type_short || '-' || acc_vouch.vouch_no as VOUCH_NO, acc_vouch.vouch_id
+from (select a.group_id, a.hos_id, a.copy_code, a.apply_code, a.apply_date
+      , a.dept_id, a.dept_no, hdd.dept_code, hdd.dept_name, a.proj_id
+      , a.proj_no, hpd.proj_code, hpd.proj_name, a.emp_id, a.emp_no
+      , hed.emp_code, hed.emp_name, a.payment_amount, a.remark, a.maker
+      , u1.user_name as maker_name, a.make_date, a.checker, u2.user_name as checker_name, a.check_date
+      , a.payer, u3.user_name as payer_name, a.pay_date, a.state, bsd.value_name as state_name
+      , a.pay_way, apy.pay_name as pay_way_name, a.phone, a.card_no, a.offset_amount
+      , a.pay_amount, case 
+					when abnbr.result = 0
+					or abnbr.result = 1
+					or abnbr.result = 2
+					or abnbr.result = 3
+					or abnbr.result = 4
+					or abnbr.result = 9
+					or abnbr.result = 10
+					or abnbr.result = 86 then '正在处理'
+					when abnbr.result = 5
+					or abnbr.result = 6
+					or abnbr.result = 8
+					or abnbr.result = 95
+					or abnbr.result = 96 then '支付失败'
+					when abnbr.result = 7
+					or abnbr.result = 11 then '支付成功'
+					else '未支付'
+				end as result_state
+    from BUDG_PAYMENT_APPLY a left join  tmp1 tmp1 on tmp1.ref = a.apply_code
+				and a.group_id = tmp1.group_id
+				and a.hos_id = tmp1.hos_id
+				and a.copy_code = tmp1.copy_code 
+				left join acc_bank_net_payment abnp on tmp1.fseqno = abnp.fseqno
+				and abnp.group_id = tmp1.group_id
+				and abnp.hos_id = tmp1.hos_id
+				and abnp.copy_code = tmp1.copy_code 
+				left join acc_bank_net_payment_rd abnbr on tmp1.fseqno = abnbr.fseqno
+				and tmp1.iseqno = abnbr.iseqno
+				and tmp1.ref = abnbr.ref
+				and abnbr.group_id = tmp1.group_id
+				and abnbr.hos_id = tmp1.hos_id
+				and abnbr.copy_code = tmp1.copy_code 
+    left join budg_borr_proj ddp
+    on a.group_id = ddp.group_id
+    and a.hos_id = ddp.hos_id and a.copy_code = ddp.copy_code
+    and a.proj_id = ddp.proj_id and  a.emp_id = ddp.emp_id
+    left join budg_borr_dept bbd
+    on a.group_id = bbd.group_id
+    and a.hos_id = bbd.hos_id and a.copy_code = bbd.copy_code
+    and a.emp_id = bbd.emp_id
+    left join hos_dept_dict hdd on a.group_id = hdd.group_id
+    and a.hos_id = hdd.hos_id
+    and a.dept_id = hdd.dept_id
+    and hdd.is_stop = 0 
+    left join hos_proj_dict hpd on a.group_id = hpd.group_id
+    and a.hos_id = hpd.hos_id
+    and a.proj_id = hpd.proj_id
+    and hpd.is_stop = 0 
+    left join hos_emp_dict hed on a.group_id = hed.group_id
+    and a.hos_id = hed.hos_id
+    and a.emp_id = hed.emp_id
+    and hed.is_stop = 0 
+    left join sys_user u1 on a.group_id = u1.group_id
+    and a.hos_id = u1.hos_id
+    and a.maker = u1.user_id 
+    left join sys_user u2 on a.group_id = u2.group_id
+    and a.hos_id = u2.hos_id
+    and a.checker = u2.user_id 
+    left join sys_user u3 on a.group_id = u3.group_id
+    and a.hos_id = u3.hos_id
+    and a.payer = u3.user_id 
+    left join acc_pay_type apy on a.group_id = apy.group_id
+    and a.hos_id = apy.hos_id
+    and a.copy_code = apy.copy_code
+    and a.pay_way = apy.pay_code 
+      left join BUDG_SYS_DICT bsd on a.state = bsd.value_code
+    and bsd.f_code = 'BORROW_STATE' 
+		<where>                     
+		<if test="group_id != null and group_id != ''">
+		AND a.group_id = #{group_id,jdbcType=INTEGER}
+		</if>
+		<if test="hos_id != null and hos_id != ''">
+		AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+		</if>
+		<if test="copy_code != null and copy_code != ''">
+		AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+		</if>
+		<if test="apply_code != null and apply_code != ''">
+		AND a.apply_code = #{apply_code,jdbcType=VARCHAR}
+		</if>
+		<if test="apply_codes != null and apply_codes != ''">
+		AND a.apply_code in (${apply_codes}) 
+		</if>
+		
+		<!-- 报销支付增加按报销申请单号查询 -->
+		<if test="apply_no != null and apply_no != ''">
+		AND a.apply_code like '${apply_no}%' 
+		</if>
+		<if test="result_state != null and result_state != '' ">
+		and abnbr.result in ('5','6','8','95','96')
+		</if>
+		<if test="dept_id != null and dept_id != ''">
+		AND a.dept_id = #{dept_id,jdbcType=INTEGER}
+		</if>
+		<if test="dept_no != null and dept_no != ''">
+		AND a.dept_no = #{dept_no,jdbcType=INTEGER}
+		</if>
+		<if test="proj_id != null and proj_id != ''">
+		AND a.proj_id = #{proj_id,jdbcType=INTEGER}
+		</if>
+		<if test="proj_no != null and proj_no != ''">
+		AND a.proj_no = #{proj_no,jdbcType=INTEGER}
+		</if>
+		<if test="emp_id != null and emp_id != ''">
+		AND a.emp_id = #{emp_id,jdbcType=INTEGER}
+		</if>
+		<if test="emp_no != null and emp_no != ''">
+		AND a.emp_no = #{emp_no,jdbcType=INTEGER}
+		</if>
+		<if test="payment_amount != null and payment_amount != ''">
+		AND a.payment_amount = #{payment_amount,jdbcType=INTEGER}
+		</if>
+		<if test="offset_amount != null and offset_amount != ''">
+		AND a.offset_amount = #{offset_amount,jdbcType=INTEGER}
+		</if>
+		<if test="pay_amount != null and pay_amount != ''">
+		AND a.pay_amount = #{pay_amount,jdbcType=INTEGER}
+		</if>
+		<if test="remark != null and remark != ''">
+		AND a.remark = #{remark,jdbcType=VARCHAR}
+		</if>
+		<if test="maker != null and maker != ''">
+		AND a.maker = #{maker,jdbcType=INTEGER}
+		</if>
+		<if test="make_date != null and make_date != ''">
+		AND a.make_date = #{make_date,jdbcType=DATE}
+		</if>
+		<if test="checker != null and checker != ''">
+		AND a.checker = #{checker,jdbcType=INTEGER}
+		</if>
+		<if test="check_date != null and check_date != ''">
+		AND a.check_date = #{check_date,jdbcType=DATE}
+		</if>
+		<if test="payer != null and payer != ''">
+		AND a.payer = #{payer,jdbcType=INTEGER}
+		</if>
+		<if test="pay_date != null and pay_date != ''">
+		AND a.pay_date = #{pay_date,jdbcType=DATE}
+		</if>
+		<if test="state != null and state != ''">
+		AND a.state = #{state,jdbcType=VARCHAR}
+		</if>
+		<if test="pay_way != null and pay_way != ''">
+		AND a.pay_way = #{pay_way,jdbcType=VARCHAR}
+		</if>
+		<if test="phone != null and phone != ''">
+		AND a.phone = #{phone,jdbcType=VARCHAR}
+		</if>
+		<if test="card_no != null and card_no != ''">
+		AND a.card_no = #{card_no,jdbcType=VARCHAR}
+		</if>
+		<if test="offset_state != null">
+			<if test="offset_state == 1">
+			AND (abs(ddp.remain_amount)> 0 or abs(bbd.remain_amount)>0) 
+			</if>
+			<if test="offset_state == 0">
+			 and nvl(ddp.remain_amount,0) = 0
+		   and nvl(bbd.remain_amount,0) = 0
+			</if>
+		</if>
+		<if test="apply_date_b != null and apply_date_b != '' and apply_date_e != null and apply_date_e != ''">
+		AND a.apply_date between to_date(#{apply_date_b},'yyyy/MM/dd') and to_date(#{apply_date_e},'yyyy/MM/dd')
+		</if>
+		</where>   
+		order by a.apply_code desc
+		 ) t1
+    left join ACC_BUSI_LOG_0203 on ACC_BUSI_LOG_0203.group_id = #{group_id,jdbcType=INTEGER}
+    and ACC_BUSI_LOG_0203.hos_id = #{hos_id,jdbcType=INTEGER}
+    and ACC_BUSI_LOG_0203.copy_code = #{copy_code,jdbcType=VARCHAR}
+    and t1.apply_code = ACC_BUSI_LOG_0203.BUSINESS_NO 
+    left join acc_vouch on acc_vouch.group_id = ACC_BUSI_LOG_0203.group_id
+    and acc_vouch.hos_id = ACC_BUSI_LOG_0203.hos_id
+    and acc_vouch.copy_code = ACC_BUSI_LOG_0203.copy_code
+    and acc_vouch.vouch_id = ACC_BUSI_LOG_0203.vouch_id 
+      left join acc_vouch_type on acc_vouch_type.group_id = acc_vouch.group_id
+    and acc_vouch_type.hos_id = acc_vouch.hos_id
+    and acc_vouch_type.copy_code = acc_vouch.copy_code
+    and acc_vouch_type.vouch_type_code = acc_vouch.vouch_type_code 
+		
+	</select>
+	
+	<select id="queryBudgPaymentApplyForAccPrint" parameterType="java.util.Map" resultType="java.util.Map" >
+	
+		with tmp1 as
+ (select abnp.group_id,
+         abnp.hos_id,
+         abnp.copy_code,
+         max(abnp.acc_year) as acc_year,
+         max(abnp.fseqno) as fseqno,
+         max(abnpr.iseqno) as iseqno,
+         abnpr.ref
+    from acc_bank_net_payment abnp
+    left join acc_bank_net_payment_rd abnpr
+      on abnp.fseqno = abnpr.fseqno
+     and abnpr.group_id = #{group_id}
+     and abnpr.hos_id = #{hos_id}
+     and abnpr.copy_code = #{copy_code}
+     <where>
+
+			abnp.group_id= #{group_id} and abnp.hos_id= #{hos_id} and abnp.copy_code= #{copy_code} 
+
+			<if test="beginDate != null and beginDate != '' and endDate !=null and endDate !=''">
+				AND abnp.trandate between
+				to_date(#{beginDate,jdbcType=DATE},'yyyy-MM-dd') and
+				to_date(#{endDate,jdbcType=DATE},'yyyy-MM-dd')
+			</if>
+			
+			<if test="fseqno != null and fseqno != ''">
+				and abnp.fseqno = #{fseqno}
+			</if>
+			<if test="apply_code != null and apply_code != ''">
+				and abnpr.ref like '%${apply_code}%'
+			</if>
+			<if test="emp_id != null and emp_id != ''">
+				and abnpr.erpsqn || '.' || abnpr.buscode = #{emp_id}
+			</if>
+		</where>
+	group by abnp.group_id, abnp.hos_id, abnp.copy_code, abnpr.ref)
+	
+		select t1.*, acc_vouch_type.vouch_type_short || '-' || acc_vouch.vouch_no as VOUCH_NO, acc_vouch.vouch_id
+from (select a.group_id, a.hos_id, a.copy_code, a.apply_code, a.apply_date
+      , a.dept_id, a.dept_no, hdd.dept_code, hdd.dept_name, a.proj_id
+      , a.proj_no, hpd.proj_code, hpd.proj_name, a.emp_id, a.emp_no
+      , hed.emp_code, hed.emp_name, a.payment_amount, a.remark, a.maker
+      , u1.user_name as maker_name, a.make_date, a.checker, u2.user_name as checker_name, a.check_date
+      , a.payer, u3.user_name as payer_name, a.pay_date, a.state, bsd.value_name as state_name
+      , a.pay_way, apy.pay_name as pay_way_name, a.phone, a.card_no, a.offset_amount
+      , a.pay_amount, case 
+					when abnbr.result = 0
+					or abnbr.result = 1
+					or abnbr.result = 2
+					or abnbr.result = 3
+					or abnbr.result = 4
+					or abnbr.result = 9
+					or abnbr.result = 10
+					or abnbr.result = 86 then '正在处理'
+					when abnbr.result = 5
+					or abnbr.result = 6
+					or abnbr.result = 8
+					or abnbr.result = 95
+					or abnbr.result = 96 then '支付失败'
+					when abnbr.result = 7
+					or abnbr.result = 11 then '支付成功'
+					else '未支付'
+				end as result_state
+    from BUDG_PAYMENT_APPLY a left join  tmp1 tmp1 on tmp1.ref = a.apply_code
+				and a.group_id = tmp1.group_id
+				and a.hos_id = tmp1.hos_id
+				and a.copy_code = tmp1.copy_code 
+				left join acc_bank_net_payment abnp on tmp1.fseqno = abnp.fseqno
+				and abnp.group_id = tmp1.group_id
+				and abnp.hos_id = tmp1.hos_id
+				and abnp.copy_code = tmp1.copy_code 
+				left join acc_bank_net_payment_rd abnbr on tmp1.fseqno = abnbr.fseqno
+				and tmp1.iseqno = abnbr.iseqno
+				and tmp1.ref = abnbr.ref
+				and abnbr.group_id = tmp1.group_id
+				and abnbr.hos_id = tmp1.hos_id
+				and abnbr.copy_code = tmp1.copy_code  
+    left join budg_borr_proj ddp
+    on a.group_id = ddp.group_id
+    and a.hos_id = ddp.hos_id and a.copy_code = ddp.copy_code
+    and a.proj_id = ddp.proj_id and  a.emp_id = ddp.emp_id
+    left join budg_borr_dept bbd
+    on a.group_id = bbd.group_id
+    and a.hos_id = bbd.hos_id and a.copy_code = bbd.copy_code
+    and a.emp_id = bbd.emp_id
+    left join hos_dept_dict hdd on a.group_id = hdd.group_id
+    and a.hos_id = hdd.hos_id
+    and a.dept_id = hdd.dept_id
+    and hdd.is_stop = 0 
+    left join hos_proj_dict hpd on a.group_id = hpd.group_id
+    and a.hos_id = hpd.hos_id
+    and a.proj_id = hpd.proj_id
+    and hpd.is_stop = 0 
+    left join hos_emp_dict hed on a.group_id = hed.group_id
+    and a.hos_id = hed.hos_id
+    and a.emp_id = hed.emp_id
+    and hed.is_stop = 0 
+    left join sys_user u1 on a.group_id = u1.group_id
+    and a.hos_id = u1.hos_id
+    and a.maker = u1.user_id 
+    left join sys_user u2 on a.group_id = u2.group_id
+    and a.hos_id = u2.hos_id
+    and a.checker = u2.user_id 
+    left join sys_user u3 on a.group_id = u3.group_id
+    and a.hos_id = u3.hos_id
+    and a.payer = u3.user_id 
+    left join acc_pay_type apy on a.group_id = apy.group_id
+    and a.hos_id = apy.hos_id
+    and a.copy_code = apy.copy_code
+    and a.pay_way = apy.pay_code 
+      left join BUDG_SYS_DICT bsd on a.state = bsd.value_code
+    and bsd.f_code = 'BORROW_STATE' 
+		<where>                     
+		<if test="group_id != null and group_id != ''">
+		AND a.group_id = #{group_id,jdbcType=INTEGER}
+		</if>
+		<if test="hos_id != null and hos_id != ''">
+		AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+		</if>
+		<if test="copy_code != null and copy_code != ''">
+		AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+		</if>
+		<if test="apply_code != null and apply_code != ''">
+		AND a.apply_code = #{apply_code,jdbcType=VARCHAR}
+		</if>
+		<if test="apply_codes != null and apply_codes != ''">
+		AND a.apply_code in (${apply_codes}) 
+		</if>
+		
+		<!-- 报销支付增加按报销申请单号查询 -->
+		<if test="apply_no != null and apply_no != ''">
+		AND a.apply_code like '${apply_no}%' 
+		</if>
+		<if test="result_state != null and result_state != '' ">
+		and abnbr.result in ('5','6','8','95','96')
+		</if>
+		<if test="dept_id != null and dept_id != ''">
+		AND a.dept_id = #{dept_id,jdbcType=INTEGER}
+		</if>
+		<if test="dept_no != null and dept_no != ''">
+		AND a.dept_no = #{dept_no,jdbcType=INTEGER}
+		</if>
+		<if test="proj_id != null and proj_id != ''">
+		AND a.proj_id = #{proj_id,jdbcType=INTEGER}
+		</if>
+		<if test="proj_no != null and proj_no != ''">
+		AND a.proj_no = #{proj_no,jdbcType=INTEGER}
+		</if>
+		<if test="emp_id != null and emp_id != ''">
+		AND a.emp_id = #{emp_id,jdbcType=INTEGER}
+		</if>
+		<if test="emp_no != null and emp_no != ''">
+		AND a.emp_no = #{emp_no,jdbcType=INTEGER}
+		</if>
+		<if test="payment_amount != null and payment_amount != ''">
+		AND a.payment_amount = #{payment_amount,jdbcType=INTEGER}
+		</if>
+		<if test="offset_amount != null and offset_amount != ''">
+		AND a.offset_amount = #{offset_amount,jdbcType=INTEGER}
+		</if>
+		<if test="pay_amount != null and pay_amount != ''">
+		AND a.pay_amount = #{pay_amount,jdbcType=INTEGER}
+		</if>
+		<if test="remark != null and remark != ''">
+		AND a.remark = #{remark,jdbcType=VARCHAR}
+		</if>
+		<if test="maker != null and maker != ''">
+		AND a.maker = #{maker,jdbcType=INTEGER}
+		</if>
+		<if test="make_date != null and make_date != ''">
+		AND a.make_date = #{make_date,jdbcType=DATE}
+		</if>
+		<if test="checker != null and checker != ''">
+		AND a.checker = #{checker,jdbcType=INTEGER}
+		</if>
+		<if test="check_date != null and check_date != ''">
+		AND a.check_date = #{check_date,jdbcType=DATE}
+		</if>
+		<if test="payer != null and payer != ''">
+		AND a.payer = #{payer,jdbcType=INTEGER}
+		</if>
+		<if test="pay_date != null and pay_date != ''">
+		AND a.pay_date = #{pay_date,jdbcType=DATE}
+		</if>
+		<if test="state != null and state != ''">
+		AND a.state = #{state,jdbcType=VARCHAR}
+		</if>
+		<if test="pay_way != null and pay_way != ''">
+		AND a.pay_way = #{pay_way,jdbcType=VARCHAR}
+		</if>
+		<if test="phone != null and phone != ''">
+		AND a.phone = #{phone,jdbcType=VARCHAR}
+		</if>
+		<if test="card_no != null and card_no != ''">
+		AND a.card_no = #{card_no,jdbcType=VARCHAR}
+		</if>
+		<if test="offset_state != null">
+			<if test="offset_state == 1">
+			AND (abs(ddp.remain_amount)> 0 or abs(bbd.remain_amount)>0) 
+			</if>
+			<if test="offset_state == 0">
+			 and nvl(ddp.remain_amount,0) = 0
+		   and nvl(bbd.remain_amount,0) = 0
+			</if>
+		</if>
+		<if test="apply_date_b != null and apply_date_b != '' and apply_date_e != null and apply_date_e != ''">
+		AND a.apply_date between to_date(#{apply_date_b},'yyyy/MM/dd') and to_date(#{apply_date_e},'yyyy/MM/dd')
+		</if>
+		</where>   
+		order by a.apply_code desc
+		 ) t1
+    left join ACC_BUSI_LOG_0203 on ACC_BUSI_LOG_0203.group_id = #{group_id,jdbcType=INTEGER}
+    and ACC_BUSI_LOG_0203.hos_id = #{hos_id,jdbcType=INTEGER}
+    and ACC_BUSI_LOG_0203.copy_code = #{copy_code,jdbcType=VARCHAR}
+    and t1.apply_code = ACC_BUSI_LOG_0203.BUSINESS_NO 
+    left join acc_vouch on acc_vouch.group_id = ACC_BUSI_LOG_0203.group_id
+    and acc_vouch.hos_id = ACC_BUSI_LOG_0203.hos_id
+    and acc_vouch.copy_code = ACC_BUSI_LOG_0203.copy_code
+    and acc_vouch.vouch_id = ACC_BUSI_LOG_0203.vouch_id 
+      left join acc_vouch_type on acc_vouch_type.group_id = acc_vouch.group_id
+    and acc_vouch_type.hos_id = acc_vouch.hos_id
+    and acc_vouch_type.copy_code = acc_vouch.copy_code
+    and acc_vouch_type.vouch_type_code = acc_vouch.vouch_type_code 
+		
+	</select>
+	
+</mapper>
+

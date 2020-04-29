@@ -1,0 +1,2460 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.med.dao.storage.out.MedCommonOutApplyCheckMapper">
+	
+	<resultMap id="medApplyMainCheck" type="java.util.Map">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="apply_id" column="apply_id"/>
+		<result property="apply_no" column="apply_no"/>
+		<result property="dept_id" column="dept_id"/>
+		<result property="dept_no" column="dept_no"/>
+		<result property="dept_code" column="dept_code"/>
+		<result property="dept_name" column="dept_name"/>
+		<result property="store_id" column="store_id"/>
+		<result property="store_no" column="store_no"/>
+		<result property="store_code" column="store_code"/>
+		<result property="store_name" column="store_name"/>
+		<result property="app_emp" column="app_emp"/>
+		<result property="emp_code" column="emp_code"/>
+		<result property="emp_name" column="emp_name"/>
+		<result property="response_emp" column="response_emp"/>
+		<result property="response_emp_code" column="response_emp_code"/>
+		<result property="response_emp_name" column="response_emp_name"/>
+		<result property="app_date" column="app_date"/>
+		<result property="maker" column="maker"/>
+		<result property="maker_name" column="maker_name"/>
+		<result property="checker" column="checker"/>
+		<result property="checker_name" column="checker_name"/>
+		<result property="check_date" column="check_date"/>
+		<result property="sender" column="sender"/>
+		<result property="sender_name" column="sender_name"/>
+		<result property="send_date" column="send_date"/>
+		<result property="state" column="state"/>
+		<result property="rela_state" column="rela_state"/>
+		<result property="back_reason" column="back_reason"/>
+		<result property="brief" column="brief"/>
+		<result property="is_req" column="is_req"/>
+		<result property="left_state" column="left_state"/>
+		<result property="app_date" column="app_date"/> 
+		
+	</resultMap>
+	
+	<resultMap id="medApplyDetailCheck" type="java.util.Map">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="apply_id" column="apply_id"/>
+		<result property="detail_id" column="detail_id"/>
+		<result property="inv_id" column="inv_id"/>
+		<result property="inv_no" column="inv_no"/>
+		<result property="inv_code" column="inv_code"/>
+		<result property="inv_name" column="inv_name"/>
+		<result property="inv_model" column="inv_model"/>
+		<result property="unit_name" column="unit_name"/>
+		<result property="fac_name" column="fac_name"/>
+		<result property="is_com" column="is_com"/>
+		<result property="app_amount" column="app_amount"/>
+		<result property="rela_amount" column="rela_amount"/>
+		<result property="common_amount" column="common_amount"/>
+		<result property="imme_amount" column="imme_amount"/>
+		<result property="affi_amount" column="affi_amount"/>
+		<result property="affi_imme_amount" column="affi_imme_amount"/>
+		<result property="note" column="note"/>
+		<result property="price" column="price"/>
+		<result property="amount_money" column="amount_money"/>
+		<result property="is_closed" column="is_closed"/>
+		<result property="bid_code" column="bid_code"/> 
+		<result property="amount" column="amount"/>
+		<result property="location_new_id" column="location_new_id"/>
+		<result property="location_new_code" column="location_new_code"/>
+		<result property="location_new_name" column="location_new_name"/>
+		<result property="note" column="note"/>
+	</resultMap>
+	
+	<select id="query" resultMap="medApplyMainCheck" parameterType="java.util.Map">
+		with tmp_imme as (
+			select inv_id, store_id, sum(amount) as amount
+			from (
+				--出库未确认单据         
+				select inv_id, mom.store_id, sum(nvl(amount, 0)) as amount
+				from med_out_main mom
+				left join med_out_detail medod
+					on mom.group_id = medod.group_id and mom.hos_id = medod.hos_id
+					and mom.copy_code = medod.copy_code and mom.out_id = medod.out_id
+				where medod.group_id = #{group_id,jdbcType=INTEGER}
+					AND medod.hos_id = #{hos_id,jdbcType=INTEGER}
+					AND medod.copy_code = #{copy_code,jdbcType=VARCHAR}
+					<![CDATA[
+					AND mom.state < 3 
+					AND mom.bus_type_code <> '21'
+					AND medod.amount_money > 0
+					]]>
+				group by inv_id, mom.store_id
+				--退货未确认单据         
+				union all
+				select inv_id, mim.store_id, -1 * sum(nvl(amount, 0)) as amount
+				from med_in_main mim
+				left join med_in_detail medid
+					on mim.group_id = medid.group_id and mim.hos_id = medid.hos_id
+					and mim.copy_code = medid.copy_code and mim.in_id = medid.in_id
+				where medid.group_id = #{group_id,jdbcType=INTEGER}
+					AND medid.hos_id = #{hos_id,jdbcType=INTEGER} 
+					AND medid.copy_code = #{copy_code,jdbcType=VARCHAR} 
+					<![CDATA[ 
+					AND mim.state < 3 
+					AND mim.bus_type_code in ('10','12','16','22') 
+					]]>
+					and <![CDATA[ medid.amount_money < 0 ]]>
+				group by inv_id, mim.store_id
+			)
+			group by inv_id, store_id
+		), 
+		tmp_affi_imme as (
+			select inv_id, store_id, sum(amount) as amount
+			from (
+				--出库未确认单据         
+				select inv_id, mom.store_id, sum(nvl(amount, 0)) as amount
+				from med_affi_out mom
+				left join med_affi_out_detail medod
+					on mom.group_id = medod.group_id and mom.hos_id = medod.hos_id
+					and mom.copy_code = medod.copy_code and mom.out_id = medod.out_id
+				where medod.group_id = #{group_id,jdbcType=INTEGER}
+					AND medod.hos_id = #{hos_id,jdbcType=INTEGER}
+					AND medod.copy_code = #{copy_code,jdbcType=VARCHAR}
+					<![CDATA[
+					AND mom.state < 3 
+					AND mom.bus_type_code <> '30'
+					]]>
+				group by inv_id, mom.store_id
+				--退货未确认单据         
+				union all
+				select inv_id, mim.store_id, -1 * sum(nvl(amount, 0)) as amount
+				from med_affi_in mim
+				left join med_affi_in_detail medid
+					on mim.group_id = medid.group_id and mim.hos_id = medid.hos_id
+					and mim.copy_code = medid.copy_code and mim.in_id = medid.in_id
+				where medid.group_id = #{group_id,jdbcType=INTEGER}
+					AND medid.hos_id = #{hos_id,jdbcType=INTEGER} 
+					AND medid.copy_code = #{copy_code,jdbcType=VARCHAR} 
+					<![CDATA[ 
+					AND mim.state < 3 
+					AND mim.bus_type_code = '29' 
+					]]>
+				group by inv_id, mim.store_id
+			)
+			group by inv_id, store_id
+		), 
+		tmp_rela as (
+			--申领单总处理数量
+			select mad.apply_id, mad.detail_id,mad.inv_id, mad.app_amount, sum(nvl(maor.rela_amount, 0)) rela_amount
+			from med_apply_detail mad
+			left join med_apply_out_rela maor
+				on mad.group_id = maor.group_id and mad.hos_id = maor.hos_id
+				and mad.copy_code = maor.copy_code and mad.apply_id = maor.apply_id
+				and mad.detail_id = maor.app_detail_id 
+				and <![CDATA[maor.rela_type <> 5]]>
+				<if test="inv_code != null and inv_code != ''">
+					LEFT JOIN med_inv_dict mid 
+						ON mad.group_id = mid.group_id and mad.hos_id = mid.hos_id
+						and mad.copy_code = mid.copy_code and mad.inv_id = mid.inv_id
+						and mad.inv_no = mid.inv_no
+				</if>
+			where mad.group_id = #{group_id,jdbcType=INTEGER}
+				and mad.hos_id = #{hos_id,jdbcType=INTEGER}
+				and mad.copy_code = #{copy_code,jdbcType=VARCHAR}	
+				and nvl(mad.is_closed, 0) = 0 <!-- 关闭的药品算做全部完成 -->
+				<if test="inv_code != null and inv_code != ''">
+					and (mid.inv_code like '%${inv_code}%' or mid.inv_name like '%${inv_code}%')
+				</if>
+			group by mad.apply_id, mad.detail_id, mad.app_amount,mad.inv_id
+		), 
+		tmp_app_left as(
+			--申请单药品总库存
+			select mad.apply_id,mad.inv_id,  sum(nvl(hold.cur_amount, 0) + nvl(afhold.cur_amount, 0) - nvl(imme.amount, 0) - nvl(afimme.amount, 0)) left_amount
+			from med_apply_main mam
+			left join med_apply_detail mad
+				on mam.group_id = mad.group_id and mam.hos_id = mad.hos_id
+				and mam.copy_code = mad.copy_code and mam.apply_id = mad.apply_id
+			left join tmp_rela tr
+				on mad.apply_id = tr.apply_id and mad.detail_id = tr.detail_id
+			left join med_inv_hold hold
+				on mam.group_id = hold.group_id and mam.hos_id = hold.hos_id
+				and mam.copy_code = hold.copy_code and mam.store_id = hold.store_id
+				and mad.inv_id = hold.inv_id
+			left join med_affi_inv_hold afhold
+				on mam.group_id = afhold.group_id and mam.hos_id = afhold.hos_id
+				and mam.copy_code = afhold.copy_code and mam.store_id = afhold.store_id
+				and mad.inv_id = afhold.inv_id
+			left join tmp_imme imme
+				on mam.store_id = imme.store_id
+				and mad.inv_id = imme.inv_id 
+			left join tmp_affi_imme afimme
+				on mam.store_id = afimme.store_id
+				and mad.inv_id = afimme.inv_id
+			where mad.group_id = #{group_id,jdbcType=INTEGER}
+				and mad.hos_id = #{hos_id,jdbcType=INTEGER}
+				and mad.copy_code = #{copy_code,jdbcType=VARCHAR}	
+				and nvl(mad.is_closed, 0) = 0 <!-- 关闭的药品算做全部完成 -->
+				and <![CDATA[tr.app_amount <> tr.rela_amount]]>
+			group by mad.apply_id,mad.inv_id
+		),
+      tem_app_kczt
+      as
+      (
+      select a.apply_id,a.inv_id,case when a.app_amount  &gt; b.left_amount then 0 else 1 end kczt
+      from tmp_rela  a
+      left join tmp_app_left  b on 
+      a.apply_id=b.apply_id and 
+      a.inv_id=b.inv_id
+      ),
+      tem_app_kczt1
+      as
+      ( 
+      select a.apply_id,sum(a.kczt) kczt2,count(*) as kczt3 
+      from tem_app_kczt  a
+      group by a.apply_id
+       ),
+       tem_app_kczt2 
+      as
+      ( 
+      select a.apply_id,case when kczt2=kczt3 then 1 when kczt2  &lt;&gt; 0 and kczt2  &lt;   kczt3 then 2 else 3 end as kczt4
+      from tem_app_kczt1  a
+     
+       )
+		select a.group_id, a.hos_id, a.copy_code, a.apply_id, a.apply_no, to_char(a.app_date, 'yyyy-MM-dd hh24:mi:ss') app_date, 
+			a.brief, a.store_id, hsd.store_name, a.dept_id, b.dept_name, c.emp_name, a.sender, d.user_name sender_name,e.emp_name as response_emp, a.send_date, 
+			case 
+				when e.rela_amount >= e.app_amount then 3 
+				when <![CDATA[e.rela_amount < e.app_amount and e.rela_amount > 0]]> then 2
+				else 1 
+			end rela_state, 
+			case nvl(f.apply_id, 0) when 0 then 0 else 1 end is_req, 
+			 kczt4 as left_state 
+		from med_apply_main a
+		left join hos_store_dict hsd
+			on a.group_id = hsd.group_id and a.hos_id = hsd.hos_id
+			and a.store_id = hsd.store_id
+			<if test="show_history == 1">
+				and a.store_no = hsd.store_no
+			</if>
+			<if test="show_history == 0">
+				and hsd.is_stop = 0
+			</if>
+		left join hos_dept_dict b
+			on a.group_id = b.group_id and a.hos_id = b.hos_id
+			and a.dept_id = b.dept_id
+			<if test="show_history == 1">
+				and a.dept_no = b.dept_no
+			</if>
+			<if test="show_history == 0">
+				and b.is_stop = 0
+			</if>
+		left join hos_emp_dict c
+			on a.group_id = c.group_id and a.hos_id = c.hos_id
+			and a.app_emp = c.emp_id and c.is_stop = 0
+		left join hos_emp_dict e
+            on a.group_id = e.group_id and a.hos_id = e.hos_id 
+            and a.app_emp = e.emp_id and e.is_stop = 0
+		left join sys_user d
+			on a.group_id = d.group_id and a.hos_id = d.hos_id
+			and a.sender = d.user_id
+		inner join (
+			select apply_id, sum(app_amount) app_amount, sum(rela_amount) rela_amount 
+			from tmp_rela
+			group by apply_id
+		) e
+			on a.apply_id = e.apply_id 
+		left join(
+			select distinct apply_id 
+			from med_apply_out_rela 
+			where group_id = #{group_id,jdbcType=INTEGER}
+				and hos_id = #{hos_id,jdbcType=INTEGER}
+				and copy_code = #{copy_code,jdbcType=VARCHAR}
+				and rela_type = 5
+		) f
+			on a.apply_id = f.apply_id
+		left join tem_app_kczt2 g on a.apply_id = g.apply_id 
+		<where>
+			<if test="group_id != null and group_id != ''">
+				and a.group_id = #{group_id,jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and a.hos_id = #{hos_id,jdbcType=INTEGER}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				and a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			</if>  
+			<if test="begin_app_date != null and begin_app_date != ''">
+				and a.app_date &gt;= #{begin_app_date,jdbcType=TIMESTAMP}
+			</if>
+			<if test="end_app_date != null and end_app_date != ''">
+				and a.app_date &lt;= #{end_app_date,jdbcType=TIMESTAMP}
+			</if>
+			<if test="begin_send_date != null and begin_send_date != ''">
+				and a.send_date &gt;= #{begin_send_date,jdbcType=TIMESTAMP}
+			</if>
+			<if test="end_send_date != null and end_send_date != ''">
+				and a.send_date &lt;= #{end_send_date,jdbcType=TIMESTAMP}
+			</if>
+			<if test="dept_id != null and dept_id != '' and dept_id != '00'">
+				and a.dept_id = #{dept_id,jdbcType=INTEGER}
+			</if>
+			<if test="brief != null and brief != ''">
+				and a.brief = #{brief,jdbcType=VARCHAR}
+			</if>
+			<if test="store_id != null and store_id != '' and store_id != '00'">
+				and a.store_id = #{store_id,jdbcType=INTEGER}
+			</if>
+			<if test="do_state != null and do_state != ''">
+				<if test="do_state == 1"><!-- 未完成 -->
+					and nvl(e.rela_amount, 0) = 0
+				</if>
+				<if test="do_state == 3"><!-- 已完成 -->
+					and e.rela_amount = e.app_amount
+				</if>
+				<if test="do_state == 2"><!-- 部分完成 -->
+					and e.rela_amount != e.app_amount and nvl(e.rela_amount, 0) != 0
+				</if>
+				<if test="do_state == 0"><!-- 未完成+部分完成 -->
+					and nvl(e.rela_amount, 0) != e.app_amount 
+				</if>
+			</if>
+			<if test="is_req != null">
+				<if test="is_req == 0">
+					and nvl(f.apply_id, 0) = 0
+				</if>
+				<if test="is_req == 1">
+					<![CDATA[ and nvl(f.apply_id, 0) <> 0]]>
+				</if>
+			</if>
+			<if test="apply_no != null and apply_no != ''">
+				AND a.apply_no like '%${apply_no}%'
+			</if>
+			<!-- <if test="dept_id == '00' ">
+				and a.dept_id in ( select perm_code from v_user_data_perm
+				where group_id = ${group_id}
+				and hos_id = ${hos_id} and user_id = ${user_id} and table_code =
+				'HOS_DEPT_DICT'
+				and is_read = 1 and is_write = 1)
+			</if> -->
+			<if test="store_id == '00' ">
+				and ((to_char(a.store_id) in (select perm_code from v_user_data_perm
+					where group_id = ${group_id}
+						and hos_id = ${hos_id} and user_id = ${user_id} 
+						and table_code = 'HOS_STORE_DICT'
+						and is_read = 1  and is_write = 1
+						 )
+					) or (a.store_id is null))
+			</if>
+			<if test="app_emp !=null and app_emp!=''">
+				and a.app_emp = #{app_emp,jdbcType=INTEGER}
+			</if>
+			<if test="response_emp !=null and response_emp!=''">
+				and a.response_emp = #{response_emp,jdbcType=INTEGER}
+			</if>
+			and a.state = 3
+			<!-- 逻辑判断有点问题会导致单据消失故先注释 
+			and (nvl(f.apply_id, 0) = 0 or nvl(g.left_amount, 0) != 0)
+			-->
+		</where>
+		order by a.app_date desc, a.store_id, a.dept_id
+		
+	</select>
+	
+	<!-- 用于申请单主表加载 -->
+	<select id="queryMedApplyMainByCode" resultMap="medApplyMainCheck" parameterType="java.util.Map" >
+		SELECT 
+			a.group_id, a.hos_id, a.copy_code, a.apply_id, a.apply_no, a.dept_id, a.dept_no, b.dept_code, b.dept_name, 
+			a.store_id, a.store_no, c.store_code, c.store_name, a.app_date, a.app_emp, d.emp_code, d.emp_name, a.response_emp,e.emp_code as response_emp_code,e.emp_name as response_emp_name,
+			a.brief, a.state, #{rela_state,jdbcType=INTEGER} rela_state
+		FROM med_apply_main a
+		LEFT JOIN hos_dept_dict b
+			ON a.group_id = b.group_id AND a.hos_id = b.hos_id
+			AND a.dept_id = b.dept_id
+			<if test="show_history == 1">
+				and a.dept_no = b.dept_no
+			</if>
+			<if test="show_history == 0">
+				and b.is_stop = 0
+			</if>
+		LEFT JOIN hos_store_dict c
+			ON a.group_id = c.group_id AND a.hos_id = c.hos_id
+			AND a.store_id = c.store_id
+			<if test="show_history == 1">
+				AND a.store_no = c.store_no
+			</if>
+			<if test="show_history == 0">
+				and c.is_stop = 0
+			</if>
+		LEFT JOIN hos_emp_dict d
+			ON a.group_id = d.group_id AND a.hos_id = d.hos_id
+			AND a.app_emp = d.emp_id AND d.is_stop = 0
+		left join hos_emp_dict e on a.group_id = e.group_id
+            and a.hos_id = e.hos_id
+            and a.response_emp = e.emp_id
+            and e.is_stop = 0
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER} 
+			and a.hos_id = #{hos_id,jdbcType=INTEGER} 
+			and a.copy_code = #{copy_code,jdbcType=VARCHAR} 
+			and a.apply_id = #{apply_id,jdbcType=INTEGER} 
+	</select>
+	
+	<!-- 用于申请单明细表加载 -->
+	<select id="queryMedApplyDetailByCode" resultMap="medApplyDetailCheck" parameterType="java.util.Map" >
+		with tmp_imme as (
+			select inv_id, sum(amount) as amount
+			from (
+				--出库未确认单据         
+				select inv_id, sum(nvl(amount, 0)) as amount
+				from med_out_main mom
+				left join med_out_detail medod
+					on mom.group_id = medod.group_id and mom.hos_id = medod.hos_id
+					and mom.copy_code = medod.copy_code and mom.out_id = medod.out_id
+				where medod.group_id = #{group_id,jdbcType=INTEGER}
+					AND medod.hos_id = #{hos_id,jdbcType=INTEGER}
+					AND medod.copy_code = #{copy_code,jdbcType=VARCHAR}
+					AND mom.store_id = #{store_id,jdbcType=INTEGER}
+					<![CDATA[
+					AND mom.state < 3 
+					AND mom.bus_type_code <> '21'
+					AND medod.amount_money > 0
+					]]>
+				group by inv_id
+				--退货未确认单据         
+				union all
+				select inv_id, -1 * sum(nvl(amount, 0)) as amount
+				from med_in_main mim
+				left join med_in_detail medid
+					on mim.group_id = medid.group_id and mim.hos_id = medid.hos_id
+					and mim.copy_code = medid.copy_code and mim.in_id = medid.in_id
+				where medid.group_id = #{group_id,jdbcType=INTEGER}
+					AND medid.hos_id = #{hos_id,jdbcType=INTEGER} 
+					AND medid.copy_code = #{copy_code,jdbcType=VARCHAR} 
+					AND mim.store_id = #{store_id,jdbcType=INTEGER} 
+					<![CDATA[ 
+					AND mim.state < 3 
+					AND mim.bus_type_code in ('10','12','16','22')
+					and medid.amount_money < 0
+					]]>
+				group by inv_id
+			)
+			group by inv_id
+		), 
+		tmp_affi_imme as (
+			select inv_id, sum(amount) as amount
+			from (
+				--出库未确认单据         
+				select inv_id, sum(nvl(amount, 0)) as amount
+				from med_affi_out mom
+				left join med_affi_out_detail medod
+					on mom.group_id = medod.group_id and mom.hos_id = medod.hos_id
+					and mom.copy_code = medod.copy_code and mom.out_id = medod.out_id
+				where medod.group_id = #{group_id,jdbcType=INTEGER}
+					AND medod.hos_id = #{hos_id,jdbcType=INTEGER}
+					AND medod.copy_code = #{copy_code,jdbcType=VARCHAR}
+					AND mom.store_id = #{store_id,jdbcType=INTEGER}
+					<![CDATA[
+					AND mom.state < 3 
+					AND mom.bus_type_code <> '30'
+					]]>
+				group by inv_id
+				--退货未确认单据         
+				union all
+				select inv_id, -1 * sum(nvl(amount, 0)) as amount
+				from med_affi_in mim
+				left join med_affi_in_detail medid
+					on mim.group_id = medid.group_id and mim.hos_id = medid.hos_id
+					and mim.copy_code = medid.copy_code and mim.in_id = medid.in_id
+				where medid.group_id = #{group_id,jdbcType=INTEGER}
+					AND medid.hos_id = #{hos_id,jdbcType=INTEGER} 
+					AND medid.copy_code = #{copy_code,jdbcType=VARCHAR} 
+					AND mim.store_id = #{store_id,jdbcType=INTEGER} 
+					<![CDATA[ 
+					AND mim.state < 3 
+					AND mim.bus_type_code = '29' 
+					]]>
+				group by inv_id
+			)
+			group by inv_id
+		)
+		SELECT 
+			a.group_id, a.hos_id, a.copy_code, a.apply_id, a.detail_id, b.bid_code,a.inv_id, a.inv_no, b.inv_code, b.inv_name, 
+			b.inv_model, c.unit_name, d.fac_name, b.is_com, a.app_amount, nvl(g.rela_amount, 0) as rela_amount, 
+			nvl(e.cur_amount, 0) common_amount, nvl(f.cur_amount, 0) affi_amount, 
+			nvl(e.cur_amount, 0) - nvl(h.amount, 0) imme_amount, nvl(f.cur_amount, 0) - nvl(i.amount, 0) affi_imme_amount, 
+			nvl(b.plan_price, 0) price, a.app_amount*nvl(b.plan_price, 0) amount_money, a.note, a.is_closed
+		FROM med_apply_detail a
+		left join med_inv_dict b
+			on a.group_id = b.group_id and a.hos_id = b.hos_id
+			and a.copy_code = b.copy_code and a.inv_id = b.inv_id
+			and b.is_stop = 0
+			<if test="show_history == 1">
+			and a.inv_no = b.inv_no
+			</if>
+			<if test="show_history == 0">
+				and b.is_stop = 0
+			</if>
+		left join hos_unit c
+			on b.group_id = c.group_id and b.hos_id = c.hos_id
+			and b.unit_code = c.unit_code
+	    left join hos_fac_dict d
+	   		on b.group_id = d.group_id and b.hos_id = d.hos_id
+	    	and b.fac_id = d.fac_id and b.fac_no=d.fac_no
+		left join med_inv_hold e
+			on a.group_id = e.group_id and a.hos_id = e.hos_id
+			and a.copy_code = e.copy_code and a.inv_id = e.inv_id
+			and e.store_id = #{store_id,jdbcType=INTEGER} 
+		left join med_affi_inv_hold f
+			on a.group_id = f.group_id and a.hos_id = f.hos_id
+			and a.copy_code = f.copy_code and a.inv_id = f.inv_id
+			and f.store_id = #{store_id,jdbcType=INTEGER} 
+		LEFT JOIN (
+			select app_detail_id, sum(nvl(rela_amount, 0)) rela_amount 
+			from med_apply_out_rela
+			where group_id = #{group_id,jdbcType=INTEGER} 
+				and hos_id = #{hos_id,jdbcType=INTEGER} 
+				and copy_code = #{copy_code,jdbcType=VARCHAR} 
+				and apply_id = #{apply_id,jdbcType=INTEGER} 
+				and <![CDATA[rela_type <> 5]]>
+			group by app_detail_id
+		) g
+			on a.detail_id = g.app_detail_id
+		left join tmp_imme h
+			on a.inv_id = h.inv_id
+		left join tmp_affi_imme i
+			on a.inv_id = i.inv_id
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER} 
+			and a.hos_id = #{hos_id,jdbcType=INTEGER} 
+			and a.copy_code = #{copy_code,jdbcType=VARCHAR} 
+			and a.apply_id = #{apply_id,jdbcType=INTEGER} 
+		ORDER BY a.detail_id
+	</select>
+	
+	<!-- 退回科室 -->
+	<update id="updateMedApplyBackBatch" parameterType="java.util.List">
+		<foreach collection="list" index="index" item="item" open="begin" separator=";" close=";end;">
+			update med_apply_main set 
+				state = #{item.state,jdbcType=INTEGER}, 
+				back_reason = #{item.back_reason,jdbcType=VARCHAR}
+			WHERE
+				group_id = #{item.group_id,jdbcType=INTEGER}
+				and hos_id = #{item.hos_id,jdbcType=INTEGER}
+				and copy_code = #{item.copy_code,jdbcType=VARCHAR}
+				and apply_id = #{item.apply_id,jdbcType=INTEGER}
+		</foreach>
+	</update>
+	
+	<!-- 关闭药品 -->
+	<update id="updateMedCommonOutApplyCheckCloseInv" parameterType="java.util.List">
+		update med_apply_detail set 
+			is_closed = 1
+		WHERE
+		<foreach collection="list" index="index" item="item" open="(" separator=") or (" close=")">
+			group_id = #{item.group_id,jdbcType=INTEGER}
+			and hos_id = #{item.hos_id,jdbcType=INTEGER}
+			and copy_code = #{item.copy_code,jdbcType=VARCHAR}
+			and apply_id = #{item.apply_id,jdbcType=INTEGER}
+			and detail_id = #{item.detail_id,jdbcType=INTEGER}
+		</foreach>
+	</update>
+	
+	<!-- 用于出库单主表组装 -->
+	<select id="queryOutMain" resultType="java.util.TreeMap" parameterType="java.util.Map" >
+		<!-- bus_type_code暂时写成3：科室领用，Controller里可以改成相对应的业务类型 -->
+		SELECT a.group_id, a.hos_id, a.copy_code, '3' bus_type_code, a.store_id, c.store_no, c.store_code, c.store_name, a.dept_id, d.dept_no, 
+			d.dept_code, d.dept_name, a.app_emp dept_emp, b.emp_no, b.emp_code, b.emp_name, 
+			a.apply_id,a.app_date, 
+			<!--'申领单'||a.apply_no||'生成，'||a.brief brief-'由科室申领单'||apply_no||'生成' brief-->
+			to_char('由科室申领单汇总生成：'||WM_CONCAT(to_char(brief))) as brief 
+		FROM med_apply_main a
+		LEFT JOIN hos_emp_dict b
+			ON a.group_id = b.group_id and a.hos_id = b.hos_id
+			and a.app_emp = b.emp_id and b.is_stop = 0
+		LEFT JOIN hos_store_dict c
+			ON a.group_id = c.group_id and a.hos_id = c.hos_id
+			and a.store_id = c.store_id and c.is_stop = 0
+		LEFT JOIN hos_dept_dict d
+			ON a.group_id = d.group_id and a.hos_id = d.hos_id
+			and a.dept_id = d.dept_id and d.is_stop = 0
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER} 
+			and a.hos_id = #{hos_id,jdbcType=INTEGER} 
+			and a.copy_code = #{copy_code,jdbcType=VARCHAR} 
+			and a.apply_id = #{apply_id,jdbcType=INTEGER} 
+			
+		GROUP BY a.group_id, a.hos_id, a.copy_code,  a.store_id, c.store_no, c.store_code, c.store_name, a.dept_id, d.dept_no, 
+			d.dept_code, d.dept_name, a.app_emp , b.emp_no, b.emp_code, b.emp_name, a.apply_id,a.app_date
+	</select>
+	
+	<!-- 用于调拨单主表组装 -->
+	<select id="queryTranMain" resultType="java.util.TreeMap" parameterType="java.util.Map" >
+		<!-- 调拨类型为1：院内调拨，调拨方式为1：同价调拨，调入单位和调出单位页面自动处理为本单位 -->
+		SELECT a.group_id, a.hos_id, a.copy_code, '1' tran_type,'1' tran_method, '申领单'||a.apply_no||'生成，'||a.brief brief, --'由科室申领单'||a.apply_no||'生成' brief, 
+			a.hos_id as out_hos_id, e.hos_no as out_hos_no, e.hos_code as out_hos_code, 
+			e.hos_name as out_hos_name, a.hos_id as in_hos_id, e.hos_no as in_hos_no, 
+			e.hos_code as in_hos_code, e.hos_name as in_hos_name,  
+			a.store_id out_store_id, d.store_no out_store_no, d.store_code out_store_code, 
+			d.store_name out_store_name, b.store_id in_store_id, c.store_no in_store_no, 
+			c.store_code in_store_code, c.store_name in_store_name, a.apply_id
+		FROM med_apply_main a
+		LEFT JOIN med_store b
+			ON a.group_id = b.group_id AND a.hos_id = b.hos_id
+			AND a.dept_id = b.dept_id
+		LEFT JOIN hos_store_dict c
+			ON b.group_id = c.group_id AND b.hos_id = c.hos_id
+			AND b.store_id = c.store_id AND c.is_stop = 0
+		LEFT JOIN hos_store_dict d
+			ON a.group_id = d.group_id AND a.hos_id = d.hos_id
+			AND a.store_id = d.store_id AND d.is_stop = 0
+		LEFT JOIN v_hos_dict e
+			ON a.group_id = e.group_id and a.hos_id = e.hos_id 
+			AND e.is_stop = 0
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER} 
+			and a.hos_id = #{hos_id,jdbcType=INTEGER} 
+			and a.copy_code = #{copy_code,jdbcType=VARCHAR} 
+			and a.apply_id = #{apply_id,jdbcType=INTEGER} 
+			and rownum = 1 
+	</select>
+	
+	<!-- 汇总生成出库单查询明细 -->
+	<select id="queryDetailByCollect" resultType="java.util.TreeMap" parameterType="java.util.Map" >
+		SELECT 
+			a.group_id, a.hos_id, a.copy_code, a.apply_id, e.store_id, a.detail_id, a.inv_id, a.inv_no, 
+			b.inv_code, b.inv_name, nvl(a.app_amount, 0) - nvl(c.rela_amount, 0) amount,msi.location_id location_new_id,
+			mld.location_code location_new_code,mld.location_name location_new_name,a.note
+		FROM med_apply_detail a
+		LEFT JOIN med_apply_main e
+			ON a.group_id = e.group_id
+			AND a.hos_id = e.hos_id
+			AND a.copy_code = e.copy_code
+			AND a.apply_id = e.apply_id
+		LEFT JOIN med_inv_dict b
+			ON a.group_id = b.group_id
+			AND a.hos_id = b.hos_id
+			AND a.copy_code = b.copy_code
+			AND a.inv_id = b.inv_id
+			AND a.inv_no = b.inv_no
+			left join med_store_inv msi on a.group_id = msi.group_id
+		and a.hos_id = msi.hos_id and a.copy_code = msi.copy_code
+		and a.inv_id = msi.inv_id and msi.store_id= #{store_id,jdbcType=INTEGER} 
+		left join med_location_dict mld on msi.group_id = mld.group_id
+		and msi.hos_id = mld.hos_id and msi.copy_code= mld.copy_code
+		and msi.location_id = mld.location_id and msi.store_id = mld.store_id
+		and mld.is_stop = 0
+		LEFT JOIN (
+			select app_detail_id, sum(nvl(rela_amount, 0)) rela_amount 
+			from med_apply_out_rela
+			where group_id = #{group_id,jdbcType=INTEGER} 
+				and hos_id = #{hos_id,jdbcType=INTEGER} 
+				and copy_code = #{copy_code,jdbcType=VARCHAR} 
+				and apply_id = #{apply_id,jdbcType=INTEGER} 
+				and <![CDATA[rela_type <> 5]]>
+			group by app_detail_id
+		) c
+			on a.detail_id = c.app_detail_id
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER} 
+			and a.hos_id = #{hos_id,jdbcType=INTEGER} 
+			and a.copy_code = #{copy_code,jdbcType=VARCHAR} 
+			and a.apply_id = #{apply_id,jdbcType=INTEGER} 
+			and nvl(a.is_closed, 0) = 0
+		ORDER BY b.inv_name
+	</select>
+	
+	<!-- 用于出库单明细表组装 其中键is_check_imme为库存不足时剩余数量是否生成单据 -->
+	<select id="querySelectDetailForOut" resultType="java.util.TreeMap" parameterType="java.util.Map" >
+		SELECT 
+			a.group_id, a.hos_id, a.copy_code, a.apply_id, e.store_id, a.detail_id, a.inv_id, a.inv_no, 
+			b.inv_code, b.inv_name, nvl(a.app_amount, 0) - nvl(c.rela_amount, 0) amount, 0 is_check_imme ,a.note
+		FROM med_apply_detail a
+		LEFT JOIN med_apply_main e
+			ON a.group_id = e.group_id
+			AND a.hos_id = e.hos_id
+			AND a.copy_code = e.copy_code
+			AND a.apply_id = e.apply_id
+		LEFT JOIN med_inv_dict b
+			ON a.group_id = b.group_id
+			AND a.hos_id = b.hos_id
+			AND a.copy_code = b.copy_code
+			AND a.inv_id = b.inv_id
+			AND a.inv_no = b.inv_no
+		LEFT JOIN (
+			select app_detail_id, sum(nvl(rela_amount, 0)) rela_amount 
+			from med_apply_out_rela
+			where group_id = #{group_id,jdbcType=INTEGER} 
+				and hos_id = #{hos_id,jdbcType=INTEGER} 
+				and copy_code = #{copy_code,jdbcType=VARCHAR} 
+				and apply_id = #{apply_id,jdbcType=INTEGER} 
+				and <![CDATA[rela_type <> 5]]>
+			group by app_detail_id
+		) c
+			on a.detail_id = c.app_detail_id
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER} 
+			and a.hos_id = #{hos_id,jdbcType=INTEGER} 
+			and a.copy_code = #{copy_code,jdbcType=VARCHAR} 
+			and a.apply_id = #{apply_id,jdbcType=INTEGER} 
+			and nvl(a.is_closed, 0) = 0
+			and a.detail_id in (${detail_ids})
+		ORDER BY b.inv_name
+	</select>
+	
+	<!-- 查询管理科室对应的库房信息 -->
+	<select id="queryStoreByDept" resultType="String" parameterType="java.util.Map">
+		select a.store_id||','||b.store_no from med_store a
+		left join hos_store_dict b
+			on a.group_id = b.group_id
+			and a.hos_id = b.hos_id
+			and a.store_id = b.store_id
+			and b.is_stop = 0
+		where a.group_id = #{group_id,jdbcType=INTEGER}
+			and a.hos_id = #{hos_id,jdbcType=INTEGER}
+			and a.dept_id = #{dept_id,jdbcType=INTEGER} 
+			and rownum = 1
+	</select>
+	
+	<!-- 用于科室需求计划主表组装 -->
+	<select id="queryReqMain" resultType="java.util.TreeMap" parameterType="java.util.Map" >
+		SELECT a.store_id, a.store_no, c.store_code, c.store_name, a.dept_id, a.dept_no, b.dept_code, b.dept_name, 
+			'2' as come_from, a.apply_id 
+		FROM med_apply_main a
+		LEFT JOIN hos_dept_dict b
+			ON a.group_id = b.group_id
+			AND a.hos_id = b.hos_id
+			AND a.dept_id = b.dept_id
+			AND a.dept_no = b.dept_no
+		LEFT JOIN hos_store_dict c
+			ON a.group_id = c.group_id
+			AND a.hos_id = c.hos_id
+			AND a.store_id = c.store_id
+			AND a.store_no = c.store_no
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER} 
+			and a.hos_id = #{hos_id,jdbcType=INTEGER} 
+			and a.copy_code = #{copy_code,jdbcType=VARCHAR} 
+			and a.apply_id = #{apply_id,jdbcType=INTEGER} 
+	</select>
+	
+	<!-- 用于科室需求计划明细表组装 -->
+	<select id="queryReqDetail" resultType="java.util.TreeMap" parameterType="java.util.Map" >
+		SELECT 
+			a.group_id, a.hos_id, a.copy_code, a.apply_id || '@' || a.detail_id || '@' || a.app_amount other_ids, 
+			a.inv_id, b.inv_no, b.inv_code, b.inv_name, b.inv_model, c.unit_name,
+			e.sup_id, f.sup_no, f.sup_code, f.sup_name, d.fac_name, 
+			nvl(b.plan_price, 0) as price, a.app_amount as amount, 
+			nvl(b.plan_price, 0)*a.app_amount as sum_money
+		FROM med_apply_detail a
+		left join med_inv_dict b
+			on a.group_id = b.group_id
+			and a.hos_id = b.hos_id
+			and a.copy_code = b.copy_code
+			and a.inv_id = b.inv_id
+			and a.inv_no = b.inv_no
+		left join hos_unit c
+			on b.group_id = c.group_id
+			and b.hos_id = c.hos_id
+			and b.unit_code = c.unit_code
+		left join hos_fac_dict d
+			on b.group_id = d.group_id
+			and b.hos_id = d.hos_id
+			and b.fac_id = d.fac_id
+			and b.fac_no = d.fac_no
+		left join (
+			select * from med_inv_sup a 
+			where a.sup_id = (
+				select sup_id from med_inv_sup b 
+				where b.inv_id = a.inv_id and rownum = 1)
+		) e
+			on b.group_id = e.group_id
+			and b.hos_id = e.hos_id
+			and b.copy_code = e.copy_code
+			and b.inv_id = e.inv_id
+		left join hos_sup_dict f
+			on b.group_id = f.group_id
+			and b.hos_id = f.hos_id
+			and e.sup_id = f.sup_id
+			and f.is_stop = 0
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER} 
+			and a.hos_id = #{hos_id,jdbcType=INTEGER} 
+			and a.copy_code = #{copy_code,jdbcType=VARCHAR} 
+			and a.apply_id = #{apply_id,jdbcType=INTEGER} 
+			and nvl(a.is_closed, 0) = 0
+			and a.detail_id in (${detail_ids})
+			and b.use_state = 1 
+		ORDER BY b.inv_name
+	</select>
+	
+	<!-- 生成各个单据操作所需sql~~~~~~begin -->	
+	<!-- 获取出库单主表序列 -->
+	<select id="queryMedOutMainSeqNext"  resultType="java.lang.Long" useCache="false" flushCache="true">
+		SELECT MED_OUT_MAIN_SEQ.nextval as in_id FROM DUAL
+	</select>
+	
+	<!-- 获取出库单明细表序列 -->
+	<select id="queryMedOutDetailSeqNext"  resultType="java.lang.Long" useCache="false" flushCache="true">
+		SELECT MED_OUT_DETAIL_SEQ.nextval FROM DUAL
+	</select>
+	
+	<!-- 出库单主表添加 -->
+	<insert id="addMedOutMainByApp" parameterType="java.util.Map">
+		INSERT INTO MED_OUT_MAIN (
+			group_id, hos_id, copy_code, out_id, out_no, year, month, bus_type_code, store_id, store_no, 
+			out_date, dept_id, dept_no, dept_emp, use_code, proj_id, brief, maker, state,app_date 
+		) VALUES (
+			#{group_id,jdbcType=INTEGER},
+			#{hos_id,jdbcType=INTEGER},
+			#{copy_code,jdbcType=VARCHAR},
+			#{out_id,jdbcType=INTEGER},
+			#{out_no,jdbcType=VARCHAR},
+			#{year,jdbcType=VARCHAR},
+			#{month,jdbcType=VARCHAR},
+			#{bus_type_code,jdbcType=VARCHAR},
+			#{store_id,jdbcType=INTEGER},
+			#{store_no,jdbcType=INTEGER},
+			#{out_date,jdbcType=DATE},
+			#{dept_id,jdbcType=INTEGER},
+			#{dept_no,jdbcType=INTEGER},
+			#{dept_emp,jdbcType=INTEGER},
+			#{use_code,jdbcType=VARCHAR},
+			#{proj_id,jdbcType=INTEGER},
+			#{brief,jdbcType=VARCHAR},
+			#{maker,jdbcType=INTEGER},
+			#{state,jdbcType=INTEGER},
+			#{app_date,jdbcType=TIMESTAMP}
+		)
+	</insert>
+	
+	<!-- 出库单主表批量添加 -->
+	<insert id="addMedOutMainByAppBatch" parameterType="java.util.Map">
+		INSERT INTO MED_OUT_MAIN (
+			group_id, hos_id, copy_code, out_id, out_no, year, month, bus_type_code, store_id, store_no, 
+			out_date,  dept_id, dept_no, dept_emp, use_code, proj_id, brief, maker, state, app_date 
+		) 
+		<foreach collection="list" item="item" index="index" separator="union all" >		
+			SELECT
+				#{item.group_id,jdbcType=INTEGER},
+				#{item.hos_id,jdbcType=INTEGER},
+				#{item.copy_code,jdbcType=VARCHAR},
+				#{item.out_id,jdbcType=INTEGER},
+				#{item.out_no,jdbcType=VARCHAR},
+				#{item.year,jdbcType=VARCHAR},
+				#{item.month,jdbcType=VARCHAR},
+				#{item.bus_type_code,jdbcType=VARCHAR},
+				#{item.store_id,jdbcType=INTEGER},
+				#{item.store_no,jdbcType=INTEGER},
+				#{item.out_date,jdbcType=DATE},
+				#{item.dept_id,jdbcType=INTEGER},
+				#{item.dept_no,jdbcType=INTEGER},
+				#{item.dept_emp,jdbcType=INTEGER},
+				#{item.use_code,jdbcType=VARCHAR},
+				#{item.proj_id,jdbcType=INTEGER},
+				#{item.brief,jdbcType=VARCHAR},
+				#{item.maker,jdbcType=INTEGER},
+				#{item.state,jdbcType=INTEGER},
+				#{item.app_date,jdbcType=TIMESTAMP}
+			FROM DUAL
+		</foreach>
+	</insert>
+	
+	<!-- 出库单明细表添加 -->
+	<insert id="addMedOutDetailByApp" parameterType="java.util.List">
+		INSERT INTO MED_OUT_DETAIL (
+			group_id, hos_id, copy_code, out_id, out_no, out_detail_id, inv_id, inv_no, batch_no, batch_sn, bar_code, location_id, 
+			price, sale_price, sell_price, amount, amount_money, sale_money, sell_money, inva_date, disinfect_date, note
+		) 
+		<foreach collection="list" item="item" index="index" separator="union all" >		
+			SELECT
+				#{item.group_id,jdbcType=INTEGER},
+				#{item.hos_id,jdbcType=INTEGER},
+				#{item.copy_code,jdbcType=VARCHAR},
+				#{item.out_id,jdbcType=INTEGER},
+				#{item.out_no,jdbcType=VARCHAR},
+				#{item.out_detail_id,jdbcType=INTEGER},
+				#{item.inv_id,jdbcType=INTEGER},
+				#{item.inv_no,jdbcType=INTEGER},
+				#{item.batch_no,jdbcType=VARCHAR},
+				#{item.batch_sn,jdbcType=INTEGER},
+				#{item.bar_code,jdbcType=VARCHAR},
+				#{item.location_id,jdbcType=INTEGER},
+				#{item.price,jdbcType=NUMERIC},
+				#{item.sale_price,jdbcType=NUMERIC},
+				#{item.sell_price,jdbcType=NUMERIC},
+				#{item.amount,jdbcType=NUMERIC},
+				#{item.amount_money,jdbcType=NUMERIC},
+				#{item.sale_money,jdbcType=NUMERIC},
+				#{item.sell_money,jdbcType=NUMERIC},
+				#{item.inva_date,jdbcType=DATE},
+				#{item.disinfect_date,jdbcType=DATE},
+				#{item.note,jdbcType=VARCHAR}
+			FROM DUAL
+		</foreach>
+	</insert>
+	<!-- 批量删除出库主表 -->
+	<delete id="deleteMedOutMainByApp" parameterType="java.util.List">
+		DELETE FROM MED_OUT_MAIN
+		WHERE
+		<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+			group_id = #{item.group_id,jdbcType=INTEGER}
+			and hos_id = #{item.hos_id,jdbcType=INTEGER}
+			and copy_code = #{item.copy_code,jdbcType=VARCHAR}
+			and out_id = #{item.out_id,jdbcType=VARCHAR}
+		</foreach>
+	</delete>
+	<!-- 批量删除出库明细表 -->
+	<delete id="deleteMedOutDetailByApp" parameterType="java.util.List">
+		DELETE FROM MED_OUT_DETAIL
+		WHERE
+		<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+			group_id = #{item.group_id,jdbcType=INTEGER}
+			and hos_id = #{item.hos_id,jdbcType=INTEGER}
+			and copy_code = #{item.copy_code,jdbcType=VARCHAR}
+			and out_id = #{item.out_id,jdbcType=VARCHAR}
+		</foreach>
+	</delete>
+	
+	<!-- 获取代销出库单主表序列 -->
+	<select id="queryMedAffiOutSeqNext"  resultType="java.lang.Long" useCache="false" flushCache="true">
+		SELECT MED_AFFI_OUT_SEQ.nextval as in_id FROM DUAL
+	</select>
+	
+	<!-- 获取代销出库单明细表序列 -->
+	<select id="queryMedAffiOutDetailSeqNext"  resultType="java.lang.Long" useCache="false" flushCache="true">
+		SELECT MED_AFFI_OUT_DETAIL_SEQ.nextval FROM DUAL
+	</select>
+	
+	<!-- 代销出库单主表添加 -->
+	<insert id="addMedAffiOutByApp" parameterType="java.util.Map">
+		INSERT INTO MED_AFFI_OUT (
+			group_id, hos_id, copy_code, out_id, out_no, year, month, bus_type_code, store_id, store_no, 
+			out_date, dept_id, dept_no, dept_emp, use_code, proj_id, brief, maker, state 
+		) VALUES (
+			#{group_id,jdbcType=INTEGER},
+			#{hos_id,jdbcType=INTEGER},
+			#{copy_code,jdbcType=VARCHAR},
+			#{out_id,jdbcType=INTEGER},
+			#{out_no,jdbcType=VARCHAR},
+			#{year,jdbcType=VARCHAR},
+			#{month,jdbcType=VARCHAR},
+			#{bus_type_code,jdbcType=VARCHAR},
+			#{store_id,jdbcType=INTEGER},
+			#{store_no,jdbcType=INTEGER},
+			#{out_date,jdbcType=DATE},
+			#{dept_id,jdbcType=INTEGER},
+			#{dept_no,jdbcType=INTEGER},
+			#{dept_emp,jdbcType=INTEGER},
+			#{use_code,jdbcType=VARCHAR},
+			#{proj_id,jdbcType=INTEGER},
+			#{brief,jdbcType=VARCHAR},
+			#{maker,jdbcType=INTEGER},
+			#{state,jdbcType=INTEGER}
+		)
+	</insert>
+	
+	<!-- 代销出库单明细表添加 -->
+	<insert id="addMedAffiOutDetailByApp" parameterType="java.util.List">
+		<foreach collection="list" item="item" index="index" open="begin" close=";end;" separator=";" >
+			INSERT INTO MED_AFFI_OUT_DETAIL (
+			group_id, hos_id, copy_code, out_id, out_no, detail_id, inv_id, inv_no, price,amount,amount_money
+			<if test="item.batch_no != null and item.batch_no != ''">, batch_no</if>
+			<if test="item.batch_sn != null and item.batch_sn != ''">, batch_sn</if>
+			<if test="item.bar_code != null and item.bar_code != ''">, bar_code</if>
+			<if test="item.sale_price != null">, sale_price</if>
+			<if test="item.sale_money != null">, sale_money</if>
+			<if test="item.sell_price != null">, sell_price</if>
+			<if test="item.sell_money != null">, sell_money</if>
+			<if test="item.inva_date != null and item.inva_date != ''">, inva_date</if>
+			<if test="item.disinfect_date != null and item.disinfect_date != ''">, disinfect_date</if>
+			<if test="item.location_id != null">, location_id</if>
+			<if test="item.note != null ">, note</if>
+			<if test="item.sup_id != null and item.sup_id != ''">, sup_id</if>
+			<if test="item.sup_no != null and item.sup_no != ''">, sup_no</if>
+			)values(
+				#{item.group_id,jdbcType=INTEGER},
+				#{item.hos_id,jdbcType=INTEGER},
+				#{item.copy_code,jdbcType=VARCHAR},
+				#{item.out_id,jdbcType=INTEGER},
+				#{item.out_no,jdbcType=INTEGER},
+				#{item.detail_id,jdbcType=INTEGER},
+				#{item.inv_id,jdbcType=INTEGER},
+				#{item.inv_no,jdbcType=INTEGER},
+				#{item.price,jdbcType=FLOAT},
+				#{item.amount,jdbcType=FLOAT},
+				#{item.amount_money,jdbcType=FLOAT}
+				<if test="item.batch_no != null and item.batch_no != ''">, #{item.batch_no,jdbcType=VARCHAR}</if>
+				<if test="item.batch_sn != null and item.batch_sn != ''">, #{item.batch_sn,jdbcType=INTEGER}</if>
+				<if test="item.bar_code != null and item.bar_code != ''">, #{item.bar_code,jdbcType=VARCHAR}</if>
+				<if test="item.sale_price != null">, #{item.sale_price,jdbcType=FLOAT}</if>
+				<if test="item.sale_money != null">, #{item.sale_money,jdbcType=FLOAT}</if>
+				<if test="item.sell_price != null">, #{item.sell_price,jdbcType=FLOAT}</if>
+				<if test="item.sell_money != null">, #{item.sell_money,jdbcType=FLOAT}</if>
+				<if test="item.inva_date != null and item.inva_date != ''">, #{item.inva_date,jdbcType=DATE}</if>
+				<if test="item.disinfect_date != null and item.disinfect_date != ''">, #{item.disinfect_date,jdbcType=DATE}</if>
+				<if test="item.location_id != null">, #{item.location_id,jdbcType=INTEGER}</if>
+				<if test="item.note != null ">, #{item.note,jdbcType=VARCHAR}</if>
+				<if test="item.sup_id != null and item.sup_id != ''">, #{item.sup_id,jdbcType=INTEGER}</if>
+				<if test="item.sup_no != null and item.sup_no != ''">, #{item.sup_no,jdbcType=INTEGER}</if>
+			) 
+		</foreach>
+	</insert>
+	
+	<!-- 批量删除代销出库主表 -->
+	<delete id="deleteMedAffiOutByApp" parameterType="java.util.List">
+		DELETE FROM MED_AFFI_OUT
+		WHERE
+		<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+			group_id = #{item.group_id,jdbcType=INTEGER}
+			and hos_id = #{item.hos_id,jdbcType=INTEGER}
+			and copy_code = #{item.copy_code,jdbcType=VARCHAR}
+			and out_id = #{item.out_id,jdbcType=VARCHAR}
+		</foreach>
+	</delete>
+	<!-- 批量删除代销出库明细表 -->
+	<delete id="deleteMedAffiOutDetailByApp" parameterType="java.util.List">
+		DELETE FROM MED_AFFI_OUT_DETAIL
+		WHERE
+		<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+			group_id = #{item.group_id,jdbcType=INTEGER}
+			and hos_id = #{item.hos_id,jdbcType=INTEGER}
+			and copy_code = #{item.copy_code,jdbcType=VARCHAR}
+			and out_id = #{item.out_id,jdbcType=VARCHAR}
+		</foreach>
+	</delete>
+	
+	<!-- 获取调拨单主表序列 -->
+	<select id="queryMedTranMainSeqNext"  resultType="java.lang.Long" useCache="false" flushCache="true">
+		SELECT MED_TRAN_MAIN_SEQ.nextval as in_id FROM DUAL
+	</select>
+	
+	<!-- 获取调拨单明细表序列 -->
+	<select id="queryMedTranDetailSeqNext"  resultType="java.lang.Long" useCache="false" flushCache="true">
+		SELECT MED_TRAN_DETAIL_SEQ.nextval FROM DUAL
+	</select>
+	
+	<!-- 调拨单主表添加 -->
+	<insert id="addMedTranMainByApp" parameterType="java.util.Map">
+		INSERT INTO MED_TRAN_MAIN (
+			group_id, hos_id, copy_code, tran_id, tran_no, year, month, bus_type, tran_method, tran_type, tran_date, 
+			out_hos_id, out_copy_code, out_store_id, out_store_no, in_hos_id, in_copy_code, in_store_id, in_store_no, 
+			brief, maker, state
+		) VALUES (
+			#{group_id,jdbcType=INTEGER},
+			#{hos_id,jdbcType=INTEGER},
+			#{copy_code,jdbcType=VARCHAR},
+			#{tran_id,jdbcType=INTEGER},
+			#{tran_no,jdbcType=VARCHAR},
+			#{year,jdbcType=VARCHAR},
+			#{month,jdbcType=VARCHAR},
+			#{bus_type,jdbcType=INTEGER},
+			#{tran_method,jdbcType=INTEGER},
+			#{tran_type,jdbcType=INTEGER},
+			#{tran_date,jdbcType=DATE},
+			#{out_hos_id,jdbcType=INTEGER},
+			#{out_copy_code,jdbcType=INTEGER},
+			#{out_store_id,jdbcType=INTEGER},
+			#{out_store_no,jdbcType=INTEGER},
+			#{in_hos_id,jdbcType=INTEGER},
+			#{in_copy_code,jdbcType=INTEGER},
+			#{in_store_id,jdbcType=INTEGER},
+			#{in_store_no,jdbcType=INTEGER},
+			#{brief,jdbcType=VARCHAR},
+			#{maker,jdbcType=INTEGER},
+			#{state,jdbcType=INTEGER}
+		)
+	</insert>
+	
+	<!-- 调拨单明细表添加 -->
+	<insert id="addMedTranDetailByApp" parameterType="java.util.List">
+		INSERT INTO MED_TRAN_DETAIL (
+			group_id, hos_id, copy_code, tran_id, tran_no, tran_detail_id, inv_id, inv_no, batch_no, batch_sn, bar_code, 
+			price, sale_price, sell_price, amount, amount_money, sale_money, sell_money, inva_date, disinfect_date, 
+			location_out_id, location_in_id, note
+		) 
+		<foreach collection="list" item="item" index="index" separator="union all" >		
+			SELECT
+				#{item.group_id,jdbcType=INTEGER},
+				#{item.hos_id,jdbcType=INTEGER},
+				#{item.copy_code,jdbcType=VARCHAR},
+				#{item.tran_id,jdbcType=INTEGER},
+				#{item.tran_no,jdbcType=VARCHAR},
+				#{item.tran_detail_id,jdbcType=INTEGER},
+				#{item.inv_id,jdbcType=INTEGER},
+				#{item.inv_no,jdbcType=INTEGER},
+				#{item.batch_no,jdbcType=VARCHAR},
+				#{item.batch_sn,jdbcType=INTEGER},
+				#{item.bar_code,jdbcType=VARCHAR},
+				#{item.price,jdbcType=NUMERIC},
+				#{item.sale_price,jdbcType=NUMERIC},
+				#{item.sell_price,jdbcType=NUMERIC},
+				#{item.amount,jdbcType=NUMERIC},
+				#{item.amount_money,jdbcType=NUMERIC},
+				#{item.sale_money,jdbcType=NUMERIC},
+				#{item.sell_money,jdbcType=NUMERIC},
+				#{item.inva_date,jdbcType=DATE},
+				#{item.disinfect_date,jdbcType=DATE},
+				#{item.location_out_id,jdbcType=INTEGER},
+				#{item.location_in_id,jdbcType=INTEGER},
+				#{item.note,jdbcType=VARCHAR}
+			FROM DUAL
+		</foreach>
+	</insert>
+	
+	<!-- 批量删除调拨主表 -->
+	<delete id="deleteMedTranMainByApp" parameterType="java.util.List">
+		DELETE FROM MED_TRAN_MAIN
+		WHERE
+		<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+			group_id = #{item.group_id,jdbcType=INTEGER}
+			and hos_id = #{item.hos_id,jdbcType=INTEGER}
+			and copy_code = #{item.copy_code,jdbcType=VARCHAR}
+			and tran_id = #{item.tran_id,jdbcType=VARCHAR}
+		</foreach>
+	</delete>
+	<!-- 批量删除调拨明细表 -->
+	<delete id="deleteMedTranDetailByApp" parameterType="java.util.List">
+		DELETE FROM MED_TRAN_DETAIL
+		WHERE
+		<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+			group_id = #{item.group_id,jdbcType=INTEGER}
+			and hos_id = #{item.hos_id,jdbcType=INTEGER}
+			and copy_code = #{item.copy_code,jdbcType=VARCHAR}
+			and tran_id = #{item.tran_id,jdbcType=VARCHAR}
+		</foreach>
+	</delete>
+	
+	<!-- 获取代销调拨单主表序列 -->
+	<select id="queryMedAffiTranMainSeqNext"  resultType="java.lang.Long" useCache="false" flushCache="true">
+		SELECT MED_AFFI_TRAN_MAIN_SEQ.nextval as in_id FROM DUAL
+	</select>
+	
+	<!-- 获取代销调拨单明细表序列 -->
+	<select id="queryMedAffiTranDetailSeqNext"  resultType="java.lang.Long" useCache="false" flushCache="true">
+		SELECT MED_AFFI_TRAN_DETAIL_SEQ.nextval FROM DUAL
+	</select>
+	
+	<!-- 代销调拨单主表添加 -->
+	<insert id="addMedAffiTranMainByApp" parameterType="java.util.Map">
+		INSERT INTO MED_AFFI_TRAN_MAIN (
+			group_id, hos_id, copy_code, tran_id, tran_no, year, month, bus_type, tran_method, tran_type, tran_date, 
+			out_hos_id, out_copy_code, out_store_id, out_store_no, in_hos_id, in_copy_code, in_store_id, in_store_no, 
+			brief, maker, state
+		) VALUES (
+			#{group_id,jdbcType=INTEGER},
+			#{hos_id,jdbcType=INTEGER},
+			#{copy_code,jdbcType=VARCHAR},
+			#{tran_id,jdbcType=INTEGER},
+			#{tran_no,jdbcType=VARCHAR},
+			#{year,jdbcType=VARCHAR},
+			#{month,jdbcType=VARCHAR},
+			#{bus_type,jdbcType=INTEGER},
+			#{tran_method,jdbcType=INTEGER},
+			#{tran_type,jdbcType=INTEGER},
+			#{tran_date,jdbcType=DATE},
+			#{out_hos_id,jdbcType=INTEGER},
+			#{out_copy_code,jdbcType=INTEGER},
+			#{out_store_id,jdbcType=INTEGER},
+			#{out_store_no,jdbcType=INTEGER},
+			#{in_hos_id,jdbcType=INTEGER},
+			#{in_copy_code,jdbcType=INTEGER},
+			#{in_store_id,jdbcType=INTEGER},
+			#{in_store_no,jdbcType=INTEGER},
+			#{brief,jdbcType=VARCHAR},
+			#{maker,jdbcType=INTEGER},
+			#{state,jdbcType=INTEGER}
+		)
+	</insert>
+	
+	<!-- 代销调拨单明细表添加 -->
+	<insert id="addMedAffiTranDetailByApp" parameterType="java.util.List">
+		INSERT INTO MED_AFFI_TRAN_DETAIL (
+			group_id, hos_id, copy_code, tran_id, tran_no, tran_detail_id, inv_id, inv_no, batch_no, batch_sn, bar_code, 
+			price, sale_price, sell_price, amount, amount_money, sale_money, sell_money, inva_date, disinfect_date, 
+			location_out_id, location_in_id, note
+		) 
+		<foreach collection="list" item="item" index="index" separator="union all" >		
+			SELECT
+				#{item.group_id,jdbcType=INTEGER},
+				#{item.hos_id,jdbcType=INTEGER},
+				#{item.copy_code,jdbcType=VARCHAR},
+				#{item.tran_id,jdbcType=INTEGER},
+				#{item.tran_no,jdbcType=VARCHAR},
+				#{item.tran_detail_id,jdbcType=INTEGER},
+				#{item.inv_id,jdbcType=INTEGER},
+				#{item.inv_no,jdbcType=INTEGER},
+				#{item.batch_no,jdbcType=VARCHAR},
+				#{item.batch_sn,jdbcType=INTEGER},
+				#{item.bar_code,jdbcType=VARCHAR},
+				#{item.price,jdbcType=NUMERIC},
+				#{item.sale_price,jdbcType=NUMERIC},
+				#{item.sell_price,jdbcType=NUMERIC},
+				#{item.amount,jdbcType=NUMERIC},
+				#{item.amount_money,jdbcType=NUMERIC},
+				#{item.sale_money,jdbcType=NUMERIC},
+				#{item.sell_money,jdbcType=NUMERIC},
+				#{item.inva_date,jdbcType=DATE},
+				#{item.disinfect_date,jdbcType=DATE},
+				#{item.location_out_id,jdbcType=INTEGER},
+				#{item.location_in_id,jdbcType=INTEGER},
+				#{item.note,jdbcType=VARCHAR}
+			FROM DUAL
+		</foreach>
+	</insert>
+	
+	<!-- 批量删除代销调拨主表 -->
+	<delete id="deleteMedAffiTranMainByApp" parameterType="java.util.List">
+		DELETE FROM MED_AFFI_TRAN_MAIN
+		WHERE
+		<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+			group_id = #{item.group_id,jdbcType=INTEGER}
+			and hos_id = #{item.hos_id,jdbcType=INTEGER}
+			and copy_code = #{item.copy_code,jdbcType=VARCHAR}
+			and tran_id = #{item.tran_id,jdbcType=VARCHAR}
+		</foreach>
+	</delete>
+	<!-- 批量删除代销调拨明细表 -->
+	<delete id="deleteMedAffiTranDetailByApp" parameterType="java.util.List">
+		DELETE FROM MED_AFFI_TRAN_DETAIL
+		WHERE
+		<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+			group_id = #{item.group_id,jdbcType=INTEGER}
+			and hos_id = #{item.hos_id,jdbcType=INTEGER}
+			and copy_code = #{item.copy_code,jdbcType=VARCHAR}
+			and tran_id = #{item.tran_id,jdbcType=VARCHAR}
+		</foreach>
+	</delete>
+	
+	<!-- 获取科室需求计划主表序列 -->
+	<select id="queryMedRequireMainSeqNext"  resultType="java.lang.Long" useCache="false" flushCache="true">
+		SELECT MED_REQUIRE_MAIN_SEQ.nextval as in_id FROM DUAL
+	</select>
+	
+	<!-- 获取科室需求计划明细表序列 -->
+	<select id="queryMedRequireDetailSeqNext"  resultType="java.lang.Long" useCache="false" flushCache="true">
+		SELECT MED_REQUIRE_DETAIL_SEQ.nextval FROM DUAL
+	</select>
+	
+	<!-- 科室需求计划主表添加 -->
+	<insert id="addMedRequireMainByApp" parameterType="java.util.Map">
+		INSERT INTO MED_REQUIRE_MAIN (
+			group_id, hos_id, copy_code, req_id, req_code, dept_id, dept_no, make_date, stock_id, stock_no, rdate, 
+			brif, other_inv, maker, state, req_type, is_dir, come_from
+		) VALUES (
+			#{group_id,jdbcType=INTEGER},
+			#{hos_id,jdbcType=INTEGER},
+			#{copy_code,jdbcType=VARCHAR},
+			#{req_id,jdbcType=INTEGER},
+			#{req_code,jdbcType=VARCHAR},
+			#{dept_id,jdbcType=INTEGER},
+			#{dept_no,jdbcType=INTEGER},
+			#{make_date,jdbcType=DATE},
+			#{store_id,jdbcType=INTEGER},
+			#{store_no,jdbcType=INTEGER},
+			#{rdate,jdbcType=DATE},
+			#{brif,jdbcType=VARCHAR},
+			#{other_inv,jdbcType=VARCHAR},
+			#{maker,jdbcType=INTEGER},
+			#{state,jdbcType=INTEGER},
+			1, 0, 2
+		)
+	</insert>
+	
+	<!-- 科室需求计划主表批量添加 -->
+	<insert id="addMedRequireMainByAppBatch" parameterType="java.util.List">
+		INSERT INTO MED_REQUIRE_MAIN (
+			group_id, hos_id, copy_code, req_id, req_code, dept_id, dept_no, make_date, stock_id, stock_no, rdate, 
+			brif, other_inv, maker, state, req_type, is_dir, come_from
+		) 
+		<foreach collection="list" item="item" index="index" separator="union all" >	
+			SELECT
+				#{item.group_id,jdbcType=INTEGER},
+				#{item.hos_id,jdbcType=INTEGER},
+				#{item.copy_code,jdbcType=VARCHAR},
+				#{item.req_id,jdbcType=INTEGER},
+				#{item.req_code,jdbcType=VARCHAR},
+				#{item.dept_id,jdbcType=INTEGER},
+				#{item.dept_no,jdbcType=INTEGER},
+				#{item.make_date,jdbcType=DATE},
+				#{item.store_id,jdbcType=INTEGER},
+				#{item.store_no,jdbcType=INTEGER},
+				#{item.rdate,jdbcType=DATE},
+				#{item.brif,jdbcType=VARCHAR},
+				#{item.other_inv,jdbcType=VARCHAR},
+				#{item.maker,jdbcType=INTEGER},
+				#{item.state,jdbcType=INTEGER},
+				1, 0, 2
+			FROM DUAL
+		</foreach>
+	</insert>
+	
+	<!-- 科室需求计划明细表添加 -->
+	<insert id="addMedRequireDetailByApp" parameterType="java.util.List">
+		INSERT INTO MED_REQUIRE_DETAIL (
+			group_id, hos_id, copy_code, req_id, req_code, req_detail_id, inv_id, inv_no, price, amount, pack_code, num, num_exchange, 
+			sup_id, sup_no, memo, is_closed
+		) 
+		<foreach collection="list" item="item" index="index" separator="union all" >		
+			SELECT
+				#{item.group_id,jdbcType=INTEGER},
+				#{item.hos_id,jdbcType=INTEGER},
+				#{item.copy_code,jdbcType=VARCHAR},
+				#{item.req_id,jdbcType=INTEGER},
+				#{item.req_code,jdbcType=VARCHAR},
+				#{item.req_detail_id,jdbcType=INTEGER},
+				#{item.inv_id,jdbcType=INTEGER},
+				#{item.inv_no,jdbcType=INTEGER},
+				#{item.price,jdbcType=NUMERIC},
+				#{item.amount,jdbcType=NUMERIC},
+				#{item.pack_code,jdbcType=VARCHAR},
+				#{item.num,jdbcType=NUMERIC},
+				#{item.num_exchange,jdbcType=NUMERIC},
+				#{item.sup_id,jdbcType=VARCHAR},
+				#{item.sup_no,jdbcType=VARCHAR},
+				#{item.memo,jdbcType=VARCHAR}, 
+				0
+			FROM DUAL
+		</foreach>
+	</insert>
+	
+	<!-- 批量删除科室需求计划主表 -->
+	<delete id="deleteMedRequireMainByApp" parameterType="java.util.List">
+		DELETE FROM MED_REQUIRE_MAIN
+		WHERE
+		<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+			group_id = #{item.group_id,jdbcType=INTEGER}
+			and hos_id = #{item.hos_id,jdbcType=INTEGER}
+			and copy_code = #{item.copy_code,jdbcType=VARCHAR}
+			and req_id = #{item.req_id,jdbcType=VARCHAR}
+		</foreach>
+	</delete>
+	<!-- 批量删除科室需求计划明细表 -->
+	<delete id="deleteMedRequireDetailByApp" parameterType="java.util.List">
+		DELETE FROM MED_REQUIRE_DETAIL
+		WHERE
+		<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+			group_id = #{item.group_id,jdbcType=INTEGER}
+			and hos_id = #{item.hos_id,jdbcType=INTEGER}
+			and copy_code = #{item.copy_code,jdbcType=VARCHAR}
+			and req_id = #{item.req_id,jdbcType=VARCHAR}
+		</foreach>
+	</delete>
+	<!-- 生成各个单据操作所需sql~~~~~end -->
+	
+	<select id="queryMedApplyRela" resultType="java.util.TreeMap" parameterType="java.util.Map">
+		with rela_tmp as(
+			select group_id, hos_id, copy_code, rela_type, rela_id, sum(rela_amount) from med_apply_out_rela 
+			where group_id = #{group_id,jdbcType=INTEGER}
+				and hos_id = #{hos_id,jdbcType=INTEGER}
+				and copy_code = #{copy_code,jdbcType=VARCHAR}		
+				and apply_id = #{apply_id,jdbcType=INTEGER}
+			group by group_id, hos_id, copy_code, rela_type, rela_id
+		), out_tmp as(
+			select a.group_id, a.hos_id, a.copy_code, a.rela_type, a.rela_id, b.out_no rela_no, 
+				b.maker, c.user_name maker_name, b.out_date rela_date, b.state, b.store_id
+			from rela_tmp a
+			left join med_out_main b
+				on a.group_id = b.group_id and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code and a.rela_id = b.out_id
+			left join sys_user c
+				on a.group_id = c.group_id and a.hos_id = c.hos_id
+				and b.maker = c.user_id  
+			where a.rela_type = 1
+		), tran_tmp as(
+			select a.group_id, a.hos_id, a.copy_code, a.rela_type, a.rela_id, b.tran_no rela_no, 
+				b.maker, c.user_name maker_name, b.tran_date rela_date, b.state, b.out_store_id store_id
+			from rela_tmp a
+			left join med_tran_main b
+				on a.group_id = b.group_id and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code and a.rela_id = b.tran_id
+			left join sys_user c
+				on a.group_id = c.group_id and a.hos_id = c.hos_id
+				and b.maker = c.user_id  
+			where a.rela_type = 2
+		), affi_out_tmp as(
+			select a.group_id, a.hos_id, a.copy_code, a.rela_type, a.rela_id, b.out_no rela_no, 
+				b.maker, c.user_name maker_name, b.out_date rela_date, b.state, b.store_id
+			from rela_tmp a
+			left join med_affi_out b
+				on a.group_id = b.group_id and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code and a.rela_id = b.out_id
+			left join sys_user c
+				on a.group_id = c.group_id and a.hos_id = c.hos_id
+				and b.maker = c.user_id  
+			where a.rela_type = 3
+		), affi_tran_tmp as(
+			select a.group_id, a.hos_id, a.copy_code, a.rela_type, a.rela_id, b.tran_no rela_no, 
+				b.maker, c.user_name maker_name, b.tran_date rela_date, b.state, b.out_store_id store_id
+			from rela_tmp a
+			left join med_affi_tran_main b
+				on a.group_id = b.group_id and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code and a.rela_id = b.tran_id
+			left join sys_user c
+				on a.group_id = c.group_id and a.hos_id = c.hos_id
+				and b.maker = c.user_id  
+			where a.rela_type = 4
+		), req_tmp as(
+			select a.group_id, a.hos_id, a.copy_code, a.rela_type, a.rela_id, b.req_code rela_no, 
+				b.maker, c.user_name maker_name, b.make_date rela_date, b.state, b.stock_id store_id
+			from rela_tmp a
+			left join med_require_main b
+				on a.group_id = b.group_id and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code and a.rela_id = b.req_id
+			left join sys_user c
+				on a.group_id = c.group_id and a.hos_id = c.hos_id
+				and b.maker = c.user_id  
+			where a.rela_type = 5
+		)
+		select group_id, hos_id, copy_code, rela_type, rela_id, rela_no, maker, maker_name, rela_date, state, store_id from out_tmp
+		union all
+		select group_id, hos_id, copy_code, rela_type, rela_id, rela_no, maker, maker_name, rela_date, state, store_id from tran_tmp
+		union all
+		select group_id, hos_id, copy_code, rela_type, rela_id, rela_no, maker, maker_name, rela_date, state, store_id from affi_out_tmp
+		union all
+		select group_id, hos_id, copy_code, rela_type, rela_id, rela_no, maker, maker_name, rela_date, state, store_id from affi_tran_tmp
+		union all
+		select group_id, hos_id, copy_code, rela_type, rela_id, rela_no, maker, maker_name, rela_date, state, store_id from req_tmp
+		order by rela_type, rela_id
+	</select>
+	<!-- 查询对应的出库单主表信息 -->
+	<select id="queryRelaOutMainByCode" resultType="java.util.TreeMap" parameterType="java.util.Map">
+		SELECT 
+			mom.group_id, mom.hos_id, mom.copy_code, mom.out_id, mom.out_no, mom.bus_type_code,
+			mom.store_id, mom.store_no, hsd.store_code, hsd.store_name, mom.brief, mom.out_date, 
+			mom.dept_id, mom.dept_no, hdd.dept_code, hdd.dept_name, mom.dept_emp, hed.emp_no, 
+	    	hed.emp_code, hed.emp_name, mom.use_code, mou.use_name, mom.proj_id, hpd.proj_no, 
+	    	hpd.proj_code, hpd.proj_name, mom.maker, mom.state
+		FROM med_out_main mom 
+    	left join hos_emp_dict hed 
+    		on mom.group_id = hed.group_id and mom.hos_id = hed.hos_id 
+    		and mom.dept_emp = hed.emp_id and hed.is_stop=0
+    	left join hos_store_dict hsd 
+    		on mom.group_id = hsd.group_id and mom.hos_id = hsd.hos_id 
+    		and mom.store_id = hsd.store_id and mom.store_no = hsd.store_no
+    	left join hos_dept_dict hdd
+    		on mom.group_id = hdd.group_id and mom.hos_id = hdd.hos_id
+    		and mom.dept_id = hdd.dept_id and mom.dept_no = hdd.dept_no
+		left join med_out_use mou
+			on mom.group_id = mou.group_id and mom.hos_id = mou.hos_id
+			and mom.copy_code = mou.copy_code and mom.use_code = mou.use_code
+		left join hos_proj_dict hpd 
+			on mom.group_id = hpd.group_id and mom.hos_id = hpd.hos_id 
+			and mom.proj_id = hpd.proj_id and hpd.is_stop = 0 
+		WHERE mom.group_id = #{group_id,jdbcType=INTEGER} 
+			and mom.hos_id = #{hos_id,jdbcType=INTEGER} 
+			and mom.copy_code = #{copy_code,jdbcType=VARCHAR} 
+			and mom.out_id = #{out_id,jdbcType=INTEGER} 
+	</select>
+	<!-- 查询对应的出库单明细表信息 -->
+	<select id="queryRelaOutDetailByCode" resultType="java.util.TreeMap" parameterType="java.util.Map">
+		with w_modet as(
+			SELECT 
+				modet.group_id as group_id,
+				modet.hos_id as hos_id,
+				modet.copy_code as copy_code,
+				modet.out_id as out_id,
+				modet.out_detail_id as out_detail_id,
+				modet.inv_id as inv_id,
+				modet.inv_no as inv_no,
+				modet.batch_sn as batch_sn,
+				modet.batch_no as batch_no,
+				modet.price as price,
+				modet.amount as amount,
+				modet.sale_price as sale_price,
+				modet.sale_money as sale_money,
+				modet.sell_price as sell_price,
+				modet.sell_money as sell_money,
+				modet.allot_price as allot_price,
+				modet.allot_money as allot_money,
+				modet.amount_money as amount_money,
+				modet.bar_code as bar_code,
+				modet.inva_date as inva_date,
+				modet.disinfect_date as disinfect_date,
+				modet.location_id as location_id,
+				modet.note as note,
+				mid.inv_code as inv_code,
+				mid.inv_name as inv_name,
+				mid.inv_model as inv_model,
+				mid.unit_code as unit_code,
+				hu.unit_name as unit_name,
+				mld.location_code as location_code,
+				mld.location_name as location_name,
+				mfb.left_amount as cur_amount
+			FROM MED_OUT_DETAIL modet
+			left join med_inv_dict mid 
+				on modet.group_id = mid.group_id and modet.hos_id = mid.hos_id 
+				and modet.copy_code = mid.copy_code and modet.inv_id = mid.inv_id 
+				and modet.inv_no = mid.inv_no
+			LEFT JOIN hos_unit hu 
+				ON mid.group_id = hu.group_id and mid.hos_id = hu.hos_id 
+				and mid.unit_code = hu.unit_code 
+			LEFT JOIN med_location_dict mld 
+				on modet.group_id = mld.group_id and modet.hos_id = mld.hos_id 
+				and modet.copy_code = mld.copy_code and modet.location_id = mld.location_id 
+				and mld.is_stop=0
+			left join med_fifo_balance mfb 
+				on modet.group_id = mfb.group_id and modet.hos_id = mfb.hos_id 
+				and modet.copy_code = mfb.copy_code and modet.inv_id = mfb.inv_id 
+				and modet.batch_sn= mfb.batch_sn and modet.batch_no = mfb.batch_no 
+				and modet.bar_code = mfb.bar_code and mfb.store_id = #{store_id,jdbcType=INTEGER}
+			where modet.group_id = #{group_id,jdbcType=INTEGER}
+				AND modet.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND modet.copy_code = #{copy_code,jdbcType=VARCHAR}
+				AND modet.out_id = #{out_id,jdbcType=INTEGER}
+			order by modet.out_detail_id asc             
+		),
+		w_mod as(
+			select 
+				inv_id,
+				batch_sn,
+				batch_no,
+				bar_code,
+				sum(amount) as amount
+			from(
+				--出库未确认单据
+				select 
+					inv_id,
+					batch_sn,
+					batch_no,
+					bar_code,
+					sum(nvl(amount, 0)) as amount
+				from med_out_main mom 
+				left join med_out_detail medod 
+					on mom.group_id = medod.group_id and mom.hos_id = medod.hos_id 
+					and mom.copy_code = medod.copy_code and mom.out_id = medod.out_id
+				where medod.group_id = #{group_id,jdbcType=INTEGER}
+					AND medod.hos_id = #{hos_id,jdbcType=INTEGER}
+					AND medod.copy_code = #{copy_code,jdbcType=VARCHAR}
+					AND mom.store_id = #{store_id,jdbcType=INTEGER}
+					<![CDATA[
+					AND mom.out_id <> #{out_id,jdbcType=INTEGER} --出库单加载使用
+					AND mom.state < 3 
+					AND mom.bus_type_code <> '21'
+					AND medod.amount_money > 0
+					]]>
+				group by inv_id, batch_sn, batch_no, bar_code
+				--退货未确认单据
+				union all
+				select 
+					inv_id as inv_id,
+					batch_sn as batch_sn,
+					batch_no as batch_no,
+					bar_code as bar_code,
+					-1 * sum(nvl(amount, 0)) as amount
+				from med_in_main mim
+				left join  med_in_detail medid
+					on mim.group_id = medid.group_id and mim.hos_id = medid.hos_id 
+					and mim.copy_code = medid.copy_code and mim.in_id = medid.in_id
+				where medid.group_id = #{group_id,jdbcType=INTEGER}
+					AND medid.hos_id = #{hos_id,jdbcType=INTEGER}
+					AND medid.copy_code = #{copy_code,jdbcType=VARCHAR}
+					AND mim.store_id = #{store_id,jdbcType=INTEGER}
+					<![CDATA[
+					AND mim.state < 3 
+					]]>
+					AND mim.bus_type_code in ('10','12','16','22')
+					and <![CDATA[ medid.amount_money < 0 ]]>
+				group by inv_id, batch_sn, batch_no, bar_code
+			)
+			group by inv_id, batch_sn, batch_no, bar_code
+			order by inv_id asc
+		)
+		select 
+			w_modet.group_id as group_id,
+			w_modet.hos_id as hos_id,
+			w_modet.copy_code as copy_code,
+			w_modet.out_id as out_id,
+			w_modet.inv_id as inv_id,
+			w_modet.inv_no as inv_no,
+			w_modet.batch_no as batch_no,
+			w_modet.price as price,
+			sum(nvl(w_modet.cur_amount, 0)) as cur_amount, 
+			sum(nvl(w_modet.cur_amount, 0) - nvl(w_mod.amount, 0)) AS imme_amount,
+			sum(nvl(w_modet.amount, 0)) as amount,
+			sum(nvl(w_modet.amount_money, 0)) as amount_money,
+			w_modet.sale_price as sale_price,
+			sum(nvl(w_modet.sale_money, 0)) as sale_money,
+			w_modet.sell_price as sell_price,
+			sum(nvl(w_modet.sell_money, 0)) as sell_money,
+			w_modet.allot_price as allot_price,
+			sum(nvl(w_modet.allot_money, 0)) as allot_money,
+			w_modet.bar_code as bar_code,
+			w_modet.inva_date as inva_date,
+			w_modet.disinfect_date as disinfect_date,
+			w_modet.location_id as location_id,
+			w_modet.note as note,
+			w_modet.inv_code as inv_code,
+			w_modet.inv_name as inv_name,
+			w_modet.inv_model as inv_model,
+			w_modet.unit_code as unit_code,
+			w_modet.unit_name as unit_name,
+			w_modet.location_code as location_code,
+			w_modet.location_name as location_name,
+			sum(nvl(w_modet.amount, 0)) as sum_amount,
+			'['||to_char(wm_concat('{"out_detail_id":'||w_modet.out_detail_id||',"inv_id":'||w_modet.inv_id
+			||',"inv_code":"'||to_char(w_modet.inv_code)||'","inv_name":"'||to_char(w_modet.inv_name)
+			||'","batch_sn":'||w_modet.batch_sn||',"cur_amount":'||w_modet.cur_amount
+			||',"imme_amount":'||(nvl(w_modet.cur_amount,0)-nvl(w_mod.amount,0))
+			||',"amount":'||w_modet.amount
+			||',"price":'||w_modet.price||',"amount_money":'||w_modet.amount_money
+			||',"sale_price":'||w_modet.sale_price||',"sale_money":'||w_modet.sale_money
+			||',"sell_price":'||w_modet.sell_price||',"sell_money":'||w_modet.sell_money
+			||'}'))||']' inv_detail_data
+		from w_modet w_modet
+		left join w_mod w_mod 
+			on w_modet.inv_id = w_mod.inv_id and  w_modet.batch_sn= w_mod.batch_sn 
+			and w_modet.batch_no= w_mod.batch_no and w_modet.bar_code= w_mod.bar_code
+		group by
+			w_modet.group_id, w_modet.hos_id, w_modet.copy_code, w_modet.out_id, w_modet.inv_id,
+			w_modet.inv_no, w_modet.batch_no, w_modet.price, w_modet.sale_price, w_modet.sell_price,
+			w_modet.allot_price, w_modet.bar_code, w_modet.inva_date, w_modet.disinfect_date,
+			w_modet.location_id, w_modet.note, w_modet.inv_code, w_modet.inv_name, w_modet.inv_model,
+			w_modet.unit_code, w_modet.unit_name, w_modet.location_code, w_modet.location_name
+		order by inv_detail_data
+	</select>
+	<!-- 查询对应的代销出库单主表信息 -->
+	<select id="queryRelaAffiOutMainByCode" resultType="java.util.TreeMap" parameterType="java.util.Map">
+		SELECT 
+			mao.group_id, mao.hos_id, mao.copy_code, mao.out_id, mao.out_no, mao.bus_type_code,
+			mao.store_id, mao.store_no, hsd.store_code, hsd.store_name, mao.brief, mao.out_date, 
+			mao.dept_id, mao.dept_no, hdd.dept_code, hdd.dept_name, mao.dept_emp, hed.emp_no, 
+	    	hed.emp_code, hed.emp_name, mao.use_code, mou.use_name, mao.proj_id, hpd.proj_no, 
+	    	hpd.proj_code, hpd.proj_name, mao.maker, mao.state
+		FROM med_affi_out mao 
+    	left join hos_emp_dict hed 
+    		on mao.group_id = hed.group_id and mao.hos_id = hed.hos_id 
+    		and mao.dept_emp = hed.emp_id and hed.is_stop=0
+    	left join hos_store_dict hsd 
+    		on mao.group_id = hsd.group_id and mao.hos_id = hsd.hos_id 
+    		and mao.store_id = hsd.store_id and mao.store_no = hsd.store_no
+    	left join hos_dept_dict hdd
+    		on mao.group_id = hdd.group_id and mao.hos_id = hdd.hos_id
+    		and mao.dept_id = hdd.dept_id and mao.dept_no = hdd.dept_no
+		left join med_out_use mou
+			on mao.group_id = mou.group_id and mao.hos_id = mou.hos_id
+			and mao.copy_code = mou.copy_code and mao.use_code = mou.use_code
+		left join hos_proj_dict hpd 
+			on mao.group_id = hpd.group_id and mao.hos_id = hpd.hos_id 
+			and mao.proj_id = hpd.proj_id and hpd.is_stop = 0 
+		WHERE mao.group_id = #{group_id,jdbcType=INTEGER} 
+			and mao.hos_id = #{hos_id,jdbcType=INTEGER} 
+			and mao.copy_code = #{copy_code,jdbcType=VARCHAR} 
+			and mao.out_id = #{out_id,jdbcType=INTEGER} 
+	</select>
+	<!-- 查询对应的代销出库单明细表信息 -->
+	<select id="queryRelaAffiOutDetailByCode" resultType="java.util.TreeMap" parameterType="java.util.Map">
+		with w_modet as(
+			SELECT 
+				modet.group_id as group_id,
+				modet.hos_id as hos_id,
+				modet.copy_code as copy_code,
+				modet.out_id as out_id,
+				modet.detail_id as detail_id,
+				modet.inv_id as inv_id,
+				modet.inv_no as inv_no,
+				modet.batch_sn as batch_sn,
+				modet.batch_no as batch_no,
+				nvl(modet.price,0) as price,
+				nvl(modet.amount,0) as amount,
+				nvl(modet.sale_price,0) as sale_price,
+				nvl(modet.sale_money,0) as sale_money,
+				nvl(modet.sell_price,0) as sell_price,
+				nvl(modet.sell_money,0) as sell_money,
+				nvl(modet.allot_price,0) as allot_price,
+				nvl(modet.allot_money,0) as allot_money,
+				nvl(modet.amount_money,0) as amount_money,
+				modet.bar_code as bar_code,
+				modet.inva_date as inva_date,
+				modet.disinfect_date as disinfect_date,
+				modet.location_id as location_id,
+				modet.note as note,
+				mid.inv_code as inv_code,
+				mid.inv_name as inv_name,
+				mid.inv_model as inv_model,
+				mid.unit_code as unit_code,
+				hu.unit_name as unit_name,
+				mld.location_code as location_code,
+				mld.location_name as location_name,
+				mfb.left_amount as cur_amount
+			FROM med_affi_out_detail modet
+			left join med_inv_dict mid 
+				on modet.group_id = mid.group_id and modet.hos_id = mid.hos_id 
+				and modet.copy_code = mid.copy_code and modet.inv_id = mid.inv_id 
+				and modet.inv_no = mid.inv_no
+			LEFT JOIN hos_unit hu 
+				ON mid.group_id = hu.group_id and mid.hos_id = hu.hos_id 
+				and mid.unit_code = hu.unit_code 
+				and hu.is_stop = 0
+			LEFT JOIN med_location_dict mld 
+				on modet.group_id = mld.group_id and modet.hos_id = mld.hos_id 
+				and modet.copy_code = mld.copy_code and modet.location_id = mld.location_id 
+				and mld.is_stop=0
+			left join med_affi_fifo mfb 
+				on modet.group_id = mfb.group_id and modet.hos_id = mfb.hos_id 
+				and modet.copy_code = mfb.copy_code and modet.inv_id = mfb.inv_id 
+				and modet.batch_sn= mfb.batch_sn and modet.batch_no = mfb.batch_no 
+				and modet.bar_code = mfb.bar_code and mfb.store_id = #{store_id,jdbcType=INTEGER}
+			where modet.group_id = #{group_id,jdbcType=INTEGER}
+				AND modet.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND modet.copy_code = #{copy_code,jdbcType=VARCHAR}
+				AND modet.out_id = #{out_id,jdbcType=INTEGER}
+			order by modet.detail_id asc             
+		),
+		w_mod as(
+			select 
+				inv_id,
+				batch_sn,
+				batch_no,
+				bar_code,
+				sum(amount) as amount
+			from(
+				--出库未确认单据
+				select 
+					inv_id as inv_id,
+					batch_sn as batch_sn,
+					batch_no as batch_no,
+					bar_code as bar_code,
+					sum(nvl(amount, 0)) as amount
+				from med_affi_out mom 
+				left join med_affi_out_detail medod
+					on mom.group_id = medod.group_id and mom.hos_id = medod.hos_id 
+					and mom.copy_code = medod.copy_code and mom.out_id = medod.out_id
+				where medod.group_id = #{group_id,jdbcType=INTEGER}
+					AND medod.hos_id = #{hos_id,jdbcType=INTEGER}
+					AND medod.copy_code = #{copy_code,jdbcType=VARCHAR}
+					AND mom.store_id = #{store_id,jdbcType=INTEGER}
+					<![CDATA[ 
+					AND mom.out_id <> #{out_id,jdbcType=INTEGER} --出库单加载使用
+					AND mom.state < 3 
+					AND mom.bus_type_code <> '30' 
+					]]>
+				group by inv_id,batch_sn,batch_no,bar_code
+				--退货未确认单据
+				union all
+				select 
+					inv_id as inv_id,
+					batch_sn as batch_sn,
+					batch_no as batch_no,
+					bar_code as bar_code,
+					sum(nvl(amount, 0)) as amount
+				from med_affi_in mim 
+				left join med_affi_in_detail medid 
+					on mim.group_id = medid.group_id and mim.hos_id = medid.hos_id 
+					and mim.copy_code = medid.copy_code and mim.in_id = medid.in_id
+				where medid.group_id = #{group_id,jdbcType=INTEGER}
+					AND medid.hos_id = #{hos_id,jdbcType=INTEGER}
+					AND medid.copy_code = #{copy_code,jdbcType=VARCHAR}
+					AND mom.store_id = #{store_id,jdbcType=INTEGER}
+					<![CDATA[ 
+					AND mim.state < 3 
+					]]>
+					AND mim.bus_type_code = '29'
+				group by inv_id,batch_sn,batch_no,bar_code
+			)
+			group by inv_id, batch_sn, batch_no, bar_code
+			order by inv_id asc
+		)
+		select 
+			w_modet.group_id as group_id,
+			w_modet.hos_id as hos_id,
+			w_modet.copy_code as copy_code,
+			w_modet.out_id as out_id,
+			w_modet.inv_id as inv_id,
+			w_modet.inv_no as inv_no,
+			w_modet.batch_no as batch_no,
+			w_modet.price as price,
+			sum(nvl(w_modet.cur_amount, 0)) as cur_amount, 
+			sum(nvl(w_modet.cur_amount, 0) - nvl(w_mod.amount, 0)) AS imme_amount,
+			sum(nvl(w_modet.amount, 0)) as amount,
+			sum(nvl(w_modet.amount_money, 0)) as amount_money,
+			w_modet.sale_price as sale_price,
+			sum(nvl(w_modet.sale_money, 0)) as sale_money,
+			w_modet.sell_price as sell_price,
+			sum(nvl(w_modet.sell_money, 0)) as sell_money,
+			w_modet.allot_price as allot_price,
+			sum(nvl(w_modet.allot_money, 0)) as allot_money,
+			w_modet.bar_code as bar_code,
+			w_modet.inva_date as inva_date,
+			w_modet.disinfect_date as disinfect_date,
+			w_modet.location_id as location_id,
+			w_modet.note as note,
+			w_modet.inv_code as inv_code,
+			w_modet.inv_name as inv_name,
+			w_modet.inv_model as inv_model,
+			w_modet.unit_code as unit_code,
+			w_modet.unit_name as unit_name,
+			w_modet.location_code as location_code,
+			w_modet.location_name as location_name,
+			sum(nvl(w_modet.amount, 0)) as sum_amount,
+			'['||to_char(wm_concat('{"detail_id":'||w_modet.detail_id||',"inv_id":'||w_modet.inv_id
+			||',"inv_code":"'||to_char(w_modet.inv_code)||'","inv_name":"'||to_char(w_modet.inv_name)
+			||'","batch_sn":'||w_modet.batch_sn||',"cur_amount":'||w_modet.cur_amount
+			||',"imme_amount":'||(nvl(w_modet.cur_amount,0)-nvl(w_mod.amount,0))
+			||',"amount":'||w_modet.amount
+			||',"price":'||w_modet.price||',"amount_money":'||w_modet.amount_money
+			||',"sale_price":'||w_modet.sale_price||',"sale_money":'||w_modet.sale_money
+			||',"sell_price":'||w_modet.sell_price||',"sell_money":'||w_modet.sell_money
+			||'}'))||']' inv_detail_data
+		from w_modet w_modet
+		left join w_mod w_mod 
+			on w_modet.inv_id = w_mod.inv_id and  w_modet.batch_sn= w_mod.batch_sn 
+			and w_modet.batch_no= w_mod.batch_no and w_modet.bar_code= w_mod.bar_code
+		group by
+			w_modet.group_id, w_modet.hos_id, w_modet.copy_code, w_modet.out_id, w_modet.inv_id,
+			w_modet.inv_no, w_modet.batch_no, w_modet.price, w_modet.sale_price, w_modet.sell_price,
+			w_modet.allot_price, w_modet.bar_code, w_modet.inva_date, w_modet.disinfect_date,
+			w_modet.location_id, w_modet.note, w_modet.inv_code, w_modet.inv_name, w_modet.inv_model,
+			w_modet.unit_code, w_modet.unit_name, w_modet.location_code, w_modet.location_name
+		order by inv_detail_data
+	</select>
+	<!-- 查询对应的调拨单主表信息 -->
+	<select id="queryRelaTranMainByCode" resultType="java.util.TreeMap" parameterType="java.util.Map">
+		SELECT
+			mtm.group_id, mtm.hos_id, mtm.copy_code, mtm.tran_id, mtm.tran_no, mtm.bus_type, mtm.tran_method, mtm.tran_type,
+			mtm.out_hos_id, vhdo.hos_no as out_hos_no, vhdo.hos_code as out_hos_code, vhdo.hos_name as out_hos_name,  
+			mtm.in_hos_id, vhdi.hos_no as in_hos_no, vhdi.hos_code as in_hos_code, vhdi.hos_name as in_hos_name,  
+			mtm.out_store_id, mtm.out_store_no, hsdo.store_code as out_store_code, hsdo.store_name as out_store_name, 
+			mtm.in_store_id, mtm.in_store_no, hsdi.store_code as in_store_code, hsdi.store_name as in_store_name, 
+			mtm.brief, mtm.tran_date, mtm.maker, mtm.checker, mtm.confirmer, mtm.state
+		FROM med_tran_main mtm
+		left join v_hos_dict vhdi 
+			on mtm.group_id = vhdi.group_id and mtm.in_hos_id = vhdi.hos_id 
+			and vhdi.is_stop=0
+		left join v_hos_dict vhdo 
+			on mtm.group_id = vhdo.group_id and mtm.out_hos_id = vhdo.hos_id
+			and vhdo.is_stop=0
+		left join hos_store_dict hsdi 
+			on mtm.group_id = hsdi.group_id and mtm.hos_id = hsdi.hos_id
+			and mtm.in_store_id = hsdi.store_id and mtm.in_store_no = hsdi.store_no
+		left join hos_store_dict hsdo
+			on mtm.group_id = hsdo.group_id and mtm.hos_id = hsdo.hos_id
+			and mtm.out_store_id = hsdo.store_id and mtm.out_store_no = hsdo.store_no
+		WHERE mtm.group_id = #{group_id,jdbcType=INTEGER} 
+			and mtm.hos_id = #{hos_id,jdbcType=INTEGER} 
+			and mtm.copy_code = #{copy_code,jdbcType=VARCHAR} 
+			and mtm.tran_id = #{tran_id,jdbcType=INTEGER}
+	</select>
+	<!-- 查询对应的调拨单明细表信息 -->
+	<select id="queryRelaTranDetailByCode" resultType="java.util.TreeMap" parameterType="java.util.Map">
+		with w_mtd as(
+			SELECT 
+				mtd.group_id as group_id,
+				mtd.hos_id as hos_id,
+				mtd.copy_code as copy_code,
+				mtd.tran_id as tran_id,
+				mtd.tran_detail_id as tran_detail_id,
+				mtd.inv_id as inv_id,
+				mtd.inv_no as inv_no,
+				mtd.batch_sn as batch_sn,
+				mtd.batch_no as batch_no,
+				mtd.price as price,
+				mtd.amount as amount,
+				mtd.sale_price as sale_price,
+				mtd.sale_money as sale_money,
+				mtd.sell_price as sell_price,
+				mtd.sell_money as sell_money,
+				mtd.allot_price as allot_price,
+				mtd.allot_money as allot_money,
+				mtd.amount_money as amount_money,
+				mtd.bar_code as bar_code,
+				mtd.inva_date as inva_date,
+				mtd.disinfect_date as disinfect_date,
+				mtd.location_out_id as location_out_id,
+				mtd.location_in_id as location_in_id,
+				mtd.note as note,
+				mid.inv_code as inv_code,
+				mid.inv_name as inv_name,
+				mid.inv_model as inv_model,
+				mid.unit_code as unit_code,
+				hu.unit_name as unit_name,
+				mldout.location_code as location_out_code,
+				mldout.location_name as location_out_name,
+				mldin.location_code as location_in_code,
+				mldin.location_name as location_in_name,
+				mfb.left_amount as cur_amount
+			FROM med_tran_detail mtd
+			left join med_inv_dict mid 
+				on mtd.group_id = mid.group_id and mtd.hos_id = mid.hos_id 
+				and mtd.copy_code = mid.copy_code and mtd.inv_id = mid.inv_id 
+				and mtd.inv_no = mid.inv_no
+			LEFT JOIN hos_unit hu 
+				ON mid.group_id = hu.group_id and mid.hos_id = hu.hos_id 
+				and mid.unit_code = hu.unit_code 
+			LEFT JOIN med_location_dict mldout 
+				on mtd.group_id = mldout.group_id and mtd.hos_id = mldout.hos_id 
+				and mtd.copy_code = mldout.copy_code and mtd.location_out_id = mldout.location_id 
+				and mldout.is_stop=0
+			LEFT JOIN med_location_dict mldin 
+				on mtd.group_id = mldin.group_id and mtd.hos_id = mldin.hos_id 
+				and mtd.copy_code = mldin.copy_code and mtd.location_in_id = mldin.location_id 
+				and mldin.is_stop=0
+			left join med_fifo_balance mfb 
+				on mtd.group_id = mfb.group_id and mtd.hos_id = mfb.hos_id 
+				and mtd.copy_code = mfb.copy_code and mtd.inv_id = mfb.inv_id 
+				and mtd.batch_sn= mfb.batch_sn and mtd.batch_no = mfb.batch_no 
+				and mtd.bar_code = mfb.bar_code and mfb.store_id = #{store_id,jdbcType=INTEGER}
+			where mtd.group_id = #{group_id,jdbcType=INTEGER}
+				AND mtd.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND mtd.copy_code = #{copy_code,jdbcType=VARCHAR}
+				AND mtd.tran_id = #{tran_id,jdbcType=INTEGER}
+			order by mtd.tran_detail_id asc             
+		),
+		w_mod as(
+			select 
+				inv_id,
+				batch_sn,
+				batch_no,
+				bar_code,
+				sum(amount) as amount
+			from(
+				--出库未确认单据
+				select 
+					inv_id,
+					batch_sn,
+					batch_no,
+					bar_code,
+					sum(nvl(amount, 0)) as amount
+				from med_out_main mom 
+				left join med_out_detail medod 
+					on mom.group_id = medod.group_id and mom.hos_id = medod.hos_id 
+					and mom.copy_code = medod.copy_code and mom.out_id = medod.out_id
+				where medod.group_id = #{group_id,jdbcType=INTEGER}
+					AND medod.hos_id = #{hos_id,jdbcType=INTEGER}
+					AND medod.copy_code = #{copy_code,jdbcType=VARCHAR}
+					AND mom.store_id = #{store_id,jdbcType=INTEGER}
+					AND NOT EXISTS(
+						select 1 from med_tran_rela 
+						where group_id = #{group_id,jdbcType=INTEGER}
+							and hos_id = #{hos_id,jdbcType=INTEGER}
+							and copy_code = #{copy_code,jdbcType=VARCHAR}
+							and tran_id = #{tran_id,jdbcType=INTEGER}
+							and out_id = medod.out_id )
+					<![CDATA[
+					AND mom.state < 3 
+					AND mom.bus_type_code <> '21'
+					AND medod.amount_money > 0
+					]]>
+				group by inv_id, batch_sn, batch_no, bar_code
+				--退货未确认单据
+				union all
+				select 
+					inv_id as inv_id,
+					batch_sn as batch_sn,
+					batch_no as batch_no,
+					bar_code as bar_code,
+					-1 * sum(nvl(amount, 0)) as amount
+				from med_in_main mim
+				left join  med_in_detail medid
+					on mim.group_id = medid.group_id and mim.hos_id = medid.hos_id 
+					and mim.copy_code = medid.copy_code and mim.in_id = medid.in_id
+				where medid.group_id = #{group_id,jdbcType=INTEGER}
+					AND medid.hos_id = #{hos_id,jdbcType=INTEGER}
+					AND medid.copy_code = #{copy_code,jdbcType=VARCHAR}
+					AND mim.store_id = #{store_id,jdbcType=INTEGER}
+					<![CDATA[
+					AND mim.state < 3 
+					]]>
+					AND mim.bus_type_code in ('10','12','16','22')
+					and <![CDATA[ medid.amount_money < 0 ]]>
+				group by inv_id, batch_sn, batch_no, bar_code
+			)
+			group by inv_id, batch_sn, batch_no, bar_code
+			order by inv_id asc
+		)
+		select 
+			w_mtd.group_id as group_id,
+			w_mtd.hos_id as hos_id,
+			w_mtd.copy_code as copy_code,
+			w_mtd.tran_id as tran_id,
+			w_mtd.inv_id as inv_id,
+			w_mtd.inv_no as inv_no,
+			w_mtd.batch_no as batch_no,
+			w_mtd.price as price,
+			sum(nvl(w_mtd.cur_amount, 0)) as cur_amount, 
+			sum(nvl(w_mtd.cur_amount, 0) - nvl(w_mod.amount, 0)) AS imme_amount,
+			sum(nvl(w_mtd.amount, 0)) as amount,
+			sum(nvl(w_mtd.amount_money, 0)) as amount_money,
+			w_mtd.sale_price as sale_price,
+			sum(nvl(w_mtd.sale_money, 0)) as sale_money,
+			w_mtd.sell_price as sell_price,
+			sum(nvl(w_mtd.sell_money, 0)) as sell_money,
+			w_mtd.allot_price as allot_price,
+			sum(nvl(w_mtd.allot_money, 0)) as allot_money,
+			w_mtd.bar_code as bar_code,
+			w_mtd.inva_date as inva_date,
+			w_mtd.disinfect_date as disinfect_date,
+			w_mtd.location_out_id as location_out_id,
+			w_mtd.location_in_id as location_in_id,
+			w_mtd.note as note,
+			w_mtd.inv_code as inv_code,
+			w_mtd.inv_name as inv_name,
+			w_mtd.inv_model as inv_model,
+			w_mtd.unit_code as unit_code,
+			w_mtd.unit_name as unit_name,
+			w_mtd.location_out_code as location_out_code,
+			w_mtd.location_out_name as location_out_name,
+			w_mtd.location_in_code as location_in_code,
+			w_mtd.location_in_name as location_in_name,
+			sum(nvl(w_mtd.amount, 0)) as sum_amount,
+			'['||to_char(wm_concat('{"tran_detail_id":'||w_mtd.tran_detail_id||',"inv_id":'||w_mtd.inv_id
+			||',"inv_code":"'||to_char(w_mtd.inv_code)||'","inv_name":"'||to_char(w_mtd.inv_name)
+			||'","batch_sn":'||w_mtd.batch_sn||',"cur_amount":'||w_mtd.cur_amount
+			||',"imme_amount":'||(nvl(w_mtd.cur_amount,0)-nvl(w_mod.amount,0))
+			||',"amount":'||w_mtd.amount
+			||',"price":'||w_mtd.price||',"amount_money":'||w_mtd.amount_money
+			||',"sale_price":'||w_mtd.sale_price||',"sale_money":'||w_mtd.sale_money
+			||',"sell_price":'||w_mtd.sell_price||',"sell_money":'||w_mtd.sell_money
+			||'}'))||']' inv_detail_data
+		from w_mtd w_mtd
+		left join w_mod w_mod 
+			on w_mtd.inv_id = w_mod.inv_id and  w_mtd.batch_sn= w_mod.batch_sn 
+			and w_mtd.batch_no= w_mod.batch_no and w_mtd.bar_code= w_mod.bar_code
+		group by
+			w_mtd.group_id, w_mtd.hos_id, w_mtd.copy_code, w_mtd.tran_id, w_mtd.inv_id,
+			w_mtd.inv_no, w_mtd.batch_no, w_mtd.price, w_mtd.sale_price, w_mtd.sell_price,
+			w_mtd.allot_price, w_mtd.bar_code, w_mtd.inva_date, w_mtd.disinfect_date,
+			w_mtd.location_out_id, w_mtd.location_in_id, w_mtd.note, w_mtd.inv_code, w_mtd.inv_name, 
+			w_mtd.inv_model, w_mtd.unit_code, w_mtd.unit_name, w_mtd.location_out_code, 
+			w_mtd.location_out_name, w_mtd.location_in_code, w_mtd.location_in_name
+		order by inv_detail_data
+	</select>
+	<!-- 查询对应的代销调拨单主表信息 -->
+	<select id="queryRelaAffiTranMainByCode" resultType="java.util.TreeMap" parameterType="java.util.Map">
+		SELECT
+			medm.group_id, medm.hos_id, medm.copy_code, medm.tran_id, medm.tran_no, medm.bus_type, medm.tran_method, medm.tran_type,
+			medm.out_hos_id, vhdo.hos_no as out_hos_no, vhdo.hos_code as out_hos_code, vhdo.hos_name as out_hos_name,  
+			medm.in_hos_id, vhdi.hos_no as in_hos_no, vhdi.hos_code as in_hos_code, vhdi.hos_name as in_hos_name,  
+			medm.out_store_id, medm.out_store_no, hsdo.store_code as out_store_code, hsdo.store_name as out_store_name, 
+			medm.in_store_id, medm.in_store_no, hsdi.store_code as in_store_code, hsdi.store_name as in_store_name, 
+			medm.brief, medm.tran_date, medm.maker, medm.checker, medm.confirmer, medm.state
+		FROM med_affi_tran_main medm
+		left join v_hos_dict vhdi 
+			on medm.group_id = vhdi.group_id and medm.in_hos_id = vhdi.hos_id 
+			and vhdi.is_stop=0
+		left join v_hos_dict vhdo 
+			on medm.group_id = vhdo.group_id and medm.out_hos_id = vhdo.hos_id
+			and vhdo.is_stop=0
+		left join hos_store_dict hsdi 
+			on medm.group_id = hsdi.group_id and medm.hos_id = hsdi.hos_id
+			and medm.in_store_id = hsdi.store_id and medm.in_store_no = hsdi.store_no
+		left join hos_store_dict hsdo
+			on medm.group_id = hsdo.group_id and medm.hos_id = hsdo.hos_id
+			and medm.out_store_id = hsdo.store_id and medm.out_store_no = hsdo.store_no
+		WHERE medm.group_id = #{group_id,jdbcType=INTEGER} 
+			and medm.hos_id = #{hos_id,jdbcType=INTEGER} 
+			and medm.copy_code = #{copy_code,jdbcType=VARCHAR} 
+			and medm.tran_id = #{tran_id,jdbcType=INTEGER}
+	</select>
+	<!-- 查询对应的代销调拨单明细表信息 -->
+	<select id="queryRelaAffiTranDetailByCode" resultType="java.util.TreeMap" parameterType="java.util.Map">
+		with w_mtd as(
+			SELECT 
+				mtd.group_id as group_id,
+				mtd.hos_id as hos_id,
+				mtd.copy_code as copy_code,
+				mtd.tran_id as tran_id,
+				mtd.tran_detail_id as tran_detail_id,
+				mtd.inv_id as inv_id,
+				mtd.inv_no as inv_no,
+				mtd.batch_sn as batch_sn,
+				mtd.batch_no as batch_no,
+				mtd.price as price,
+				mtd.amount as amount,
+				mtd.sale_price as sale_price,
+				mtd.sale_money as sale_money,
+				mtd.sell_price as sell_price,
+				mtd.sell_money as sell_money,
+				mtd.allot_price as allot_price,
+				mtd.allot_money as allot_money,
+				mtd.amount_money as amount_money,
+				mtd.bar_code as bar_code,
+				mtd.inva_date as inva_date,
+				mtd.disinfect_date as disinfect_date,
+				mtd.location_out_id as location_out_id,
+				mtd.location_in_id as location_in_id,
+				mtd.note as note,
+				mid.inv_code as inv_code,
+				mid.inv_name as inv_name,
+				mid.inv_model as inv_model,
+				mid.unit_code as unit_code,
+				hu.unit_name as unit_name,
+				mldout.location_code as location_out_code,
+				mldout.location_name as location_out_name,
+				mldin.location_code as location_in_code,
+				mldin.location_name as location_in_name,
+				mfb.left_amount as cur_amount
+			FROM med_affi_tran_detail mtd
+			left join med_inv_dict mid 
+				on mtd.group_id = mid.group_id and mtd.hos_id = mid.hos_id 
+				and mtd.copy_code = mid.copy_code and mtd.inv_id = mid.inv_id 
+				and mtd.inv_no = mid.inv_no
+			LEFT JOIN hos_unit hu 
+				ON mid.group_id = hu.group_id and mid.hos_id = hu.hos_id 
+				and mid.unit_code = hu.unit_code 
+			LEFT JOIN med_location_dict mldout 
+				on mtd.group_id = mldout.group_id and mtd.hos_id = mldout.hos_id 
+				and mtd.copy_code = mldout.copy_code and mtd.location_out_id = mldout.location_id 
+				and mldout.is_stop=0
+			LEFT JOIN med_location_dict mldin 
+				on mtd.group_id = mldin.group_id and mtd.hos_id = mldin.hos_id 
+				and mtd.copy_code = mldin.copy_code and mtd.location_in_id = mldin.location_id 
+				and mldin.is_stop=0
+			left join med_affi_fifo mfb 
+				on mtd.group_id = mfb.group_id and mtd.hos_id = mfb.hos_id 
+				and mtd.copy_code = mfb.copy_code and mtd.inv_id = mfb.inv_id 
+				and mtd.batch_sn= mfb.batch_sn and mtd.batch_no = mfb.batch_no 
+				and mtd.bar_code = mfb.bar_code and mfb.store_id = #{store_id,jdbcType=INTEGER}
+			where mtd.group_id = #{group_id,jdbcType=INTEGER}
+				AND mtd.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND mtd.copy_code = #{copy_code,jdbcType=VARCHAR}
+				AND mtd.tran_id = #{tran_id,jdbcType=INTEGER}
+			order by mtd.tran_detail_id asc             
+		),
+		w_mod as(
+			select 
+				inv_id,
+				batch_sn,
+				batch_no,
+				bar_code,
+				sum(amount) as amount
+			from(
+				--出库未确认单据
+				select 
+					inv_id as inv_id,
+					batch_sn as batch_sn,
+					batch_no as batch_no,
+					bar_code as bar_code,
+					sum(nvl(amount, 0)) as amount
+				from med_affi_out mom 
+				left join med_affi_out_detail medod
+					on mom.group_id = medod.group_id and mom.hos_id = medod.hos_id 
+					and mom.copy_code = medod.copy_code and mom.out_id = medod.out_id
+				where medod.group_id = #{group_id,jdbcType=INTEGER}
+					AND medod.hos_id = #{hos_id,jdbcType=INTEGER}
+					AND medod.copy_code = #{copy_code,jdbcType=VARCHAR}
+					AND mom.store_id = #{store_id,jdbcType=INTEGER}
+					AND NOT EXISTS(
+						select 1 from med_affi_tran_rela 
+						where group_id = #{group_id,jdbcType=INTEGER}
+							and hos_id = #{hos_id,jdbcType=INTEGER}
+							and copy_code = #{copy_code,jdbcType=VARCHAR}
+							and tran_id = #{tran_id,jdbcType=INTEGER}
+							and out_id = medod.out_id )
+					<![CDATA[ 
+					AND mom.state < 3 
+					AND mom.bus_type_code <> '30' 
+					]]>
+				group by inv_id,batch_sn,batch_no,bar_code
+				--退货未确认单据
+				union all
+				select 
+					inv_id as inv_id,
+					batch_sn as batch_sn,
+					batch_no as batch_no,
+					bar_code as bar_code,
+					sum(nvl(amount, 0)) as amount
+				from med_affi_in mim 
+				left join med_affi_in_detail medid 
+					on mim.group_id = medid.group_id and mim.hos_id = medid.hos_id 
+					and mim.copy_code = medid.copy_code and mim.in_id = medid.in_id
+				where medid.group_id = #{group_id,jdbcType=INTEGER}
+					AND medid.hos_id = #{hos_id,jdbcType=INTEGER}
+					AND medid.copy_code = #{copy_code,jdbcType=VARCHAR}
+					AND mom.store_id = #{store_id,jdbcType=INTEGER}
+					<![CDATA[ 
+					AND mim.state < 3 
+					]]>
+					AND mim.bus_type_code = '29'
+				group by inv_id,batch_sn,batch_no,bar_code
+			)
+			group by inv_id, batch_sn, batch_no, bar_code
+			order by inv_id asc
+		)
+		select 
+			w_mtd.group_id as group_id,
+			w_mtd.hos_id as hos_id,
+			w_mtd.copy_code as copy_code,
+			w_mtd.tran_id as tran_id,
+			w_mtd.inv_id as inv_id,
+			w_mtd.inv_no as inv_no,
+			w_mtd.batch_no as batch_no,
+			w_mtd.price as price,
+			sum(nvl(w_mtd.cur_amount, 0)) as cur_amount, 
+			sum(nvl(w_mtd.cur_amount, 0) - nvl(w_mod.amount, 0)) AS imme_amount,
+			sum(nvl(w_mtd.amount, 0)) as amount,
+			sum(nvl(w_mtd.amount_money, 0)) as amount_money,
+			w_mtd.sale_price as sale_price,
+			sum(nvl(w_mtd.sale_money, 0)) as sale_money,
+			w_mtd.sell_price as sell_price,
+			sum(nvl(w_mtd.sell_money, 0)) as sell_money,
+			w_mtd.allot_price as allot_price,
+			sum(nvl(w_mtd.allot_money, 0)) as allot_money,
+			w_mtd.bar_code as bar_code,
+			w_mtd.inva_date as inva_date,
+			w_mtd.disinfect_date as disinfect_date,
+			w_mtd.location_out_id as location_out_id,
+			w_mtd.location_in_id as location_in_id,
+			w_mtd.note as note,
+			w_mtd.inv_code as inv_code,
+			w_mtd.inv_name as inv_name,
+			w_mtd.inv_model as inv_model,
+			w_mtd.unit_code as unit_code,
+			w_mtd.unit_name as unit_name,
+			w_mtd.location_out_code as location_out_code,
+			w_mtd.location_out_name as location_out_name,
+			w_mtd.location_in_code as location_in_code,
+			w_mtd.location_in_name as location_in_name,
+			sum(nvl(w_mtd.amount, 0)) as sum_amount,
+			'['||to_char(wm_concat('{"tran_detail_id":'||w_mtd.tran_detail_id||',"inv_id":'||w_mtd.inv_id
+			||',"inv_code":"'||to_char(w_mtd.inv_code)||'","inv_name":"'||to_char(w_mtd.inv_name)
+			||'","batch_sn":'||w_mtd.batch_sn||',"cur_amount":'||w_mtd.cur_amount
+			||',"imme_amount":'||(nvl(w_mtd.cur_amount,0)-nvl(w_mod.amount,0))
+			||',"amount":'||w_mtd.amount
+			||',"price":'||w_mtd.price||',"amount_money":'||w_mtd.amount_money
+			||',"sale_price":'||w_mtd.sale_price||',"sale_money":'||w_mtd.sale_money
+			||',"sell_price":'||w_mtd.sell_price||',"sell_money":'||w_mtd.sell_money
+			||'}'))||']' inv_detail_data
+		from w_mtd w_mtd
+		left join w_mod w_mod 
+			on w_mtd.inv_id = w_mod.inv_id and  w_mtd.batch_sn= w_mod.batch_sn 
+			and w_mtd.batch_no= w_mod.batch_no and w_mtd.bar_code= w_mod.bar_code
+		group by
+			w_mtd.group_id, w_mtd.hos_id, w_mtd.copy_code, w_mtd.tran_id, w_mtd.inv_id,
+			w_mtd.inv_no, w_mtd.batch_no, w_mtd.price, w_mtd.sale_price, w_mtd.sell_price,
+			w_mtd.allot_price, w_mtd.bar_code, w_mtd.inva_date, w_mtd.disinfect_date,
+			w_mtd.location_out_id, w_mtd.location_in_id, w_mtd.note, w_mtd.inv_code, w_mtd.inv_name, 
+			w_mtd.inv_model, w_mtd.unit_code, w_mtd.unit_name, w_mtd.location_out_code, 
+			w_mtd.location_out_name, w_mtd.location_in_code, w_mtd.location_in_name
+		order by inv_detail_data
+	</select>
+	<!-- 查询对应的科室需求计划主表信息 -->
+	<select id="queryRelaReqMainByCode" resultType="java.util.TreeMap" parameterType="java.util.Map">
+		SELECT
+			a.group_id, a.hos_id, a.copy_code, a.req_id, a.req_code, a.brif, a.dept_id, a.dept_no, b.dept_code, b.dept_name,
+			a.stock_no, a.stock_id, c.store_code, c.store_name, a.make_date, a.rdate, a.maker, su1.user_name make_name, 
+			a.checker checker, su.user_name check_name, a.check_date, a.state, a.req_type, a.is_dir, a.return_reason, a.other_inv
+	    FROM med_require_main a
+	    left join hos_dept_dict b 
+	    	on a.group_id = b.group_id and a.hos_id = b.hos_id
+			and a.dept_id = b.dept_id 
+	      <if test="show_history == 1">
+			and a.dept_no = b.dept_no 
+		  </if>
+		  <if test="show_history == 0">
+			and b.is_stop = 0
+		  </if>
+	    left join hos_store_dict c 
+	    	on a.group_id = c.group_id and a.hos_id = c.hos_id
+			and a.stock_id = c.store_id
+			<if test="show_history == 1">
+				and a.stock_no = c.store_no 
+			</if>
+			<if test="show_history == 0">
+				and c.is_stop = 0
+			</if>
+	    left join sys_user su1 
+	    	on a.group_id = su1.group_id and a.hos_id = su1.hos_id
+			and a.copy_code = su1.copy_code and a.maker = su1.user_id
+	    left join sys_user su 
+	    	on a.group_id = su.group_id and a.hos_id = su.hos_id
+			and a.copy_code = su.copy_code and a.checker = su.user_id
+	    where a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND a.req_id = #{req_id,jdbcType=INTEGER}
+	</select>
+	<!-- 查询对应的科室需求计划明细表信息 -->
+	<select id="queryRelaReqDetailByCode" resultType="java.util.TreeMap" parameterType="java.util.Map">
+		SELECT
+			a.group_id, a.hos_id, a.copy_code, a.req_id, a.req_detail_id, a.inv_no, a.inv_id, b.inv_code, b.inv_name,
+			b.inv_model, c.unit_name, a.pack_code, hp.pack_name, a.num_exchange num_exchange, nvl(a.num,0) num,
+			nvl(a.amount,0) amount, nvl(a.price,0) price, nvl(a.amount,0)*nvl(a.price,0) sum_money, a.sup_no,
+			a.sup_id, d.sup_name, e.fac_no, e.fac_id, e.fac_name, a.memo 
+		FROM MED_REQUIRE_DETAIL a
+		left join med_inv_dict b 
+			on a.group_id = b.group_id and a.hos_id = b.hos_id 
+			and a.copy_code = b.copy_code and a.inv_id = b.inv_id 
+			and a.inv_no = b.inv_no
+		left join hos_unit c 
+			on b.group_id = c.group_id and b.hos_id = c.hos_id
+			and b.unit_code = c.unit_code
+		left join hos_sup_dict d  
+			on a.group_id = d.group_id and a.hos_id = d.hos_id
+			and a.sup_id = d.sup_id and a.sup_no = d.sup_no
+			and d.is_stop = 0
+		left join hos_fac_dict e  
+			on b.group_id = e.group_id and b.hos_id = e.hos_id
+			and b.fac_id = e.fac_id and b.fac_no = e.fac_no		    
+		left join hos_package hp 
+			on a.group_id = hp.group_id and a.hos_id = hp.hos_id
+			and a.pack_code = hp.pack_code and hp.is_stop = 0
+		where a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND a.req_id = #{req_id,jdbcType=INTEGER}
+			AND nvl(a.is_closed, 0) = 0
+		order by a.req_detail_id asc
+	</select>
+	
+	<!-- 入库主表模板打印 -->
+	<select id="queryMedOutPrintTemlateByMain" parameterType="java.util.Map" resultType="java.util.Map" >
+		SELECT 
+			a.group_id, a.hos_id, a.copy_code, a.apply_id, a.apply_no, a.dept_id, a.dept_no, b.dept_code, b.dept_name, 
+			a.store_id, a.store_no, c.store_code, c.store_name, app_date, a.app_emp , d.emp_code, d.emp_name app_emp, 
+			a.brief, a.state, #{rela_state,jdbcType=INTEGER} rela_state, su.user_name maker,a.app_date in_date,su1.user_name CHECKER,
+			a.check_date
+		FROM med_apply_main a
+		LEFT JOIN hos_dept_dict b
+			ON a.group_id = b.group_id AND a.hos_id = b.hos_id
+			AND a.dept_id = b.dept_id
+			<if test="show_history == 1">
+				and a.dept_no = b.dept_no
+			</if>
+			<if test="show_history == 0">
+				and b.is_stop = 0
+			</if>
+		LEFT JOIN hos_store_dict c
+			ON a.group_id = c.group_id AND a.hos_id = c.hos_id
+			AND a.store_id = c.store_id
+			<if test="show_history == 1">
+				AND a.store_no = c.store_no
+			</if>
+			<if test="show_history == 0">
+				and c.is_stop = 0
+			</if>
+		LEFT JOIN hos_emp_dict d
+			ON a.group_id = d.group_id AND a.hos_id = d.hos_id
+			AND a.app_emp = d.emp_id AND d.is_stop = 0
+			  left join sys_user su on a.maker = su.user_id 
+			  	        and a.group_id = su.group_id 
+			  	        and a.hos_id = su.hos_id 
+			  	        and a.hos_id = su.hos_id
+             left join sys_user su1  on a.maker = su1.user_id 
+                       and a.group_id = su1.group_id 
+                       and a.hos_id = su1.hos_id 
+                       and a.hos_id = su1.hos_id 
+             left join sys_user su2  on a.maker = su2.user_id 
+                       and a.group_id = su2.group_id 
+                       and a.hos_id = su2.hos_id 
+                       and a.hos_id = su2.hos_id
+          
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER} 
+			and a.hos_id = #{hos_id,jdbcType=INTEGER} 
+			and a.copy_code = #{copy_code,jdbcType=VARCHAR} 
+			and a.apply_id = #{apply_id,jdbcType=INTEGER} 
+
+	</select>
+	
+	<select id="queryApplyCheckPrintTemlateByMainInBatch" parameterType="java.util.Map" resultType="java.util.Map" >
+		SELECT 
+		a.apply_id as id,
+			a.group_id, a.hos_id, a.copy_code, a.apply_id, a.apply_no, a.dept_id, a.dept_no, b.dept_code, b.dept_name, 
+			a.store_id, a.store_no, c.store_code, c.store_name, app_date, a.app_emp , d.emp_code, d.emp_name app_emp, 
+			a.brief, a.state, #{rela_state,jdbcType=INTEGER} rela_state, su.user_name maker,a.app_date in_date,su1.user_name CHECKER,
+			a.check_date
+		FROM med_apply_main a
+		LEFT JOIN hos_dept_dict b
+			ON a.group_id = b.group_id AND a.hos_id = b.hos_id
+			AND a.dept_id = b.dept_id
+			<if test="show_history == 1">
+				and a.dept_no = b.dept_no
+			</if>
+			<if test="show_history == 0">
+				and b.is_stop = 0
+			</if>
+		LEFT JOIN hos_store_dict c
+			ON a.group_id = c.group_id AND a.hos_id = c.hos_id
+			AND a.store_id = c.store_id
+			<if test="show_history == 1">
+				AND a.store_no = c.store_no
+			</if>
+			<if test="show_history == 0">
+				and c.is_stop = 0
+			</if>
+		LEFT JOIN hos_emp_dict d
+			ON a.group_id = d.group_id AND a.hos_id = d.hos_id
+			AND a.app_emp = d.emp_id AND d.is_stop = 0
+			  left join sys_user su on a.maker = su.user_id 
+			  	        and a.group_id = su.group_id 
+			  	        and a.hos_id = su.hos_id 
+			  	        and a.hos_id = su.hos_id
+             left join sys_user su1  on a.maker = su1.user_id 
+                       and a.group_id = su1.group_id 
+                       and a.hos_id = su1.hos_id 
+                       and a.hos_id = su1.hos_id 
+             left join sys_user su2  on a.maker = su2.user_id 
+                       and a.group_id = su2.group_id 
+                       and a.hos_id = su2.hos_id 
+                       and a.hos_id = su2.hos_id
+          
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER} 
+			and a.hos_id = #{hos_id,jdbcType=INTEGER} 
+			and a.copy_code = #{copy_code,jdbcType=VARCHAR} 
+			and  a.apply_id in (${paraId})
+	        order by  a.apply_id desc	
+
+	</select>
+	<!-- 入库明细表模板打印 -->
+	<select id="queryMedOutPrintTemlateByDetail" parameterType="java.util.Map" resultType="java.util.Map" >
+		SELECT 
+			a.apply_id as id,
+			a.group_id, a.hos_id, a.copy_code, a.apply_id, a.detail_id, a.inv_id, a.inv_no, b.inv_code, b.inv_name, 
+			b.inv_model, c.unit_name, d.fac_name, b.is_com, a.app_amount, g.rela_amount, 
+			e.cur_amount common_amount, f.cur_amount affi_amount, nvl(b.plan_price, 0) price, 
+			a.app_amount*nvl(b.plan_price, 0) amount_money, a.note,b.bid_code 
+		FROM med_apply_detail a
+		left join med_inv_dict b
+			on a.group_id = b.group_id and a.hos_id = b.hos_id
+			and a.copy_code = b.copy_code and a.inv_id = b.inv_id
+			and a.inv_no = b.inv_no
+		left join hos_unit c
+			on b.group_id = c.group_id and b.hos_id = c.hos_id
+			and b.unit_code = c.unit_code
+	    left join hos_fac_dict d
+	   		on b.group_id = d.group_id and b.hos_id = d.hos_id
+	    	and b.fac_id = d.fac_id and b.fac_no = d.fac_no
+		left join med_inv_hold e
+			on a.group_id = e.group_id and a.hos_id = e.hos_id
+			and a.copy_code = e.copy_code and a.inv_id = e.inv_id
+			and e.store_id = #{store_id,jdbcType=INTEGER} 
+		left join med_affi_inv_hold f
+			on a.group_id = f.group_id and a.hos_id = f.hos_id
+			and a.copy_code = f.copy_code and a.inv_id = f.inv_id
+			and f.store_id = #{store_id,jdbcType=INTEGER} 
+		LEFT JOIN (
+			select app_detail_id, sum(nvl(rela_amount, 0)) rela_amount 
+			from med_apply_out_rela
+			where group_id = #{group_id,jdbcType=INTEGER} 
+				and hos_id = #{hos_id,jdbcType=INTEGER} 
+				and copy_code = #{copy_code,jdbcType=VARCHAR} 
+				and apply_id = #{apply_id,jdbcType=INTEGER} 
+				and <![CDATA[rela_type <> 5]]>
+			group by app_detail_id
+		) g
+			on a.detail_id = g.app_detail_id
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER} 
+			and a.hos_id = #{hos_id,jdbcType=INTEGER} 
+			and a.copy_code = #{copy_code,jdbcType=VARCHAR} 
+			<if test="p_num ==1">
+				and a.apply_id in (${paraId})
+			</if>
+			<if test="p_num ==0">
+				and a.apply_id=#{apply_id,jdbcType=NUMERIC}
+			</if>	
+	</select>
+	<!-- 判断科室申请审核生成科室需求计划 -->
+	<select id="queryMedOutRequirelExists" parameterType="java.util.Map" resultType="java.util.Map" >
+		select a.group_id, a.hos_id, a.copy_code, rela_type, rela_id, sum(rela_amount)
+		from med_apply_out_rela a
+		left join med_require_main b
+			on a.group_id = b.group_id
+			and a.hos_id = b.hos_id
+			and a.copy_code = b.copy_code
+			and a.rela_id = b.req_id
+		where a.group_id = #{group_id, jdbcType = INTEGER}
+			and a.hos_id = #{hos_id, jdbcType = INTEGER}
+			and a.copy_code = #{copy_code, jdbcType = VARCHAR}
+			and apply_id = #{apply_id, jdbcType = INTEGER}
+			and rela_type = 5
+		group by a.group_id, a.hos_id, a.copy_code, rela_type, rela_id
+	</select>
+	
+	 
+	
+</mapper>
+

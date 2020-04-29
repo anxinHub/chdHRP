@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper
+	namespace="com.chd.hrp.hr.dao.scientificresearch.HrIntegrationProjectsResultsMapper">
+	<resultMap id="hrEmpProjSet"
+		type="com.chd.hrp.hr.entity.scientificresearch.HrIntegrationProjectsResults">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="year" column="year" />
+		<result property="proj" column="proj" />
+		<result property="proj_level" column="proj_level" />
+		<result property="proj_level_name" column="proj_level_name" />
+		<result property="score" column="score" />
+		<result property="note" column="note" />
+	</resultMap>
+	
+	
+	<resultMap id="hrResearchTotSet" type="java.util.Map">
+	<result property="group_id" column="group_id"/>
+	<result property="hos_id" column="hos_id"/>
+	<result property="year" column="year"/>
+	<result property="acade_honor" column="acade_honor"/>
+	<result property="acade_status" column="acade_status"/>
+	<result property="proj" column="proj"/>
+	<result property="paper" column="paper"/>
+	<result property="note" column="note"/>
+	</resultMap>
+	<insert id="addBatch" parameterType="java.util.List">
+
+		INSERT INTO HR_EMP_PROJ_SET (
+		group_id,
+		hos_id,
+		year,
+		proj_level,
+		score,
+		note
+		)(
+		<foreach collection="list" item="item" index="index"
+			separator=" union all ">
+			select
+			#{item.group_id,jdbcType=INTEGER},
+			#{item.hos_id,jdbcType=INTEGER},
+			#{item.year,jdbcType=INTEGER},
+			#{item.proj_level,jdbcType=VARCHAR},
+			#{item.score,jdbcType=INTEGER},
+			#{item.note,jdbcType=VARCHAR}
+			from dual
+		</foreach>
+		)
+	</insert>
+
+		 <select id="queryProjByYear"  parameterType="java.util.Map"
+		resultMap="hrResearchTotSet">
+
+		SELECT
+		
+		proj
+		FROM
+		HR_RESEARCH_TOT_SET
+		<where>
+			<if test="group_id != null and group_id != ''">
+				AND group_id = #{group_id,jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND hos_id = #{hos_id,jdbcType=INTEGER}
+			</if>
+			<if test="year != null and year != ''">
+				AND year = #{year,jdbcType=VARCHAR}
+			</if>
+			<if test="acade_honor != null and acade_honor != ''">
+				AND acade_honor = #{acade_honor,jdbcType=INTEGER}
+			</if>
+			<if test="acade_status != null and acade_status != ''">
+				AND acade_status = #{acade_status,jdbcType=INTEGER}
+			</if>
+			<if test="proj != null and proj != ''">
+				AND proj = #{proj,jdbcType=INTEGER}
+			</if>
+			<if test="paper != null and paper != ''">
+				AND paper = #{paper,jdbcType=INTEGER}
+			</if>
+			<if test="note != null and note != ''">
+				AND note = #{note,jdbcType=VARCHAR}
+			</if>
+		</where>
+		order by group_id asc</select>
+	<!-- 查询满分表 -->
+	<select id="queryProjectsTot" parameterType="java.util.Map"
+		resultMap="hrResearchTotSet">
+
+		SELECT
+		group_id,
+		hos_id,
+		year,
+		acade_honor,
+		acade_status,
+		proj,
+		paper,
+		note
+		FROM
+		HR_RESEARCH_TOT_SET
+		<where>
+			<if test="group_id != null and group_id != ''">
+				AND group_id = #{group_id,jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND hos_id = #{hos_id,jdbcType=INTEGER}
+			</if>
+			<if test="year != null and year != ''">
+				AND year = #{year,jdbcType=VARCHAR}
+			</if>
+		</where>
+		order by group_id asc
+	</select>
+
+	<!-- 更新满分表 -->
+	<update id="updateProjectsTot" parameterType="java.util.Map">
+
+		UPDATE hr_research_tot_set
+		<trim prefix="SET" suffixOverrides=",">
+			proj = #{proj,jdbcType=INTEGER},
+			note = #{note,jdbcType=VARCHAR},
+		</trim>
+		<where>
+			AND group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND year = #{year,jdbcType=VARCHAR}
+		</where>
+	</update>
+	<!-- 添加满分表 -->
+	<insert id="addProjectsTot" useGeneratedKeys="true">
+
+		INSERT INTO HR_RESEARCH_TOT_SET (
+		<trim suffix="" suffixOverrides=",">
+			group_id,
+			hos_id,
+			year,
+			proj
+		</trim>
+		) VALUES (
+		<trim suffix="" suffixOverrides=",">
+			#{group_id,jdbcType=INTEGER},
+			#{hos_id,jdbcType=INTEGER},
+			#{year,jdbcType=VARCHAR},
+			#{proj,jdbcType=INTEGER}
+		</trim>
+		)
+
+	</insert>
+	<select id="query" resultMap="hrEmpProjSet" parameterType="java.util.Map">
+		select t.group_id,t.hos_id,t.field_col_code as proj_level,t.field_col_name as proj_level_name ,hrt.proj,he.score from HR_FIIED_DATA t
+		left join HR_EMP_PROJ_SET he on t.field_col_code=he.proj_level and t.group_id=he.group_id and t.hos_id=he.hos_id
+		left join HR_RESEARCH_TOT_SET hrt on he.year=hrt.year and hrt.group_id=he.group_id and hrt.hos_id=he.hos_id
+		where t.field_tab_code ='DIC_PROJ_LEVEL'
+		<if test="group_id != null and group_id != ''">
+				AND he.group_id = #{group_id,jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND he.hos_id = #{hos_id,jdbcType=INTEGER}
+			</if>
+			<if test="year != null and year != ''">
+				AND he.year = #{year,jdbcType=VARCHAR}
+			</if>
+		<if test="proj_level !=null and proj_level !='' ">
+			AND t.field_col_code =#{proj_level,jdbcType=INTEGER}
+		</if>
+
+			<if test="proj_level_name != null and proj_level_name != ''">
+				AND t.FIELD_COL_NAME like '%${proj_level_name}%'
+			</if>
+    order by t.field_col_code asc
+	</select>
+
+	<delete id="deleteIntegration" parameterType="java.util.Map">
+
+		DELETE FROM hr_emp_proj_set
+		<where>
+			<if test="group_id != null and group_id != ''">
+				AND group_id = #{group_id,jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND hos_id = #{hos_id,jdbcType=INTEGER}
+			</if>
+			<if test="year != null and year != ''">
+				AND year = #{year,jdbcType=INTEGER}
+			</if>
+			<if test="proj_level != null and proj_level != ''">
+				AND proj_level = #{proj_level,jdbcType=VARCHAR}
+			</if>
+
+		</where>
+	</delete>
+	<delete id="deleteIntegrationProjectsResults" parameterType="java.util.List">
+		DELETE FROM hr_emp_proj_set
+		<where>
+			<foreach collection="list" index="index" item="item" open="("
+				separator="or" close=")">
+					 group_id = #{item.group_id,jdbcType=INTEGER}
+					AND hos_id = #{item.hos_id,jdbcType=INTEGER}
+					AND year = #{item.year,jdbcType=INTEGER}
+					AND proj_level = #{item.proj_level,jdbcType=VARCHAR}
+			</foreach>
+		</where>
+	</delete>
+	<insert id="copyIntegration" parameterType="java.util.List">
+		insert into hr_emp_proj_set( select hls.group_id, hls.hos_id
+		,(
+		select extract(year from sysdate)from dual
+		) as year ,hls.proj_level,hls.score,hls.note
+		from hr_emp_proj_set hls
+		WHERE
+		hls.group_id = #{group_id,jdbcType=INTEGER}
+		AND hls.hos_id = #{hos_id,jdbcType=INTEGER}
+		AND hls.year =(select extract(year from sysdate)-1 from dual)
+		)
+	</insert>
+	
+	<!-- 查询上一年数据 -->
+	<select id="queryIntegrationByLastYear" resultType="java.lang.Integer">
+		select 
+			count(*)
+		from 
+			hr_emp_proj_set
+		where 
+			group_id = #{group_id}
+			and hos_id = #{hos_id}
+			and year = extract(year from sysdate) - 1
+	</select>
+</mapper>

@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.hr.dao.nursing.HrInserviceStatisticsMapper">
+  <resultMap id="assPriceChnageStudent" type="com.chd.hrp.hr.entity.nursing.HrEducationStudent">
+  <result column="emp_id" property="emp_id"/>
+  <result column="emp_name" property="emp_name"/>
+  <result column="dept_no" property="dept_no"/>
+  <result column="dept_name" property="dept_name"/>
+  <result column="edu_date" property="edu_date"/>
+  <result column="duty_code" property="duty_code"/>
+  <result column="duty_name" property="duty_name"/>
+  <result column="title_code" property="title_code"/>
+  <result column="title_name" property="title_name"/>
+  <result column="col_code" property="col_code"/>
+  <result column="col_name" property="col_name"/>
+  <result column="education" property="education"/>
+  <result column="hours" property="hours"/>
+  <result column="state_name" property="state_name"/>
+  </resultMap>
+
+  <resultMap id="assPriceChnage" type="java.util.Map">
+	  <result column="emp_id" property="emp_id"/>
+	  <result column="emp_code" property="emp_code"/>
+	  <result column="emp_name" property="emp_name"/>
+	  <result column="dept_no" property="dept_no"/>
+	  <result column="dept_name" property="dept_name"/>
+	  <result column="edu_date" property="edu_date"/>
+	  <result column="duty_code" property="duty_code"/>
+	  <result column="duty_name" property="duty_name"/>
+	  <result column="title_code" property="title_code"/>
+	  <result column="title_name" property="title_name"/>
+	  <result column="col_code" property="col_code"/>
+	  <result column="col_name" property="col_name"/>
+	  <result column="education" property="education"/>
+	  <result column="hours" property="hours"/>
+	  <result column="state_name" property="state_name"/>
+  </resultMap>
+
+
+	<select id="queryStudent" parameterType="java.util.Map" resultMap="assPriceChnageStudent">
+		select hoe.group_id,hoe.hos_id,hoe.emp_id, hoe.emp_name, he.edu_date as edu_date , he.hours as hours ,hes.CLASS_NAME
+    	from hr_education_student hes
+    	left join hr_education he on hes.class_name = he.class_name and hes.edu_date = he.edu_date 
+    	left join hr_level_set hls on hes.level_code = hls.level_code and hls.year = to_char(he.edu_date, 'YYYY') 
+    	left join hos_emp hoe on hes.emp_id = hoe.emp_id and hes.group_id=hoe.group_id and hes.hos_id=hoe.hos_id
+    		and hoe.is_stop = 0
+    	left join hr_emp_promotion hep on hes.emp_id = hep.emp_id and hes.group_id = hep.group_id
+    		and hes.hos_id = hep.hos_id 
+		<where>
+				and hes.group_id = #{group_id,jdbcType=INTEGER}
+				and hes.hos_id =  #{hos_id,jdbcType=INTEGER}
+			<if test="edu_date!=null and edu_date !=''">
+				and hes.edu_date = to_date(#{edu_date,jdbcType=DATE},'YYYY/MM/DD')
+			</if>
+			<if test="class_name !=null and class_name !=''">
+				and hes.class_name =#{class_name}
+			</if>
+		</where>
+  		group by hoe.emp_id, hoe.emp_name,he.hours,he.edu_date,hes.CLASS_NAME,hoe.group_id,hoe.hos_id
+	</select>
+	
+	<select id="query" parameterType="java.util.Map" resultMap="assPriceChnage">
+		with inservice_statistics as(
+			select hoe.emp_id,hoe.emp_code,hoe.emp_name,hde.dept_id,hde.dept_no,hde.dept_name,to_char(he.edu_date,'YYYY')edu_date , hd.duty_code,hd.duty_name,ht.title_code,ht.title_name,
+				t.field_col_code col_code ,t.field_col_name  col_name,hls.education,sum(he.hours) hours ,
+				case when sum(nvl(he.hours,0))-nvl(hls.education,0) 	&gt; 0 then '合格'  when sum(nvl(he.hours,0))-nvl(hls.education,0)   &lt; 0 then '不合格' else '' end  as state_name 
+ 			from hr_education_student hes
+		    left join hr_education he on hes.class_name = he.class_name
+		         and hes.edu_date = he.edu_date 
+		         and hes.group_id=he.group_id 
+		         and hes.hos_id=he.hos_id
+		    left join hr_level_set hls on hes.level_code = hls.level_code
+		         and hls.year = to_char(he.edu_date, 'YYYY') 
+		         and hes.group_id=hls.group_id 
+		         and hes.hos_id=hls.hos_id
+		    left join hos_emp hoe on hes.emp_id = hoe.emp_id 
+		         and hes.group_id=hoe.group_id 
+		         and hes.hos_id=hoe.hos_id
+		    left join hr_emp_promotion hep on hes.emp_id = hep.emp_id
+		         and hes.group_id = hep.group_id
+		         and hes.hos_id = hep.hos_id
+		    left join hr_fiied_data t on hep.level_code = t.field_col_code
+		         and t.field_tab_code = 'DIC_LEVEL'
+		         and t.group_id = hep.group_id
+		         and t.hos_id = hep.hos_id
+		    left join hos_dept_dict hde on hoe.dept_no = hde.dept_no and hoe.dept_id=hde.dept_id
+		         and hoe.group_id = hde.group_id
+		         and hoe.hos_id = hde.hos_id
+		    left join hr_hos_duty hhd on hoe.emp_id = hhd.emp_id
+		         and hoe.group_id = hhd.group_id
+		         and hoe.hos_id = hhd.hos_id
+		    left join hos_duty hd on hhd.duty_code = hd.duty_code
+		         and hd.group_id = hhd.group_id
+		         and hd.hos_id = hhd.hos_id
+		    left join hr_emp_technology_title het on hoe.emp_id = het.emp_id
+		         and hoe.group_id = het.group_id
+		         and hoe.hos_id = het.hos_id
+		    left join hr_title ht on het.title_code = ht.title_code
+		         and ht.group_id = het.group_id
+		         and ht.hos_id = het.hos_id
+			<where>
+				and hes.group_id = #{group_id,jdbcType=INTEGER}
+				and hes.hos_id = #{hos_id,jdbcType=INTEGER}
+			</where>
+			group by hoe.emp_id,hoe.emp_code,hoe.emp_name,hde.dept_id,hde.dept_name,hd.duty_name,ht.title_name,t.field_col_name,hls.education,to_char(he.edu_date, 'YYYY'),hde.dept_no,hd.duty_code,ht.title_code,t.field_col_code
+		)
+		select * from inservice_statistics inst 
+		<where>
+			inst.emp_name is not null
+			<if test="year != null and year != '' ">
+				and inst.edu_date=#{year}
+			</if>
+			<if test="emp_id !=null and emp_id !=''">
+				and inst.emp_id like '%${emp_id}%'
+			</if>
+			<if test="state_name !=null and state_name !=''">
+			 	and inst.state_name=#{state_name}
+			</if>
+			<if test="dept_id !=null and dept_id !=''">
+			 	and inst.dept_id=#{dept_id}
+			</if>
+			<if test="duty_code !=null and duty_code !=''">
+			 	and inst.duty_code=#{duty_code}
+			</if>
+			<if test="title_code !=null and title_code !=''">
+				and inst.title_code=#{title_code}
+			</if>
+			
+			<if test="col_code != null and col_code != ''">
+				and inst.col_code=#{col_code}
+			</if>
+			
+			<if test="col_name != null and col_name != ''">
+				and inst.col_name=#{col_name}
+			</if>
+		</where>
+		order by inst.emp_code
+	</select>
+	
+	<select id="queryByPrint" parameterType="java.util.Map" resultType="java.util.Map">
+		with inservice_statistics as(
+			select hoe.emp_id,hoe.emp_name,hde.dept_no,hde.dept_name,to_char(he.edu_date,'YYYY')edu_date , hd.duty_code,hd.duty_name,ht.title_code,ht.title_name,
+				t.field_col_code col_code ,t.field_col_name  col_name,hls.education,sum(he.hours) hours ,
+				case when sum(he.hours)-hls.education 	&gt; 0 then '合格' when sum(he.hours)-hls.education  &lt; 0 then '不合格' else '' end  as state_name 
+ 			from hr_education_student hes
+		    left join hr_education he on hes.class_name = he.class_name
+		         and hes.edu_date = he.edu_date 
+		         and hes.group_id=he.group_id 
+		         and hes.hos_id=he.hos_id
+		    left join hr_level_set hls on hes.level_code = hls.level_code
+		         and hls.year = to_char(he.edu_date, 'YYYY') 
+		         and hes.group_id=hls.group_id 
+		         and hes.hos_id=hls.hos_id
+		    left join hos_emp hoe on hes.emp_id = hoe.emp_id 
+		         and hes.group_id=hoe.group_id 
+		         and hes.hos_id=hoe.hos_id
+		    left join hr_emp_promotion hep on hes.emp_id = hep.emp_id
+		         and hes.group_id = hep.group_id
+		         and hes.hos_id = hep.hos_id
+		    left join hr_fiied_data t on hep.level_code = t.field_col_code
+		         and t.field_tab_code = 'DIC_LEVEL'
+		         and t.group_id = hep.group_id
+		         and t.hos_id = hep.hos_id
+		    left join hos_dept_dict hde on hoe.dept_no = hde.dept_no and hoe.dept_id=hde.dept_id
+		         and hoe.group_id = hde.group_id
+		         and hoe.hos_id = hde.hos_id
+		    left join hr_hos_duty hhd on hoe.emp_id = hhd.emp_id
+		         and hoe.group_id = hhd.group_id
+		         and hoe.hos_id = hhd.hos_id
+		    left join hos_duty hd on hhd.duty_code = hd.duty_code
+		         and hd.group_id = hhd.group_id
+		         and hd.hos_id = hhd.hos_id
+		    left join hr_emp_technology_title het on hoe.emp_id = het.emp_id
+		         and hoe.group_id = het.group_id
+		         and hoe.hos_id = het.hos_id
+		    left join hr_title ht on het.title_code = ht.title_code
+		         and ht.group_id = het.group_id
+		         and ht.hos_id = het.hos_id
+			<where>
+				and hoe.group_id = #{group_id,jdbcType=INTEGER}
+				and hoe.hos_id = #{hos_id,jdbcType=INTEGER}
+			</where>
+			group by hoe.emp_id,hoe.emp_name,hde.dept_name,hd.duty_name,ht.title_name,t.field_col_name,hls.education,he.edu_date,hde.dept_no,hd.duty_code,ht.title_code,t.field_col_code
+		)
+		select * from inservice_statistics inst 
+		<where>
+			<if test="edu_date!=null and edu_date !=''">
+				and inst.edu_date=#{edu_date}
+			</if>
+			<if test="emp_id !=null and emp_id !=''">
+				and inst.emp_id like '%${emp_id}%'
+			</if>
+			<if test="state_name !=null and state_name !=''">
+			 	and inst.state_name=#{state_name}
+			</if>
+			<if test="dept_no !=null and dept_no !=''">
+			 	and inst.dept_no=#{dept_no}
+			</if>
+			<if test="duty_code !=null and duty_code !=''">
+			 	and inst.duty_code=#{duty_code}
+			</if>
+			<if test="title_code !=null and title_code !=''">
+				and inst.title_code=#{title_code}
+			</if>
+		</where>
+		order by inst.emp_id
+	</select>
+</mapper>

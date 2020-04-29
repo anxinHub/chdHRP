@@ -1,0 +1,300 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.hr.dao.report.HrEducationCountMapper">
+	
+	<select id="queryHrEducationCount" resultType="java.util.Map" parameterType="java.util.Map">
+	select count(education_code) numb, field_col_name
+	  from (select a.education_code,
+	               a.emp_id,
+	               a.graduation_date,
+	               b.emp_name,
+	               c.field_col_name,
+	               row_number() over(partition by a.emp_id order by graduation_date desc) as rn
+	          from hr_emp_degree a
+	          left join hos_emp_dict b
+	            on a.group_id = b.group_id
+	           and a.hos_id = b.hos_id
+	           and a.emp_id = b.emp_id
+	           and b.is_stop = 0
+	           and b.is_disable = 0
+	          left join hr_fiied_data c
+	            on a.group_id = c.group_id
+	           and a.hos_id = b.hos_id
+	           and c.field_tab_code = 'DIC_EDUCATION'
+	           and c.field_col_code = a.education_code
+	          left join hos_emp d
+	            on b.group_id = d.group_id
+	           and b.hos_id = d.hos_id
+	           and b.is_stop = 0
+	           and b.is_disable = 0
+	         where 1=1
+	         and d.group_id = #{group_id}
+	         and d.hos_id = #{hos_id}
+	         <if test="begin_hostime != '' and begin_hostime != null ">
+		        and  d.hostime &gt;= to_date(#{begin_hostime}, 'yyyy-mm-dd')  
+	         </if>
+	         <if test="end_hostime != '' and end_hostime != null ">
+		        and   d.hostime 	&lt;= to_date(#{end_hostime}, 'yyyy-mm-dd')
+	         </if>
+		        )
+	 where rn = 1
+	 and  education_code  &gt; 0
+	 group by field_col_name
+	 
+	</select>
+	
+	<select id="queryHrAgeCount" resultType="java.util.Map" parameterType="java.util.Map" >
+	with a_table as(
+		select case when age &lt;= 25 then '25岁以下' 
+		            when age between 25 and 30 then '25-30岁' 
+		            when age between 30 and 40 then '30-40岁' 
+		            when age between 40 and 50 then '40-50岁' 
+		            when age &gt;=50 then '50岁以上' end as age,
+		count(*) as numb 
+		from hos_emp 
+		 where group_id = #{group_id}
+		 and hos_id = #{hos_id}
+		 and is_stop=0
+		  <if test="begin_hostime != '' and begin_hostime != null ">
+		        and  hostime &gt;= to_date(#{begin_hostime}, 'yyyy-mm-dd')  
+	         </if>
+	         <if test="end_hostime != '' and end_hostime != null ">
+		        and   hostime 	&lt;= to_date(#{end_hostime}, 'yyyy-mm-dd')
+	         </if>
+		 and age is not null
+		group by case when age &lt;= 25 then '25岁以下' 
+		              when age between 25 and 30 then '25-30岁' 
+		              when age between 30 and 40 then '30-40岁' 
+		              when age between 40 and 50 then '40-50岁' 
+		              when age &gt;=50 then '50岁以上'end
+		union all 
+		select '总人数',count(*)
+		from hos_emp
+		 where group_id = #{group_id}
+		 and hos_id = #{hos_id}
+		 and is_stop=0
+		  <if test="begin_hostime != '' and begin_hostime != null ">
+		        and  hostime &gt;= to_date(#{begin_hostime}, 'yyyy-mm-dd')  
+	         </if>
+	         <if test="end_hostime != '' and end_hostime != null ">
+		        and   hostime 	&lt;= to_date(#{end_hostime}, 'yyyy-mm-dd')
+	         </if>
+		 and age is not null
+		) 
+		select
+			case	when age='25岁以下' then 1 
+					when age='25-30岁' then 2 
+					when age='30-40岁' then 3 
+					when age='40-50岁' then 4 
+					when age='50岁以上' then 5 
+					when age='总人数'   then 6 
+		      end as ob_num,
+		      a.*
+		 from a_table a
+		 order by ob_num asc
+	</select>
+	
+	
+	<select id="queryHrWorkAgeCount" resultType="java.util.Map" parameterType="java.util.Map" >
+	with a_table as(
+			select case 
+			            when HOSKAGE between 1 and 10 then '1-10年' 
+			            when HOSKAGE between 10 and 20 then '10-20年' 
+			            when HOSKAGE between 20 and 30 then '20-30年' 
+			            when HOSKAGE &gt;=30 then '30年以上' end as HOSKAGE,
+			count(*) as numb 
+			from hos_emp 
+			  where  group_id = #{group_id}
+				 and hos_id = #{hos_id}
+				 and is_stop=0
+			  	 <if test="begin_hostime != '' and begin_hostime != null ">
+			        and  hostime &gt;= to_date(#{begin_hostime}, 'yyyy-mm-dd')  
+		         </if>
+		         <if test="end_hostime != '' and end_hostime != null ">
+			        and   hostime 	&lt;= to_date(#{end_hostime}, 'yyyy-mm-dd')
+		         </if>
+			 and HOSKAGE is not null
+			   group by      case when HOSKAGE between 1 and 10 then '1-10年' 
+			              when HOSKAGE between 10 and 20 then '10-20年' 
+			              when HOSKAGE between 20 and 30 then '20-30年' 
+			              when HOSKAGE &gt;=30 then '30年以上'end
+			union all 
+			select '总人数',count(*)
+			from hos_emp
+			 where group_id  = #{group_id}
+				 and hos_id  = #{hos_id}
+				 and is_stop =0
+		  <if test="begin_hostime != '' and begin_hostime != null ">
+		        and  hostime &gt;= to_date(#{begin_hostime}, 'yyyy-mm-dd')  
+	         </if>
+	         <if test="end_hostime != '' and end_hostime != null ">
+		        and   hostime 	&lt;= to_date(#{end_hostime}, 'yyyy-mm-dd')
+	         </if>
+			and HOSKAGE is not null) 
+			
+			select
+			      case when HOSKAGE='25年以下' then 1 
+			           when HOSKAGE='25-30年' then 2 
+			           when HOSKAGE='30-40年' then 3 
+			           when HOSKAGE='40-50年' then 4 
+			           when HOSKAGE='50年以上' then 5 
+			           when HOSKAGE='总人数' then 6 
+			      end as ob_num,
+			      a.*
+			 from a_table a
+			 order by ob_num asc
+	</select>
+	
+	<select id="queryHrUserCountMain" parameterType="java.util.Map" resultType="java.util.Map">
+	with kind_all as
+		 (select a.kind_code,
+		         a.kind_name,
+		         count(b.emp_id) as numb,
+		         count(case when b.sex_code = (select field_col_code from hr_fiied_data where field_col_name = '女') then '1' end) inGirl
+		    from HOS_EMP_KIND a
+		    left join hos_emp b
+		      on a.group_id = b.group_id
+		     and a.hos_id = b.hos_id
+		     and a.kind_code = b.kind_code
+		     where a.group_id = #{group_id}
+		     and a.hos_id = #{hos_id}
+		      <if test="begin_hostime != '' and begin_hostime != null ">
+		        and  b.hostime &gt;= to_date(#{begin_hostime}, 'yyyy-mm-dd')  
+	         </if>
+	         <if test="end_hostime != '' and end_hostime != null ">
+		        and   b.hostime 	&lt;= to_date(#{end_hostime}, 'yyyy-mm-dd')
+	         </if>
+		   group by a.kind_code, a.kind_name),
+		degree_all as
+		 (select *
+		    from (select b.kind_code,
+		                 d.kind_name,
+		                 c.field_col_code,
+		                 row_number() over(partition by a.emp_id order by a.graduation_date desc) as rn
+		            from hr_emp_degree a
+		            left join hos_emp b
+		              on a.group_id = b.group_id
+		             and a.hos_id = b.hos_id
+		             and a.emp_id = b.emp_id
+		             and b.is_stop = 0
+		            left join hr_fiied_data c
+		              on a.group_id = c.group_id
+		             and a.hos_id = b.hos_id
+		             and c.field_tab_code = 'DIC_EDUCATION'
+		             and a.education_code = c.field_col_code
+		            left join HOS_EMP_KIND d
+		              on b.group_id = d.group_id
+		             and b.hos_id = d.hos_id
+		             and b.kind_code = d.kind_code
+		             and b.is_stop = 0
+	              where a.group_id = #{group_id}
+				     and a.hos_id = #{hos_id}
+				      <if test="begin_hostime != '' and begin_hostime != null ">
+				        and  b.hostime &gt;= to_date(#{begin_hostime}, 'yyyy-mm-dd')  
+			         </if>
+			         <if test="end_hostime != '' and end_hostime != null ">
+				        and   b.hostime 	&lt;= to_date(#{end_hostime}, 'yyyy-mm-dd')
+			         </if>
+		             ) 
+	             pivot(count(*) for field_col_code in(${degreeColumn})
+		             
+		             )
+		   where rn = 1
+    		
+	         ),
+		age_all as
+		 (select *
+		    from (select b.kind_code,
+		                 case
+		                   when a.age &lt;= 25 then
+		                    '25岁以下'
+		                   when a.age between 26 and 30 then
+		                    '26-30岁'
+		                   when a.age between 31 and 40 then
+		                    '31-40岁'
+		                   when a.age between 41 and 50 then
+		                    '41-50岁'
+		                   when a.age &gt;= 51 then
+		                    '51岁以上'
+		                 end as age
+		            from hos_emp a
+		            left join hos_emp_kind b
+		              on a.group_id = b.group_id
+		             and a.hos_id = b.hos_id
+		             and a.kind_code = b.kind_code
+	           where  a.group_id = #{group_id}
+				     and a.hos_id = #{hos_id}
+				      <if test="begin_hostime != '' and begin_hostime != null ">
+				        and  a.hostime &gt;= to_date(#{begin_hostime}, 'yyyy-mm-dd')  
+			         </if>
+			         <if test="end_hostime != '' and end_hostime != null ">
+				        and   a.hostime 	&lt;= to_date(#{end_hostime}, 'yyyy-mm-dd')
+			         </if>
+	         and a.is_stop = 0
+		             and a.age is not null
+		           group by case
+		                      when a.age &lt;= 25 then
+		                       '25岁以下'
+		                      when a.age between 26 and 30 then
+		                       '26-30岁'
+		                      when a.age between 31 and 40 then
+		                       '31-40岁'
+		                      when a.age between 41 and 50 then
+		                       '41-50岁'
+		                      when a.age &gt;= 51 then
+		                       '51岁以上'
+		                    end,
+		                    b.kind_code) pivot(count(*) for age in('25岁以下' as "25岁以下" , '26-30岁'as "26-30岁", '30-40岁' as "30-40岁", '40-50岁' as "40-50岁", '50岁以上'as "50岁以上"))),
+		station_all as
+		 (select *
+	  from (select c.kind_code,
+                 d.kind_code as station_code,
+                 row_number() over(partition by a.emp_id order by a.engage_date desc) as rn
+		            from HR_HOS_STATION a
+		            left join hos_emp b
+		              on a.group_id = b.group_id
+		             and a.hos_id = b.hos_id
+		             and a.emp_id = b.emp_id
+		             and b.is_stop = 0
+		             left join hos_emp_kind c
+		             on  b.group_id = c.group_id
+		             and b.hos_id = c.hos_id
+		             and b.kind_code = c.kind_code
+		             and b.is_stop = 0 
+		             left join hr_station_kind d
+		             on a.group_id = d.group_id
+		             and a.hos_id = d.hos_id
+		             and a.station_type = d.kind_code
+		             and d.is_stop = 0 
+	              where  a.group_id = #{group_id}
+			     and a.hos_id = #{hos_id}
+			      <if test="begin_hostime != '' and begin_hostime != null ">
+			        and  b.hostime &gt;= to_date(#{begin_hostime}, 'yyyy-mm-dd')  
+		         </if>
+		         <if test="end_hostime != '' and end_hostime != null ">
+			        and   b.hostime 	&lt;= to_date(#{end_hostime}, 'yyyy-mm-dd')
+		         </if>
+            )
+   pivot (count(*) for station_code in (${stationColumn}))
+      where rn = 1
+ )
+		select *
+		  from kind_all a
+		  left join degree_all b
+		    on a.kind_code = b.kind_code
+	      left join station_all c
+		    on a.kind_code = c.kind_code
+		  left join age_all d
+		    on a.kind_code = d.kind_code
+		 
+		 order by a.kind_code
+			
+	</select>
+	
+	<select id="queryDegreeColumns" resultType="java.util.Map" parameterType="java.util.Map">
+		select field_col_code，field_col_name from  hr_fiied_data c where c.group_id=#{group_id} and c.hos_id=#{hos_id} and c.field_tab_code = 'DIC_EDUCATION'
+	</select>
+	<select id="queryStationColumns" resultType="java.util.Map" parameterType="java.util.Map">
+		select c.kind_code as station_code,c.kind_name as station_name from hr_station_kind  c where c.group_id=#{group_id} and c.hos_id=#{hos_id} 
+	</select>
+</mapper>

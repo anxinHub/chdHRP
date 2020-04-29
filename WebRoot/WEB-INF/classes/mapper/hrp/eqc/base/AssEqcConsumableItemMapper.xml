@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.eqc.dao.base.AssEqcConsumableItemMapper">
+	
+	<resultMap id="assEqcConsumableItem" type="java.util.Map">
+	<result property="group_id" column="group_id"/>
+	<result property="hos_id" column="hos_id"/>
+	<result property="copy_code" column="copy_code"/>
+	<result property="consum_code" column="consum_code"/>
+	<result property="consum_desc" column="consum_desc"/>
+	<result property="price" column="price"/>
+	<result property="unit_code" column="unit_code"/>
+	<result property="unit_name" column="unit_name"/>
+	<result property="invalid_flag" column="invalid_flag"/>
+	<result property="is_seperate_fee" column="is_seperate_fee"/>
+	<result property="is_seperate_fee_name" column="is_seperate_fee_name"/>
+	<result property="pay_price" column="pay_price"/>
+	</resultMap>
+	
+	<insert id="add" useGeneratedKeys="true" >
+	
+		INSERT INTO ASS_EQ_CONSUMABLE_ITEM (
+			group_id
+			,
+			hos_id
+			,
+			copy_code
+			,
+			consum_code
+			,
+			consum_desc
+			,
+			price
+			,
+			unit_code
+			,
+			invalid_flag
+			,
+			is_seperate_fee
+			,
+			pay_price
+		
+		) VALUES (
+			#{group_id}		,
+			#{hos_id}		,
+			#{copy_code}		,
+			#{consum_code}		,
+			#{consum_desc}		,
+			#{price}		,
+			#{unit_code}		,
+			#{invalid_flag}		,
+			#{is_seperate_fee}		,
+			#{pay_price}		
+		)
+	
+	</insert>
+	<insert id="addBatch" parameterType="java.util.List" >
+	
+		INSERT INTO ASS_EQ_CONSUMABLE_ITEM (
+			group_id
+			,
+			hos_id
+			,
+			copy_code
+			,
+			consum_code
+			,
+			consum_desc
+			,
+			price
+			,
+			unit_code
+			,
+			invalid_flag
+			,
+			is_seperate_fee
+			,
+			pay_price
+		
+		) select  t.* from(
+		<foreach collection="list" item="item" index="index" separator=" union all " >
+			select 		
+				#{item.group_id}			,
+				#{item.hos_id}			,
+				#{item.copy_code}			,
+				#{item.consum_code}			,
+				#{item.consum_desc}			,
+				#{item.price}			,
+				#{item.unit_code}			,
+				#{item.invalid_flag}			,
+				#{item.is_seperate_fee}			,
+				#{item.pay_price}			
+			from dual
+		</foreach>
+		)t
+	</insert>
+	
+	<update id="update" parameterType="java.util.Map">
+	
+		UPDATE ASS_EQ_CONSUMABLE_ITEM SET
+		consum_desc = #{consum_desc} ,
+		price = #{price},
+		unit_code = #{unit_code},
+		invalid_flag = #{invalid_flag},
+		is_seperate_fee = #{is_seperate_fee},
+		pay_price = #{pay_price}
+		
+		WHERE 
+				group_id = #{group_id}
+			and hos_id = #{hos_id}
+			and copy_code = #{copy_code}
+			and consum_code = #{consum_code}
+	</update>
+	<update id="updateBatch" parameterType="java.util.List">
+	
+		<foreach collection="list" item="item" index="index" open="begin" close=";end;" separator=";" >
+			UPDATE ASS_EQ_CONSUMABLE_ITEM SET
+			consum_desc = #{item.consum_desc} ,
+			price = #{item.price}	,
+			unit_code = #{item.unit_code} ,
+			invalid_flag = #{item.invalid_flag}	,
+			is_seperate_fee = #{item.is_seperate_fee}	,
+			pay_price = #{item.pay_price}
+			
+			WHERE 
+				group_id = #{item.group_id}
+				and hos_id = #{item.hos_id}
+				and copy_code = #{item.copy_code}
+				and consum_code = #{item.consum_code}
+			
+		</foreach>
+	</update>
+	
+	<delete id="delete" parameterType="java.util.Map">
+	
+		DELETE FROM ASS_EQ_CONSUMABLE_ITEM 
+		WHERE
+			group_id = #{group_id}
+			and hos_id = #{hos_id}
+			and copy_code = #{copy_code}
+			and consum_code = #{consum_code}
+	</delete>
+	<delete id="deleteBatch" parameterType="java.util.List">
+		DELETE FROM ASS_EQ_CONSUMABLE_ITEM WHERE
+			<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+					group_id = #{item.group_id}
+				and hos_id = #{item.hos_id}
+				and copy_code = #{item.copy_code}
+				and consum_code = #{item.consum_code}
+			</foreach>
+	
+	</delete>
+	<select id="query" parameterType="java.util.Map" resultMap="assEqcConsumableItem" >
+	
+		SELECT 
+			a.group_id,
+			a.hos_id,
+			a.copy_code,
+			a.consum_code,
+			a.consum_desc,
+			a.price,
+			a.unit_code,
+			b.unit_name ,
+			a.invalid_flag,
+			a.is_seperate_fee,
+			case a.is_seperate_fee when 1 then '是' else '否' end is_seperate_fee_name ,
+			a.pay_price
+		FROM ASS_EQ_CONSUMABLE_ITEM a
+		left join hos_unit  b
+			on  a.group_id = b.group_id
+			and a.hos_id = b.hos_id
+			and a.unit_code =  b.unit_code
+			and b.is_stop = 0
+			
+		where                    
+			a.group_id = #{group_id}
+			AND a.hos_id = #{hos_id}
+			AND a.copy_code = #{copy_code}
+			<if test="consum_code != null and consum_code != ''">
+			AND (a.consum_code like #{consum_code} || '%' or
+				a.consum_desc like #{consum_code} || '%' )
+			</if>
+			<if test="price != null and price != ''">
+			AND a.price = #{price}
+			</if>
+			<if test="unit_code != null and unit_code != ''">
+			AND a.unit_code = #{unit_code}
+			</if>
+			<if test="is_seperate_fee != null and is_seperate_fee != ''">
+			AND a.is_seperate_fee = #{is_seperate_fee}
+			</if>
+		order by a.consum_code asc
+	</select>
+	<select id="queryByCode" resultMap="assEqcConsumableItem" parameterType="string" >
+	
+		SELECT 
+			group_id,
+			hos_id,
+			copy_code,
+			consum_code,
+			consum_desc,
+			price,
+			unit_code,
+			invalid_flag,
+			is_seperate_fee,
+			pay_price
+		FROM ASS_EQ_CONSUMABLE_ITEM 
+		WHERE 
+			group_id = #{item.group_id}
+			and hos_id = #{item.hos_id}
+			and copy_code = #{item.copy_code}
+			and consum_code = #{item.consum_code}
+	
+	</select>
+	
+	<!-- 查询添加数据是否已存在 -->
+	<select id="queryDataExist" resultType="java.lang.String">
+		<foreach collection="list" item="item" index="index" separator=" union all " >
+			SELECT to_number(${item.rowNo})+ 1 rowNo
+			FROM ASS_EQ_CONSUMABLE_ITEM
+			where
+				group_id = #{item.group_id,jdbcType=INTEGER}
+				AND hos_id = #{item.hos_id,jdbcType=INTEGER}
+				AND copy_code = #{item.copy_code,jdbcType=VARCHAR}
+				AND consum_code = #{item.consum_code,jdbcType=VARCHAR}
+		</foreach>
+	</select>
+</mapper>
+

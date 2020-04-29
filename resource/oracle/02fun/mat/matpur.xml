@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+
+	<sql id="getMatPurAdviseNum" type="fun" desc="获取采购计划中的建议采购量"><![CDATA[
+	    CREATE OR REPLACE FUNCTION getMatPurAdviseNum(
+	      prm_group_id in number,
+	      prm_hos_id in number,
+	      prm_copy_code in varchar2,
+	      prm_store_id in number,
+	      prm_inv_id in number
+	    )
+	    RETURN NUMERIC
+	    IS
+	      p_pjrxhl numeric(16, 2); --平均日消耗量
+	      p_period numeric(16,2); --周期单位（1：年，2：季度，3：月， 4：天）
+	      p_rxhl_period numeric(16, 2); --日消耗周期
+	      p_ps_period numeric(16, 2); --配送周期
+	      p_cg_period numeric(16, 2); --采购周期
+	      p_cur_amount numeric(16, 2); --当前库存量
+	      p_order_amount numeric(16, 2); --在途订单量
+	      p_min_pur numeric(16, 2); --最小采购批量
+	      p_num numeric(16, 2);
+	    BEGIN
+	      --获取材料安全库存信息
+	      SELECT case period when 1 then 365 when 2 then 90 when 3 then 30 when 4 then 1 else 0 end period,
+	        nvl(rxhl_period, 0), nvl(ps_period, 0), nvl(cg_period, 0), nvl(min_pur, 0)
+	      INTO p_period, p_rxhl_period, p_ps_period, p_cg_period, p_min_pur
+	      FROM mat_store_inv
+	      WHERE group_id = prm_group_id
+	        AND hos_id = prm_hos_id
+	        AND copy_code = prm_copy_code
+	        AND store_id = prm_store_id
+	        AND inv_id = prm_inv_id;
+	      
+	      --未维护【周期单位】【日消耗周期】【最小采购批量】则返回0
+	      if p_period = 0 or p_rxhl_period = 0 or p_min_pur = 0 then
+	        return 0;
+	      end if;
+	      
+	      --获取材料当前库存
+	      SELECT cur_amount
+	      INTO p_cur_amount
+	      FROM mat_inv_hold
+	      WHERE group_id = prm_group_id
+	        AND hos_id = prm_hos_id
+	        AND copy_code = prm_copy_code
+	        AND store_id = prm_store_id
+	        AND inv_id = prm_inv_id;
+	      
+	      if p_cur_amount is null then 
+	        p_cur_amount := 0;
+	      end if;
+      
+	      --判断订单是否使用审核功能
+	      SELECT para_value 
+	      INTO p_04033
+	      FROM acc_para 
+	      WHERE group_id = prm_group_id
+	        AND hos_id = prm_hos_id
+	        AND copy_code = prm_copy_code
+	        AND mod_code = '04'
+	        AND para_code = '04033';
+	      
+	      --获取在途订单量 = 有效订单中未入库的数量
+	      SELECT sum(b.amount - nvl(c.in_amount, 0))
+	      INTO p_order_amount
+	      FROM mat_order_main a
+	      LEFT JOIN mat_order_detail b
+	        ON a.group_id = b.group_id
+	        AND a.hos_id = b.hos_id
+	        AND a.copy_code = b.copy_code
+	        AND a.order_id = b.order_id
+	      LEFT JOIN (
+	        SELECT order_id, order_detail_id, sum(in_amount) in_amount
+	        FROM mat_in_order_rela
+	        WHERE group_id = prm_group_id
+	          AND hos_id = prm_hos_id
+	          AND copy_code = prm_copy_code
+	        GROUP BY order_id, order_detail_id
+	      ) c
+	        ON a.order_id = c.order_id
+	        AND b.order_detail_id = c.order_detail_id
+	      WHERE a.group_id = prm_group_id
+	        AND a.hos_id = prm_hos_id
+	        AND a.copy_code = prm_copy_code
+	        AND a.store_id = prm_store_id
+	        AND b.inv_id = prm_inv_id
+	        AND (
+	          (p_04033 = 0 and a.state not in (0, 4, 9))
+	          or 
+	          (p_04033 = 1 and a.state not in (0, 1, 4, 9))
+	        )
+	        AND b.amount - nvl(c.in_amount, 0) > 0;
+	
+	      if p_order_amount is null then
+	        p_order_amount := 0;
+	      end if;
+	      
+	      --获取材料平均日消耗量 = 日消耗量周期内总消耗量(所有仓库的出库数量) / 周期天数
+	      SELECT sum(b.amount) / (p_period * p_rxhl_period)
+	      INTO p_pjrxhl
+	      FROM mat_out_main a
+	      LEFT JOIN mat_out_detail b
+	        ON a.group_id = b.group_id
+	        AND a.hos_id = b.hos_id
+	        AND a.copy_code = b.copy_code
+	        AND a.out_id = b.out_id
+	      WHERE a.group_id = prm_group_id
+	        AND a.hos_id = prm_hos_id
+	        AND a.copy_code = prm_copy_code
+	        AND b.inv_id = prm_inv_id
+	        AND a.state = 3
+	        AND ceil(sysdate - a.out_date) <= p_period * p_rxhl_period;
+	      
+	      if p_pjrxhl is null then 
+	        p_pjrxhl := 0;
+	      end if;
+	        
+	      --计算建议采购量 = 取整{【平均日消耗量（近半年）×（配送周期+采购周期）—当前库存量—在途订货】/最小采购批量}×最小采购批量
+	      p_num := ceil((p_pjrxhl * (p_ps_period + p_cg_period) - p_cur_amount - p_order_amount) / p_min_pur) * p_min_pur;
+	
+	      return p_num;
+	    END getMatPurAdviseNum;
+	]]></sql>
+	
+</root>
+

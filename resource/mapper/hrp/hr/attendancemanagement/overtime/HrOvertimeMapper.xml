@@ -1,0 +1,490 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.hr.dao.attendancemanagement.overtime.HrOvertimeMapper">
+
+	<resultMap id="hrOvertimeMap" type="java.util.Map">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="overtime_code" column="overtime_code" />
+		<result property="attend_year" column="attend_year" />
+		<result property="emp_id" column="emp_id" />
+		<result property="emp_code" column="emp_code" />
+		<result property="emp_name" column="emp_name" />
+		<result property="bdept_id" column="bdept_id" />
+		<result property="bdept_name" column="bdept_name" />
+		<result property="cdept_id" column="cdept_id" />
+		<result property="cdept_name" column="cdept_name" />	
+		<result property="photo" column="photo" />	
+		<result property="attend_code" column="attend_code" />
+		<result property="kind_name" column="kind_name" />
+		<result property="overtime_date" column="overtime_date" />
+		<result property="begin_date" column="begin_date" />
+		<result property="end_date" column="end_date" />
+		<result property="hours" column="hours" />
+		<result property="oper" column="oper" />
+		<result property="oper_name" column="oper_name" />
+		<result property="oper_date" column="oper_date" />
+		<result property="days" column="days" /> 
+		<result property="state" column="state" />
+		<result property="state_name" column="state_name" />
+		<result property="create_date" column="create_date" />
+		<result property="checker_name" column="checker_name" />
+		<result property="check_date" column="check_date" />
+		<result property="note" column="note" />
+		<result property="back_reason" column="back_reason"/>
+	</resultMap>
+	
+	<!-- 添加 -->
+	<insert id="add" useGeneratedKeys="true">
+		INSERT INTO HR_ATTEND_OVERTIME (
+			group_id, hos_id, overtime_code, attend_year, cdept_id, emp_id, bdept_id, attend_code, 
+			overtime_date, begin_date, end_date, hours, days, state, create_date, note 
+			<if test="add_valid_amt != null ">
+				,add_valid_amt
+			</if>
+			<if test="add_invalid_amt != null ">
+				,add_invalid_amt
+			</if>
+		) VALUES (
+			#{group_id,jdbcType=INTEGER},
+			#{hos_id,jdbcType=INTEGER},
+		    #{overtime_code,jdbcType=VARCHAR},
+		    #{attend_year,jdbcType=VARCHAR},
+			#{cdept_id,jdbcType=INTEGER},
+			#{emp_id,jdbcType=INTEGER},
+			#{bdept_id,jdbcType=INTEGER},
+			#{attend_code,jdbcType=VARCHAR},
+			#{overtime_date,jdbcType=DATE},
+			#{begin_date,jdbcType=VARCHAR}, 
+			#{end_date,jdbcType=VARCHAR}, 
+			#{hours,jdbcType=FLOAT},
+			#{days,jdbcType=FLOAT},
+			#{state,jdbcType=INTEGER},
+			#{create_date,jdbcType=DATE},
+			#{note,jdbcType=VARCHAR}
+			<if test="add_valid_amt != null ">
+				,#{add_valid_amt,jdbcType=INTEGER}
+			</if>
+			<if test="add_invalid_amt != null ">
+				,#{add_invalid_amt,jdbcType=INTEGER}
+			</if>
+		)
+	</insert>	
+	
+	<!-- 主查询 -->
+	<select id="queryOvertime" resultMap="hrOvertimeMap" parameterType="java.util.Map">
+		SELECT 
+			hao.group_id, hao.hos_id, hao.overtime_code, hao.cdept_id, hdc.dept_name cdept_name,
+			he.emp_code, he.emp_name, hao.emp_id, hao.bdept_id, hdb.dept_name bdept_name, 
+			hao.attend_code, hai.attend_name kind_name, hao.overtime_date, hao.begin_date, 
+			hao.end_date, hao.hours, hao.days, sy.user_name oper_name, hao.oper_date,
+			hao.checker, sy1.user_name checker_name, hao.check_date, hao.back_reason, 
+			hao.state, hao.create_date, hao.attend_year, 
+			CASE 
+				when hao.state='0' then '新建' 
+				when hao.state='1' then '已提交' 
+				when hao.state='2' then '已审核' 
+				else ''
+	 		END state_name, hao.note, hao.add_valid_amt, hao.add_invalid_amt
+	 	FROM  HR_ATTEND_OVERTIME hao 
+		LEFT JOIN hos_emp he 
+			ON hao.group_id = he.group_id
+			AND hao.hos_id = he.hos_id
+			AND hao.emp_id = he.emp_id
+			and he.is_attend = 1 
+	    <if test="dept_source == 1">
+		LEFT JOIN hr_dept_dict hdb 
+			ON hao.group_id = hdb.group_id
+			AND hao.hos_id = hdb.hos_id
+			AND hao.bdept_id = hdb.dept_id
+			AND hdb.is_stop = 0
+			LEFT JOIN hr_dept_dict hdc 
+			ON hao.group_id = hdc.group_id
+			AND hao.hos_id = hdc.hos_id
+			AND hao.cdept_id = hdc.dept_id
+			AND hdc.is_stop = 0
+	   </if>
+	     <if test="dept_source == 2">
+		LEFT JOIN hos_dept_dict hdb 
+			ON hao.group_id = hdb.group_id
+			AND hao.hos_id = hdb.hos_id
+			AND hao.bdept_id = hdb.dept_id
+			AND hdb.is_stop = 0
+			LEFT JOIN hos_dept_dict hdc 
+			ON hao.group_id = hdc.group_id
+			AND hao.hos_id = hdc.hos_id
+			AND hao.cdept_id = hdc.dept_id
+			AND hdc.is_stop = 0
+	   </if>
+		
+		LEFT JOIN hr_attend_item hai
+			ON hao.group_id = hai.group_id
+			AND hao.hos_id = hai.hos_id
+			AND hao.attend_code = hai.attend_code
+			AND hai.attend_types = '02'
+		LEFT JOIN sys_user sy
+			ON hao.group_id = sy.group_id
+			AND hao.hos_id = sy.hos_id
+			AND hao.oper = sy.user_id
+		LEFT JOIN sys_user sy1
+			ON hao.group_id = sy1.group_id
+			AND hao.hos_id = sy1.hos_id
+			AND hao.checker = sy1.user_id
+		WHERE hao.group_id = #{group_id,jdbcType=INTEGER}
+			AND hao.hos_id = #{hos_id,jdbcType=INTEGER}
+			<if test="overtime_code != null and overtime_code != ''">
+				AND hao.overtime_code like '%${overtime_code}%'
+			</if>
+			<if test="create_beg_date != null and create_beg_date != ''">
+				AND hao.create_date &gt;= #{create_beg_date,jdbcType=DATE}
+			</if>
+			<if test="create_end_date != null and create_end_date != ''">
+				AND hao.create_date &lt;= #{create_end_date,jdbcType=DATE}
+			</if>
+			<if test="overtime_beg_date != null and overtime_beg_date != ''">
+				AND hao.overtime_date  &gt;= #{overtime_beg_date,jdbcType=VARCHAR}
+			</if>
+			<if test="overtime_end_date != null and overtime_end_date != ''">
+				AND hao.overtime_date &lt;= #{overtime_end_date,jdbcType=VARCHAR}
+			</if>
+			<if test="emp_id != null and emp_id != ''">
+				AND hao.emp_id = #{emp_id,jdbcType=INTEGER}
+			</if>
+			<if test="cdept_id != null and cdept_id != ''">
+				AND hao.cdept_id = #{cdept_id,jdbcType=INTEGER}
+			</if>
+			<if test="bdept_id != null and bdept_id != ''">
+				AND hao.bdept_id = #{bdept_id,jdbcType=INTEGER}
+			</if>
+			<if test="attend_code != null and attend_code != ''">
+				AND hao.attend_code = #{attend_code,jdbcType=VARCHAR}
+			</if>
+			<if test="state != null and state != ''">
+				AND hao.state = #{state,jdbcType=INTEGER}
+			</if>
+			<if test="is_check != null and is_check == 1">
+				AND hao.state &gt;= 1
+			</if>
+			and exists (
+			select 1
+			from sys_user_perm_data b
+			where he.group_id = b.group_id
+			and he.hos_id = b.hos_id
+			and to_char(he.dept_id) = b.perm_code
+			and user_id =#{user_id,jdbcType=VARCHAR}
+			 <if test="dept_source == 1">
+			and TABLE_CODE = 'HR_DEPT_DICT'
+			</if>
+			 <if test="dept_source == 2">
+			and TABLE_CODE = 'HOS_DEPT_DICT'
+			</if>
+			and (b.is_read = 1 or b.is_write = 1)
+		)
+			and he.is_attend = 1 
+		order by hao.overtime_code asc
+	</select>
+	
+	
+	<!-- 修改跳转查询 -->
+	<select id="queryByCode" resultMap="hrOvertimeMap" parameterType="java.util.Map">
+		SELECT hao.overtime_code, hao.emp_id, he.emp_name, 
+			hdb.dept_name bdept_name, hdb.dept_no || '@' || hdb.dept_id as bdept_id,
+			hdc.dept_name cdept_name, hdc.dept_no || '@' || hdc.dept_id as cdept_id, 
+			he.photo, hao.attend_code, hao.overtime_date, hao.begin_date, hao.end_date, hao.hours, 
+			hao.days, hao.oper_date, hao.state, hao.note, hao.create_date
+		FROM HR_ATTEND_OVERTIME hao
+		LEFT JOIN hos_emp he 
+			ON hao.group_id = he.group_id
+			AND hao.hos_id = he.hos_id 
+			AND hao.emp_id = he.emp_id
+		<if test="dept_source == 1">
+		LEFT JOIN hr_dept_dict hdb  
+			ON hao.group_id = hdb.group_id
+			AND hao.hos_id = hdb.hos_id
+			AND hao.bdept_id = hdb.dept_id
+			and hdb.is_stop = 0 
+		LEFT JOIN hr_dept_dict hdc  
+			ON hao.group_id = hdc.group_id
+			AND hao.hos_id = hdc.hos_id
+			AND hao.cdept_id = hdc.dept_id
+			AND hdc.is_stop = 0
+		</if>	
+		<if test="dept_source == 2">
+		LEFT JOIN hos_dept_dict hdb  
+			ON hao.group_id = hdb.group_id
+			AND hao.hos_id = hdb.hos_id
+			AND hao.bdept_id = hdb.dept_id
+			and hdb.is_stop = 0 
+		LEFT JOIN hos_dept_dict hdc  
+			ON hao.group_id = hdc.group_id
+			AND hao.hos_id = hdc.hos_id
+			AND hao.cdept_id = hdc.dept_id
+			AND hdc.is_stop = 0
+		</if>	
+		WHERE hao.group_id = #{group_id,jdbcType=INTEGER}
+			AND hao.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND hao.overtime_code = #{overtime_code,jdbcType=VARCHAR}
+	</select>
+	
+	<!-- 修改 -->
+	<update id="update" parameterType="java.util.Map">
+		UPDATE HR_ATTEND_OVERTIME
+		SET attend_year = #{attend_year,jdbcType=VARCHAR},
+			bdept_id = #{bdept_id,jdbcType=INTEGER},
+			cdept_id = #{cdept_id,jdbcType=INTEGER},
+			emp_id = #{emp_id,jdbcType=INTEGER},
+			attend_code = #{attend_code,jdbcType=VARCHAR},
+			overtime_date = #{overtime_date,jdbcType=DATE},
+			begin_date = #{begin_date,jdbcType=VARCHAR}, 
+			end_date = #{end_date,jdbcType=VARCHAR}, 
+			hours =#{hours,jdbcType=FLOAT},
+			days = #{days,jdbcType=FLOAT},
+			note = #{note,jdbcType=VARCHAR}
+			<if test="add_valid_amt != null">
+				,add_valid_amt = #{add_valid_amt,jdbcType=INTEGER}
+			</if> 
+			<if test="add_invalid_amt != null">
+				,add_invalid_amt = #{add_invalid_amt,jdbcType=INTEGER}
+			</if> 
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND overtime_code = #{overtime_code,jdbcType=VARCHAR}
+	</update>
+	
+	<!-- 删除根据主键 -->
+	<delete id="deleteHrOvertime" parameterType="java.util.Map">
+		DELETE FROM HR_ATTEND_OVERTIME	 
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			and hos_id = #{hos_id,jdbcType=INTEGER}
+			and overtime_code in (${overtime_codes})
+	</delete>
+	
+	<!-- 提交、取消提交更新单据状态 -->
+	<update id="updateStateByConfirm" parameterType="java.util.Map">
+		UPDATE HR_ATTEND_OVERTIME 
+		SET 
+			state = #{state,jdbcType=INTEGER}, 
+			oper = #{oper,jdbcType=INTEGER}, 
+			oper_date = #{oper_date,jdbcType=DATE},
+			back_reason=null
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id =#{hos_id,jdbcType=INTEGER}
+			AND overtime_code in (${overtime_codes})
+	</update>
+	
+	<!-- 审核、消审更新单据状态 -->
+	<update id="updateStateByCheck" parameterType="java.util.Map">
+		UPDATE HR_ATTEND_OVERTIME 
+		SET 
+			state = #{state,jdbcType=INTEGER}, 
+			checker = #{checker,jdbcType=INTEGER}, 
+			check_date = #{check_date,jdbcType=DATE}
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id =#{hos_id,jdbcType=INTEGER}
+			AND overtime_code in (${overtime_codes})
+	</update>
+	
+	<!-- 退回更新单据状态 -->
+	<update id="updateStateByBack" parameterType="java.util.Map">
+		UPDATE HR_ATTEND_OVERTIME 
+		SET 
+			state = #{state,jdbcType=INTEGER}, 
+			oper = #{oper,jdbcType=INTEGER}, 
+			oper_date = #{oper_date,jdbcType=DATE}, 
+			back_reason = #{back_reason,jdbcType=VARCHAR}
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id =#{hos_id,jdbcType=INTEGER}
+			AND overtime_code in (${overtime_codes})
+	</update>
+	
+	<!-- 打印 -->
+	<select id="queryOvertimeByPrint" resultType="java.util.Map" parameterType="java.util.Map">
+		SELECT 
+			hao.overtime_code, hdb.dept_name bdept_name, hdc.dept_name cdept_name, 
+			he.emp_code, he.emp_name, hao.emp_id, hai.attend_name kind_name, 
+			hao.overtime_date, hao.begin_date, hao.end_date, hao.hours, hao.days, 
+			sy.user_name oper_name, hao.oper_date,
+			hao.checker, sy1.user_name checker_name, hao.check_date, hao.back_reason,
+			hao.state, hao.create_date, hao.attend_year, 
+			CASE 
+				when hao.state='0' then '新建' 
+				when hao.state='1' then '已提交' 
+				when hao.state='2' then '已审核' 
+			ELSE ''
+	 		END state_name, hao.note
+	 	FROM  HR_ATTEND_OVERTIME hao 
+		LEFT JOIN hos_emp he 
+			ON hao.group_id = he.group_id
+			AND hao.hos_id = he.hos_id
+			AND hao.emp_id = he.emp_id
+		 <if test="dept_source == 1">	
+		LEFT JOIN hr_dept_dict hdb 
+			ON hao.group_id = hdb.group_id
+			AND hao.hos_id = hdb.hos_id
+			AND hao.bdept_id = hdb.dept_id
+			AND hdb.is_stop = 0
+		LEFT JOIN hr_dept_dict hdc 
+			ON hao.group_id = hdc.group_id
+			AND hao.hos_id = hdc.hos_id
+			AND hao.cdept_id = hdc.dept_id
+			AND hdc.is_stop = 0
+		</if>
+		<if test="dept_source == 2">	
+		LEFT JOIN hos_dept_dict hdb 
+			ON hao.group_id = hdb.group_id
+			AND hao.hos_id = hdb.hos_id
+			AND hao.bdept_id = hdb.dept_id
+			AND hdb.is_stop = 0
+		LEFT JOIN hos_dept_dict hdc 
+			ON hao.group_id = hdc.group_id
+			AND hao.hos_id = hdc.hos_id
+			AND hao.cdept_id = hdc.dept_id
+			AND hdc.is_stop = 0
+		</if>	
+		LEFT JOIN hr_attend_item hai
+			ON hao.group_id = hai.group_id
+			AND hao.hos_id = hai.hos_id
+			AND hao.attend_code = hai.attend_code
+			AND hai.attend_types = 02
+		LEFT JOIN sys_user sy
+			ON hao.group_id = sy.group_id
+			AND hao.hos_id = sy.hos_id
+			AND hao.oper = sy.user_id
+		LEFT JOIN sys_user sy1
+			ON hao.group_id = sy1.group_id
+			AND hao.hos_id = sy1.hos_id
+			AND hao.checker = sy1.user_id
+		WHERE hao.group_id = #{group_id,jdbcType=INTEGER}
+			AND hao.hos_id = #{hos_id,jdbcType=INTEGER}
+			<if test="overtime_code != null and overtime_code != ''">
+				AND hao.overtime_code like '%${overtime_code}%'
+			</if>
+			<if test="create_beg_date != null and create_beg_date != ''">
+				AND hao.create_date &gt;= #{create_beg_date,jdbcType=DATE}
+			</if>
+			<if test="create_end_date != null and create_end_date != ''">
+				AND hao.create_date &lt;= #{create_end_date,jdbcType=DATE}
+			</if>
+			<if test="overtime_beg_date != null and overtime_beg_date != ''">
+				AND hao.overtime_date  &gt;= #{overtime_beg_date,jdbcType=VARCHAR}
+			</if>
+			<if test="overtime_end_date != null and overtime_end_date != ''">
+				AND hao.overtime_date &lt;= #{overtime_end_date,jdbcType=VARCHAR}
+			</if>
+			<if test="emp_id != null and emp_id != ''">
+				AND hao.emp_id = #{emp_id,jdbcType=INTEGER}
+			</if>
+			<if test="cdept_id != null and cdept_id != ''">
+				AND hao.cdept_id = #{cdept_id,jdbcType=INTEGER}
+			</if>
+			<if test="bdept_id != null and bdept_id != ''">
+				AND hao.bdept_id = #{bdept_id,jdbcType=INTEGER}
+			</if>
+			<if test="attend_code != null and attend_code != ''">
+				AND hao.attend_code = #{attend_code,jdbcType=VARCHAR}
+			</if>
+			<if test="state != null and state != ''">
+				AND hao.state = #{state,jdbcType=INTEGER}
+			</if>
+		order by hao.overtime_code asc
+	</select>
+
+	<!-- 取积休天数 -->
+	<select id="queryHosJxNum" resultType="java.util.Map" parameterType="java.util.Map">
+		select group_id,hos_id,attend_acctop
+		from hr_attend_acctop
+		where
+				group_id = #{group_id,jdbcType=INTEGER}
+			and hos_id = #{hos_id,jdbcType=INTEGER}
+			and attend_acc_isnot = 1
+	</select>
+	
+	<!-- 账表中每个职工的积休余额 -->
+	<select id="queryAttendCodeByJx" resultType="java.util.Map" parameterType="java.util.Map">
+		select aa.group_id,aa.hos_id,aa.emp_id,aa.attend_code,aa.bala_amt,aa.add_valid_amt,aa.add_invalid_amt
+	    from hr_attend_vacal_balance aa 
+	    join (
+	    	select a.group_id,a.hos_id,a.attend_code,a.attend_types,a.control_type,a.max_ed,a.is_jx 
+		    from hr_attend_item  a
+		    where a.group_id = #{group_id,jdbcType=INTEGER}
+				and a.hos_id = #{hos_id,jdbcType=INTEGER}
+		      	and a.is_jx = 1
+		      	and a.is_stop = 0
+        ) bb on aa.group_id=bb.group_id and aa.hos_id=bb.hos_id and aa.attend_code = bb.attend_code
+	</select>
+	<select  id="getAttendCodeOfJx" resultType="java.util.Map" parameterType="java.util.Map">
+		select attend_code from hr_attend_item a where a.group_id = #{group_id,jdbcType=INTEGER}
+				and a.hos_id = #{hos_id,jdbcType=INTEGER}
+		      	and a.is_jx = 1
+		      	and a.is_stop = 0
+	</select>
+	
+	<!-- 查询考勤数据 -->
+	<select id="queryOvertimeData" resultType="java.util.Map" parameterType="java.util.Map">
+		select emp_id,attend_code,days,overtime_code,add_valid_amt,add_invalid_amt  
+			from HR_ATTEND_OVERTIME a
+			where 	group_id = #{group_id,jdbcType=INTEGER}
+				and hos_id = #{hos_id,jdbcType=INTEGER}
+				and overtime_code in (${overtime_codes})
+	</select>
+	
+	<!-- 根据单号查询员工的账表信息 -->
+	<select id="queryBanlaceByOverCode" resultType="java.util.Map" parameterType="java.util.Map">
+		select a.group_id,a.hos_id,a.emp_id,a.attend_code,a.add_valid_amt-b.sum_add add_valid_amt ,
+			a.add_invalid_amt-b.sum_addv add_invalid_amt,
+       		a.limit + (a.add_valid_amt-b.sum_add)-a.dec_amt  bala_amt
+    	from hr_attend_vacal_balance a
+     	join (
+			select group_id, hos_id, emp_id, attend_code, 
+				sum(days) as sumdays,sum(add_valid_amt) sum_add,sum(add_invalid_amt) sum_addv
+			from HR_ATTEND_OVERTIME
+			where group_id = #{group_id,jdbcType=INTEGER}
+				and hos_id = #{hos_id,jdbcType=INTEGER}
+				and overtime_code in (${overtime_codes})
+			group by group_id, hos_id, emp_id, attend_code
+		) b on a.group_id=b.group_id and a.hos_id=b.hos_id and a.attend_code=b.attend_code and a.emp_id=b.emp_id
+		where a.attend_year = #{attend_year}	
+	</select>
+	
+	<!-- 状态判断（是否存在不为该状态的数据） -->
+	<select id="notExistsByState" parameterType="java.util.Map" resultType="java.lang.Integer">
+		SELECT count(0) 
+		FROM HR_ATTEND_OVERTIME 
+		WHERE group_id = #{group_id,jdbcType=INTEGER} 
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			<if test="overtime_codes != null and overtime_codes != ''">
+				AND overtime_code in #{overtime_codes}
+			</if>
+			<if test="attend_year != null and attend_year != ''">
+				AND attend_year= #{attend_year}
+			</if>
+			<if test="check_state != null and check_state != ''">
+				AND state = #{check_state,jdbcType=INTEGER}
+			</if>
+	</select>
+	
+	<!-- 批量更新(用于审核) -->
+	<update id="updateBatchStateByCheck" parameterType="java.util.List">
+		<foreach collection="list" item="item" index="index" open="begin" close=";end;" separator=";">
+			update HR_ATTEND_OVERTIME set 
+				state = #{map.state}
+				<if test="map.checker != null">
+					,checker =  #{map.checker}
+				</if>
+				<if test="map.check_date != null">
+					,check_date =  #{map.check_date}
+				</if>
+				<if test="item.add_valid_amt != null">
+					,add_valid_amt =  #{item.add_valid_amt}
+				</if>
+				<if test="item.add_invalid_amt != null">
+					,add_invalid_amt =  #{item.add_invalid_amt}
+				</if>
+			where group_id = #{map.group_id}
+				AND hos_id = #{map.hos_id}
+				<!-- AND emp_id = #{item.emp_id} -->
+				<!-- AND attend_code = #{item.attend_code} -->
+				and overtime_code = #{item.overtime_code}
+		</foreach>
+	</update>
+</mapper>

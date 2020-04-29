@@ -1,0 +1,2281 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.sys.dao.HrpSysSelectMapper">
+	<resultMap type="com.chd.hrp.sys.entity.HrpSysSelect" id="hrpSysSelect">
+		<result property="id" column="id" />
+		<result property="text" column="text" />
+	</resultMap>
+	
+	
+	<resultMap type="java.util.Map" id="sysAccSubjTypeMap">
+		<result column="group_id" property="group_id"/>
+		<result column="hos_id" property="hos_id"/>
+		<result column="copy_code" property="copy_code"/>
+		<result column="subj_type_code" property="subj_type_code"/>
+		<result column="subj_type_name" property="subj_type_name"/>
+	</resultMap>
+	<!-- 下拉框 -->
+	<resultMap type="com.chd.hrp.acc.entity.HrpAccSelect" id="hrpAccSelect">
+		<result property="id" column="id" />
+		<result property="text" column="text" />
+		<result property="search" column="search" />
+		<result property="nature_code" column="nature_code" />
+		<result property="nature_name" column="nature_name" />
+		<result property="type_code" column="type_code" />
+		<result property="type_name" column="type_name" />
+	</resultMap>
+	
+	<select id="queryEmpDict" resultMap="hrpSysSelect">
+		SELECT
+			hed.emp_id id,
+			hed.emp_code||' '||hed.emp_name text
+		FROM HOS_EMP_DICT hed
+		<!-- <if test="user_id != null and user_id != ''">
+	                   left join v_user_data_perm vudp 
+					on hed.group_id=vudp.group_id and hed.hos_id=vudp.hos_id 
+						and hed.emp_id=vudp.perm_code 
+         </if> -->
+		<where>
+			<if test="user_id != null and user_id != ''">
+				and hed.emp_id in (select vudp.perm_code 
+								   from v_user_data_perm vudp 
+								   where vudp.group_id = #{group_id} 
+									 and vudp.hos_id = #{hos_id}
+									 and vudp.is_read = 1 
+									 and vudp.is_write = 1
+									 and vudp.table_code = 'HOS_EMP_DICT'
+									 and vudp.user_id=#{user_id})
+			</if>
+			and is_stop = 0
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="dept_id != null  and dept_id != ''">
+				and dept_id = #{dept_id}
+			</if>
+			<if test="is_disable != null  and is_disable != ''">
+				and is_disable = #{is_disable}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+				<!-- emp_id like '%${key}%' or -->
+					upper(hed.emp_code) like '%${key}%' or
+					upper(hed.emp_name) like '%${key}%'
+					or
+					upper(hed.spell_code) like '%${key}%' or
+					upper(hed.wbx_code) like '%${key}%'
+				)
+			</if>
+		</where>
+		order by hed.emp_id
+	</select>
+	
+	<select id="queryEmpDictDept" resultMap="hrpSysSelect">
+	SELECT
+		hed.emp_id||'.'||hed.emp_no id,
+      hed.emp_code||' '||hed.emp_name||'('||hdd.dept_name||')' text
+		FROM HOS_EMP_DICT hed
+		    left join hos_dept_dict hdd 
+    on hed.group_id = hdd.group_id
+    and hed.hos_id = hdd.hos_id
+    and hed.dept_id = hdd.dept_id
+    and hdd.is_stop = 0
+				<where>
+		 <if test="kind_code != null and kind_code != ''">
+			 and hed.kind_code in (
+			select kind_code from hos_emp_kind
+			<where>
+				<if test="group_id != null  and group_id != ''">
+					and group_id = #{group_id}
+				</if>
+				<if test="hos_id != null  and hos_id != ''">
+					and hos_id = #{hos_id}
+				</if>
+					and kind_code = #{kind_code}
+			</where>
+			)
+		 </if>
+		 <if test="dept_id != null and dept_id != ''">
+			 and hed.dept_id in (
+			select dept_id from hos_dept_dict
+			<where>
+				<if test="group_id != null  and group_id != ''">
+					and group_id = #{group_id}
+				</if>
+				<if test="hos_id != null  and hos_id != ''">
+					and hos_id = #{hos_id}
+				</if>
+				<if test="dept_id != null  and dept_id != ''">
+					and dept_id = #{dept_id}
+				</if>
+				<if test="dept_no != null  and dept_no != ''">
+					and dept_no = #{dept_no}
+				</if>
+			</where>
+			)
+		 </if>
+			<if test="group_id != null  and group_id != ''">
+				and hed.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hed.hos_id = #{hos_id}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+				hed.emp_id like '${key}%' or
+				hed.emp_code like '${key}%' or
+				hed.emp_name like '%${key}%'
+				or
+				hed.spell_code like '%${key}%' or
+				hed.wbx_code like '%${key}%'
+				)
+			</if>
+			and  hed.is_stop = 0 
+		</where>
+		order by hed.emp_id
+	</select>
+	
+	<select id="queryEmpDictForCode" resultMap="hrpSysSelect">
+		SELECT
+		emp_code id,
+		emp_name text
+		FROM HOS_EMP
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+				emp_id like '%${key}%' or
+				emp_name like '%${key}%'
+				or
+				spell_code like '%${key}%' or
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+
+		order by emp_id
+	</select>
+	<!-- 加载项目 -->
+	<select id="queryProjDictDict" resultMap="hrpSysSelect">
+		SELECT
+		p1.proj_id||'.'||p1.proj_no||'.'||p1.proj_code id,
+		p1.proj_code||' '||p1.proj_name text
+		FROM HOS_PROJ_DICT p1
+			left join hos_proj_type p2
+			on p1.group_id = p2.group_id
+			and p1.hos_id = p2.hos_id
+			and p1.type_code = p2.type_code
+		<where>
+		p1.is_stop = 0
+		<if test="attr_code != null and attr_code != '' ">
+			AND p2.attr_code = #{attr_code,jdbcType=VARCHAR}
+		</if>
+			<if test="group_id != null  and group_id != ''">
+				and p1.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and p1.hos_id = #{hos_id}
+			</if>
+			<if test="proj_id != null  and proj_id != ''">
+				and p1.proj_id = #{proj_id}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+				p1.proj_code like '${key}%' or
+				p1.proj_name like '%${key}%'
+				or
+				p1.spell_code like '%${key}%' or
+				p1.wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+
+		order by proj_code
+	</select>
+	<!-- 加载项目 明细-->
+	<select id="queryProjDictDictDet" resultMap="hrpSysSelect">
+	select p1.proj_id || '.' || p1.proj_no || '.' || p1.proj_code as id,
+	       p1.proj_code || ' ' || p1.proj_name || '(' || hed.emp_name|| '/' || p2.type_name || '/' || hpu.use_name ||')' as text
+	  from HOS_PROJ_DICT p1
+	  left join hos_proj_type p2
+	    on p1.group_id = p2.group_id
+	   and p1.hos_id = p2.hos_id
+	   and p1.type_code = p2.type_code
+	   left join acc_proj_attr p3 
+	   on p1.group_id = p3.group_id
+	   and p1.hos_id = p3.hos_id
+	   and p1.proj_id = p3.proj_id
+	   left join hos_emp_dict hed 
+	   on p3.group_id = hed.group_id
+	   and p3.hos_id = hed.hos_id
+	   and p3.con_emp_id = hed.emp_id
+	   left join hos_proj_use hpu
+	   on p3.group_id = hpu.group_id
+	   and p3.hos_id = hpu.hos_id
+	   and p3.use_code = hpu.use_code
+		<where>
+		p1.is_stop = 0
+		<if test="attr_code != null and attr_code != '' ">
+			AND p2.attr_code = #{attr_code,jdbcType=VARCHAR}
+		</if>
+			<if test="group_id != null  and group_id != ''">
+				and p1.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and p1.hos_id = #{hos_id}
+			</if>
+			<if test="proj_id != null  and proj_id != ''">
+				and p1.proj_id = #{proj_id}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+				p1.proj_code like '${key}%' or
+				p1.proj_name like '%${key}%'
+				or
+				p1.spell_code like '%${key}%' or
+				p1.wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+
+		order by proj_code
+	</select>
+	<!-- 加载仓库 -->
+	<select id="queryStoreDictDict" resultMap="hrpSysSelect">
+		SELECT
+		store_id||'.'||store_no||'.'||store_code id,
+		store_code||' '||store_name text
+		FROM HOS_STORE_DICT
+		<where>
+		is_stop = 0
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="is_ass_flag != null  and is_ass_flag != ''">
+				and is_ass = 1
+			</if>
+			<if test="key != null and key != ''">
+				and (
+				store_code like '%${key}%' or
+				store_name like '%${key}%'
+				or
+				spell_code like '%${key}%' or
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+
+		order by store_code
+	</select>
+	
+	<!-- 加载虚仓 -->
+	<select id="querySetDictDict" resultMap="hrpSysSelect">
+		select set_id as id, set_code || ' ' || set_name as text
+		from MAT_STORE_SET 
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+				set_code like '%${key}%' or
+				set_name like '%${key}%')
+			</if>
+		</where>
+		order by set_code
+	</select>
+	<!-- 加载供应商 -->
+	<select id="querySupDictDict" resultMap="hrpSysSelect">
+		SELECT
+		sup_id||'.'||sup_no||'.'||sup_code id,
+		sup_code||' '||sup_name text
+		FROM HOS_SUP_DICT
+		<where>
+		is_stop = 0
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+				sup_code like '${key}%' or
+				sup_name like '%${key}%'
+				or
+				spell_code like '%${key}%' or
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+
+		order by sup_code
+	</select>
+	
+	<select id="queryEmp" resultMap="hrpSysSelect">
+		SELECT
+		emp_id||'.'||emp_no||'.'||emp_code id,
+		emp_code||' '||emp_name text
+		FROM HOS_EMP_DICT
+		<where>
+			is_stop = 0
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="dept_id != null  and dept_id != ''">
+				and dept_id = #{dept_id}
+			</if>
+			<if test="is_disable != null  and is_disable != ''">
+				and is_disable = #{is_disable}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+				emp_code like '${key}%' or
+				emp_name like '%${key}%'
+				or
+				spell_code like '%${key}%' or
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+
+		order by emp_code
+	</select>
+	
+	<select id="queryEmpNew" resultMap="hrpSysSelect">
+		SELECT
+		emp_id id,
+		emp_code||' '||emp_name text
+		FROM HOS_EMP_DICT
+		<where>
+			is_stop = 0
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="dept_id != null  and dept_id != ''">
+				and dept_id = #{dept_id}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+				emp_code like '${key}%' or
+				emp_name like '%${key}%'
+				or
+				spell_code like '%${key}%' or
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+
+		order by emp_code
+	</select>
+
+	<select id="queryHosLevelDict" resultMap="hrpSysSelect">
+		SELECT
+		level_code id,
+		level_name text
+		FROM DIC_HOS_LEVEL
+		<where>
+			
+			<!-- <if test="group_id != null and group_id != ''"> and group_id = #{group_id} 
+				</if> <if test="hos_id != null and hos_id != ''"> and hos_id = #{hos_id} 
+				</if> -->
+			<if test="key != null and key != ''">
+				and (
+				level_code like '%${key}%' or
+				level_name like
+				'%${key}%'
+				)
+			</if>
+		</where>
+		order by level_code
+	</select>
+
+	<select id="queryHosTypeDict" resultMap="hrpSysSelect">
+		SELECT
+		type_code id,
+		type_name text
+		FROM DIC_HOS_TYPE
+		<where>
+			
+			<if test="key != null and key != ''">
+				and (
+				type_code like '%${key}%' or
+				type_name like
+				'%${key}%'
+				)
+			</if>
+		</where>
+		order by type_code
+	</select>
+
+	<select id="queryCountriesDict" resultMap="hrpSysSelect">
+		SELECT
+		countries_code id,
+		countries_name text
+		FROM DIC_COUNTRIES
+		<where>
+			
+			<if test="key != null and key != ''">
+				and (
+				countries_code like '%${key}%' or
+				countries_name like
+				'%${key}%' or
+				spell_code like '%${key}%' or
+				wbx_code like '%${key}%'
+				)
+			</if>
+			
+		</where>
+		order by countries_code
+	</select>
+
+	<select id="queryRegionDict" resultMap="hrpSysSelect">
+		SELECT
+		cities_code id,
+		cities_name text
+		FROM DIC_REGION
+		<where>
+			
+			<if test="key != null and key != ''">
+				and (
+				cities_code like '%${key}%' or
+				cities_name like
+				'%${key}%' or
+				spell_code like '%${key}%' or
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by cities_code
+	</select>
+
+	<select id="queryPoliticalDict" resultMap="hrpSysSelect">
+		SELECT
+		political_code id,
+		political_name text
+		FROM DIC_POLITICAL
+		<where>
+			
+			<if test=" key != null and key != ''">
+				and (
+				political_code like '%${key}%' or
+				political_name like
+				'%${key}%' or
+				spell_code like '%${key}%' or
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by political_code
+	</select>
+
+	<!-- 用户查询列表 -->
+	<select id="queryUserDict" resultMap="hrpSysSelect">
+	select * from (
+		SELECT
+		user_id id,
+		user_name text
+		FROM SYS_USER
+		where group_id = #{group_id} and hos_id = #{hos_id} 
+		<if test=" key != null and key != ''">
+			and (
+			user_name like '%${key}%' or
+			upper(user_code) like '%${key}%' or
+			spell_code like '%${key}%' or
+			wbx_code like '%${key}%'
+			)
+		</if>
+		order by user_code
+	)  where rownum &lt;50
+	</select>
+	
+	<!-- 系统平台用户查询列表过滤管理员，根据上级用户查询 -->
+	<select id="queryUserDictBySys" resultMap="hrpSysSelect">
+	select * from (
+		SELECT
+		user_id id,
+		user_code||' '||user_name text
+		FROM SYS_USER
+		where group_id = #{group_id} and hos_id = #{hos_id} and type_code in(0,1)
+		<if test='type_code ==0 or  type_code ==1 '>
+			and sj_id=#{user_id}
+		</if>
+		<if test=" key != null and key != ''">
+			and (
+			user_name like '%${key}%' or
+			upper(user_code) like '%${key}%' or
+			spell_code like '%${key}%' or
+			wbx_code like '%${key}%'
+			)
+		</if>
+		order by user_code
+	)  where rownum &lt;50
+	</select>
+	
+	<!-- 凭证制单全部人员下拉列表 -->
+	<select id="queryNewUserDict" resultMap="hrpSysSelect">
+		SELECT DISTINCT s.user_id as id, s.user_name as text
+  		FROM sys_user s
+		WHERE s.user_id IN (SELECT a.create_user, 
+				a.cash_user, 
+				a.audit_user, 
+				a.acc_user 
+				FROM acc_vouch a
+				where a.group_id = s.group_id
+                     and a.hos_id = s.hos_id
+                     and a.copy_code = #{copy_code})
+				and s.group_id = #{group_id}
+				and s.hos_id = #{hos_id}
+			<if test="type_code != null  and type_code != ''">
+				and s.type_code = #{type_code}
+			</if>
+			<if test=" key != null and key != ''">
+				and (
+				s.user_id like '%${key}%' or
+				s.user_name like '%${key}%'
+				or
+				s.user_code like '%${key}%' or
+				s.spell_code like '%${key}%' or
+				s.wbx_code like '%${key}%'
+				)
+			</if>
+    	order by s.user_id
+	</select>
+	<!-- 记账人 -->
+	<select id="queryAccUserDict" resultMap="hrpSysSelect">
+		SELECT s.user_id as id, s.user_name as text
+  			FROM sys_user s
+ 			WHERE s.user_id IN (select DISTINCT a.acc_user
+                       from acc_vouch a
+                      where a.group_id = s.group_id
+                        and a.hos_id = s.hos_id
+                        and a.copy_code = #{copy_code}
+					<!-- AND a.vouch_date between to_date(#{create_date_b},'yyyy-MM-dd')
+					and to_date(#{create_date_e},'yyyy-MM-dd') -->
+                )
+				and s.group_id = #{group_id}
+				and s.hos_id = #{hos_id}
+			<if test=" key != null and key != ''">
+				and (
+				s.user_id like '%${key}%' or
+				s.user_name like '%${key}%'
+				or
+				s.user_code like '%${key}%' or
+				s.spell_code like '%${key}%' or
+				s.wbx_code like '%${key}%'
+				)
+			</if>
+    	order by s.user_id
+	</select>
+	<!-- 审核人 -->
+	<select id="queryAuditUserDict" resultMap="hrpSysSelect">
+		SELECT s.user_id as id, s.user_name as text
+  			FROM sys_user s
+ 			WHERE s.user_id IN (select DISTINCT a.audit_user
+                       from acc_vouch a
+                      where a.group_id = s.group_id
+                        and a.hos_id = s.hos_id
+                        and a.copy_code = #{copy_code}
+						<!-- AND a.vouch_date between to_date(#{create_date_b},'yyyy-MM-dd')
+						and to_date(#{create_date_e},'yyyy-MM-dd') -->
+                        )
+				and s.group_id = #{group_id}
+				and s.hos_id = #{hos_id}
+			<if test=" key != null and key != ''">
+				and (
+				s.user_id like '%${key}%' or
+				s.user_name like '%${key}%'
+				or
+				s.user_code like '%${key}%' or
+				s.spell_code like '%${key}%' or
+				s.wbx_code like '%${key}%'
+				)
+			</if>
+    	order by s.user_id
+	</select>
+	<!-- 制单人 -->
+	<select id="queryCreateUserDict" resultMap="hrpSysSelect">
+		SELECT s.user_id as id, s.user_name as text
+  			FROM sys_user s
+ 			WHERE s.user_id IN (select DISTINCT a.create_user
+                       from acc_vouch a
+                      where a.group_id = s.group_id
+                        and a.hos_id = s.hos_id
+                        and a.copy_code = #{copy_code}
+						<!-- AND a.vouch_date between to_date(#{create_date_b},'yyyy-MM-dd')
+						and to_date(#{create_date_e},'yyyy-MM-dd') -->
+                        )
+				and s.group_id = #{group_id}
+				and s.hos_id = #{hos_id}
+			<if test=" key != null and key != ''">
+				and (
+				s.user_id like '%${key}%' or
+				s.user_name like '%${key}%'
+				or
+				s.user_code like '%${key}%' or
+				s.spell_code like '%${key}%' or
+				s.wbx_code like '%${key}%'
+				)
+			</if>
+    	order by s.user_id
+	</select>
+	<!-- 出纳人 -->
+	<select id="queryCashUserDict" resultMap="hrpSysSelect">
+		SELECT s.user_id as id, s.user_name as text
+  			FROM sys_user s
+ 			WHERE s.user_id IN (select DISTINCT a.cash_user
+                       from acc_vouch a
+                      where a.group_id = s.group_id
+                        and a.hos_id = s.hos_id
+                        and a.copy_code = #{copy_code}
+						<!-- AND a.vouch_date between to_date(#{create_date_b},'yyyy-MM-dd')
+						and to_date(#{create_date_e},'yyyy-MM-dd') -->
+                        )
+				and s.group_id = #{group_id}
+				and s.hos_id = #{hos_id}
+			<if test=" key != null and key != ''">
+				and (
+				s.user_id like '%${key}%' or
+				s.user_name like '%${key}%'
+				or
+				s.user_code like '%${key}%' or
+				s.spell_code like '%${key}%' or
+				s.wbx_code like '%${key}%'
+				)
+			</if>
+    	order by s.user_id
+	</select>
+
+	<select id="queryHosInfoDict" resultMap="hrpSysSelect">
+		SELECT
+		hos_id id,
+		HOS_SIMPLE text
+		FROM HOS_INFO_DICT
+		<where>
+			is_stop = 0
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test=" key != null and key != ''">
+				and (
+				hos_code like '%${key}%' or
+				hos_name like '%${key}%'
+				)
+			</if>
+		</where>
+		order by hos_code
+	</select>
+	<select id="queryHosInfoDictPerm" resultMap="hrpSysSelect">
+		SELECT
+		hos_id id,
+		HOS_SIMPLE text
+		FROM HOS_INFO_DICT m
+		where exists
+		(
+			  select distinct up.group_id,up.hos_id from v_user_perm up 	         
+	          where up.group_id=m.group_id and up.hos_id=m.hos_id 
+	          and up.user_id=#{user_id} 		
+		
+		)
+			<if test="group_id != null  and group_id != ''">
+				and m.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and m.hos_id = #{hos_id}
+			</if>
+			<if test=" key != null and key != ''">
+				and (
+				m.hos_code like '%${key}%' or
+				m.hos_name like '%${key}%'
+				)
+			</if>
+		order by m.hos_code
+	</select>
+
+	<select id="queryHosInfo" resultMap="hrpSysSelect">
+		SELECT
+		hos_id id,
+		HOS_SIMPLE text
+		FROM HOS_INFO
+		<where>
+			
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test=" key != null and key != ''">
+				and (
+				hos_code like '%${key}%' or
+				hos_name like '%${key}%'
+				or
+				spell_code like '%${key}%' or
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by hos_id
+	</select>
+
+	<select id="queryCopyCodeDict" resultMap="hrpSysSelect">
+		SELECT
+		copy_code id,
+		copy_name text
+		FROM HOS_COPY
+		<where>
+			
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test=" key != null and key != ''">
+				and (
+				copy_code like '%${key}%' or
+				copy_name like
+				'%${key}%'
+				)
+			</if>
+		</where>
+		order by copy_code
+	</select>
+	<select id="queryCopyCodeDictPerm" resultMap="hrpSysSelect">
+		SELECT
+		m.copy_code id,
+		m.copy_name text
+		FROM HOS_COPY m
+		where exists(
+		 	  select distinct up.copy_code from v_user_perm up 	         
+	          where up.group_id=m.group_id and up.hos_id=m.hos_id and up.copy_code=m.copy_code
+	          and up.user_id=#{user_id} 
+		)
+		and m.group_id=#{group_id} 
+		<if test="hos_id != null and hos_id != ''">
+		and m.hos_id=#{hos_id}
+		</if>
+		<if test="copy_code != null and copy_code != ''">
+			AND m.copy_code = #{copy_code}
+		</if>
+		<if test=" key != null and key != ''">
+			and (
+			copy_code like '%${key}%' or
+			copy_name like '%${key}%'
+			)
+		</if>
+		order by m.copy_code
+	</select>
+
+	<select id="queryRoleDict" resultMap="hrpSysSelect">
+		SELECT
+		role_id id,
+		role_name text
+		FROM SYS_ROLE
+		where group_id = #{group_id} and hos_id = #{hos_id}
+		<if test='type_code ==0 or  type_code ==1 '>
+			and sj_id=#{user_id}
+		</if>
+		<if test=" key != null and key != ''">
+			and (
+			role_name like '%${key}%' or
+			spell_code like '%${key}%' or
+			wbx_code like '%${key}%'
+			)
+		</if>
+		order by role_id
+	</select>
+
+	<select id="queryModDict" resultMap="hrpSysSelect">
+		SELECT
+		a.mod_code id,
+		mod_name text
+		FROM SYS_MOD a
+		<where>
+			<if test="mod_code != null and mod_code != ''">
+			and a.mod_code = #{mod_code}
+			</if>
+			<if test="type_code == 1 or type_code == 3">
+			and exists (select 1
+				from sys_group_perm b where a.mod_code=b.mod_code and
+				b.group_id=#{group_id} 
+			)
+			</if>
+			<if test="type_code == 0 or type_code == 4">
+			and exists (select 1
+				from hos_perm b where a.mod_code=b.mod_code and
+				b.group_id=#{group_id} and b.hos_id=#{hos_id}
+			)
+			</if>	
+			<if test=" key != null  and  key != ''">
+				and (
+				a.mod_code like '%${key}%' or
+				mod_name like '%${key}%'
+				)
+			</if>
+		</where>
+		order by mod_code
+	</select>
+	<select id="queryModDictPerm" resultMap="hrpSysSelect">
+		SELECT
+	      mod_code id,
+	      mod_name text
+	      FROM SYS_MOD m
+	      where exists (
+	            select distinct up.mod_code from v_user_perm up 
+	            inner join (
+	            select group_id,hos_id,mod_code from hos_perm
+	            union all
+	            select group_id,0 hos_id,mod_code from sys_group t1,sys_mod t2
+	            ) hp on up.mod_code=hp.mod_code and up.group_id=hp.group_id and up.hos_id=hp.hos_id 
+	            where up.group_id=#{group_id} and up.hos_id=#{hos_id} and up.copy_code=#{copy_code} 
+	            and up.user_id=#{user_id} and up.mod_code=m.mod_code 
+	      )
+		<if test="mod_code != null and mod_code != ''">
+			AND m.mod_code = #{mod_code}
+		</if>
+		<if test=" key != null and key != ''">
+			and (
+			mod_code like '%${key}%' or
+			mod_name like '%${key}%'
+			)
+		</if>
+		order by mod_code
+	</select>
+	<select id="queryModDictAdminPerm" resultMap="hrpSysSelect">
+		SELECT
+		mod_code id,
+		mod_name text
+		FROM SYS_MOD m
+		where 
+		<choose>
+            <when test="mod_code_where !=null and mod_code_where !=''">
+              is_sys=1 or mod_code in(${mod_code_where})
+            </when>
+            <otherwise>
+              is_sys=1
+            </otherwise>
+        </choose>
+		<if test="type_code == 1 or type_code == 3">
+		and exists (select 1
+			from sys_group_perm b where m.mod_code=b.mod_code and
+			b.group_id=#{group_id} 
+		)
+		</if>
+		<if test="type_code == 0 and type_code == 4">
+		and exists (select 1
+			from hos_perm b where m.mod_code=b.mod_code and
+			b.group_id=#{group_id} and b.hos_id=#{hos_id}
+		)
+		</if>
+		<if test="mod_code != null and mod_code != ''">
+			and m.mod_code = #{mod_code}
+		</if>
+		<if test=" key != null and key != ''">
+			and (
+			mod_code like '%${key}%' or
+			mod_name like '%${key}%'
+			)
+		</if>
+		order by mod_code
+	</select>
+	<select id="queryDeptKindDict" resultMap="hrpSysSelect">
+		SELECT
+		kind_code id,
+		kind_name text
+		FROM HOS_DEPT_KIND
+		<where>
+			 is_stop=0
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="kind_code1 != null  and kind_code1 != ''">
+				and kind_code in (#{kind_code1},#{kind_code2})
+			</if>
+			<if test=" key != null  and  key != ''">
+				and (
+				kind_code like '%${key}%' or
+				kind_name like
+				'%${key}%' or
+				spell_code like '%${key}%' or
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by kind_code
+	</select>
+
+	<select id="queryDeptDict" resultMap="hrpSysSelect">
+		SELECT
+		hdd.dept_id||'.'||hdd.dept_no id,
+		hdd.dept_code||' '||hdd.dept_name text
+		FROM HOS_DEPT_DICT hdd
+		left join acc_dept_attr adc
+			on	
+				hdd.group_id = adc.group_id  and 
+				hdd.hos_id = adc.hos_id and 
+				hdd.dept_id = adc.dept_id
+		where   
+				hdd.is_stop = 0
+			<if test="emp_id != null  and emp_id != ''">
+				 and hdd.dept_id in (select dept_id from hos_emp_dict where emp_id=#{emp_id} and is_stop=0)
+			</if>
+			<if test="group_id != null  and group_id != ''">
+				 and hdd.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hdd.hos_id = #{hos_id}
+			</if>
+			<if test="is_last != null  and is_last != ''">
+				and hdd.is_last = #{is_last}
+			</if>
+			<if test="is_stock != null  and is_stock != ''">
+				and adc.is_stock = #{is_stock}
+			</if>
+			<if test=" key != null  and  key != ''">
+				and (
+				hdd.dept_code like '%${key}%' or
+				hdd.dept_name like
+				'%${key}%' or
+				hdd.spell_code like '%${key}%' or
+				hdd.wbx_code like '%${key}%'
+				)
+			</if>
+		order by hdd.dept_code
+	</select>
+	<select id="queryDeptDictLast" resultMap="hrpSysSelect">
+		SELECT
+		dept_id||'.'||dept_no id,
+		dept_code||' '||dept_name text
+		FROM HOS_DEPT_DICT
+		<where>
+			is_stop = 0 
+			and is_last=1 
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test=" key != null  and  key != ''">
+				and (
+				dept_code like '%${key}%' or
+				dept_name like
+				'%${key}%' or
+				spell_code like '%${key}%' or
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by dept_id
+	</select>
+
+	<select id="queryDept" resultMap="hrpSysSelect">
+		SELECT
+		dept_code id,
+		dept_name text
+		FROM HOS_DEPT
+		<where>
+		
+			<if test="group_id != null  and group_id != ''">
+				group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="is_last != null  and is_last != ''">
+				and is_last = #{is_last}
+			</if>
+			<if test=" key != null  and  key != ''">
+				and (
+				dept_code like '%${key}%' or
+				dept_name like
+				'%${key}%' or
+				spell_code like '%${key}%' or
+				wbx_code like '%${key}%'
+				)
+			</if>
+			
+		</where>
+		order by dept_id
+	</select>
+
+	<select id="querySchoolDict" resultMap="hrpSysSelect">
+		SELECT
+		school_code id,
+		school_name text
+		FROM HOS_SCHOOL
+		<where>
+			
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test=" key != null  and  key != ''">
+				and (
+				school_code like '%${key}%' or
+				school_name like
+				'%${key}%' or
+				spell_code like '%${key}%' or
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by school_code
+	</select>
+
+
+	<select id="queryStationDict" resultMap="hrpSysSelect">
+		SELECT
+		station_code id,
+		station_name text
+		FROM HOS_STATION
+		<where>
+			
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test=" key != null  and  key != ''">
+				and (
+				station_code like '%${key}%' or
+				station_name like
+				'%${key}%' or
+				spell_code like '%${key}%' or
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by station_code
+	</select>
+
+
+	<select id="queryDutyDict" resultMap="hrpSysSelect">
+		SELECT
+		duty_code id,
+		duty_name text
+		FROM HOS_DUTY
+		<where>
+			
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test=" key != null  and  key != ''">
+				and (
+				duty_code like '%${key}%' or
+				duty_name like
+				'%${key}%' or
+				spell_code like '%${key}%' or
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by duty_code
+	</select>
+
+
+	<select id="queryEmpKindDict" resultMap="hrpSysSelect">
+		SELECT
+		kind_code id,
+		kind_name text
+		FROM HOS_EMP_KIND
+		<where>
+			
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test=" key != null  and  key != ''">
+				and (
+				kind_code like '%${key}%' or
+				kind_name like
+				'%${key}%' or
+				spell_code like '%${key}%' or
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by kind_code
+	</select>
+
+	<select id="queryProjTypeDict" resultMap="hrpSysSelect">
+		SELECT
+		type_code id,
+		type_name text
+		FROM HOS_PROJ_TYPE
+		<where>
+            <if test="attr_code != null and attr_code != '' ">
+            		AND attr_code = #{attr_code,jdbcType=VARCHAR}
+            </if>
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test=" key != null  and  key != ''">
+				and (
+				type_code like '%${key}%' or
+				type_name like
+				'%${key}%' or
+				spell_code like '%${key}%' or
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by type_code
+	</select>
+
+	<select id="queryProjLevelDict" resultMap="hrpSysSelect">
+		SELECT
+		level_code id,
+		level_name text
+		FROM HOS_PROJ_LEVEL
+		<where>
+			
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test=" key != null  and  key != ''">
+				and (
+				level_code like '%${key}%' or
+				level_name like
+				'%${key}%' or
+				spell_code like '%${key}%' or
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by level_code
+	</select>
+
+	<select id="queryProjUseDict" resultMap="hrpSysSelect">
+		SELECT
+		use_code id,
+		use_name text
+		FROM HOS_PROJ_USE
+		<where>
+			
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test=" key != null  and  key != ''">
+				and (
+				use_code like '%${key}%' or
+				use_name like '%${key}%'
+				or
+				spell_code like '%${key}%' or
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by use_code
+	</select>
+
+	<select id="queryProjDict" resultMap="hrpSysSelect">
+		SELECT
+		proj_id id,
+		proj_name text
+		FROM HOS_PROJ
+		<where>
+			
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test=" key != null  and  key != ''">
+				and (
+				proj_code like '${key}%' or
+				proj_name like '%${key}%' or
+				spell_code like '%${key}%' or
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by proj_id
+	</select>
+
+	<select id="querySupDict" resultMap="hrpSysSelect">
+		SELECT
+		sup_code id,
+		sup_name text
+		FROM HOS_SUP
+		<where>
+			
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test=" key != null  and  key != ''">
+				and (
+				sup_code like '${key}%' or
+				sup_name like '%${key}%' or
+				spell_code like '%${key}%' or
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by sup_code
+	</select>
+
+	<select id="querySupTypeDict" resultMap="hrpSysSelect">
+		SELECT
+		type_code id,
+		type_name text
+		FROM HOS_SUP_TYPE
+		<where>
+			
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test=" key != null  and  key != ''">
+				and (
+				type_code like '%${key}%' or
+				type_name like '%${key}%' or
+				spell_code like '%${key}%' or
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by type_code
+	</select>
+
+	<select id="queryCusDict" resultMap="hrpSysSelect">
+		SELECT
+		cus_id||'.'||cus_no||'.'||cus_code id,
+		cus_code||' '||cus_name text
+		FROM HOS_CUS_DICT
+		<where>
+			is_stop = 0
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test=" key != null  and  key != ''">
+				and (
+				cus_code like '%${key}%' or
+				cus_name like '%${key}%' or
+				spell_code like '%${key}%' or
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by cus_id
+	</select>
+
+	<select id="queryCusTypeDict" resultMap="hrpSysSelect">
+		SELECT
+		type_code id,
+		type_name text
+		FROM HOS_CUS_TYPE
+		<where>
+			
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test=" key != null  and  key != ''">
+				and (
+				type_code like '%${key}%' or
+				type_name like '%${key}%' or
+				spell_code like '%${key}%' or
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by type_code
+	</select>
+
+	<select id="queryFacDict" resultMap="hrpSysSelect">
+		SELECT
+		fac_code id,
+		fac_name text
+		FROM HOS_FAC
+		<where>
+			
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test=" key != null  and  key  != ''">
+				and (
+				fac_code like '%${key}%' or
+				fac_name like '%${key}%' or
+				spell_code like '%${key}%' or
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by fac_code
+	</select>
+
+	<select id="queryFacTypeDict" resultMap="hrpSysSelect">
+		SELECT
+		type_code id,
+		type_name text
+		FROM HOS_FAC_TYPE
+		<where>
+			
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test=" key != null  and  key != ''">
+				and (
+				type_code like '%${key}%' or
+				type_name like
+				'%${key}%' or
+				spell_code like '%${key}%' or
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by type_code
+	</select>
+
+	<select id="queryStoreDict" resultMap="hrpSysSelect">
+		SELECT
+		store_code id,
+		store_name text
+		FROM HOS_STORE
+		<where>
+			
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test=" key != null  and  key  != ''">
+				and (
+				store_code like '%${key}%' or
+				store_name like
+				'%${key}%' or
+				spell_code like '%${key}%' or
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by store_code
+	</select>
+
+	<select id="queryStoreTypeDict" resultMap="hrpSysSelect">
+		SELECT
+		type_code id,
+		type_name text
+		FROM HOS_STORE_TYPE
+		<where>
+			
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test=" key != null  and  key != ''">
+				and (
+				type_code like '%${key}%' or
+				type_name like
+				'%${key}%' or
+				spell_code like '%${key}%' or
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by type_code
+	</select>
+
+	<select id="queryUnitDict" resultMap="hrpSysSelect">
+		SELECT
+		unit_code id,
+		unit_name text
+		FROM HOS_UNIT
+		<where>
+			
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test=" key != null  and  key  != ''">
+				and (
+				unit_code like '%${key}%' or
+				unit_name like
+				'%${key}%' or
+				spell_code like '%${key}%' or
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by unit_code
+	</select>
+
+	<select id="queryPatientTypeDict" resultMap="hrpSysSelect">
+		SELECT
+		patient_code id,
+		patient_name text
+		FROM HOS_PATIENT_TYPE
+		<where>
+			
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test=" key != null  and  key  != ''">
+				and (
+				patient_code like '%${key}%' or
+				patient_name like
+				'%${key}%' or
+				spell_code like '%${key}%' or
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by patient_code
+	</select>
+
+	<select id="querySourceDict" resultMap="hrpSysSelect">
+		SELECT
+		source_code||'.'||SOURCE_ID id,
+		source_code||' '||source_name text
+		FROM HOS_SOURCE
+		<where>
+			is_stop = 0
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test=" key != null  and  key  != ''">
+				and (
+				source_code like '%${key}%' or
+				source_name like
+				'%${key}%' or
+				spell_code like '%${key}%' or
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by source_code
+	</select>
+	
+	<select id="queryHosNature" resultMap="hrpSysSelect">
+		SELECT nature_code id,nature_name text FROM DIC_HOS_NATURE
+		<where>
+			<if test="nature_code != null  and nature_code != ''">
+				and nature_code = #{nature_code}
+			</if>
+			<if test="nature_name != null  and nature_name != ''">
+				and nature_name = #{nature_name}
+			</if>
+			<if test=" key != null  and  key  != ''">
+				and (
+				nature_code like '%${key}%' or
+				nature_name like
+				'%${key}%' 
+				)
+			</if>
+		</where>
+		order by nature_code
+	</select>
+	
+	<select id="queryPermData" resultMap="hrpSysSelect">
+		SELECT 
+		table_code||'.'||MOD_CODE||'.'||COLUMN_ID||'.'||COLUMN_CODE||'.'||COLUMN_NAME
+		||'.'||IS_GROUP||'.'||IS_HOS||'.'||IS_COPY||'.'||IS_ACC_YEAR||'.'||IS_EXTENDS||'****'||WHERE_SQL
+		 id,
+		table_name text 
+		FROM SYS_PERM_DATA
+		<where>
+			<if test="type_code == 0 or type_code == 1">
+				and table_code in (
+					select table_code from v_user_data_perm 
+					where group_id=#{group_id} and hos_id=#{hos_id} and user_id=#{user_id}
+				)
+			</if>
+			<if test="mod_code != null  and mod_code != ''">
+				and mod_code = #{mod_code}
+			</if>
+			<if test="table_name != null  and table_name != ''">
+				and table_name = #{table_name}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+				table_code like '%${key}%' or
+				table_name like '%${key}%' 
+				)
+			</if>
+		</where>
+		order by table_code
+	</select>
+	
+	<select id="queryHosUnitDict" resultMap="hrpSysSelect">
+		SELECT 
+		
+	    unit_code id,
+		unit_code ||' '|| unit_name  text
+		FROM hos_unit
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test=" key != null  and  key  != ''">
+				and (
+				unit_code like '%${key}%' or
+				unit_name like
+				'%${key}%' or
+				spell_code like '%${key}%' or
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by unit_code
+	</select>
+	
+		<select id="querySysBusiMod" resultMap="hrpSysSelect">
+		select mod_code id ,mod_name text from SYS_BUSI_MOD
+		<where>
+			<if test="mod_code_not != null and mod_code_not != ''">
+				and mod_code not in(${mod_code_not})
+			</if>
+			<if test="mod_code_in != null and mod_code_in != ''">
+				and mod_code in(${mod_code_in})
+			</if>
+			<if test="key != null and key != ''">
+				and (
+				mod_code like '${key}%' or
+				mod_name like '%${key}%' 
+				)
+			</if>
+		</where>
+		order by mod_code,mod_name
+	</select>
+	
+	<select id="querySysSourceNature" resultMap="hrpSysSelect">
+		select 
+		nature_code id ,
+		nature_code||' '||nature_name text 
+		from hos_source_nature
+		<where>
+			<if test="key != null and key != ''">
+				and (
+				nature_code like '${key}%' or
+				nature_name like '%${key}%' 
+				)
+			</if>
+		</where>
+		order by nature_code,nature_name
+	</select>
+	<!-- 部门类型 -->
+	<select id="queryAccDeptType" resultMap="hrpSysSelect">
+		SELECT
+		type_code id,
+		type_name text
+		FROM ACC_DEPT_TYPE
+		<where> 
+			<if test=" key != null  and  key != ''">
+				and (
+				type_code like '%${key}%' or
+				type_name like '%${key}%'  
+				)
+			</if>
+		</where>
+		order by type_code
+	</select>
+	<!-- 支出性质 -->
+	<select id="queryAccDeptOut" resultMap="hrpSysSelect">
+		SELECT
+		out_code id,
+		out_name text
+		FROM ACC_DEPT_OUT
+		<where> 
+			<if test=" key != null  and  key != ''">
+				and (
+				out_code like '%${key}%' or
+				out_name like '%${key}%'  
+				)
+			</if>
+		</where>
+		order by out_code
+	</select>
+	<!-- 查询会计科目类别 -->
+	<select id="queryAccSubjType" parameterType="java.util.Map" resultMap="sysAccSubjTypeMap">
+        select 
+            subj_type_code,
+            group_id,
+            hos_id,
+            copy_code,
+            subj_type_name
+        from acc_subj_type 
+        <where>                     
+    	<if test="subj_type_code != null and subj_type_code != ''">
+            and subj_type_code like '${subj_type_code}%'
+        </if>
+    	<if test="group_id != null and group_id != ''">
+            and group_id = #{group_id}
+        </if>
+    	<if test="hos_id != null and hos_id != ''">
+            and hos_id = #{hos_id}
+        </if>
+    	<if test="copy_code != null and copy_code != ''">
+            and copy_code = #{copy_code}
+        </if>
+    	<if test="subj_type_name != null and subj_type_name != ''">
+            and subj_type_name like '%${subj_type_name}'
+        </if>
+        </where>   
+	    order by subj_type_code asc
+	</select>
+	<select id="querySubjLevel" resultMap="hrpSysSelect" parameterType="java.util.Map">
+	 	select id,to_char(text) text from (
+	    	select 
+		    	max(subj_level) id,
+		    	max(subj_level) text 
+	    	from ACC_SUBJ   
+	    	<where>
+				<if test="group_id != null  and group_id != ''">
+					and group_id = #{group_id}
+				</if>
+				<if test="hos_id != null  and hos_id != ''">
+					and hos_id = #{hos_id}
+				</if>
+				<if test="copy_code != null  and copy_code != ''">
+					and copy_code = #{copy_code}
+				</if>
+				<if test="acc_year != null  and acc_year != ''">
+					and acc_year = #{acc_year}
+				</if>
+				<if test="key != null and key != ''">
+					and ( subj_level like '%${key}%' )
+				</if>
+			</where>
+	    	group by subj_level 
+	    	order by subj_level
+    	) a
+		union all
+		select 99 as id,'末级' as text from dual
+    </select>
+	<!-- 凭证类型 -->
+    <select id="queryVouchType" resultMap="hrpAccSelect">
+		SELECT
+		VOUCH_TYPE_CODE id,
+		VOUCH_TYPE_NAME text
+		FROM ACC_VOUCH_TYPE
+		<where>
+			is_stop = 0
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null  and copy_code != ''">
+				and copy_code = #{copy_code}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+				VOUCH_TYPE_CODE like '${key}%' or
+				VOUCH_TYPE_NAME like '%${key}%'
+				or
+				spell_code like '%${key}%' or
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by VOUCH_TYPE_CODE
+	</select>
+	<!-- 币种 -->
+	<select id="queryCur" resultMap="hrpAccSelect">
+		SELECT
+		CUR_CODE id,
+		CUR_NAME text
+		FROM ACC_CUR
+		<where>
+			is_stop = 0
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null  and copy_code != ''">
+				and copy_code = #{copy_code}
+			</if>
+			<if test="acc_year != null  and acc_year != ''">
+				and acc_year = #{acc_year}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+				CUR_CODE like '${key}%' or
+				CUR_NAME like '%${key}%'
+				or
+				spell_code like '%${key}%' or
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by CUR_CODE
+	</select>
+	<!-- 币种 集团专用-->
+	<select id="queryGroupCur" resultMap="hrpAccSelect">
+		SELECT DISTINCT
+		CUR_CODE id,
+		CUR_NAME text
+		FROM ACC_CUR
+		<where>
+			is_stop = 0
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null  and copy_code != ''">
+				and copy_code = #{copy_code}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+				CUR_CODE like '${key}%' or
+				CUR_NAME like '%${key}%'
+				or
+				spell_code like '%${key}%' or
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by CUR_CODE
+	</select>
+	
+	<select id="querySubjNature" resultMap="hrpAccSelect">
+		SELECT
+		SUBJ_NATURE_CODE id,
+		SUBJ_NATURE_NAME text
+		FROM ACC_SUBJ_NATURE
+		<where>
+			
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null  and copy_code != ''">
+				and copy_code = #{copy_code}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+				subj_nature_code like '${key}%' or
+				subj_nature_name like '%${key}%'
+				<!-- or
+				spell_code like '%${key}%' or
+				wbx_code like '%${key}%' -->
+				)
+			</if>
+		</where>
+		order by subj_nature_code
+	</select>
+	<!-- 核算类别 -->
+	<select id="queryCheckType" resultMap="hrpAccSelect">
+		SELECT
+		CHECK_TYPE_ID id,
+		CHECK_TYPE_NAME text
+		FROM ACC_CHECK_TYPE
+		<where>
+			is_stop = 0
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null  and copy_code != ''">
+				and copy_code = #{copy_code}
+			</if>
+			<if test="is_sys != null  and is_sys != ''">
+				and is_sys = #{is_sys}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+				CHECK_TYPE_ID like '${key}%' or
+				
+				CHECK_TYPE_NAME like '%${key}%'
+				or
+				spell_code like '%${key}%' or
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by is_sys desc,sort_code asc
+	</select>
+	<!-- 支出性质 -->
+	<select id="queryDeptOutSelect" resultMap="hrpAccSelect">
+		select
+		out_name text,
+		out_code id from
+		acc_dept_out 
+		<where>
+			<if test="key != null and key != ''">
+				and (
+				out_code like '${key}%' or
+				out_name like '%${key}%' 
+				)
+			</if>
+		</where>
+		order by out_code,out_name
+	</select>
+ 
+	
+	<select id="queryDeptNatur" resultMap="hrpAccSelect">
+		SELECT
+		NATUR_CODE id,
+		NATUR_NAME text
+		FROM ACC_DEPT_NATUR 
+		<where>
+			<if test="natur_code1 != null  and natur_code1 != ''">
+				and natur_code in (#{natur_code1},#{natur_code2})
+			</if>
+			<if test="key != null and key != ''">
+				and (
+				NATUR_CODE like '${key}%' or
+				NATUR_NAME like '%${key}%'
+				)
+			</if>
+		</where>
+		order by NATUR_CODE
+	</select>
+	
+	<select id="queryEmpPay" resultMap="hrpAccSelect">
+		SELECT
+		PAY_TYPE_CODE id,
+		PAY_TYPE_NAME text
+		FROM ACC_EMP_PAY 
+		<where>
+			is_stop = 0
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			
+			<if test="key != null and key != ''">
+				and (
+				PAY_TYPE_CODE like '${key}%' or
+				PAY_TYPE_NAME like '%${key}%'
+				)
+			</if>
+		</where>
+		order by PAY_TYPE_CODE
+	</select>
+ 
+	<!-- 科目类别下拉框 -->
+	<select id="querySubjTypeForSelect" resultMap="hrpAccSelect">
+		SELECT
+		SUBJ_TYPE_CODE id,
+		SUBJ_TYPE_NAME text
+		FROM ACC_SUBJ_TYPE
+		<where>
+			
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null  and copy_code != ''">
+				and copy_code = #{copy_code}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+				subj_type_code like '${key}%' or
+				subj_type_name like '%${key}%'
+				or
+				spell_code like '%${key}%' or
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by subj_type_code
+	</select>
+	<select id="queryDeptType" resultMap="hrpAccSelect" parameterType="java.util.Map">
+		SELECT
+		TYPE_CODE id,
+		TYPE_NAME text
+		FROM ACC_DEPT_TYPE 
+		<where>
+			<if test="kind_code != null  and kind_code != ''">
+				and TYPE_CODE = #{kind_code}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+				TYPE_CODE like '${key}%' or
+				TYPE_NAME like '%${key}%'
+				)
+			</if>
+			and type_code not in ('05','06')
+		</where>
+		order by TYPE_CODE
+	</select>
+	
+	<select id="queryHosDept" resultMap="hrpAccSelect">
+		select 
+			a.dept_id id, 
+			a.dept_code||' '||a.dept_name text 
+		from hos_dept_dict a
+		<!-- <if test="is_perm != null and is_perm == '1'">
+			join v_user_data_perm b
+				on a.group_id = b.group_id and a.hos_id = b.hos_id
+				and b.table_code = 'HOS_DEPT_DICT'
+				and b.user_id = #{user_id}
+				and a.dept_id = b.perm_code
+		</if> -->
+		WHERE a.group_id = #{group_id}
+			and a.hos_id = #{hos_id}
+			and a.is_stop=0
+		 <if test="is_perm != null and is_perm == '1'">
+			and to_char(a.dept_id) in (select b.perm_code from  v_user_data_perm b
+				where b.group_id = #{group_id} and   b.hos_id = #{hos_id}
+				and b.table_code = 'HOS_DEPT_DICT'
+				and b.user_id = #{user_id}
+				)
+				 
+		</if>
+			<if test="kind_code != null  and kind_code != ''">
+				and a.kind_code in ${kind_code}
+			</if>
+			<if test="is_last != null  and is_last != ''">
+				and a.is_last in ${is_last}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+				a.dept_code like '${key}%' or
+				a.dept_name like '%${key}%'
+				or
+				a.spell_code like '%${key}%' or
+				a.wbx_code like '%${key}%'
+				)
+			</if>
+		order by a.dept_id
+	</select>
+	
+	<!-- 查询自定义辅助核算字典对应表 -->
+	<select id="queryAccBusiZCheck" resultMap="hrpAccSelect">
+		SELECT
+		Z_CODE id,
+		Z_NAME text
+		FROM ACC_BUSI_ZCHECK
+		where group_id = #{group_id} and hos_id = #{hos_id}  and copy_code = #{copy_code}
+		order by Z_NAME
+	</select>
+	
+	<select id="queryHosNatureDict" resultMap="hrpSysSelect">
+		  SELECT
+    nature_code id,
+    nature_name text
+    FROM DIC_HOS_NATURE
+		<where>
+			<if test="key != null and key != ''">
+				and (
+				nature_code like '%${key}%' or
+				nature_name like '%${key}%'
+				)
+			</if>
+		</where>
+		order by nature_code
+	</select>
+	
+	<select id="queryCopyDict" resultMap="hrpSysSelect">
+		SELECT
+		copy_code id,
+		copy_name text
+		FROM HOS_COPY
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test=" key != null and key != ''">
+				and (
+				copy_code like '%${key}%' or
+				copy_name like
+				'%${key}%'
+				)
+			</if>
+		</where>
+		order by copy_code
+	</select>
+	<select id="queryAcctYearDict" resultMap="hrpSysSelect">
+		SELECT
+		acc_year id,
+		acc_year text
+		FROM ACC_YEAR
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null  and copy_code != ''">
+				and copy_code = #{copy_code}
+			</if>
+			<if test=" key != null and key != ''">
+				and (
+				acc_year like '%${key}%'
+				)
+			</if>
+		</where>
+		order by acc_year desc
+	</select>
+	
+	<select id="queryHosCopyDict" resultMap="hrpSysSelect">
+		SELECT distinct
+		d.copy_code id,
+		d.copy_name text
+		FROM HOS_COPY d
+    	where
+			d.group_id = #{group_id}  and d.hos_id=#{hos_id} and d.is_stop=0
+			<if test=" key != null and key != ''">
+				and (
+				d.spell_code like '%${key}%' or
+				d.wbx_code like '%${key}%'
+				)
+			</if>
+		order by d.copy_code
+	</select>
+	
+	<select id="queryAccYearDict" resultMap="hrpSysSelect">
+		SELECT distinct
+		acc_year id,
+		acc_year text
+		FROM acc_subj
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test=" key != null and key != ''">
+				and (
+				acc_year like '%${key}%' 
+				
+				)
+			</if>
+		</where>
+		order by acc_year
+	</select>
+	<!--集团化管理   集团辅助账  部门选择器  -->
+	<select id="queryDeptByRela" resultMap="hrpSysSelect">
+		SELECT
+			distinct hd.dept_code,
+			hd.dept_code id,
+			hd.dept_name text
+		FROM HOS_DEPT hd 
+	    LEFT JOIN HOS_COPY_RELA hcr ON hd.group_id = hcr.group_id
+	    and hd.hos_id = hcr.hos_id 
+		<where>
+		 
+				hd.group_id = #{group_id} 
+				and hcr.rela_code = #{rela_code}
+			<if test="is_last != null  and is_last != ''">
+				and hd.is_last = #{is_last}
+			</if>
+			<if test=" key != null  and  key != ''">
+				and (
+				hd.dept_code like '%${key}%' or
+				hd.dept_name like
+				'%${key}%' or
+				hd.spell_code like '%${key}%' or
+				hd.wbx_code like '%${key}%'
+				)
+			</if>
+			
+		</where>
+		order by hd.dept_code
+	</select>
+	<!--集团化管理   集团辅助账  职工选择器  -->
+	<select id="queryEmpByRela" resultMap="hrpSysSelect">
+		SELECT distinct hed.emp_code,
+		emp_id||'.'||emp_no||'.'||emp_code id,
+		emp_code||' '||emp_name text
+		FROM HOS_EMP_DICT hed
+		LEFT JOIN HOS_COPY_RELA hcr ON hed.group_id = hcr.group_id
+	    and hed.hos_id = hcr.hos_id 
+		<where>
+			hed.is_stop = 0 
+			and hed.group_id = #{group_id}
+			and hcr.rela_code = #{rela_code}
+			<if test="dept_id != null  and dept_id != ''">
+				and hed.dept_id = #{dept_id}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+				hed.emp_code like '${key}%' or
+				hed.emp_name like '%${key}%'
+				or
+				hed.spell_code like '%${key}%' or
+				hed.wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+
+		order by emp_code
+	</select>
+	
+	<!--集团化管理   集团辅助账  项目选择器-->
+	<select id="queryProjDictDictByRela" resultMap="hrpSysSelect">
+		SELECT distinct hpd.proj_code,
+		hpd.proj_id||'.'||hpd.proj_no||'.'||proj_code id,
+		hpd.proj_code||' '||hpd.proj_name text
+		FROM HOS_PROJ_DICT hpd
+		LEFT JOIN HOS_COPY_RELA hcr ON hpd.group_id = hcr.group_id
+	    and hpd.hos_id = hcr.hos_id 
+		<where>
+				hpd.is_stop = 0
+				and hpd.group_id = #{group_id}
+			    and hcr.rela_code = #{rela_code} 
+			<if test="proj_id != null  and proj_id != ''">
+				and hpd.proj_id = #{proj_id}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+				hpd.proj_code like '${key}%' or
+				hpd.proj_name like '%${key}%'
+				or
+				hpd.spell_code like '%${key}%' or
+				hpd.wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+
+		order by hpd.proj_code
+	</select>
+	
+	<!-- 集团化管理   集团辅助账  供应商选择器  -->
+	<select id="querySupDictDictByRela" resultMap="hrpSysSelect">
+		SELECT distinct hsd.sup_code,
+		sup_id||'.'||sup_no||'.'||sup_code id,
+		sup_code||' '||sup_name text
+		FROM HOS_SUP_DICT hsd
+		LEFT JOIN HOS_COPY_RELA hcr ON hsd.group_id = hcr.group_id
+	    and hsd.hos_id = hcr.hos_id 
+		<where>
+				hsd.is_stop = 0
+				and hsd.group_id = #{group_id}
+			    and hcr.rela_code = #{rela_code} 
+			<if test="key != null and key != ''">
+				and (
+				hsd.sup_code like '${key}%' or
+				hsd.sup_name like '%${key}%'
+				or
+				hsd.spell_code like '%${key}%' or
+				hsd.wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+
+		order by hsd.sup_code
+	</select>
+	<!-- 集团化管理   集团辅助账   客户下拉框 -->
+	<select id="queryCusDictByRela" resultMap="hrpSysSelect">
+		SELECT distinct hcd.cus_code,
+		hcd.cus_id||'.'||hcd.cus_no||'.'||hcd.cus_code id,
+		hcd.cus_code||' '||hcd.cus_name text
+		FROM HOS_CUS_DICT hcd
+		LEFT JOIN HOS_COPY_RELA hcr ON hcd.group_id = hcr.group_id
+	    and hcd.hos_id = hcr.hos_id 
+		
+		<where>
+				hcd.is_stop = 0
+				and hcd.group_id = #{group_id}
+				and hcr.rela_code = #{rela_code}
+			<if test=" key != null  and  key != ''">
+				and (
+				hcd.cus_code like '%${key}%' or
+				hcd.cus_name like '%${key}%' or
+				hcd.spell_code like '%${key}%' or
+				hcd.wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by hcd.cus_code
+	</select>
+	
+	<!-- HIS科室下拉框 -->
+	<select id="querySysHisDeptDict" resultMap="hrpSysSelect"> 
+			 select 
+			    his_dept_code id, 
+			    his_dept_name text
+		  	 from sys_his_dept
+		  	 <if test=" key != null  and  key != ''">
+				where (
+				   his_dept_code like '%${key}%' or
+				   his_dept_name like '%${key}%'
+				)
+			</if>
+	</select>
+</mapper>
+

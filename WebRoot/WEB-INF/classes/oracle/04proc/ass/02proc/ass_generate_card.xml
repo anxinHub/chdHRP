@@ -1,0 +1,470 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+
+	<sql id="ass_generate_card" type="proc"><![CDATA[
+		CREATE OR REPLACE PROCEDURE ASS_GENERATE_CARD(ass_group_id            IN NUMBER, --集团
+                                              ass_hos_id              IN NUMBER, --医院
+                                              ass_copy_code           IN VARCHAR2, --账套        
+                                              ass_acc_year            IN VARCHAR2, --年度  
+                                              ass_acc_month           IN VARCHAR2, --月份    
+                                              ass_naturs_code         in VARCHAR2, --资产性质(编码,名称)
+                                              ass_ass_amount          in number, --生成数量
+                                              ass_ass_code            in VARCHAR2, --资产编码(资产ID,资产编码,资产名称)
+                                              ass_gb_code             in VARCHAR2, --国标码
+                                              ass_ass_spec            in VARCHAR2, --规格
+                                              ass_ass_model           in VARCHAR2, --型号
+                                              ass_ass_brand           in VARCHAR2, --品牌
+                                              ass_unit_code           in VARCHAR2, --计量单位(编码,名称)
+                                              ass_fac_code            in VARCHAR2, --生产厂商(厂商ID,厂商编码,厂商名称)
+                                              ass_ven_code            in VARCHAR2, --供应商(供应商ID,供应商编码,供应商名称)
+                                              ass_dept_code           in VARCHAR2, --科室(科室ID,科室编码,科室名称)
+                                              ass_store_code          in VARCHAR2, --仓库(仓库ID,仓库编码,仓库名称)
+                                              ass_proj_code           in VARCHAR2, --项目(项目ID,项目编码,项目名称)
+                                              ass_price               in number, --原值
+                                              ass_buy_type            in VARCHAR2, --业务类型(编码,名称)
+                                              ass_is_depre            in number, --是否折旧(0,1)
+                                              ass_acc_depre_amount    in number, --计提年限
+                                              ass_is_manage_depre     in number, --是否分摊(0,1)
+                                              ass_manage_depre_amount in number, --分摊年限
+                                              ass_is_measure          in number, --是否计量(0,1)
+                                              ass_ass_seq_no          in VARCHAR2, --序列号
+                                              ass_note                in VARCHAR2, --备注
+                                              ass_is_bar              in number, --是否条码打印(0,1)
+                                              ass_ass_purpose         in VARCHAR2, --资产用途
+                                              ass_reg_no              in VARCHAR2, --注册证号
+                                              ass_simple_name         in VARCHAR2, --简称
+                                              ass_common_name         in VARCHAR2, --常用名称
+                                              ass_source_id           in VARCHAR2, --资金来源(ID,编码,名称)
+                                              ass_AppCode             Out Number, --执行代码
+                                              ass_ErrTxt              Out VARCHAR2 --错误信息
+                                              ) IS
+  def_OK            CONSTANT NUMBER := 0; -- 成功
+  def_ERR           CONSTANT NUMBER := -1; -- 系统错误
+  def_WARNING       CONSTANT NUMBER := 100; -- 系统警告
+  def_CONFIRM_STATE CONSTANT NUMBER := 2; -- 确认状态
+  v_card_amount NUMBER := ass_ass_amount;
+  v_pref        ass_bill_no.pref%type;
+  v_seq_no      ass_bill_no.seq_no%type;
+  v_max_no      ass_bill_no.max_no%type;
+  v_ass_card_no ass_card_other.ass_card_no%type;
+  v_ass_id      ass_no_dict.ass_id%type;
+  v_ass_no      ass_no_dict.ass_no%type;
+  v_fac_id      hos_fac_dict.fac_id%type;
+  v_fac_no      hos_fac_dict.fac_no%type;
+  v_ven_id      hos_sup_dict.sup_id%type;
+  v_ven_no      hos_sup_dict.sup_no%type;
+  v_dept_id     hos_dept_dict.dept_id%type;
+  v_dept_no     hos_dept_dict.dept_no%type;
+  v_store_id    hos_store_dict.store_id%type;
+  v_store_no    hos_store_dict.store_no%type;
+  v_proj_id     hos_proj_dict.proj_id%type;
+  v_proj_no     hos_proj_dict.proj_no%type;
+  v_bus_type    ass_bus_type_dict.bus_type_code%type;
+  v_source_id   hos_source.source_id%type;
+  v_unit_code   hos_unit.unit_code%type;
+  v_naturs_code ass_naturs.naturs_code%type;
+  v_dept_id_mat hos_dept_dict.dept_code%type;
+
+BEGIN
+  --初始化变量
+  ass_AppCode := def_OK;
+  ass_ErrTxt  := '生成成功!';
+
+  --参数必填检索
+  if (ass_naturs_code is null or ass_naturs_code = '') then
+    ass_AppCode := def_WARNING;
+    ass_ErrTxt  := '资产性质不能为空!';
+    return;
+  end if;
+
+  if (ass_ass_amount = 0 or ass_ass_amount is null or ass_ass_amount = '') then
+    ass_AppCode := def_WARNING;
+    ass_ErrTxt  := '生成数量不能为空或输入不正确!';
+    return;
+  end if;
+
+  if (ass_price = 0 or ass_price is null or ass_price = '') then
+    ass_AppCode := def_WARNING;
+    ass_ErrTxt  := '原值不能为空或输入不正确!';
+    return;
+  end if;
+
+  if (ass_ass_code is null or ass_ass_code = '') then
+    ass_AppCode := def_WARNING;
+    ass_ErrTxt  := '资产不能为空!';
+    return;
+  end if;
+
+  if (ass_ven_code is null or ass_ven_code = '') then
+    ass_AppCode := def_WARNING;
+    ass_ErrTxt  := '供应商不能为空!';
+    return;
+  end if;
+
+  if (ass_store_code is null or ass_store_code = '') then
+    ass_AppCode := def_WARNING;
+    ass_ErrTxt  := '仓库不能为空!';
+    return;
+  end if;
+
+  if (ass_source_id is null or ass_source_id = '') then
+    ass_AppCode := def_WARNING;
+    ass_ErrTxt  := '资金来源不能为空!';
+    return;
+  end if;
+
+  --提取字典数据
+  select t.NATURS_CODE
+    into v_naturs_code
+    from ass_naturs t
+   where t.NATURS_CODE = ass_naturs_code
+      or t.NATURS_NAME = ass_naturs_code;
+
+  select max(t.ass_id), max(t.ass_no)
+    into v_ass_id, v_ass_no
+    from ass_no_dict t
+   where t.group_id = ass_group_id
+     and t.hos_id = ass_hos_id
+     and t.copy_code = ass_copy_code
+     and t.is_stop = 0
+     and t.ass_id = ass_ass_code;
+
+  select max(t.unit_code)
+    into v_unit_code
+    from hos_unit t
+   where t.group_id = ass_group_id
+     and t.hos_id = ass_hos_id
+     and t.unit_code = ass_unit_code;
+
+  select max(t.fac_id), max(t.fac_no)
+    into v_fac_id, v_fac_no
+    from hos_fac_dict t
+   where t.group_id = ass_group_id
+     and t.hos_id = ass_hos_id
+     and t.is_stop = 0
+     and t.fac_id = ass_fac_code;
+
+  select max(t.sup_id), max(t.sup_no)
+    into v_ven_id, v_ven_no
+    from hos_sup_dict t
+   where t.group_id = ass_group_id
+     and t.hos_id = ass_hos_id
+     and t.is_stop = 0
+     and t.sup_id = ass_ven_code;
+
+  select max(t.store_id), max(t.store_no)
+    into v_store_id, v_store_no
+    from hos_store_dict t
+   where t.group_id = ass_group_id
+     and t.hos_id = ass_hos_id
+     and t.is_stop = 0
+     and t.store_id = ass_store_code;
+
+  if (ass_dept_code is null or ass_dept_code = '') then
+  
+    select dept_id
+      into v_dept_id_mat
+      from mat_store t
+     where t.group_id = ass_group_id
+       and t.hos_id = ass_hos_id
+       and t.store_id = v_store_id;
+  
+    select max(t.dept_id), max(t.dept_no)
+      into v_dept_id, v_dept_no
+      from hos_dept_dict t
+     where t.group_id = ass_group_id
+       and t.hos_id = ass_hos_id
+       and t.is_stop = 0
+       and t.dept_id = v_dept_id_mat;
+  else
+    select max(t.dept_id), max(t.dept_no)
+      into v_dept_id, v_dept_no
+      from hos_dept_dict t
+     where t.group_id = ass_group_id
+       and t.hos_id = ass_hos_id
+       and t.is_stop = 0
+       and t.dept_id = ass_dept_code;
+  end if;
+
+  select max(t.proj_id), max(t.proj_no)
+    into v_proj_id, v_proj_no
+    from hos_proj_dict t
+   where t.group_id = ass_group_id
+     and t.hos_id = ass_hos_id
+     and t.is_stop = 0
+     and t.proj_id = ass_proj_code;
+
+  select max(t.bus_type_code)
+    into v_bus_type
+    from ass_bus_type_dict t
+   where t.group_id = ass_group_id
+     and t.hos_id = ass_hos_id
+     and t.copy_code = ass_copy_code
+     and (t.bus_type_code = ass_buy_type or t.bus_type_name = ass_buy_type);
+
+  select max(t.source_id)
+    into v_source_id
+    from hos_source t
+   where t.group_id = ass_group_id
+     and t.hos_id = ass_hos_id
+     and t.source_id = ass_source_id;
+
+  while v_card_amount > 0 loop
+    v_card_amount := v_card_amount - 1;
+    if ass_naturs_code = '04' then
+      select pref, seq_no, max_no
+        into v_pref, v_seq_no, v_max_no
+        from ass_bill_no
+       WHERE group_id = ass_group_id
+         and hos_id = ass_hos_id
+         and copy_code = ass_copy_code
+         and bill_table = 'ASS_CARD_OTHER';
+    
+      v_ass_card_no := 'ZCKPDZ' || '00' || v_max_no;
+    
+      INSERT INTO ASS_CARD_OTHER
+        (group_id,
+         hos_id,
+         copy_code,
+         ass_card_no,
+         ass_id,
+         ass_no,
+         gb_code,
+         ass_spec,
+         ass_mondl,
+         ass_brand,
+         ass_amount,
+         unit_code,
+         fac_no,
+         fac_id,
+         ven_id,
+         ven_no,
+         is_dept,
+         dept_id,
+         dept_no,
+         store_id,
+         store_no,
+         price,
+         depre_money,
+         manage_depre_money,
+         cur_money,
+         fore_money,
+         buy_type,
+         use_state,
+         is_depr,
+         depr_method,
+         acc_depre_amount,
+         is_manage_depre,
+         manage_depr_method,
+         manage_depre_amount,
+         is_measure,
+         ass_seq_no,
+         note,
+         in_date,
+         run_date,
+         is_bar,
+         bar_type,
+         bar_code,
+         bar_url,
+         is_init,
+         ass_purpose,
+         proj_id,
+         proj_no,
+         add_depre_month,
+         add_manage_month,
+         reg_no,
+         is_bar_print,
+         simple_name,
+         proc_store_id,
+         proc_store_no,
+         common_name)
+      values
+        (ass_group_id,
+         ass_hos_id,
+         ass_copy_code,
+         v_ass_card_no,
+         v_ass_id,
+         v_ass_no,
+         ass_gb_code,
+         ass_ass_spec,
+         ass_ass_model,
+         ass_ass_brand,
+         1,
+         v_unit_code,
+         v_fac_no,
+         v_fac_id,
+         v_ven_id,
+         v_ven_no,
+         0,
+         v_dept_id,
+         v_dept_no,
+         --v_store_id,
+         --v_store_no,
+         57,--转换成资产仓库
+         57,--转换成资产仓库
+         ass_price,
+         0,
+         0,
+         ass_price,
+         0,
+         v_bus_type,
+         1,
+         ass_is_depre,
+         '01',
+         ass_acc_depre_amount,
+         ass_is_manage_depre,
+         '01',
+         ass_manage_depre_amount,
+         ass_is_measure,
+         ass_ass_seq_no,
+         ass_note,
+         sysdate,
+         sysdate,
+         ass_is_bar,
+         '2',
+         v_ass_card_no,
+         ass_group_id || '/' || ass_hos_id || '/' || ass_copy_code ||
+         '/ass/assbartwo/04/' || v_ass_card_no || '.png',
+         0,
+         ass_ass_purpose,
+         v_proj_id,
+         v_proj_no,
+         0,
+         0,
+         ass_reg_no,
+         0,
+         ass_simple_name,
+         --v_store_id,
+         --v_store_no,
+         57,--转换成资产仓库
+         57,--转换成资产仓库
+         ass_common_name);
+    
+      --资金来源
+      insert into ass_resource_other
+        (group_id,
+         hos_id,
+         copy_code,
+         ass_card_no,
+         source_id,
+         price,
+         depre_money,
+         cur_money,
+         fore_money,
+         pay_money,
+         unpay_money,
+         manage_depre_money)
+      values
+        (ass_group_id,
+         ass_hos_id,
+         ass_copy_code,
+         v_ass_card_no,
+         v_source_id,
+         ass_price,
+         0,
+         ass_price,
+         0,
+         0,
+         ass_price,
+         0);
+      --使用科室
+      insert into ass_share_dept_other
+        (group_id,
+         hos_id,
+         copy_code,
+         ass_card_no,
+         dept_id,
+         dept_no,
+         area,
+         note)
+      values
+        (ass_group_id,
+         ass_hos_id,
+         ass_copy_code,
+         v_ass_card_no,
+         v_dept_id,
+         v_dept_no,
+         1,
+         '');
+      --使用科室记录
+      insert into ass_share_dept_r_other
+        (group_id,
+         hos_id,
+         copy_code,
+         ass_card_no,
+         dept_id,
+         dept_no,
+         area,
+         note,
+         ass_year,
+         ass_month)
+      values
+        (ass_group_id,
+         ass_hos_id,
+         ass_copy_code,
+         v_ass_card_no,
+         v_dept_id,
+         v_dept_no,
+         1,
+         '',
+         ass_acc_year,
+         ass_acc_month);
+      --分期付款
+      /** insert into ass_pay_stage_other
+      (group_id,
+       hos_id,
+       copy_code,
+       ass_card_no,
+       stage_no,
+       stage_name,
+       pay_term_id,
+       pay_plan_date,
+       pay_plan_percent,
+       pay_plan_money,
+       pay_money,
+       unpay_money,
+       ven_id,
+       ven_no,
+       note,
+       bill_money,
+       unbill_money)
+       values(
+       ass_group_id,
+       ass_hos_id,
+       ass_copy_code,
+       v_ass_card_no,
+       1,
+       '一期款',
+       1,
+       sysdate,
+       1,
+       ass_price,
+       0,
+       ass_price,
+       v_ven_id,
+       v_ven_no,
+       '存储过程生成',
+       0,
+       ass_price
+       );*/
+    
+      --更新卡片号单号
+      UPDATE ass_bill_no
+         SET max_no = max_no + 1
+       WHERE group_id = ass_group_id
+         and hos_id = ass_hos_id
+         and copy_code = ass_copy_code
+         and bill_table = 'ASS_CARD_OTHER';
+    end if;
+  end loop;
+
+EXCEPTION
+  WHEN OTHERS THEN
+    ass_AppCode := def_ERR;
+    ass_ErrTxt  := SQLERRM;
+  
+END ASS_GENERATE_CARD;
+	]]></sql>
+
+</root>
+

@@ -1,0 +1,253 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.htcg.dao.analysis.PatientDrgsAnalysisMapper">
+	<resultMap id="CostMap" type="java.util.Map">
+	    <result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="period_type_code" column="period_type_code" />
+		<result property="acc_year" column="acc_year" />
+		<result property="acc_month" column="acc_month" />
+		<result property="scheme_code" column="scheme_code" />
+		<result property="scheme_name" column="scheme_name" />
+		<result property="drgs_code" column="drgs_code" />
+		<result property="drgs_name" column="drgs_name" />
+		<result property="income_money" column="income_money" />
+		<result property="cost_money" column="cost_money" />
+		<result property="cost_income" column="cost_income" />
+	</resultMap>
+	<resultMap id="CostDetailMap" type="java.util.Map">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="period_type_code" column="period_type_code" />
+		<result property="acc_year" column="acc_year" />
+		<result property="acc_month" column="acc_month" />
+		<result property="scheme_code" column="scheme_code" />
+		<result property="scheme_name" column="scheme_name" />
+		<result property="drgs_code" column="drgs_code" />
+		<result property="drgs_name" column="drgs_name" />
+		<result property="icd10_name" column="icd10_name" />
+		<result property="icd9_name" column="icd9_name" />
+		<result property="item_code" column="item_code" />
+		<result property="item_name" column="item_name" />
+		<result property="mate_mode" column="mate_mode" />
+		<result property="meas_code" column="meas_code" />
+		<result property="amount" column="amount" />
+		<result property="price" column="price" />
+		<result property="income_money" column="income_money" />
+		<result property="unit_cost" column="unit_cost" />
+		<result property="cost_money" column="cost_money" />
+		<result property="unit_cost_income" column="unit_cost_income" />
+		<result property="cost_income" column="cost_income" />
+	</resultMap>
+    
+	<select id="queryPatientDrgsAnalysisCostDetail" parameterType="java.util.Map" resultMap="CostDetailMap">
+				select 
+				    t.comp_code,
+				    t.copy_code,
+				    t.period_type_code,
+				    t.acct_year,
+				    t.acct_month,
+				    t.scheme_code,
+				    t.drgs_code,
+				    t.drgs_name,
+				    t.icd10_name, 
+				    t.icd9_name,
+				    case t.charge_kind_code when '01' then '医疗项目' when '02' then '药品' when '03' then '材料' end charge_kind_code,
+				    t.item_code,
+				    t.charge_item_name item_name,
+				    t.mate_mode,
+				    t.meas_code,
+				    sum(t.amount) amount,
+				    t.price,
+				    sum(t.income_money) income_money,
+				    sum(dbo.divide(t.cost_money,t1.num)) unit_cost,
+				    sum(t.cost_money) cost_money,
+				    sum(dbo.divide(dbo.sub(t.income_money,t.cost_money),t1.num)) unit_cost_income,
+				    sum(dbo.sub(t.income_money,t.cost_money)) cost_income
+				  from (
+				select 
+				    hpdc.comp_code,
+				    hpdc.copy_code,
+				    hpdc.period_type_code,
+				    hpdc.acct_year,
+				    hpdc.acct_month,
+				    hpdc.scheme_code,
+				    hpdc.drgs_code,
+				    hd.drgs_name,
+				    hi10.icd10_name, 
+				    hi9.icd9_name,
+				    hpdc.item_code,
+				    hcid.charge_item_name,
+				    case hcid.charge_kind_code when 'h' then '03' when 'I' then '03' when 'A' then '02' when 'B' then '02' else '01'end charge_kind_code,
+				    hcid.mate_mode,
+				    hcid.meas_code,
+				    hpdc.amount,
+				    hpdc.price,
+				    hpdc.income_money,
+				    hpdc.cost_money
+				 from htcg_patient_drgs_cost hpdc
+				 left join htcg_scheme_conf hsc
+				 on hsc.comp_code = hpdc.comp_code
+				 and hsc.copy_code = hpdc.copy_code
+				 and hsc.period_type_code = hpdc.period_type_code
+				 and hsc.acct_year = hpdc.acct_year
+				 and hsc.acct_month = hpdc.acct_month
+				 and hsc.scheme_code = hpdc.scheme_code
+				 left join htcg_drgs hd 
+				 on hd.comp_code = hpdc.comp_code
+				 and hd.copy_code = hpdc.copy_code
+				 and hd.drgs_code = hpdc.drgs_code
+				 left join htcg_icd10_info hii
+				 on hii.comp_code = hpdc.comp_code
+				 and hii.copy_code = hpdc.copy_code
+				 and hii.mr_no = hpdc.mr_no
+				 and hii.in_hos_no = hpdc.in_hos_no
+				 and hii.icd10_seq = 1
+				 left join htcg_icd10 hi10
+				 on hi10.comp_code = hii.comp_code
+				 and hi10.copy_code = hii.copy_code
+				 and hi10.icd10_code = hii.icd10_code
+				 left join htcg_icd9_info h9i
+				 on h9i.comp_code = hpdc.comp_code
+				 and h9i.copy_code = hpdc.copy_code
+				 and h9i.mr_no = hpdc.mr_no
+				 and h9i.in_hos_no = hpdc.in_hos_no
+				 and h9i.icd9_seq = 1
+				 left join htcg_icd9 hi9
+				 on hi9.comp_code = h9i.comp_code
+				 and hi9.copy_code = h9i.copy_code
+				 and hi9.icd9_code = h9i.icd9_code
+				 left join htc_charge_item_dict hcid
+				 on hcid.comp_code = hpdc.comp_code
+				 and hcid.copy_code  = hpdc.copy_code
+				 and hcid.charge_item_code = hpdc.item_code
+				 <where>
+				   	      hpdc.comp_code = #{comp_code}
+				      AND hpdc.copy_code = #{copy_code}
+				      <if test="scheme_code != null and scheme_code != ''">
+						AND hpdc.scheme_code = #{scheme_code}
+					 </if>
+					 <if test="acct_year != null and acct_year != ''">
+						AND hpdc.acct_year = #{acct_year}
+					 </if>
+				 </where>
+				 )t left join (
+				 	select comp_code,copy_code,period_type_code,acct_year,acct_month,scheme_code,drgs_code,count(*) num
+						 from (
+						select comp_code,copy_code,period_type_code,acct_year,acct_month,scheme_code,drgs_code,mr_no,in_hos_no 
+						from htcg_patient_drgs_cost
+						group by comp_code,copy_code,period_type_code,acct_year,acct_month,scheme_code,drgs_code,mr_no,in_hos_no
+						)t group by comp_code,copy_code,period_type_code,acct_year,acct_month,scheme_code,drgs_code
+				) t1 on t.comp_code = t1.comp_code 
+				     and t.copy_code = t1.copy_code
+				     and t.period_type_code = t1.period_type_code
+				     and t.acct_year = t1.acct_year
+				     and t.acct_month = t1.acct_month
+				     and t.scheme_code = t1.scheme_code
+				     and t.drgs_code = t1.drgs_code
+				 group by t.comp_code,
+						t.copy_code,
+						t.period_type_code,
+						t.acct_year,
+						t.acct_month,
+						t.scheme_code,
+						t.drgs_code,
+						t.drgs_name,
+						t.icd10_name, 
+						t.icd9_name,
+						t.charge_kind_code,
+						t.item_code,
+						t.charge_item_name,
+						t.mate_mode,
+						t.meas_code,
+						t.price
+				order by t.comp_code,
+						t.copy_code,
+						t.period_type_code,
+						t.acct_year,
+						t.acct_month,
+						t.scheme_code,
+						t.drgs_code,
+						t.drgs_name,
+						t.charge_kind_code
+	</select>
+	
+   <select id="queryPatientDrgsAnalysisCost" parameterType="java.util.Map" resultMap="CostMap">
+		  
+		     select 
+			       hpdc.group_id,
+			       hpdc.hos_id,
+			       hpdc.copy_code,
+			       hpdc.period_type_code,
+			       hpdc.acc_year,
+			       hpdc.acc_month,
+			       hpdc.scheme_code,
+			       hs.scheme_name,
+			       hpdc.drgs_code,
+			       hd.drgs_name,
+			       sum(hpdc.income_money) as income_money,
+			       sum(hpdc.cost_money) as cost_money,
+			       sum(hpdc.income_money - hpdc.cost_money) as cost_income
+			  from htcg_patient_drgs_cost hpdc
+			  left join htcg_scheme hs
+			    on hpdc.group_id = hs.group_id
+				 and hpdc.hos_id = hs.hos_id
+			   and hpdc.copy_code = hs.copy_code
+			   and hpdc.scheme_code = hs.scheme_code
+			  left join htcg_drgs hd
+			    on hd.group_id = hpdc.group_id
+				 and hd.hos_id = hpdc.hos_id
+			   and hd.copy_code = hpdc.copy_code
+			   and hd.drgs_code = hpdc.drgs_code
+			  left join htcg_mr_info hmi
+			    on hmi.group_id = hpdc.group_id
+				 and hmi.hos_id = hpdc.hos_id
+			   and hmi.copy_code = hpdc.copy_code
+			   and hmi.mr_no = hpdc.mr_no
+			   and hmi.in_hos_no = hpdc.in_hos_no
+			  left join hos_dept out_hd
+			    on out_hd.group_id = hpdc.group_id
+				 and out_hd.hos_id = hpdc.hos_id
+			   and out_hd.dept_id = hpdc.out_dept_id
+			  left join htcg_identity_type hit
+			    on hit.group_id = hpdc.group_id
+				 and hit.hos_id = hpdc.hos_id
+			   and hit.copy_code = hpdc.copy_code
+			   and hit.identity_code = hpdc.identity_code
+			  left join htcg_recipe_type hrt
+			    on hrt.group_id = hpdc.group_id
+				 and hrt.hos_id = hpdc.hos_id
+			   and hrt.copy_code = hpdc.copy_code
+			   and hrt.recipe_type_code = hpdc.recipe_type_code
+			  left join cost_charge_item_arrt ccia
+			    on ccia.group_id = hpdc.group_id
+			   and ccia.hos_id = hpdc.hos_id
+				 and ccia.copy_code = hpdc.copy_code
+			   and ccia.charge_item_code = hpdc.item_code
+		     <where>
+			         hpdc.group_id = #{group_id}
+			      and hpdc.hos_id = #{hos_id}
+			      and hpdc.copy_code = #{copy_code}
+			      <if test="scheme_code != null and scheme_code != ''">
+					and hpdc.scheme_code = #{scheme_code}
+				</if>
+				<if test="acct_year != null and acct_year != ''">
+					AND hpdc.acct_year = #{acct_year}
+				 </if>
+			  </where>
+			 group by  hpdc.group_id,
+					   hpdc.hos_id,
+					   hpdc.copy_code,
+					   hpdc.period_type_code,
+					   hpdc.acc_year,
+					   hpdc.acc_month,
+					   hpdc.scheme_code,
+					   hs.scheme_name,
+					   hpdc.drgs_code,
+					   hd.drgs_name
+	</select>
+
+</mapper>
+

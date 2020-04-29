@@ -1,0 +1,394 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.ass.dao.summary.AssSummaryMapper">
+	
+	
+	
+	<resultMap id="summaryMap" type="java.util.Map">
+		<result property="ass_card_no" column="ass_card_no"/>
+		<result property="ass_name" column="ass_name"/>
+		<result property="ass_type_name" column="ass_type_name"/>
+		<result property="naturs_name" column="naturs_name"/>
+		<result property="in_date" column="in_date"/>
+		<result property="ass_spec" column="ass_spec"/>
+		<result property="ass_mondl" column="ass_mondl"/>
+		<result property="ass_brand" column="ass_brand"/>
+		<result property="ven_name" column="ven_name"/>
+		<result property="ass_seq_no" column="ass_seq_no"/>
+		<result property="ass_in_no" column="ass_in_no"/>
+		<result property="equi_usage_name" column="equi_usage_name"/>
+		<result property="dept_name" column="dept_name"/>
+		<result property="store_name" column="store_name"/>
+		<result property="price" column="price"/>
+		<result property="depre_money" column="depre_money"/>
+		<result property="cur_money" column="cur_money"/>
+		<result property="bus_type" column="bus_type"/>
+		<result property="bus_type1" column="bus_type1"/>
+		<result property="source_name" column="source_name"/>
+		<result property="s_price" column="s_price"/>
+		<result property="g_price" column="g_price"/>
+		<result property="h_price" column="h_price"/>
+		<result property="o_price" column="o_price"/>
+		<result property="i_price" column="i_price"/>
+		<result property="l_price" column="l_price"/>
+		<result property="total" column="total"/>
+	</resultMap>
+	
+	
+	
+	<select id="queryAssSummary" parameterType="java.util.Map" resultMap="summaryMap">
+		
+	
+		with temp as (
+			select * from(
+			select  '本期增加' bus_type,  '采购增加' bus_type1,hs.source_name ,t1.ass_naturs,t.source_id,sum(t.price) price from ass_type_collect_source t 
+			left join ass_type_dict t1 on t.ass_type_id = t1.ass_type_id and t1.is_stop=0 and t.group_id = t1.group_id and t.hos_id = t1.hos_id and t.copy_code =t1.copy_code
+			left join  hos_source hs on hs.source_id = t.source_id  and t.group_id =hs.group_id and t.hos_id = hs.hos_id 
+			where buy_type = '01' and t.group_id = #{group_id,jdbcType=INTEGER}
+			
+				AND t.hos_id = #{hos_id,jdbcType=INTEGER}
+			
+				AND t.copy_code = #{copy_code,jdbcType=VARCHAR}
+				 <if test="acc_year != null and acc_year != ''">
+			      AND t.acc_year = #{acc_year} AND t.acc_month = #{acc_month}
+			      </if>
+			group by t.source_id, t1.ass_naturs,hs.source_name ,t.group_id,t.hos_id,t.copy_code
+			)),
+			
+			back_temp as (
+			select * from(
+			select  '本期减少' bus_type,  '采购退货' bus_type1,hs.source_name ,t1.ass_naturs,t.source_id,sum(t.price) price from ass_type_collect_source t 
+			left join ass_type_dict t1 on t.ass_type_id = t1.ass_type_id and t1.is_stop=0 and t.group_id = t1.group_id and t.hos_id = t1.hos_id and t.copy_code =t1.copy_code
+			left join  hos_source hs on hs.source_id = t.source_id and t.group_id =hs.group_id and t.hos_id = hs.hos_id 
+			where buy_type = '04' and t.group_id = #{group_id,jdbcType=INTEGER}
+			
+				AND t.hos_id = #{hos_id,jdbcType=INTEGER}
+			
+				AND t.copy_code = #{copy_code,jdbcType=VARCHAR}
+				 <if test="acc_year != null and acc_year != ''">
+			      AND t.acc_year = #{acc_year} AND t.acc_month = #{acc_month}
+			      </if>
+			group by t.source_id, t1.ass_naturs,hs.source_name,t.group_id,t.hos_id,t.copy_code
+			)
+			)
+			
+			select *
+			    from (select '期初' bus_type,
+			                 '期初' bus_type1,
+			                 '期初金额' source_name,
+			                 h.ass_naturs,
+			                 null,
+			                price
+			            from ass_type_collect_source t
+			            left join  ass_type_dict h on h.ass_type_id=t.ass_type_id and t.group_id=h.group_id and t.hos_id = h.hos_id and t.copy_code = h.copy_code
+			            where is_init=1 and t.group_id = #{group_id,jdbcType=INTEGER}
+			
+				AND t.hos_id = #{hos_id,jdbcType=INTEGER}
+			
+				AND t.copy_code = #{copy_code,jdbcType=VARCHAR}
+				 <if test="acc_year != null and acc_year != ''">
+			      AND t.acc_year = #{acc_year} AND t.acc_month = #{acc_month}
+			      </if>
+			            group by t.group_id,t.hos_id,t.copy_code,price,ass_naturs ,t.group_id ,t.hos_id,t.copy_code
+			            )
+			             pivot(sum(price) as price for ass_naturs in('01' as s, '02' as g, '03' as h, '04' as o,'05' as i, '06' as l)) 
+			                                                                                
+			union all
+			
+			select * from temp  pivot(sum(price) as price for ass_naturs in('01' as s,  '02' as g, '03' as h, '04' as o,'05' as i,'06' as l))
+			union all
+			select * from(
+			select  '本期增加' bus_type,  '采购增加' bus_type1,'合计' source_name ,null,t1.ass_naturs,sum(t.price) price from ass_type_collect_source t 
+			left join ass_type_dict t1 on t.ass_type_id = t1.ass_type_id and t1.is_stop=0 and t.group_id =t1.group_id and t.hos_id =t1.hos_id and t.copy_code =t1.copy_code
+			left join  hos_source hs on hs.source_id = t.source_id and t.group_id =hs.group_id and t.hos_id =hs.hos_id 
+			where buy_type = '01' and t.group_id = #{group_id,jdbcType=INTEGER}
+			
+				AND t.hos_id = #{hos_id,jdbcType=INTEGER}
+			
+				AND t.copy_code = #{copy_code,jdbcType=VARCHAR}
+				<if test="acc_year != null and acc_year != ''">
+			      AND t.acc_year = #{acc_year} AND t.acc_month = #{acc_month}
+			      </if>
+			group by null, t1.ass_naturs,hs.source_name,t.source_id ,t.group_id,t.hos_id,t.copy_code
+			)
+			pivot(sum(price) as price for ass_naturs in('01' as s,  '02' as g, '03' as h, '04' as o,'05' as i,'06' as l))
+			
+			union all
+			
+			select * from back_temp pivot(sum(price) as price for ass_naturs in('01' as s,  '02' as g, '03' as h, '04' as o,'05' as i,'06' as l))
+			
+			union all
+			
+			select * from(
+			select  '本期减少' bus_type,  '采购退货' bus_type1,'合计' source_name ,null,t1.ass_naturs,sum(t.price) price from ass_type_collect_source t 
+			left join ass_type_dict t1 on t.ass_type_id = t1.ass_type_id and t1.is_stop=0 and t.group_id =t1.group_id and t.hos_id =t1.hos_id and t.copy_code =t1.copy_code
+			left join  hos_source hs on hs.source_id = t.source_id and t.group_id =hs.group_id and t.hos_id =hs.hos_id 
+			where buy_type = '04' and t.group_id = #{group_id,jdbcType=INTEGER}
+			
+				AND t.hos_id = #{hos_id,jdbcType=INTEGER}
+			
+				AND t.copy_code = #{copy_code,jdbcType=VARCHAR}
+				<if test="acc_year != null and acc_year != ''">
+			      AND t.acc_year = #{acc_year} AND t.acc_month = #{acc_month}
+			      </if>
+			group by null, t1.ass_naturs,hs.source_name,t.source_id ,t.group_id,t.hos_id,t.copy_code
+			)
+			pivot(sum(price) as price for ass_naturs in('01' as s,  '02' as g, '03' as h, '04' as o,'05' as i,'06' as l))
+			
+			union all
+			
+			select  '期末' bus_type,  '期末' bus_type1,'期末金额' source_name , null, nvl(c_s_price,0) + nvl(s_price,0) - nvl(s_s_price,0) s ,nvl(c_g_price,0) + nvl(g_price,0) - nvl(g_g_price,0) g ,nvl(c_h_price,0) + nvl(h_price,0) - nvl(h_h_price,0) h ,
+			nvl(c_o_price,0) + nvl(o_price,0) - nvl(o_o_price,0) o,nvl(c_i_price,0) + nvl(i_price,0) - nvl(i_i_price,0) i,nvl(c_l_price,0) + nvl(l_price,0) - nvl(l_l_price,0) l
+			
+			from (
+			    select * from(
+			    select  '本期增加' bus_type,  '采购增加' bus_type1,'合计' source_name ,null,t1.ass_naturs,sum(t.price) price,t.group_id,t.hos_id,t.copy_code from ass_type_collect_source t 
+			    left join ass_type_dict t1 on t.ass_type_id = t1.ass_type_id and t1.is_stop=0 and t.group_id=t1.group_id and t.hos_id =t1.hos_id and t.copy_code = t1.copy_code
+			
+			    where buy_type = '01' and t.group_id = #{group_id,jdbcType=INTEGER}
+			
+				AND t.hos_id = #{hos_id,jdbcType=INTEGER}
+			
+				AND t.copy_code = #{copy_code,jdbcType=VARCHAR}
+				<if test="acc_year != null and acc_year != ''">
+			      AND t.acc_year = #{acc_year} AND t.acc_month = #{acc_month}
+			      </if>
+			    group by null, t1.ass_naturs ,buy_type,t.group_id,t.hos_id,t.copy_code
+			    )
+			    pivot(sum(price) as price for ass_naturs in('01' as s,  '02' as g, '03' as h, '04' as o,'05' as i,'06' as l )) aa
+			left join  (
+			         select * from(
+			    select  '本期减少' bus_type,  '采购退货' bus_type1,'合计' source_name ,null,t1.ass_naturs,nvl(sum(t.price),0) price,t.group_id,t.hos_id,t.copy_code from ass_type_collect_source t 
+			    left join ass_type_dict t1 on t.ass_type_id = t1.ass_type_id and t1.is_stop=0 and t.group_id=t1.group_id and t.hos_id =t1.hos_id and t.copy_code = t1.copy_code
+			   
+			    where buy_type = '04' and t.group_id = #{group_id,jdbcType=INTEGER}
+			
+				AND t.hos_id = #{hos_id,jdbcType=INTEGER}
+			
+				AND t.copy_code = #{copy_code,jdbcType=VARCHAR}
+				<if test="acc_year != null and acc_year != ''">
+			      AND t.acc_year = #{acc_year} AND t.acc_month = #{acc_month}
+			      </if>
+			    group by null, t1.ass_naturs,buy_type,t.group_id,t.hos_id,t.copy_code
+			    )
+			    pivot(sum(price) as price for ass_naturs in('01' as s_s,  '02' as g_g, '03' as h_h, '04' as o_o,'05' as i_i,'06' as l_l))
+			
+			) bb on  aa.hos_id =bb.hos_id and aa.group_id = bb.group_id and aa.COPY_CODE = bb.COPY_CODE
+			left join (
+			     select *
+			    from (select '期初' bus_type,'期初' bus_type1, '期初金额' source_name, h.ass_naturs,null,price,t.group_id,t.hos_id,t.copy_code
+			            from ass_type_collect_source t
+			            left join  ass_type_dict h on h.ass_type_id=t.ass_type_id
+			            where is_init=1  and t.group_id = #{group_id,jdbcType=INTEGER}
+			
+				AND t.hos_id = #{hos_id,jdbcType=INTEGER}
+			
+				AND t.copy_code = #{copy_code,jdbcType=VARCHAR}
+				<if test="acc_year != null and acc_year != ''">
+			      AND t.acc_year = #{acc_year} AND t.acc_month = #{acc_month}
+			      </if>
+			            group by t.group_id,t.hos_id,t.copy_code,price,ass_naturs,t.group_id,t.hos_id,t.copy_code 
+			            )
+			             pivot(sum(price) as price for ass_naturs in('01' as c_s, '02' as c_g, '03' as c_h, '04' as c_o,'05' as c_i, '06' as c_l))
+			
+			) cc  on aa.hos_id =cc.hos_id and cc.group_id = cc.group_id and aa.COPY_CODE = cc.COPY_CODE
+			
+			
+			)t
+
+				where t.group_id = #{group_id,jdbcType=INTEGER}
+					
+						AND t.hos_id = #{hos_id,jdbcType=INTEGER}
+						<!-- <if test="acc_year != null and acc_year != ''">
+			      AND t.acc_year = #{acc_year} AND t.acc_month = #{acc_month}
+			      </if> -->
+					
+					<!-- 	AND t.copy_code = #{copy_codes,jdbcType=VARCHAR} -->
+	
+
+
+
+
+
+
+
+
+
+
+	 		<!-- 	<if test="use_dept_id != null and use_dept_id != ''">
+					AND use_dept_id = #{use_dept_id,jdbcType=INTEGER}
+				</if> -->
+				<!-- <if test="plan_year != null and plan_year != ''">
+					AND plan_year || '' || depre_month = #{depre_year_month,jdbcType=DATE}
+				</if> 
+ -->
+	</select>
+	
+
+	<!-- 打印 -->
+	<select id="queryAssSummaryMainPrint" parameterType="java.util.Map" resultMap="summaryMap">
+	with temp as (
+			select * from(
+			select  '本期增加' bus_type,  '采购增加' bus_type1,hs.source_name ,t1.ass_naturs,t.source_id,sum(t.price) price from ass_type_collect_source t 
+			left join ass_type_dict t1 on t.ass_type_id = t1.ass_type_id and t1.is_stop=0 and t.group_id = t1.group_id and t.hos_id = t1.hos_id and t.copy_code =t1.copy_code
+			left join  hos_source hs on hs.source_id = t.source_id  and t.group_id =hs.group_id and t.hos_id = hs.hos_id 
+			where buy_type = '01' and t.group_id = #{group_id,jdbcType=INTEGER}
+			
+				AND t.hos_id = #{hos_id,jdbcType=INTEGER}
+			
+				AND t.copy_code = #{copy_code,jdbcType=VARCHAR}
+				 <if test="acc_year != null and acc_year != ''">
+			      AND t.acc_year = #{acc_year,jdbcType=VARCHAR} AND t.acc_month = #{acc_month,jdbcType=VARCHAR}
+			      </if>
+			group by t.source_id, t1.ass_naturs,hs.source_name ,t.group_id,t.hos_id,t.copy_code
+			)),
+			
+			back_temp as (
+			select * from(
+			select  '本期减少' bus_type,  '采购退货' bus_type1,hs.source_name ,t1.ass_naturs,t.source_id,sum(t.price) price from ass_type_collect_source t 
+			left join ass_type_dict t1 on t.ass_type_id = t1.ass_type_id and t1.is_stop=0 and t.group_id = t1.group_id and t.hos_id = t1.hos_id and t.copy_code =t1.copy_code
+			left join  hos_source hs on hs.source_id = t.source_id and t.group_id =hs.group_id and t.hos_id = hs.hos_id 
+			where buy_type = '04' and t.group_id = #{group_id,jdbcType=INTEGER}
+			
+				AND t.hos_id = #{hos_id,jdbcType=INTEGER}
+			
+				AND t.copy_code = #{copy_code,jdbcType=VARCHAR}
+				 <if test="acc_year != null and acc_year != ''">
+			      AND t.acc_year = #{acc_year,jdbcType=VARCHAR} AND t.acc_month = #{acc_month,jdbcType=VARCHAR}
+			      </if>
+			group by t.source_id, t1.ass_naturs,hs.source_name,t.group_id,t.hos_id,t.copy_code
+			)
+			)
+			
+			select *
+			    from (select '期初' bus_type,
+			                 '期初' bus_type1,
+			                 '期初金额' source_name,
+			                 h.ass_naturs,
+			                 null,
+			                price
+			            from ass_type_collect_source t
+			            left join  ass_type_dict h on h.ass_type_id=t.ass_type_id and t.group_id=h.group_id and t.hos_id = h.hos_id and t.copy_code = h.copy_code
+			            where is_init=1 and t.group_id = #{group_id,jdbcType=INTEGER}
+			
+				AND t.hos_id = #{hos_id,jdbcType=INTEGER}
+			
+				AND t.copy_code = #{copy_code,jdbcType=VARCHAR}
+				 <if test="acc_year != null and acc_year != ''">
+			      AND t.acc_year = #{acc_year,jdbcType=VARCHAR} AND t.acc_month = #{acc_month,jdbcType=VARCHAR}
+			      </if>
+			            group by t.group_id,t.hos_id,t.copy_code,price,ass_naturs ,t.group_id ,t.hos_id,t.copy_code
+			            )
+			             pivot(sum(price) as price for ass_naturs in('01' as s, '02' as g, '03' as h, '04' as o,'05' as i, '06' as l)) 
+			                                                                                
+			union all
+			
+			select * from temp  pivot(sum(price) as price for ass_naturs in('01' as s,  '02' as g, '03' as h, '04' as o,'05' as i,'06' as l))
+			union all
+			select * from(
+			select  '本期增加' bus_type,  '采购增加' bus_type1,'合计' source_name ,null,t1.ass_naturs,sum(t.price) price from ass_type_collect_source t 
+			left join ass_type_dict t1 on t.ass_type_id = t1.ass_type_id and t1.is_stop=0 and t.group_id =t1.group_id and t.hos_id =t1.hos_id and t.copy_code =t1.copy_code
+			left join  hos_source hs on hs.source_id = t.source_id and t.group_id =hs.group_id and t.hos_id =hs.hos_id 
+			where buy_type = '01' and t.group_id = #{group_id,jdbcType=INTEGER}
+			
+				AND t.hos_id = #{hos_id,jdbcType=INTEGER}
+			
+				AND t.copy_code = #{copy_code,jdbcType=VARCHAR}
+				<if test="acc_year != null and acc_year != ''">
+			      AND t.acc_year = #{acc_year,jdbcType=VARCHAR} AND t.acc_month = #{acc_month,jdbcType=VARCHAR}
+			      </if>
+			group by null, t1.ass_naturs,hs.source_name,t.source_id ,t.group_id,t.hos_id,t.copy_code
+			)
+			pivot(sum(price) as price for ass_naturs in('01' as s,  '02' as g, '03' as h, '04' as o,'05' as i,'06' as l))
+			
+			union all
+			
+			select * from back_temp pivot(sum(price) as price for ass_naturs in('01' as s,  '02' as g, '03' as h, '04' as o,'05' as i,'06' as l))
+			
+			union all
+			
+			select * from(
+			select  '本期减少' bus_type,  '采购退货' bus_type1,'合计' source_name ,null,t1.ass_naturs,sum(t.price) price from ass_type_collect_source t 
+			left join ass_type_dict t1 on t.ass_type_id = t1.ass_type_id and t1.is_stop=0 and t.group_id =t1.group_id and t.hos_id =t1.hos_id and t.copy_code =t1.copy_code
+			left join  hos_source hs on hs.source_id = t.source_id and t.group_id =hs.group_id and t.hos_id =hs.hos_id 
+			where buy_type = '04' and t.group_id = #{group_id,jdbcType=INTEGER}
+			
+				AND t.hos_id = #{hos_id,jdbcType=INTEGER}
+			
+				AND t.copy_code = #{copy_code,jdbcType=VARCHAR}
+				<if test="acc_year != null and acc_year != ''">
+			      AND t.acc_year = #{acc_year,jdbcType=VARCHAR} AND t.acc_month = #{acc_month,jdbcType=VARCHAR}
+			      </if>
+			group by null, t1.ass_naturs,hs.source_name,t.source_id ,t.group_id,t.hos_id,t.copy_code
+			)
+			pivot(sum(price) as price for ass_naturs in('01' as s,  '02' as g, '03' as h, '04' as o,'05' as i,'06' as l))
+			
+			union all
+			
+			select  '期末' bus_type,  '期末' bus_type1,'期末金额' source_name , null, nvl(c_s_price,0) + nvl(s_price,0) - nvl(s_s_price,0) s ,nvl(c_g_price,0) + nvl(g_price,0) - nvl(g_g_price,0) g ,nvl(c_h_price,0) + nvl(h_price,0) - nvl(h_h_price,0) h ,
+			nvl(c_o_price,0) + nvl(o_price,0) - nvl(o_o_price,0) o,nvl(c_i_price,0) + nvl(i_price,0) - nvl(i_i_price,0) i,nvl(c_l_price,0) + nvl(l_price,0) - nvl(l_l_price,0) l
+			
+			from (
+			    select * from(
+			    select  '本期增加' bus_type,  '采购增加' bus_type1,'合计' source_name ,null,t1.ass_naturs,sum(t.price) price,t.group_id,t.hos_id,t.copy_code from ass_type_collect_source t 
+			    left join ass_type_dict t1 on t.ass_type_id = t1.ass_type_id and t1.is_stop=0 and t.group_id=t1.group_id and t.hos_id =t1.hos_id and t.copy_code = t1.copy_code
+			
+			    where buy_type = '01' and t.group_id = #{group_id,jdbcType=INTEGER}
+			
+				AND t.hos_id = #{hos_id,jdbcType=INTEGER}
+			
+				AND t.copy_code = #{copy_code,jdbcType=VARCHAR}
+				<if test="acc_year != null and acc_year != ''">
+			      AND t.acc_year = #{acc_year,jdbcType=VARCHAR} AND t.acc_month = #{acc_month,jdbcType=VARCHAR}
+			      </if>
+			    group by null, t1.ass_naturs ,buy_type,t.group_id,t.hos_id,t.copy_code
+			    )
+			    pivot(sum(price) as price for ass_naturs in('01' as s,  '02' as g, '03' as h, '04' as o,'05' as i,'06' as l )) aa
+			left join  (
+			         select * from(
+			    select  '本期减少' bus_type,  '采购退货' bus_type1,'合计' source_name ,null,t1.ass_naturs,nvl(sum(t.price),0) price,t.group_id,t.hos_id,t.copy_code from ass_type_collect_source t 
+			    left join ass_type_dict t1 on t.ass_type_id = t1.ass_type_id and t1.is_stop=0 and t.group_id=t1.group_id and t.hos_id =t1.hos_id and t.copy_code = t1.copy_code
+			   
+			    where buy_type = '04' and t.group_id = #{group_id,jdbcType=INTEGER}
+			
+				AND t.hos_id = #{hos_id,jdbcType=INTEGER}
+			
+				AND t.copy_code = #{copy_code,jdbcType=VARCHAR}
+				<if test="acc_year != null and acc_year != ''">
+			      AND t.acc_year = #{acc_year,jdbcType=VARCHAR} AND t.acc_month = #{acc_month,jdbcType=VARCHAR}
+			      </if>
+			    group by null, t1.ass_naturs,buy_type,t.group_id,t.hos_id,t.copy_code
+			    )
+			    pivot(sum(price) as price for ass_naturs in('01' as s_s,  '02' as g_g, '03' as h_h, '04' as o_o,'05' as i_i,'06' as l_l))
+			
+			) bb on  aa.hos_id =bb.hos_id and aa.group_id = bb.group_id and aa.COPY_CODE = bb.COPY_CODE
+			left join (
+			     select *
+			    from (select '期初' bus_type,'期初' bus_type1, '期初金额' source_name, h.ass_naturs,null,price,t.group_id,t.hos_id,t.copy_code
+			            from ass_type_collect_source t
+			            left join  ass_type_dict h on h.ass_type_id=t.ass_type_id
+			            where is_init=1  and t.group_id = #{group_id,jdbcType=INTEGER}
+			
+				AND t.hos_id = #{hos_id,jdbcType=INTEGER}
+			
+				AND t.copy_code = #{copy_code,jdbcType=VARCHAR}
+				<if test="acc_year != null and acc_year != ''">
+			      AND t.acc_year = #{acc_year,jdbcType=VARCHAR} AND t.acc_month = #{acc_month,jdbcType=VARCHAR}
+			      </if>
+			            group by t.group_id,t.hos_id,t.copy_code,price,ass_naturs,t.group_id,t.hos_id,t.copy_code 
+			            )
+			             pivot(sum(price) as price for ass_naturs in('01' as c_s, '02' as c_g, '03' as c_h, '04' as c_o,'05' as c_i, '06' as c_l))
+			
+			) cc  on aa.hos_id =cc.hos_id and cc.group_id = cc.group_id and aa.COPY_CODE = cc.COPY_CODE
+			
+			
+			)t
+
+				where t.group_id = #{group_id,jdbcType=INTEGER}
+					
+						AND t.hos_id = #{hos_id,jdbcType=INTEGER}
+	
+	</select>
+	
+</mapper>
+

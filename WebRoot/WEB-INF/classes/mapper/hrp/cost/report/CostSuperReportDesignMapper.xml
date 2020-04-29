@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.cost.dao.report.CostSuperReportDesignMapper">
+	
+	<!-- 根据报表编码查询报表 -->
+	<select id="querySuperReportByCode" parameterType="java.util.Map" resultType="com.chd.hrp.cost.entity.report.CostRepDefine">
+		select report_code,mod_code,report_name,report_group,report_type,user_id,create_date,sort_code,is_perm,is_sys,is_stop,report_note,content,is_write
+		from REP_DEFINE where report_code=#{report_code} and 
+		group_id = #{group_id} and hos_id = #{hos_id} and copy_code = #{copy_code}  and mod_code=#{mod_code}
+	</select>
+	
+	<!--  根据报表编码查询报表内容，大字段 -->
+	<select id="querySuperReportContentByCode" parameterType="java.util.Map" resultType="com.chd.hrp.cost.entity.report.CostRepDefine">
+		select content
+		from REP_DEFINE where report_code=#{report_code} and 
+		group_id = #{group_id} and hos_id = #{hos_id} and copy_code = #{copy_code}  and mod_code=#{mod_code}
+	</select>
+	
+	<!-- 根据系统编码查询报表 -->
+	<select id="querySuperReportByMod" parameterType="java.util.Map" resultType="com.chd.hrp.cost.entity.report.CostRepDefine">
+		select report_code,mod_code,report_name,report_group,report_type,report_attr,sort_code,is_perm,is_stop,is_sys,report_note,is_write
+		from REP_DEFINE 
+		where group_id = #{group_id} and hos_id = #{hos_id} and copy_code = #{copy_code}  and mod_code=#{mod_code}
+		order by sort_code
+	</select>
+	
+	
+	<!-- 保存报表-添加 -->
+	<insert id="insertSuperReport" parameterType="java.util.Map" >
+		insert into REP_DEFINE(report_code,group_id,hos_id,copy_code,mod_code,report_name,report_group,report_type,report_attr,report_note,user_id,create_date,sort_code,is_perm,is_sys,is_stop,is_write)
+		values(#{report_code},#{group_id},#{hos_id},#{copy_code},#{mod_code},#{report_name},#{report_group},#{report_type},#{report_attr},#{report_note},#{user_id},#{create_date},#{sort_code},#{is_perm},#{is_sys},#{is_stop},#{is_write})
+	</insert>
+	
+	<!-- 保存报表 -修改-->
+	<update id="updateSuperReport" parameterType="java.util.Map" >
+		update REP_DEFINE set report_name=#{report_name},
+		report_group=#{report_group},
+		report_type=#{report_type},
+		report_attr=#{report_attr},
+		report_note=#{report_note},
+		user_id=#{user_id},
+		create_date=#{create_date},
+		sort_code=#{sort_code},
+		is_perm=#{is_perm},
+		is_sys=#{is_sys},
+		is_stop=#{is_stop},
+		is_write=#{is_write}
+		where report_code=#{report_code} and group_id = #{group_id} and hos_id = #{hos_id} 
+		and copy_code = #{copy_code}  and mod_code=#{mod_code}
+	</update>
+	
+	<!-- 保存报表内容，大字段 -->
+	<update id="updateSuperReportContent" parameterType="java.util.Map" >
+		update REP_DEFINE set 
+		user_id=#{user_id},
+		create_date=#{create_date},
+		content=#{content}
+		where report_code=#{report_code} and group_id = #{group_id} and hos_id = #{hos_id} 
+		and copy_code = #{copy_code}  and mod_code=#{mod_code}
+	</update>
+	
+	<!-- 删除判断：根据模块编码、报表编码查询报表实例 -->
+	<select id="querySuperReportInstanceCountByCode" parameterType="java.util.Map" resultType="java.lang.Integer">
+		select count(1) from rep_instance 
+		where group_id = #{group_id} and hos_id = #{hos_id} and copy_code = #{copy_code}  and mod_code=#{mod_code} and report_code=#{report_code} 
+		
+	</select>
+	
+		
+	<!-- 根据报表编码删除报表 -->
+	<delete id="deleteSuperReportByCode" parameterType="java.util.Map">
+
+		DELETE FROM REP_DEFINE WHERE group_id = #{group_id} and hos_id = #{hos_id} and copy_code = #{copy_code} 
+		and mod_code = #{mod_code} and report_code=#{report_code} 
+
+	</delete>
+	
+	
+	<!-- 查询报表元素 -->
+	<select id="querySuperReportEleByMod" parameterType="java.util.Map" resultType="com.chd.hrp.cost.entity.report.CostRepDefineEle">
+		select e.mod_code,m.mod_name,e.ele_code,e.ele_name,e.ele_group,e.ele_type,e.sort_code,e.is_stop,e.is_sys,e.note
+		from REP_DEFINE_ELE e
+		inner join sys_mod m on e.mod_code=m.mod_code
+		where e.group_id = #{group_id} and e.hos_id = #{hos_id} and e.copy_code = #{copy_code}  
+		and e.is_stop=0
+		<if test="mod_code != null and mod_code != ''">
+			and e.mod_code=#{mod_code}
+		</if>
+		<if test="ele_code != null and ele_code != ''">
+			and e.ele_code=#{ele_code}
+		</if>
+		<if test="ele_name != null and ele_name != ''">
+			and e.ele_name=#{ele_name}
+		</if>
+		order by e.sort_code
+	</select>
+	
+	<!-- 根据报表元素查询参数 -->
+	<select id="querySuperReportParaByEle" parameterType="java.util.Map" resultType="com.chd.hrp.cost.entity.report.CostRepDefinePara">
+		select p.para_code,p.para_name,p.para_type,p.para_json,p.dict_code,d.dict_name,p.is_stop,
+		case p.para_type when 1 then '文本框' when 2 then '日期框' when 3 then '下拉框' when 4 then '检索下拉框' when 5 then '复选框' else '其他' end para_type_name,
+		case p.is_stop when 1 then '是' else '否' end is_stop_name
+		from REP_DEFINE_PARA p
+		left join REP_DEFINE_DICT d on p.group_id=d.group_id and p.hos_id=d.hos_id and p.copy_code=d.copy_code and p.dict_code=d.dict_code
+		where p.group_id = #{group_id} and p.hos_id = #{hos_id} and p.copy_code = #{copy_code}  
+		and p.ele_code=#{ele_code}
+		<if test="para_code != null and para_code != ''">
+			and p.para_code=#{para_code}
+		</if>
+		<if test="is_stop != null and is_stop != ''">
+			and p.is_stop=#{is_stop}
+		</if>
+		order by p.sort_code
+	</select>
+	
+	<!-- 根据报表数据集查询参数 -->
+	<select id="querySuperReportParaByDs" parameterType="java.util.Map" resultType="com.chd.hrp.cost.entity.report.CostRepDefinePara">
+		SELECT p.para_code||'#'||p.ds_code para_code, p.para_name, p.para_type, p.para_json, p.dict_code, d.dict_name, p.is_stop,
+			case p.para_type when 1 then '文本框' when 2 then '日期框' when 3 then '下拉框' when 4 then '检索下拉框' when 5 then '复选框' else '其他' end para_type_name,
+			case p.is_stop when 1 then '是' else '否' end is_stop_name,para_value
+		FROM rep_ds_para p 
+		LEFT JOIN rep_define_dict d 
+			ON p.group_id = d.group_id 
+			AND p.hos_id = d.hos_id 
+			AND p.copy_code = d.copy_code 
+			AND p.dict_code = d.dict_code
+		left join rep_rep_ds_para dp on p.group_id=dp.group_id 
+		and p.hos_id=dp.hos_id and p.copy_code=dp.copy_code 
+		and p.ds_code=dp.ds_code and p.para_code=dp.para_name
+		WHERE p.group_id = #{group_id,jdbcType=INTEGER} 
+			AND p.hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND p.copy_code = #{copy_code,jdbcType=VARCHAR}  
+			AND p.ds_code = #{ds_code,jdbcType=VARCHAR}
+		<if test="para_code != null and para_code != ''">
+			AND p.para_code=#{para_code,jdbcType=VARCHAR}
+		</if>
+		<if test="is_stop != null and is_stop != ''">
+			AND p.is_stop=#{is_stop,jdbcType=INTEGER}
+		</if>
+		ORDER BY p.sort_code
+	</select>
+
+
+	<!-- 根据字典编码查找SQL -->
+	<select id="querySuperReportDictBySql" parameterType="java.util.Map" resultType="com.chd.hrp.cost.entity.report.CostRepDefineDict">
+		select d.dict_sql,d.dict_check_sql
+		from REP_DEFINE_DICT d
+		where d.group_id=#{group_id} and d.hos_id=#{hos_id} and d.copy_code=#{copy_code} 
+		and d.dict_code=#{dict_code}
+	</select>
+	
+	<resultMap type="com.chd.hrp.acc.entity.HrpAccSelect" id="hrpAccSelect">
+		<result property="id" column="id" />
+		<result property="text" column="text" />
+	</resultMap>
+	<!-- 参数下拉框数据初始化，报表定义通用 -->
+	<select id="querySuperReportParaSelectData" parameterType="String" resultMap="hrpAccSelect">
+		select * from (
+			${dict_sql}
+		)tab_1 where rownum &lt; 100
+	</select>
+
+
+</mapper>
+

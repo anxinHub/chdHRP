@@ -1,0 +1,531 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.eqc.dao.common.AssEqcSelectMapper">
+	<resultMap type="java.util.Map" id="eqcSelect">
+		<result property="id" column="id" />
+		<result property="text" column="text" />
+	</resultMap>
+	
+	<!-- 部门类型下拉框 -->
+	<select id="queryDeptType" resultMap="eqcSelect">
+		SELECT
+		type_code id,
+		type_code ||' '|| type_name text
+		FROM ACC_DEPT_TYPE
+		<where>
+			<if test="key != null and key != ''">
+				AND ( type_code like '${key}%' or
+					type_name like '%${key}%')
+			</if>
+		</where>
+			order by type_code
+	</select>
+	
+	<!-- 部门分类下拉框 -->
+	<select id="queryDeptKind" resultMap="eqcSelect">
+		SELECT
+		kind_code id,
+		kind_code ||' '|| kind_name text
+		FROM HOS_DEPT_KIND
+		<where>
+			<if test="group_id != null and group_id != ''">
+				AND group_id = #{group_id,jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND hos_id = #{hos_id,jdbcType=INTEGER}
+			</if>
+			<if test="key != null and key != ''">
+				AND ( kind_code like '${key}%' or
+					kind_name like '%${key}%')
+			</if>
+		</where>
+			order by kind_code
+	</select>
+	
+	<!-- 部门性质下拉框 -->
+	<select id="queryDeptNature" resultMap="eqcSelect">
+		SELECT
+		natur_code id,
+		natur_code ||' '|| natur_name text
+		FROM ACC_DEPT_NATUR
+		<where>
+			<if test="key != null and key != ''">
+				AND ( natur__code like '${key}%' or
+					natur_name like '%${key}%')
+			</if>
+		</where>
+			order by natur_code
+	</select>
+	
+	<!-- 部门支出性质下拉框 -->
+	<select id="queryDeptOut" resultMap="eqcSelect">
+		SELECT
+		out_code id,
+		out_code ||' '|| out_name text
+		FROM ACC_DEPT_OUT
+		<where>
+			<if test="key != null and key != ''">
+				AND ( out_code like '${key}%' or
+					out_name like '%${key}%')
+			</if>
+		</where>
+			order by out_code
+	</select>
+	
+	<select id="queryDeptDict" resultMap="eqcSelect">
+		select dept_id || ',' || dept_no id,
+			dept_code||' '||dept_name text
+		from hos_dept_dict 
+     	where
+     		group_id = #{group_id}
+			and hos_id = #{hos_id}
+			and is_stop = 0
+			<if test="key != null and key != ''">
+				and (
+					hd.dept_code like '${key}%' or
+					hd.dept_name like '%${key}%' or
+					hd.spell_code like '%${key}%' or
+					hd.wbx_code like '%${key}%'
+				)
+			</if>
+		order by dept_code	
+	</select>
+	
+	
+	
+	<!-- 固定资产类别 下拉框 -->
+	<select id="queryAssType" resultMap="eqcSelect">
+		select 
+		ass_type_id id ,
+		ass_type_code||' '||ass_type_name text 
+		from ASS_TYPE_DICT
+		<where>
+			<if test="group_id != null and group_id != ''">
+			AND group_id = #{group_id,jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			</if>
+			<if test="key != null and key != ''">
+				and (	ass_type_code like '${key}%' or
+					ass_type_name like '%${key}%' or
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%' 
+				)
+			</if>
+			and is_stop = 0
+		</where>
+		order by ass_type_code
+	</select>
+	
+	<!-- 支出项目下拉框  带变更NO-->
+	<select id="queryPaymentItemDict" resultMap="eqcSelect">
+		select 
+		a.payment_item_id || ','|| a.payment_item_no id ,
+		a.payment_item_code||' '|| a.payment_item_name text 
+		from budg_payment_item_dict a
+		<where>
+			<if  test="is_read != null  and is_read != '' or is_write != null  and is_write != '' or read_or_write != null  and read_or_write != ''">
+				 to_char(a.payment_item_id) in (select b.perm_code from V_USER_DATA_PERM b 
+					where b.group_id = #{group_id,jdbcType=INTEGER} and  b.hos_id = #{hos_id,jdbcType=INTEGER}
+					and b.user_id = #{user_id,jdbcType=INTEGER} and b.table_code = 'BUDG_PAYMENT_ITEM_DICT' 
+				
+	          	<if  test="is_read != null  and is_read != ''">
+	                and b.is_read = 1
+	          	</if>
+	          	<if  test="is_write != null and is_write != ''">
+	                 and b.is_write = 1 
+	          	</if>
+	           	<if  test="read_or_write != null and read_or_write != ''">
+	                 and  (b.is_write = 1 or b.is_read = 1 )
+	          	</if>
+					)
+        	</if>
+			<if test="group_id != null and group_id != ''">
+			AND a.group_id = #{group_id,jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			</if>
+			<if test="key != null and key != ''">
+				and (	
+					a.payment_item_code like '${key}%' or
+					a.payment_item_name like '%${key}%' or
+					a.spell_code like '%${key}%' or
+					a.wbx_code like '%${key}%' 
+				)
+			</if>
+			and a.is_stop = 0
+		</where>
+		order by a.payment_item_code
+	</select>
+	
+	<!-- 支出项目 下拉框 -->
+	<select id="queryPaymentItem" resultMap="eqcSelect">
+		SELECT 
+			   payment_item_no || ',' || payment_item_id as id,
+      		   payment_item_code || ' ' || payment_item_name as text
+  		FROM budg_payment_item_dict
+		<where>
+			is_stop = 0
+			and is_last = 1 
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test=" key != null and key != ''">
+				and (
+				payment_item_no like '${key}%' or
+				payment_item_code like '%${key}%'  or
+				payment_item_name like '%${key}%'
+				)
+			</if>
+		</where>
+		order by payment_item_code
+	</select>
+	
+	<!-- 资产性质 下拉框 NATURS_CODE不等于05-->
+	<select id="queryAssNatures" resultMap="eqcSelect">
+		SELECT 
+			   naturs_code as id,
+      		   naturs_name as text
+  		FROM ASS_NATURS
+  		where
+  			naturs_code != '05'
+	</select>
+	<!-- 资产性质 下拉框 NATURS_CODE等于05-->
+	<select id="queryAssNaturesInassets" resultMap="eqcSelect">
+		SELECT 
+			   naturs_code as id,
+      		   naturs_name as text
+  		FROM ASS_NATURS
+  		where
+  			naturs_code = '05'
+	</select>
+	
+	<!-- 采购资产性质 下拉框 -->
+	<select id="queryAssNaturesAll" resultMap="eqcSelect">
+		SELECT 
+			   naturs_code as id,
+      		   naturs_name as text
+  		FROM ASS_NATURS
+	</select>
+	
+	<!-- 资产字典 下拉框-->
+	<select id="queryAssDict" resultMap="eqcSelect">
+		select 
+		ad.ass_id id ,
+		ad.ass_name text 
+		from ASS_DICT ad
+		left join ASS_TYPE_DICT atd
+	    on ad.group_id = atd.group_id
+	    and ad.hos_id = atd.hos_id
+	    and ad.copy_code = atd.copy_code
+	    and ad.ass_type_id = atd.ass_type_id
+	    left join ASS_NATURS an
+    	on atd.ass_naturs = an.naturs_code
+		<where>
+			<if test="group_id != null and group_id != ''">
+			AND ad.group_id = #{group_id,jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+			AND ad.hos_id = #{hos_id,jdbcType=INTEGER}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+			AND ad.copy_code = #{copy_code,jdbcType=VARCHAR}
+			</if>
+			and an.naturs_code != '05' 
+			and ad.is_stop = 0
+		</where>
+		order by ass_id
+	</select>
+	<!-- 资产字典无形资产 下拉框-->
+	<select id="queryAssDictInassets" resultMap="eqcSelect">
+		select 
+		t.ass_id id ,
+		t.ass_name text 
+		  from ASS_NO_DICT t
+		  left join ASS_TYPE_DICT a
+		    on a.group_id = t.group_id
+		   and a.hos_id = t.hos_id
+		   and a.copy_code = t.copy_code
+		   and a.ass_type_id = t.ass_type_id
+		  left join ASS_NATURS n
+		    on n.naturs_code = a.ass_naturs
+	
+		<where>
+			<if test="group_id != null and group_id != ''">
+			AND t.group_id = #{group_id,jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+			AND t.hos_id = #{hos_id,jdbcType=INTEGER}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+			AND t.copy_code = #{copy_code,jdbcType=VARCHAR}
+			</if>
+			and n.naturs_code = '05' 
+			and t.is_stop = 0
+		</where>
+		order by ass_id
+	</select>
+	
+	<!-- 职工下拉框  -->	
+	<select id="queryEmpDict" resultMap="eqcSelect">
+		SELECT
+		emp_id||'.'||emp_no id,
+		emp_code||' '||emp_name text
+		FROM HOS_EMP_DICT
+		where
+		group_id = #{group_id}
+		and hos_id = #{hos_id}
+		<if test="key != null and key != ''">
+			and (
+			emp_code like '${key}%' or
+			emp_name like '%${key}%' or
+			spell_code like '%${key}%' or
+			wbx_code like '%${key}%'
+			)
+		</if>
+		and is_stop = 0
+		and is_disable=0
+		order by emp_code
+	</select>
+	
+	<!--仓库下拉框（所有仓库 不带NO）  -->
+	<select id="queryHosStoreDict" resultMap="eqcSelect">
+		select  store_id id, 
+			store_code||' '||store_name text
+		from HOS_STORE_DICT 
+		WHERE  group_id = #{group_id,jdbcType=INTEGER} 
+			and hos_id = #{hos_id,jdbcType=INTEGER} 
+			and is_stop = 0
+			and is_disable=0
+			<if test="key != null and key != ''">
+				and (
+					store_code like '${key}%' or
+					store_name like '%${key}%' or
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%'
+				)  
+			</if>
+			order by store_code asc
+	</select>
+	
+	<!--仓库下拉框（所有仓库 不带NO）  -->
+	<select id="queryHosStoreDictNo" resultMap="eqcSelect">
+		select  store_id || store_no id, 
+			store_code||' '||store_name text
+		from HOS_STORE_DICT 
+		WHERE  group_id = #{group_id,jdbcType=INTEGER} 
+			and hos_id = #{hos_id,jdbcType=INTEGER} 
+			and is_stop = 0
+			and is_disable=0
+			<if test="key != null and key != ''">
+				and (
+					store_code like '${key}%' or
+					store_name like '%${key}%' or
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%'
+				)  
+			</if>
+			order by store_code asc
+	</select>
+	<!--仪器来源 下拉框  -->
+	<select id="queryBusiDataSource" resultMap="eqcSelect">
+		select  busi_data_source_code id, 
+			busi_data_source_name text
+		from COST_BUSI_SOUREC_DICT 
+		WHERE  1= 1
+			<if test="key != null and key != ''">
+			and (busi_data_source_code like '${key}%' or
+				busi_data_source_name like '%${key}%' )
+			</if>
+		order by busi_data_source_code asc
+	</select>
+	
+	<!-- 资产卡片 设备下拉框   id（ass_card_no） text(ass_card_no ass_name ) -->
+	<select id="queryAssCardDict" resultMap="eqcSelect">
+		select a.ass_card_no  id, 
+			a.ass_card_no ||' ' || b.ass_name text
+		from V_ASS_CARD a
+		LEFT JOIN ASS_NO_DICT b
+			on a.group_id = b.group_id
+			and a.hos_id = b.hos_id
+			and a.copy_code = b.copy_code
+			and a.ass_id = b.ass_id
+			and b.is_stop = 0
+		WHERE  a.group_id = #{group_id}
+			and a.hos_id = #{hos_id}
+			and a.copy_code = #{copy_code}
+			<if test="key != null and key != ''">
+			and (b.ass_code like '${key}%' or
+				b.ass_name like '%${key}%'  or
+				b.spell_code like '%${key}%'  or
+				b.wbx_code like '%${key}%' )
+			</if>
+			<if test="ass_naturs != null and ass_naturs != '' ">
+			and a.ass_naturs = #{ass_naturs}
+			</if>
+		order by a.ass_card_no asc
+	</select>
+	
+	<!-- 用户下拉框   -->
+	<select id="querySysUser" resultMap="eqcSelect">
+		select a.user_id  id, 
+			a.user_code ||' ' || a.user_name text
+		from sys_user a
+		
+		WHERE  a.group_id = #{group_id}
+			and a.hos_id = #{hos_id}
+			and a.type_code = 0 <!-- 0医院用户，1集团用户，2超级管理员，3集团管理员，4医院管理员 -->
+			<if test="key != null and key != ''">
+			and (a.user_code like '${key}%' or
+				a.user_name like '%${key}%'  or
+				a.spell_code like '%${key}%'  or
+				a.wbx_code like '%${key}%' )
+			</if>
+		order by a.user_code asc
+	</select>
+	
+	<!-- 服务项（收费类别 ） 下拉框   -->
+	<select id="queryCostChargeKind" resultMap="eqcSelect">
+		select distinct a.charge_kind_id  id, 
+			a.charge_kind_code ||' ' || a.charge_kind_name text
+		from COST_CHARGE_KIND_ARRT a
+		
+		WHERE  a.group_id = #{group_id}
+			and a.hos_id = #{hos_id}
+			and a.copy_code = #{copy_code}
+			<if test="key != null and key != ''">
+			and (a.charge_kind_code like '${key}%' or
+				a.charge_kind_name like '%${key}%'  or
+				a.spell_code like '%${key}%'  or
+				a.wbx_code like '%${key}%' )
+			</if>
+		order by a.charge_kind_code asc
+	</select>
+	
+	<!-- 计量单位 下拉框   -->
+	<select id="queryHosUnit" resultMap="eqcSelect">
+		select distinct a.unit_code  id, 
+			a.unit_code ||' ' || a.unit_name text
+		from HOS_UNIT a
+		
+		WHERE  a.group_id = #{group_id}
+			and a.hos_id = #{hos_id}
+			<if test="key != null and key != ''">
+			and (a.unit_code like '${key}%' or
+				a.unit_name like '%${key}%'  or
+				a.spell_code like '%${key}%'  or
+				a.wbx_code like '%${key}%' )
+			</if>
+			and a.is_stop = 0
+		order by a.unit_code asc
+	</select>
+	
+	<!-- 服务细项（收费项目 ） 下拉框   -->
+	<select id="queryCostChargeItem" resultMap="eqcSelect">
+		select distinct a.charge_item_id  id, 
+			a.charge_item_code ||' ' || a.charge_item_name text
+		from COST_CHARGE_ITEM_ARRT a
+		
+		WHERE  a.group_id = #{group_id}
+			and a.hos_id = #{hos_id}
+			and a.copy_code = #{copy_code}
+			<if test="key != null and key != ''">
+			and (a.charge_item_code like '${key}%' or
+				a.charge_item_name like '%${key}%'  or
+				a.spell_code like '%${key}%'  or
+				a.wbx_code like '%${key}%' )
+			</if>
+		order by a.charge_item_id asc
+	</select>
+	<!-- 消耗资源 下拉框   -->
+	<select id="queryAssEqcConsumableItem" resultMap="eqcSelect">
+		select distinct a.consum_code  id, 
+			a.consum_desc ||' ' || c.unit_name text
+		from ASS_EQ_CONSUMABLE_ITEM a
+		left join ASS_EQ_CONSUMABLE_ITEM b
+			on a.group_id = b.group_id
+			and a.hos_id = b.hos_id
+			and a.consum_code = b.consum_code
+		left join hos_unit c
+			on c.group_id = b.group_id
+			and c.hos_id = b.hos_id
+			and c.unit_code = b.unit_code
+			and c.is_stop = 0
+		WHERE  a.group_id = #{group_id}
+			and a.hos_id = #{hos_id}
+			and a.copy_code = #{copy_code}
+			<if test="key != null and key != ''">
+			and (a.consum_code like '${key}%' ||'%' or
+				a.consum_desc like '%${key}%' )
+			</if>
+		order by a.consum_code asc
+	</select>
+	
+	<!-- 类型资源 下拉框   -->
+	<select id="queryAssEqcResourceType" resultMap="eqcSelect">
+		select distinct a.oresource_code  id, 
+			a.oresource_code ||' ' || a.oresource_desc text
+		from ASS_OTHER_RESOURCE_TYPE a
+		WHERE  a.group_id = #{group_id}
+			and a.hos_id = #{hos_id}
+			and a.copy_code = #{copy_code}
+			<if test="key != null and key != ''">
+			and (a.oresource_code like '${key}%' ||'%' or
+				a.oresource_desc like '%${key}%'||'%' )
+			</if>
+		order by a.oresource_code asc
+	</select>
+	
+		<!-- 会计年度 下拉框   -->
+	<select id="queryAssYear" resultMap="eqcSelect">
+		select distinct a.acc_year  id, 
+			a.acc_year text
+		from acc_year a
+		WHERE  a.group_id = #{group_id}
+			and a.hos_id = #{hos_id}
+			and a.copy_code = #{copy_code}
+			<if test="key != null and key != ''">
+			and a.acc_year like '${key}%' ||'%'
+			</if>
+		order by a.acc_year asc
+	</select>
+	
+	<!-- 机组 下拉框   -->
+	<select id="queryAssEqUnit" resultMap="eqcSelect">
+		select  a.eq_unit_code  id, 
+			a.eq_unit_code || ' '|| a.eq_unit_name text
+		from ASS_EQ_UNIT a
+		WHERE  a.group_id = #{group_id}
+			and a.hos_id = #{hos_id}
+			and a.copy_code = #{copy_code}
+			<if test="key != null and key != ''">
+			and (a.eq_unit_code like '${key}' ||'%' or a.eq_unit_name like '%'|| '${key}' ||'%')
+			</if>
+		order by a.eq_unit_code asc
+	</select>
+	
+	<!-- 分析项  下拉框   -->
+	<select id="queryAssAnalysisObject" resultMap="eqcSelect">
+		select  a.ANALYSIS_CODE  id, 
+			a.ANALYSIS_CODE  || ' ' ||a.ANALYSIS_NAME text
+		from ASS_Benefit_Analysis_Object a
+		WHERE  a.group_id = #{group_id}
+			and a.hos_id = #{hos_id}
+			and a.copy_code = #{copy_code}
+			<if test="key != null and key != ''">
+			and (a.ANALYSIS_CODE like '${key}' ||'%' or a.ANALYSIS_NAME like '%'|| '${key}' ||'%')
+			</if>
+		order by a.ANALYSIS_CODE asc
+	</select>
+</mapper>

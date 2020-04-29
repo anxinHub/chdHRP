@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+
+	<sql id="act_check_alter" type="proc"><![CDATA[
+	CREATE OR REPLACE PROCEDURE act_check_alter
+
+	/*添加辅助核算类时，动态增加业务表核算类型字段*/
+	(
+	 p_check_type_id number
+	 )
+	IS
+	   v_column_check varchar2(20);
+	   v_num number;
+	   v_count number;
+	   v_loop_count number;
+	   v_group_id number;
+	   v_hos_id number;
+	   v_copy_code varchar2(20);
+	BEGIN
+	    select group_id,hos_id,copy_code into v_group_id,v_hos_id,v_copy_code from acc_check_type where check_type_id=p_check_type_id;
+	   
+	    v_num:=1;
+	    select count(1) into v_count from acc_check_type where is_sys=0 and group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code;
+
+	    while v_num<=v_count loop
+	        --dbms_output.put_line(v_num);
+	        v_column_check:='ZCHECK'||v_num;
+	        --考虑多集团多医院多账套，检查是否使用
+	        select count(1) into v_loop_count from acc_check_type where is_sys=0 and column_check=v_column_check and group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code;
+	        IF v_loop_count = 0 THEN
+	           exit;
+	        END IF;
+
+	        v_num:=v_num+1;
+	    end loop;
+
+	    --dbms_output.put_line(v_column_check);
+
+	   if v_column_check is not null then
+	    --添加辅助核算表核算类型字段
+	     v_count:=0;
+	     SELECT COUNT(1) INTO v_count from user_tab_cols  where table_name='ACC_VOUCH_CHECK' and column_name=v_column_check;
+	     IF v_count = 0 THEN
+	           execute immediate 'alter table ACC_VOUCH_CHECK add '||v_column_check||' NUMERIC(18,0) NULL';
+	     END IF;
+
+	     --添加辅助核算账表核算类型字段
+	     v_count:=0;
+	     SELECT COUNT(1) INTO v_count from user_tab_cols  where table_name='ACC_LEDER_CHECK' and column_name=v_column_check;
+	     IF v_count = 0 THEN
+	           execute immediate 'alter table ACC_LEDER_CHECK add '||v_column_check||' NUMERIC(18,0) NULL';
+	     END IF;
+
+	      --添加凭证模板辅助核算表核算类型字段
+	     v_count:=0;
+	     SELECT COUNT(1) INTO v_count from user_tab_cols  where table_name='ACC_TEMPLATE_CHECK' and column_name=v_column_check;
+	     IF v_count = 0 THEN
+	           execute immediate 'alter table ACC_TEMPLATE_CHECK add '||v_column_check||' NUMERIC(18,0) NULL';
+	     END IF;
+	     
+	     --添加自动凭证辅助核算表核算类型字段
+	     v_count:=0;
+	     SELECT COUNT(1) INTO v_count from user_tab_cols  where table_name='ACC_AUTO_CHECK' and column_name=v_column_check;
+	     IF v_count = 0 THEN
+	           execute immediate 'alter table ACC_AUTO_CHECK add '||v_column_check||' NUMERIC(18,0) NULL';
+	     END IF;
+
+	     --绑定业务表核算类型字段
+	     update acc_check_type set column_check=v_column_check where check_type_id=p_check_type_id;
+	     commit;
+	   end if;
+	END act_check_alter;
+
+	]]></sql>
+	
+</root>
+

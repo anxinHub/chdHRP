@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+
+	<sql id="act_account_checkquery" type="proc"><![CDATA[
+			create or replace procedure act_account_checkquery
+			(
+			 group_id number,
+			 hos_id number,
+			 copy_code varchar2,
+			 begin_date varchar2,--开始出纳日期
+			 end_date varchar2,--结束出纳日期
+			 subj_code varchar2,--会计科目（现金、银行）
+			 is_account integer,--是否包含未记账
+			 is_con integer,--是否确认出纳数据
+			 objdata OUT ACT_BOOKS.checkquerycursor
+			 )
+			 is
+			 ddl_sql varchar2(4000);
+			 num NUMBER;
+			begin
+			 SELECT COUNT(1) INTO num FROM USER_TABLES WHERE TABLE_NAME = UPPER('t_account_checkquery') ;
+			    IF num = 0 THEN
+			         ddl_sql:='Create Global Temporary Table t_account_checkquery(
+			          xh integer,
+			          vouch_date varchar2(100),
+			          tell_debit numeric(19,2),
+			          acct_debit numeric(19,2),
+			          rest_debit numeric(19,2),
+			          tell_credit numeric(19,2),
+			          acct_credit numeric(19,2),
+			          rest_credit numeric(19,2),
+			          tell_end_os numeric(19,2),
+			          acct_end_os numeric(19,2),
+			          rest_end_os numeric(19,2)
+			          )On COMMIT Delete ROWS';
+			          /*
+			          On COMMIT PRESERVE ROWS 会话性临时表
+			          On Commit Delete Rows 事务性临时表
+			          */
+			          execute immediate ddl_sql;
+			    END IF;
+			    --插入出纳和会计的期初余额以及差额
+			    execute immediate 'insert into t_account_checkquery(xh,vouch_date,tell_debit,acct_debit,rest_debit,tell_credit,acct_credit,rest_credit,tell_end_os,acct_end_os,rest_end_os)
+			    select 1,''期初余额'','''','''','''','''','''','''',nvl(sum(att.debit),0)-nvl(sum(att.credit),0),nvl(sum(al.end_os),0),nvl(sum(att.debit),0) - nvl(sum(att.credit),0)-nvl(sum(al.end_os),0)
+			    from ACC_TELL att left join acc_subj asubj
+			    on att.group_id = asubj.group_id and att.hos_id = asubj.hos_id
+			    and att.copy_code = asubj.copy_code 
+		      and att.acc_year = asubj.acc_year
+		      and att.cash_subj_code = asubj.subj_code
+			    
+			    left join Acc_Leder al on al.group_id = asubj.group_id and al.hos_id = asubj.hos_id
+			    and  al.copy_code = asubj.copy_code and al.acc_year = asubj.acc_year and al.subj_code = asubj.subj_code
+			    where asubj.group_id ='||group_id||' and asubj.hos_id ='||hos_id||' and asubj.copy_code ='||copy_code||' 
+			    and  asubj.subj_code = '||subj_code||'and occur_date <to_date('||begin_date||',''yyyy-MM-dd'') 
+			    order by att.occur_date asc';
+		
+			    --插入出纳和会计的明细贷方发生额、借方发生额以及差额
+			    execute immediate 'insert into t_account_checkquery(xh,vouch_date,tell_debit,acct_debit,rest_debit,tell_credit,acct_credit,rest_credit,tell_end_os,acct_end_os,rest_end_os)
+			    select 2,to_char(att.occur_date,''yyyy-MM-dd''),sum(nvl(att.debit,0)),sum(nvl(avd.debit,0)),sum(nvl(att.debit,0))-sum(nvl(avd.debit,0)), 
+			    sum(nvl(att.credit,0)),sum(nvl(avd.credit,0)),sum(nvl(att.credit,0))-sum(nvl(avd.credit,0)),sum(nvl(avd.debit,0))-sum(nvl(avd.credit,0)), sum(nvl(att.debit,0))-sum(nvl(avd.credit,0)),
+			    sum(nvl(avd.debit,0))-sum(nvl(avd.credit,0))-sum(nvl(att.debit,0))-sum(nvl(avd.credit,0)) from acc_tell att 
+			    left join  acc_vouch_detail avd
+			    on avd.group_id = att.group_id and avd.hos_id = att.hos_id and
+			    avd.copy_code = att.copy_code and avd.acc_year= att.acc_year
+			    and avd.subj_code = att.cash_subj_code and avd.vouch_detail_id = att.vouch_detail_id 
+			    left join acc_vouch av on av.group_id = avd.group_id and av.hos_id = avd.hos_id
+			    and av.copy_code = avd.copy_code and av.vouch_id = avd.vouch_id and av.acc_year = avd.acc_year  
+			    where att.group_id ='||group_id||' and att.hos_id ='||hos_id||' and att.copy_code ='||copy_code||' and att.occur_date >to_date('||begin_date||',''yyyy-MM-dd'')
+			    and att.occur_date<to_date('||end_date||',''yyyy-MM-dd'')
+			    and  att.cash_subj_code = '||subj_code||' group by att.occur_date';
+			    --插入出纳和会计明细贷方发生额合计、借方发生额合计以及差额合计
+			    execute immediate 'insert into t_account_checkquery(xh,vouch_date,tell_debit,acct_debit,rest_debit,tell_credit,acct_credit,rest_credit,tell_end_os,acct_end_os,rest_end_os)
+			    select 3,''合计'',sum(nvl(tell_debit,0)),sum(nvl(acct_debit,0)),sum(nvl(rest_debit,0)), sum(nvl(tell_credit,0)),sum(nvl(acct_credit,0)),sum(nvl(rest_credit,0)),sum(nvl(tell_end_os,0)),
+			     sum(nvl(acct_end_os,0)),sum(nvl(rest_end_os,0)) from t_account_checkquery ';
+			    
+			    execute immediate '
+			    declare
+			      tell_end_os_sum numeric(19,2);
+			      acct_end_os_sum numeric(19,2);
+			      subj_code varchar2(18);
+			      xh integer;
+			      i number;
+			    begin
+			      
+			      i:=1;
+			      
+			      for cr in (select r.xh,r.vouch_date,r.tell_end_os,r.acct_end_os from t_account_checkquery r
+			        where r.xh<4
+			        order by r.xh asc,r.vouch_date asc) loop
+		
+			        tell_end_os_sum:=tell_end_os_sum+cr.tell_end_os;
+			        
+			        acct_end_os_sum:=acct_end_os_sum+cr.acct_end_os;
+		
+			        if cr.xh=2 then
+			           
+			           update t_account_checkquery set tell_end_os=nvl(tell_end_os_sum,0)+nvl(tell_debit,0)-nvl(tell_credit,0) where xh=2;
+			           
+			           update t_account_checkquery set acct_end_os=nvl(acct_end_os_sum,0)+nvl(acct_debit,0)-nvl(acct_credit,0) where xh=2;
+			           
+			           update t_account_checkquery set rest_end_os=nvl(tell_end_os,0)-nvl(acct_end_os,0) where xh=2;
+			        
+			        end if;
+		
+			        if cr.xh=3 then
+			          
+			           update t_account_checkquery set tell_end_os=nvl(tell_end_os_sum,0) where xh=3;
+			           
+			           update t_account_checkquery set acct_end_os=nvl(acct_end_os_sum,0) where xh=3;
+			           
+			           update t_account_checkquery set rest_end_os=nvl(tell_end_os,0)-nvl(acct_end_os,0) where xh=3;
+			        end if;
+		
+			        i:=i+1;
+			        xh:=cr.xh;
+			      end loop;
+			    end;
+			    ';
+			    
+			    ddl_sql:='select vouch_date,tell_debit,acct_debit,rest_debit,tell_credit,acct_credit,rest_credit,tell_end_os,acct_end_os,rest_end_os from t_account_checkquery
+			    order by xh asc,vouch_date asc';
+			    open objdata for  ddl_sql;
+			end act_account_checkquery;
+
+	]]></sql>
+	
+</root>
+

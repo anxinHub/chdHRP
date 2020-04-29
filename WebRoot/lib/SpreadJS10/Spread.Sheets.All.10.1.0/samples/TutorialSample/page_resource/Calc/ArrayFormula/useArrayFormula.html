@@ -1,0 +1,163 @@
+﻿<!doctype html>
+<html>
+    <head>
+    <title>Spread.Sheets - Array Formula Usage Samples</title>
+    <meta charset="utf-8"/>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"/>
+        
+    <link href="../../../external/spreadjs/css/gc.spread.sheets.excel2013white.10.1.0.css" rel="stylesheet" type="text/css" />
+
+    <script src="../../../external/external/jquery-1.8.2.min.js" type="text/javascript"></script>
+
+    <script type="text/javascript" src="../../../external/spreadjs/gc.spread.sheets.all.10.1.0.min.js"></script>
+
+    <style type="text/css">
+    /*css_begin*/
+
+    /*css_end*/
+    </style>
+    <script id="scriptInit" type="text/javascript">
+        /*code_begin*/
+        $(document).ready(function () {
+            var spread = new GC.Spread.Sheets.Workbook(document.getElementById("ss"), { sheetCount: 3 });
+            initSpread(spread);
+        });
+
+        function initSpread(spread) {
+            var spreadNS = GC.Spread.Sheets;
+
+            var fbx = new spreadNS.FormulaTextBox.FormulaTextBox(document.getElementById('formulaBar'));
+            fbx.workbook(spread);
+
+            var oldArrayRange;
+            var arrayFormulaStyle = new spreadNS.Style();
+            arrayFormulaStyle.backColor = "#E0E0FF";
+            for (var i = 0; i < spread.sheets.length; i++) {
+                (function (sheet1) {
+                    sheet1.bind(spreadNS.Events.SelectionChanged, null, function (args) {
+                        sheet1.suspendPaint();
+                        var formulaBar = $("#formulaBar");
+                        var formulaInfo = sheet1.getFormulaInformation(sheet1.getActiveRowIndex(), sheet1.getActiveColumnIndex());
+                        if (oldArrayRange && (!formulaInfo || !formulaInfo.isArrayFormula || !formulaInfo.baseRange.equals(oldArrayRange))) {
+                            for (var r = oldArrayRange.row; r < oldArrayRange.row + oldArrayRange.rowCount; r++) {
+                                for (var c = oldArrayRange.col; c < oldArrayRange.col + oldArrayRange.colCount; c++) {
+                                    sheet1.setStyle(r, c, null);
+                                }
+                            }
+                            oldArrayRange = null;
+                        }
+                        if (formulaInfo && formulaInfo.hasFormula) {
+                            var formula = "=" + formulaInfo.formula;
+                            formula = formulaInfo.isArrayFormula ? "{" + formula + "}" : formula;
+                            formulaBar.val(formula);
+                            if (formulaInfo.isArrayFormula && !formulaInfo.baseRange.equals(oldArrayRange)) {
+                                oldArrayRange = formulaInfo.baseRange;
+                                for (var r = oldArrayRange.row; r < oldArrayRange.row + oldArrayRange.rowCount; r++) {
+                                    for (var c = oldArrayRange.col; c < oldArrayRange.col + oldArrayRange.colCount; c++) {
+                                        sheet1.setStyle(r, c, arrayFormulaStyle);
+                                    }
+                                }
+                            }
+                        }
+                        else {
+                            formulaBar.val(sheet1.getValue(sheet1.getActiveRowIndex(), sheet1.getActiveColumnIndex()));
+                        }
+                        sheet1.resumePaint();
+                    });
+                })(spread.sheets[i]);
+            }
+
+            setCalculation(spread.sheets[0]);
+            setSearch(spread.sheets[1]);
+            setStatistics(spread.sheets[2]);
+        };
+
+        function setCalculation(sheet) {
+            sheet.name("Calculation");
+
+            sheet.setArray(0, 0, [
+                ["", "Match", "Physical", "Chemistry"],
+                ["Alice", 97, 61, 53],
+                ["Jon", 65, 76, 65],
+                ["Bob", 55, 70, 64],
+                ["Jack", 89, 77, 73],
+                ["Tom", 83, 62, 78],
+                ["Robert", 86, 98, 57]
+            ]);
+
+            sheet.addSpan(0, 5, 1, 4);
+            sheet.setValue(0, 5, "Calculate every body's total score");
+            sheet.setArrayFormula(1, 5, 6, 1, "=SUBTOTAL(9,OFFSET($B$2,ROW($A$1:$A$6)-ROW($A$1),,1,3))");
+        }
+
+        function setSearch(sheet) {
+            sheet.name("Search");
+            sheet.setArray(0, 0, [
+                ["apple", "apple"],
+                ["banana", "strawberry"],
+                ["pea", "potato"],
+                ["tomato", "potato"],
+                ["potato", "dumpling"],
+                ["cake"],
+                ["noodel"],
+                ["rice"],
+                ["soup"]
+            ]);
+           
+            sheet.addSpan(0, 3, 1, 8);
+            sheet.setValue(0, 3, "Find out the first value on B1:B5 that dose not contains on A1:A9");
+
+            sheet.setColumnWidth(3, 80);
+            sheet.addSpan(2, 3, 1, 2);
+            sheet.setValue(2, 3, "ArrayFormula Result:");
+            sheet.setArrayFormula(2, 5, 1, 1, "=INDEX(B1:B5,MATCH(TRUE,ISNA(MATCH(B1:B5,A1:A9,0)),0))");
+            sheet.getCell(2, 5).backColor("Accent 5 80");
+            sheet.addSpan(3, 3, 1, 2);
+            sheet.setValue(3, 3, "NomalFormula Result:");
+            sheet.setFormula(3, 5, "=INDEX(B1:B5,MATCH(TRUE,ISNA(MATCH(B1:B5,A1:A9,0)),0))");
+            sheet.getCell(3, 5).backColor("Accent 6 80");
+        }
+
+        function setStatistics(sheet) {
+            sheet.name("Statistics");
+            sheet.options.allowCellOverflow = true;
+            sheet.setArray(0, 0, [
+                ["Product", "Salesman", "Units Sold"],
+                ["Fax", "Brown", 1],
+                ["Phone", "Smith", 10],
+                ["Fax", "Jones", 20],
+                ["Fax", "Smith", 30],
+                ["Phone", "Jones", 40],
+                ["PC", "Smith", 50],
+                ["Fax", "Brown", 60],
+                ["Phone", "Davis", 70],
+                ["PC", "Jones", 80]
+            ]);
+
+            sheet.setValue(1, 5, "Summing Sales: Faxes Sold By Brown");
+            sheet.setArrayFormula(2, 5, 1, 1, "=SUM((A2:A10=\"Fax\")*(B2:B10=\"Brown\")*(C2:C10))");
+
+            sheet.setValue(4, 5, "Logical AND (Faxes And Brown)");
+            sheet.setArrayFormula(5, 5, 1, 1, "=SUM((A2:A10=\"Fax\")*(B2:B10=\"Brown\"))");
+
+            sheet.setValue(7, 5, "Logical OR (Faxes Or Jones)");
+            sheet.setArrayFormula(8, 5, 1, 1, "=SUM(IF((A2:A10=\"Fax\")+(B2:B10=\"Jones\"),1,0))");
+
+            sheet.setValue(10, 5, "Logical XOR (Fax Or Jones but not both)");
+            sheet.setArrayFormula(11, 5, 1, 1, "=SUM(IF(MOD((A2:A10=\"Fax\")+(B2:B10=\"Jones\"),2),1,0))");
+
+            sheet.setValue(13, 5, "Logical NAND (All Sales Except Fax And Jones)");
+            sheet.setArrayFormula(14, 5, 1, 1, "=SUM(IF((A2:A10=\"Fax\")+(B2:B10=\"Jones\")<>2,1,0))");
+        }
+        /*code_end*/
+    </script>
+    </head>
+    <body>
+    <div class="sample-turtorial">
+        <div>
+            <textarea id="formulaBar" readonly="readonly" style="width: 98%; margin: 6px"></textarea>
+        </div>
+        <div id="ss" style="width:100%; height:390px;border: 1px solid gray;"></div>
+    </div>
+    </body>
+</html>

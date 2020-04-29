@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.acc.dao.InternetBank.AccBankNetCommonMapper">
+
+	<select id="queryAccBankForInternet" parameterType="java.util.Map"
+		resultType="java.util.Map">
+
+		select bank_number, bank_name, simple_name, bank_account,
+		bank_address, phone, spell_code, wbx_code, sort_code, is_stop, note,
+		bank_zh from acc_bank
+		<where>
+
+			group_id= #{group_id} and hos_id= #{hos_id} and is_stop='0'
+
+			<if test="key != null and key != ''">
+				and (
+				bank_number like '${key}%' or
+				bank_name like
+				'%${key}%' or
+				bank_account like '%${key}%' or
+				spell_code like
+				'%${key}%' or
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+
+	</select>
+	
+	<select id="querySupBankForInternet" parameterType="java.util.Map"
+		resultType="java.util.Map">
+
+		select a.group_id, a.hos_id, a.sup_id, b.sup_code, b.sup_name
+		  , a.bank_name, a.bank_no, a.bank_area_number, a.bank_code, a.bank_area_name
+		  , a.bank_full_name, a.is_default
+		from hos_sup_bank a
+		  left join hos_sup_dict b on a.group_id = b.group_id
+		and a.hos_id = b.hos_id
+		and a.sup_id = b.sup_id
+		and b.is_stop = 0 
+		
+		where a.group_id= #{group_id} and a.hos_id= #{hos_id} and a.sup_id=#{sup_id} 
+		
+		order by is_default
+
+	</select>
+	
+	<select id="queryAccBankNetICBCCode" parameterType="java.util.Map" resultType="com.chd.hrp.acc.entity.HrpAccSelect">
+
+		select icbc_code as id, icbc_name as text from acc_bank_net_icbccode where is_stop='0'
+		<if test="key != null and key != ''">
+				and (
+				icbc_code like '${key}%' or
+				icbc_name like '%${key}%' or
+				spell_code like '${key}%' or
+				wbx_code like '%${key}%'
+				)
+			</if>
+	</select>
+	
+	<select id="queryAccWageItem" parameterType="java.util.Map" resultType="com.chd.hrp.acc.entity.HrpAccSelect">
+		SELECT
+		column_item id,
+		item_name text
+		FROM ACC_WAGE_ITEM
+		<where>
+			and is_stop = '0'
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null  and copy_code != ''">
+				and copy_code = #{copy_code}
+			</if>
+			<if test="wage_code != null  and wage_code != ''">
+				and wage_code = #{wage_code}
+			</if>
+			<if test="item_cal != null  and item_cal != ''">
+				and item_cal = #{item_cal}
+			</if>
+			<if test="acc_year != null  and acc_year != ''">
+				and acc_year = #{acc_year}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+				item_code like '${key}%' or
+				item_name like '%${key}%' or
+				spell_code like upper('%${key}%') or
+				wbx_code like upper('%${key}%')
+				)
+			</if>
+		</where>
+		order by item_code
+	</select>
+	
+	<resultMap id="icbcibps" type="java.util.Map">
+		<result property="ibps_code" column="ibps_code" />
+		<result property="ibps_name" column="ibps_name" />
+		<result property="is_stop" column="is_stop" />
+	</resultMap>
+	
+	<select id="queryAccICBCIBPSMain" parameterType="java.util.Map" resultMap="icbcibps">
+	
+		select ibps_code,ibps_name,is_stop from ACC_BANK_NET_ICBCIBPS
+		<where>
+			<if test="ibps_code != null  and ibps_code != ''">
+				and ibps_code = #{ibps_code}
+			</if>
+			<if test="ibps_name != null  and ibps_name != ''">
+				and ibps_name = #{ibps_name}
+			</if>
+		</where>
+		order by ibps_code
+	</select>
+	<select id="queryAccICBCIBPSCode" parameterType="java.util.Map" resultType="com.chd.hrp.acc.entity.HrpAccSelect">
+
+		select id,text from (
+		select '0000' as id,'中国工商银行股份有限公司' as text from dual
+		union all
+		select ibps_code as id, ibps_name as text from ACC_BANK_NET_ICBCIBPS where is_stop='0')
+		<where>
+		<if test="key != null and key != ''">
+				and regexp_like(text,'${key}')
+		</if>
+		</where>
+		order by id
+	</select>
+	
+	<insert id="addBatchICBCIBPS" parameterType="java.util.List">
+
+		insert into ACC_BANK_NET_ICBCIBPS(ibps_code, ibps_name, spell_code,wbx_code,is_stop)
+		<foreach collection="list" item="item" index="index"
+			separator=" union all ">
+			select
+			#{item.ibps_code,jdbcType=VARCHAR},
+			#{item.ibps_name,jdbcType=VARCHAR},
+			#{item.spell_code,jdbcType=VARCHAR},
+			#{item.wbx_code,jdbcType=VARCHAR},
+			#{item.is_stop,jdbcType=VARCHAR}
+			from dual
+		</foreach>
+	</insert>
+	<insert id="deleteBatchICBCIBPS" parameterType="java.util.List">
+		truncate table ACC_BANK_NET_ICBCIBPS
+	</insert>
+	<update id="updateBatchICBCIBPS" parameterType="java.util.List">
+
+		<foreach collection="list" item="item" index="index" open="begin" close=";end;" separator=";">
+			UPDATE ACC_BANK_NET_ICBCIBPS
+			<trim prefix="SET" suffixOverrides=",">
+				<if test="item.ibps_name != null ">
+					ibps_name = #{item.ibps_name,jdbcType=VARCHAR},
+				</if>
+				<if test="item.spell_code != null ">
+					spell_code = #{item.spell_code,jdbcType=VARCHAR},
+				</if>
+				<if test="item.wbx_code != null ">
+					wbx_code = #{item.wbx_code,jdbcType=VARCHAR},
+				</if>
+				<if test="item.is_stop != null ">
+					is_stop = #{item.is_stop,jdbcType=VARCHAR},
+				</if>
+			</trim>
+			<where>
+				ibps_code = #{item.ibps_code,jdbcType=VARCHAR}
+			</where>
+		</foreach>
+	</update>
+</mapper>
+
+	

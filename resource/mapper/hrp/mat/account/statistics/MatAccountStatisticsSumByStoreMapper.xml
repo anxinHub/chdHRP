@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.mat.dao.account.statistics.MatAccountStatisticsSumByStoreMapper">
+	<select id="queryMatAccountStatisticsSumByStore" parameterType="java.util.Map"  resultType="java.util.TreeMap">
+		with t_init AS(
+			SELECT a.store_id, SUM(round(nvl(a.in_money, 0), c.para_value)) - SUM(round(nvl(a.out_money, 0), c.para_value)) begin_money
+			FROM mat_inv_balance a
+			LEFT JOIN acc_para c 
+				ON a.group_id = c.group_id
+				AND a.hos_id = c.hos_id
+				AND a.copy_code = c.copy_code
+				AND c.mod_code = '04'
+				AND c.para_code = '04005' 
+			WHERE a.group_id = #{group_id,jdbcType=INTEGER}
+				AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+				AND a.year || a.month &lt; #{year,jdbcType=VARCHAR} || #{month,jdbcType=VARCHAR}
+				<!-- 只显示有权限的库房信息 -->
+				and to_char(a.store_id) in (
+					select perm_code from v_user_data_perm  
+					where group_id = #{group_id,jdbcType=INTEGER}
+						and hos_id = #{hos_id,jdbcType=INTEGER}
+						and table_code = 'HOS_STORE_DICT'
+						and user_id = #{user_id,jdbcType=INTEGER}
+						and is_read = 1 and is_write = 1 
+				)
+			GROUP BY a.store_id
+		), 
+		t_result as(
+			SELECT a.store_id, b.store_name, 
+				sum(round(nvl(a.in_money, 0), c.para_value)) as in_money, 
+				sum(round(nvl(a.out_money, 0), c.para_value)) as out_money
+			FROM mat_inv_balance a
+			LEFT JOIN hos_store_dict b
+				ON a.group_id = b.group_id
+				AND a.hos_id = b.hos_id
+				AND a.store_id = b.store_id
+				AND b.is_stop = 0
+			LEFT JOIN acc_para c
+				ON a.group_id = c.group_id
+				AND a.hos_id = c.hos_id
+				AND a.copy_code = c.copy_code
+				AND c.mod_code = '04'
+				AND c.para_code = '04005' 
+			where a.group_id = #{group_id,jdbcType=INTEGER}
+				AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+				AND a.year = #{year,jdbcType=VARCHAR}
+				AND a.month = #{month,jdbcType=VARCHAR}
+				<if test="type_code != null and type_code != '' ">
+					AND b.type_code = #{type_code,jdbcType=VARCHAR}
+				</if>
+				<!-- 只显示有权限的库房信息 -->
+				and to_char(a.store_id) in (
+					select perm_code from v_user_data_perm  
+					where group_id = #{group_id,jdbcType=INTEGER}
+						and hos_id = #{hos_id,jdbcType=INTEGER}
+						and table_code = 'HOS_STORE_DICT'
+						and user_id = #{user_id,jdbcType=INTEGER}
+						and is_read = 1 and is_write = 1 
+				)
+			GROUP BY a.store_id, b.store_name
+			order by a.store_id
+		)
+		SELECT a.store_id, a.store_name, nvl(b.begin_money, 0) begin_money, a.in_money, a.out_money, 
+			nvl(b.begin_money, 0) + a.in_money - a.out_money end_money
+		FROM t_result a
+		LEFT JOIN t_init b
+			ON a.store_id = b.store_id
+		UNION ALL
+		SELECT NULL, CAST('合计' AS varchar2(20)), SUM(nvl(b.begin_money, 0)), SUM(in_money), SUM(out_money), 
+			SUM(nvl(b.begin_money, 0) + a.in_money - a.out_money ) end_money
+		FROM t_result a
+		LEFT JOIN t_init b
+			ON a.store_id = b.store_id
+	</select>
+</mapper>
+

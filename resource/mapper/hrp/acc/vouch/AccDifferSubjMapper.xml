@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.acc.dao.vouch.AccDifferSubjMapper">
+
+	<resultMap id="resultMap" type="java.util.Map">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="diff_item_code" column="diff_item_code" />
+		<result property="diff_type_code" column="diff_type_code" />
+		<result property="subj_code" column="subj_code" />
+		<result property="note" column="note" />
+		<result property="subj_name_all" column="subj_name_all" />
+		<result property="subj_name" column="subj_name" />
+		<result property="diff_type_name" column="diff_type_name" />
+		<result property="diff_dire" column="diff_dire" />
+	</resultMap>
+
+
+	<select id="query" parameterType="java.util.Map"
+		resultMap="resultMap">
+		select a.DIFF_ITEM_CODE,a.DIFF_TYPE_CODE,a.SUBJ_CODE,b.SUBJ_NAME_ALL,b.SUBJ_NAME,c.DIFF_TYPE_NAME,c.DIFF_DIRE
+		from ACC_DIFF_SUBJ_SET a 
+		LEFT JOIN ACC_SUBJ b on a.GROUP_ID=b.GROUP_ID AND a.HOS_ID=b.HOS_ID AND a.COPY_CODE = b.COPY_CODE AND a.SUBJ_CODE = b.SUBJ_CODE
+		LEFT JOIN ACC_DIFF_TYPE c on a.GROUP_ID = c.GROUP_ID AND a.HOS_ID = c.HOS_ID AND a.COPY_CODE = c.COPY_CODE  AND a.DIFF_TYPE_CODE = c.DIFF_TYPE_CODE
+		<where>
+			a.group_id = #{group_id}
+			and a.hos_id = #{hos_id}
+			and a.copy_code = #{copy_code}
+			<if test="diff_type_code !=null and diff_type_code != ''">
+				and a.DIFF_TYPE_CODE = #{diff_type_code}
+			</if>
+			<if test="diff_item_code !=null and diff_item_code != ''">
+				and a.DIFF_ITEM_CODE = #{diff_item_code}
+			</if>
+			<if test="subj_code !=null and subj_code != ''">
+				and a.subj_code like  #{subj_code} || '%'
+			</if>
+			<if test="acc_year !=null and acc_year != ''">
+				and b.acc_year = #{acc_year}
+			</if>
+		</where>
+		order by a.subj_code
+	</select>
+
+	<select id="queryAccDifferSubjForAdd" parameterType="java.util.Map" resultMap="resultMap">
+		SELECT SUBJ_CODE,SUBJ_NAME,SUBJ_NAME_ALL
+		FROM ACC_SUBJ a
+		WHERE
+		GROUP_ID = #{group_id}
+		AND HOS_ID = #{hos_id}
+		AND COPY_CODE = #{copy_code}
+		AND ACC_YEAR = #{acc_year}
+		<if test="subj !=null and subj != ''">
+			and (subj_code like '${subj}%' or subj_name like '%${subj}%' or subj_name_all like '%${subj}%' or spell_code like '%${subj}%' or wbx_code like '%${subj}%')
+		</if>
+		<if test="super_code !=null and super_code != ''">
+			and super_code = #{super_code}
+		</if>
+		<if test="subj_level !=null and subj_level != ''">
+			and subj_level = #{subj_level}
+		</if>
+		<if test="is_last !=null and is_last != ''">
+			and is_last = #{is_last}
+		</if>
+		<if test="page_query !=null and page_query != ''">
+			AND NOT EXISTS (
+			SELECT 1 FROM ACC_DIFF_SUBJ_SET b WHERE a.GROUP_ID = b.GROUP_ID AND A.HOS_ID = b.HOS_ID AND a.COPY_CODE = b.COPY_CODE AND a.SUBJ_CODE like  b.SUBJ_CODE||'%' AND b.diff_type_code = #{diff_type_code}
+			)
+		</if>
+		AND NOT EXISTS (
+			SELECT 1 FROM ACC_DIFF_SUBJ_SET b WHERE a.GROUP_ID = b.GROUP_ID AND A.HOS_ID = b.HOS_ID AND a.COPY_CODE = b.COPY_CODE AND a.SUBJ_CODE = b.SUBJ_CODE AND b.diff_type_code = #{diff_type_code}
+		)
+		ORDER BY SUBJ_CODE
+	</select>
+	
+	<select id="queryExistInAccDiffSubjSet"
+		parameterType="java.util.Map" resultType="java.lang.Integer">
+		select count(1) from
+		ACC_DIFF_SUBJ_SET
+		where group_id = #{group_id}
+		and hos_id = #{hos_id}
+		and copy_code = #{copy_code}
+		<if test="diff_item_code !=null and diff_item_code != ''">
+			and diff_item_code = #{diff_item_code}
+		</if>
+		<if test="diff_type_code !=null and diff_type_code != ''">
+			and diff_type_code = #{diff_type_code}
+		</if>
+		<if test="subj_code !=null and subj_code != ''">
+			and subj_code in 
+			<foreach collection="subj_code" index="index" item="item" open="(" separator="," close=")">
+				#{item}
+			</foreach>
+		</if>
+		
+	</select>
+
+	<delete id="deleteBatch" parameterType="java.util.List">
+		 DELETE FROM ACC_DIFF_SUBJ_SET WHERE
+		<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+			group_id = #{item.group_id}
+			and hos_id = #{item.hos_id}
+			and copy_code = #{item.copy_code}
+			and diff_item_code = #{item.diff_item_code}
+			and subj_code like #{item.subj_code}||'%'
+		</foreach>
+	</delete>
+	
+	<insert id="add" parameterType="java.util.Map">
+		insert into ACC_DIFF_SUBJ_SET
+		  (GROUP_ID,
+		   HOS_ID,
+		   COPY_CODE,
+		   DIFF_ITEM_CODE,
+		   SUBJ_CODE, 
+		   DIFF_TYPE_CODE
+		   )
+		   <foreach collection="list" item="item" index="index"
+			separator=" union all ">
+			select 
+			#{group_id},
+			#{hos_id},
+			#{copy_code},
+			#{diff_item_code},
+			#{item},
+			#{diff_type_code}
+			from dual
+			</foreach>
+	</insert>
+</mapper>
+

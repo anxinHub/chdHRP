@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+
+	<sql id="sys_dict_del_check_fpact" type="proc"><![CDATA[
+		CREATE OR REPLACE PROCEDURE SYS_DICT_DEL_CHECK_FPACT (
+		   p_dict_id_str varchar2,--ID 1,2,3
+		   p_dict_code varchar2,--table_name ACC_SUBJ
+		   p_group_id number,
+		   p_hos_id number,
+		   p_copy_code varchar2,
+		   p_note out varchar2
+		)
+		  IS
+		     type v_cursor_type is ref cursor;
+		     v_cursor v_cursor_type;
+		     v_record sys_dict_use%ROWTYPE;
+		     v_str varchar2(3000);
+		     v_count number;
+		  BEGIN
+		     v_str:=' ';
+		     open v_cursor for select dict_code,table_code,column_code,note from SYS_DICT_USE where DICT_CODE=p_dict_code;
+		     loop
+		     fetch v_cursor into v_record;
+		     exit when v_cursor%notfound;
+		       v_count := 0;
+		       execute immediate '
+		         select count(1) 
+		         from USER_tables 
+		         where TABLE_NAME = '''||v_record.table_code||'''
+		       ' into v_count; 
+		       if v_count = 0 then 
+		         continue;
+		       end if;
+		       
+		       v_count := 0;
+		
+		         execute immediate '
+		         select count(1) from '||v_record.table_code||' where '||v_record.column_code||' in ('''||p_dict_id_str||''')
+		         ' into v_count;
+		
+		       IF v_count > 0  and instr(v_str,v_record.note)=0 THEN
+		          v_str:=v_str||v_record.note||'?';
+		       END IF;
+		
+		     end loop;
+		     close v_cursor;
+		     
+		     p_note:=substr(v_str,2);
+		  END SYS_DICT_DEL_CHECK_FPACT;
+	]]></sql>
+	
+</root>
+

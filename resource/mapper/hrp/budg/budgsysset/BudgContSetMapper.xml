@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.budg.dao.budgsysset.BudgContSetMapper">
+	
+	<resultMap id="budgContSetMap" type="java.util.Map">
+	<result property="group_id" column="group_id"/>
+	<result property="hos_id" column="hos_id"/>
+	<result property="mod_code" column="mod_code"/>
+	<result property="mod_name" column="mod_name"/>
+	<result property="exe_sys_code" column="exe_sys_code"/>
+	<result property="exe_sys_name" column="exe_sys_name"/>
+	<result property="exe_page_code" column="exe_page_code"/>
+	<result property="exe_page_name" column="exe_page_name"/>
+	<result property="cont_node_code" column="cont_node_code"/>
+	<result property="cont_node_name" column="cont_node_name"/>
+	<result property="re_node_code" column="re_node_code"/>
+	<result property="re_node_name" column="re_node_name"/>
+	
+	<result property="control_way" column="control_way"/>
+	<result property="control_way_name" column="control_way_name"/>
+	<result property="is_postback" column="is_postback"/>
+	</resultMap>
+	
+	<resultMap type="com.chd.hrp.budg.entity.BudgSelect" id="hrpBudgSelect">
+		<result property="id" column="id" />
+		<result property="text" column="text" />
+	</resultMap>
+	
+<!-- 	 添加  预算节点设置 -->
+	<insert id="saveBudgContSet" parameterType="java.util.Map" >
+	
+		INSERT INTO BUDG_CONT_SET (
+			group_id
+			,
+			hos_id
+			,
+			mod_code
+			,
+			exe_sys_code
+			,
+			exe_page_code
+			,
+			cont_node_code
+			,
+			re_node_code
+			,
+			control_way
+			,
+			is_postback
+		) VALUES (
+			#{group_id,jdbcType=INTEGER},
+			#{hos_id,jdbcType=INTEGER},
+			#{mod_code,jdbcType=VARCHAR},
+			#{exe_sys_code,jdbcType=VARCHAR},
+			#{exe_page_code,jdbcType=VARCHAR},
+			#{cont_node_code,jdbcType=VARCHAR},
+			#{re_node_code,jdbcType=VARCHAR},
+			#{control_way,jdbcType=VARCHAR},
+			#{is_postback,jdbcType=VARCHAR}
+		)
+	</insert>
+	
+<!-- 	 根据主键查询 预算节点设置 -->
+	<select id="existsBudgContSetByCode" resultType="java.lang.Integer" parameterType="java.util.Map" >
+	
+		SELECT 
+			count(0)
+		FROM BUDG_CONT_SET
+		WHERE                     
+			group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND mod_code = #{mod_code,jdbcType=VARCHAR}
+			AND exe_sys_code = #{exe_sys_code,jdbcType=VARCHAR}
+			AND exe_page_code = #{exe_page_code,jdbcType=VARCHAR}
+	</select>
+	
+	<!-- 查询  预算节点设置方案 -->
+	<select id="queryBudgContSet" resultMap="budgContSetMap" parameterType="java.util.Map" >
+		 select 
+		       bcn.mod_code,
+		       bcn.mod_name,
+		       bcn.exe_sys_code,
+		       bcn.exe_sys_name,
+		       bcn.exe_page_code,
+		       bcn.exe_page_name,
+		    
+		       max(bcs.cont_node_code) cont_node_code,
+		       max(bcn2.cont_node_name) cont_node_name,
+		       max(bcs.re_node_code) re_node_code,
+		       max(bcn2.re_node_name) re_node_name,
+		       max(bcs.control_way) control_way,
+		       max(bsd.value_name) as control_way_name,
+		       max(bcs.is_postback) is_postback
+		  from budg_cont_note bcn
+		  left join budg_cont_set bcs
+		    on bcn.mod_code = bcs.mod_code
+			   and bcn.exe_sys_code = bcs.exe_sys_code
+			   and bcn.exe_page_code = bcs.exe_page_code
+			   and bcn.cont_node_code = bcs.cont_node_code
+			   AND bcs.group_id = #{group_id,jdbcType=INTEGER}
+			   AND bcs.hos_id = #{hos_id,jdbcType=INTEGER}
+		  left join budg_cont_note bcn2
+		  on   bcn2.mod_code = bcs.mod_code
+			   and bcn2.exe_sys_code = bcs.exe_sys_code
+			   and bcn2.exe_page_code = bcs.exe_page_code
+			   and bcn2.cont_node_code = bcs.cont_node_code
+			   AND bcs.group_id = #{group_id,jdbcType=INTEGER}
+			   AND bcs.hos_id = #{hos_id,jdbcType=INTEGER}
+		  left join budg_sys_dict bsd
+		  on  bcs.control_way = bsd.value_code
+			  and bsd.f_code = 'CONTROL_WAY' 
+			  AND bcs.group_id = #{group_id,jdbcType=INTEGER}
+			  AND bcs.hos_id = #{hos_id,jdbcType=INTEGER}
+		 group by 
+	        bcn.mod_code,
+	        bcn.mod_name,
+	        bcn.exe_sys_code,
+	        bcn.exe_sys_name,
+	        bcn.exe_page_code,
+	        bcn.exe_page_name
+		  order by 
+	        bcn.mod_code,
+	        bcn.exe_sys_code,
+	        bcn.exe_page_code
+	</select>
+	
+<!-- 	 修改预算节点设置 -->
+	<update id="updateBudgContSet" parameterType="java.util.Map" >
+		update BUDG_CONT_SET set
+			cont_node_code = #{cont_node_code,jdbcType=VARCHAR},
+			re_node_code = #{re_node_code,jdbcType=VARCHAR},
+			control_way = #{control_way,jdbcType=VARCHAR},
+			is_postback = #{is_postback,jdbcType=VARCHAR}
+		where 
+		    group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND mod_code = #{mod_code,jdbcType=VARCHAR}
+			AND exe_sys_code = #{exe_sys_code,jdbcType=VARCHAR}
+			AND exe_page_code = #{exe_page_code,jdbcType=VARCHAR}
+	</update>
+	
+	<!-- 查询  预算控制节点下拉框 -->
+	<select id="queryBudgContNote" resultMap="hrpBudgSelect" parameterType="java.util.Map" >
+		select 
+		   cont_node_code as id, 
+		   cont_node_name as text
+		from budg_cont_note
+		where
+		    mod_code = #{mod_code,jdbcType=VARCHAR}
+			AND exe_sys_code = #{exe_sys_code,jdbcType=VARCHAR}
+			AND exe_page_code = #{exe_page_code,jdbcType=VARCHAR}
+	</select>
+	
+	<select id="queryReNodeByCode" resultMap="budgContSetMap">
+		select
+		   bcn.re_node_code, 
+		   bcn.re_node_name
+		from budg_cont_note bcn
+		where 
+			bcn.mod_code = #{mod_code,jdbcType=VARCHAR}
+			AND bcn.exe_sys_code = #{exe_sys_code,jdbcType=VARCHAR}
+			AND bcn.exe_page_code = #{exe_page_code,jdbcType=VARCHAR}
+		    AND bcn.cont_node_code = #{cont_node_code,jdbcType=VARCHAR}
+	</select>
+	
+	<delete id="deleteBudgContSet" parameterType="java.util.Map">
+	
+		DELETE FROM BUDG_CONT_SET 
+		where                    
+			group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND mod_code = #{mod_code,jdbcType=VARCHAR}
+			AND exe_sys_code = #{exe_sys_code,jdbcType=VARCHAR}
+			AND exe_page_code = #{exe_page_code,jdbcType=VARCHAR}
+	</delete>
+	
+	<select id="queryBudgSysDict" resultMap="hrpBudgSelect">
+		select
+		value_code id,
+		value_name text
+		from budg_sys_dict
+		where 1 = 1
+			<if test="f_code != null and f_code != ''">
+				and f_code = #{f_code}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+				value_code like '${key}%' or
+				value_name like '%${key}%' 
+				)
+			</if>		
+		order by value_code
+	</select>
+</mapper>
+

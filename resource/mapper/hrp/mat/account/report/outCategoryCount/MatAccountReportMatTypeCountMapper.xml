@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.chd.hrp.mat.dao.account.report.outCategoryCount.MatAccountReportMatTypeCountMapper">
+	<resultMap id="matAccountReportMatTypeCountMap" type="java.util.Map" >
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="dept_code" column="dept_code"/>
+		<result property="dept_name" column="dept_name"/>
+		<result property="mat_type_code" column="mat_type_code"/>
+		<result property="mat_type_name" column="mat_type_name"/>
+		<result property="amount_money" column="amount_money"/>
+		<result property="store_name" column="store_name"/>
+		<result property="set_name" column="set_name"/>
+	</resultMap>
+	
+	<!-- 物资分类统计 查询 -->
+	<select id="queryMatTypeCount" parameterType="java.util.Map" resultMap="matAccountReportMatTypeCountMap">
+		with a_table as (
+			<!-- 按科室级次、物资类别汇总金额 -->
+			select
+				t.group_id,t.hos_id,t.copy_code,
+				<if test="is_showStore != null and is_showStore != '' ">
+			       t.store_code,
+				   t.store_name,
+		       	</if>
+				t.set_code,to_char(t.set_name) set_name,
+				<if test="is_showDept != null and is_showDept != '' ">
+		       		t.dept_code,
+			   		t.dept_name,
+		       	</if>
+				t.mat_type_code,t.mat_type_name,sum(t.amount_money) as amount_money
+			from(
+				select
+					a.group_id,a.hos_id,a.copy_code,a.store_code,a.store_name,a.set_code,
+					a.set_name,b.dept_code,b.dept_name,a.mat_type_code,a.mat_type_name,
+					sum(a.amount_money) as amount_money
+				from (
+		             <!-- 按科室、物资类别 汇总出库金额 -->
+					select 
+						mom.group_id,mom.hos_id,mom.copy_code,hsd.store_code,hsd.store_name,
+						<if test="set_id != null and set_id != '' ">
+							mss.set_code,mss.set_name,
+						</if>
+						<if test="set_id == null or set_id == '' ">
+							null set_code, null set_name, 
+						</if>
+						mom.dept_id,hdd.dept_code,hdd.dept_name,
+						mid.mat_type_id,mtd.mat_type_code,mtd.mat_type_name,
+						sum(nvl(mod.amount_money, 0)) as amount_money
+					from mat_out_main mom
+					 LEFT JOIN mat_bus_type mbt ON mom.bus_type_code = mbt.bus_type_code 
+		            left join mat_out_detail mod
+					on 
+						mom.group_id = mod.group_id and mom.hos_id = mod.hos_id
+						and mom.copy_code = mod.copy_code and mom.out_id = mod.out_id
+		            left join mat_inv_dict mid
+		            on  mod.group_id=mid.group_id and mod.hos_id=mid.hos_id and mod.copy_code=mid.copy_code
+		            	and mod.inv_id = mid.inv_id 
+		            	<if test="show_history == '1'">
+							and mod.inv_no = mid.inv_no
+						</if>
+						<if test="show_history != '1'">
+							and mid.is_stop = 0
+						</if>
+		            	and mid.is_stop = 0
+		            left join mat_type_dict mtd
+		            on mid.group_id=mtd.group_id and mid.hos_id=mtd.hos_id and mid.copy_code=mtd.copy_code
+		            	and mid.mat_type_id = mtd.mat_type_id 
+		            	<if test="show_history != '1'">
+							and mtd.is_stop = 0
+						</if>
+		            left join hos_dept_dict hdd
+		            on 
+		            	mom.group_id = hdd.group_id and mom.hos_id = hdd.hos_id
+		             	and mom.dept_id = hdd.dept_id 
+		             	<if test="show_history == '1'">
+							and mom.dept_no = hdd.dept_no
+						</if>
+						<if test="show_history != '1'">
+							and hdd.is_stop = 0
+						</if>
+		            LEFT JOIN hos_store_dict hsd
+					ON
+					    mom.group_id = hsd.group_id AND mom.hos_id = hsd.hos_id
+						AND mom.store_id = hsd.store_id 
+						<if test="show_history == '1'">
+							and mom.store_no = hsd.store_no
+						</if>
+						<if test="show_history != '1'">
+							AND hsd.is_stop = 0
+						</if>
+						
+					<if test="set_id != null and set_id != '' ">
+					LEFT JOIN mat_store_detail msd 
+			        ON 
+			            mom.group_id = msd.group_id AND mom.hos_id = msd.hos_id
+						AND mom.store_id = msd.store_id 
+					LEFT JOIN mat_store_set mss 
+			        ON 
+			            msd.group_id = mss.group_id AND msd.hos_id = mss.hos_id
+						AND msd.set_id = mss.set_id
+					</if>
+					where 
+		           		mom.group_id = #{group_id}
+		           		and mom.hos_id = #{hos_id}
+		           		and mom.copy_code = #{copy_code}
+		           		and mbt.sel_flag = 'out'
+		           		<!-- 2017/03/17 查询已确认的数据-->
+		           		and mom.state = '3'
+		           		<!-- 2017/03/22 将出库日期改为确认日期 -->
+		           		and to_char(mom.confirm_date,'yyyy-MM-dd') between #{begin_date} and #{end_date}
+		           		
+		           		<!-- 20170302经台州项目要求改为只查询领用退库和盘亏的业务 -->
+						<!-- and mom.bus_type_code in(3, 21, 9) -->
+						<if test="bus_type_code != null and bus_type_code != '' ">
+						 	and mom.bus_type_code in ${bus_type_code}
+						</if>
+						<if test="bus_type_code == null or bus_type_code == '' ">
+							and mom.bus_type_code in (3, 21, 9,11,13,23,49,50)
+						</if>
+						<!-- 只显示有权限的库房信息 -->
+						and to_char(mom.store_id) in (
+							select perm_code from v_user_data_perm  
+							where group_id = #{group_id,jdbcType=INTEGER}
+								and hos_id = #{hos_id,jdbcType=INTEGER}
+								and table_code = 'HOS_STORE_DICT'
+								and user_id = #{user_id,jdbcType=INTEGER}
+								and is_read = 1 and is_write = 1 
+						)
+						and to_char(mtd.mat_type_id) in (
+							select perm_code from v_user_data_perm  
+							where group_id = #{group_id,jdbcType=INTEGER}
+								and hos_id = #{hos_id,jdbcType=INTEGER}
+								and table_code = 'MAT_TYPE_DICT'
+								and user_id = #{user_id,jdbcType=INTEGER}
+								and is_read = 1 and is_write = 1 
+						)
+								
+		           		<if test="store_id != null and store_id != '' ">
+				            and mom.store_id = #{store_id}
+		           		</if>
+			            <if test="dept_id != null and dept_id != '' and dept_id != '00' ">
+				            and mom.dept_id = #{dept_id}
+			            </if>
+			            
+			            <if test="set_id != null and set_id != '' ">
+			            	and msd.set_id = #{set_id}
+			            </if>
+			            
+			            
+			            <!-- 2017/03/17 不选科室加科室权限-->
+			            <if test="dept_id == '00' ">
+							and to_char(mom.dept_id) in ( select perm_code from v_user_data_perm
+							where group_id = ${group_id}
+							and hos_id = ${hos_id} and user_id = ${user_id} and table_code = 'HOS_DEPT_DICT'
+							and is_read = 1 and is_write = 1)
+						</if>
+		           		and mom.dept_id is not null
+					group by 
+						mtd.mat_type_code,mtd.mat_type_name,mom.group_id,mom.hos_id,mom.copy_code,
+		                mom.dept_id,hdd.dept_code,hdd.dept_name,mid.mat_type_id,hsd.store_code,
+						hsd.store_name
+						<if test="set_id != null and set_id != '' ">
+							,mss.set_code,mss.set_name
+						</if>
+			) a 
+		left join hos_dept_dict b
+		on
+			a.group_id = b.group_id  and a.hos_id = b.hos_id 
+			<!-- 2017/07/17 增加科室id连接条件,台州库有脏数据-->
+			and a.dept_id = b.dept_id
+			<if test="show_history != '1'">
+				and b.is_stop = 0
+			</if>
+		    and a.dept_code like (b.dept_code|| '%')
+		where
+			b.is_last = '1'
+			group by 
+				a.group_id,a.hos_id,a.copy_code,b.dept_code,b.dept_name,
+				a.mat_type_code,a.mat_type_name,a.store_code,a.store_name,
+				a.set_code,a.set_name
+		)t
+		group by 
+			t.group_id,t.hos_id,t.copy_code,
+			<if test="is_showStore != null and is_showStore != ''">
+				t.store_code,t.store_name,
+			</if>
+			t.set_code,t.set_name,
+			<if test="is_showDept != null and is_showDept != '' ">
+				t.dept_code,t.dept_name,
+			</if>
+			t.mat_type_code,t.mat_type_name
+		)
+		select a.* from a_table a
+		union all
+			<!-- 总计 -->
+		select 
+			null as group_id,null as hos_id,null as copy_code,
+			<if test="is_showStore != null and is_showStore != '' ">
+				null as store_code,null as store_name,
+			</if>
+			null as set_code,to_char('合计') as set_name,
+		    <if test="is_showDept != null and is_showDept != '' ">
+				null as dept_code,NULL as dept_name,
+		    </if>
+		    null as mat_type_code,null as mat_type_name,sum(temp.amount_money) as amount_money 
+		from a_table temp
+	</select>
+</mapper>

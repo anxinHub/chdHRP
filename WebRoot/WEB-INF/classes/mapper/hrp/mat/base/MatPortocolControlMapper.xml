@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.mat.dao.base.MatPortocolControlMapper">
+	<select id="queryMatInPriceControl" resultType="java.util.Map" parameterType="java.util.Map" >
+		select distinct mi.inv_code,mi.inv_name
+         from (
+         select mpd.subject_id inv_id, mpd.price
+                from pact_main_fkxy mpm 
+                left join pact_det_fkxy mpd on mpm.pact_code =mpd.pact_code and mpm.group_id =mpd.group_id and mpm.hos_id =mpd.hos_id and mpm.copy_code =mpd.copy_code
+                where mpm.group_id =#{group_id,jdbcType=INTEGER}
+              and mpm.hos_id = #{hos_id,jdbcType=INTEGER}
+              and mpm.copy_code =#{copy_code,jdbcType=VARCHAR}
+              and mpm.pact_code=#{work_code,jdbcType=VARCHAR}
+         ) fkxy_data
+          join     
+          ( 
+            <foreach collection="detail_data" item="item" index="index" separator=" union all ">
+            select
+              #{item.inv_id,jdbcType=INTEGER} as inv_id,
+              #{item.inv_price,jdbcType=NUMERIC} as inv_price,
+              #{item.inv_money,jdbcType=NUMERIC} as inv_money
+            from dual
+            </foreach>        
+          ) in_data on fkxy_data.inv_id =in_data.inv_id
+          left join mat_inv_dict mi 
+              on mi.group_id =#{group_id,jdbcType=INTEGER}
+              and mi.hos_id = #{hos_id,jdbcType=INTEGER}
+              and mi.copy_code =#{copy_code,jdbcType=VARCHAR}
+              and fkxy_data.inv_id=mi.inv_id
+              and mi.is_stop =0
+          where fkxy_data.price &lt; in_data.inv_price
+	</select>
+	<select id="queryMatInMoneyControl" resultType="java.util.Map" parameterType="java.util.Map" >
+	select case
+         when nvl(exec_money, 0) + nvl(sum_inv_money, 0) &gt;
+              nvl(pact_money, 0) then
+          '协议执行金额' || to_char(nvl(exec_money, 0) + nvl(sum_inv_money, 0)) ||
+          '元，已超过协议总金额' || to_char(nvl(pact_money, 0)) || '元，是否继续保存？'
+         when nvl(exec_money, 0) + nvl(sum_inv_money, 0) &gt;=
+              nvl(pact_money, 0) * nvl(pact_warn_line,0) and
+              nvl(exec_money, 0) + nvl(sum_inv_money, 0) &lt;=
+              nvl(pact_money, 0) then
+          '协议执行金额' || to_char(nvl(exec_money, 0) + nvl(sum_inv_money, 0)) ||
+          '元，已超过协议预警金额' || to_char(nvl(exec_money, 0) + nvl(sum_inv_money, 0) -
+          nvl(pact_money, 0) * nvl(pact_warn_line,0))|| '元，是否继续保存？'
+       end return_info
+	from 
+	(
+		select 
+    (
+    select pact_money
+    from pact_main_fkxy pmf
+    where pmf.group_id =#{group_id,jdbcType=INTEGER}
+              and pmf.hos_id = #{hos_id,jdbcType=INTEGER}
+              and pmf.copy_code =#{copy_code,jdbcType=VARCHAR}
+              and pmf.pact_code=#{work_code,jdbcType=VARCHAR}
+    ) pact_money, 
+    nvl((       
+    select max(PACT_EXE_W) PACT_EXE_W 
+    from PACT_WARN_SET_FKXY 
+           where group_id =#{group_id,jdbcType=INTEGER}
+              and hos_id = #{hos_id,jdbcType=INTEGER}
+              and copy_code =#{copy_code,jdbcType=VARCHAR} 
+              and pact_type in (select pact_type_code
+    from pact_main_fkxy pmf
+    where pmf.group_id =#{group_id,jdbcType=INTEGER}
+              and pmf.hos_id = #{hos_id,jdbcType=INTEGER}
+              and pmf.copy_code =#{copy_code,jdbcType=VARCHAR}
+              and pmf.pact_code=#{work_code,jdbcType=VARCHAR} )
+    ) ,0) pact_warn_line,
+    (
+    select sum(mid.amount_money) exec_money
+         from mat_in_main mim
+         join mat_in_detail mid on mim.in_id =mid.in_id and mim.group_id =mid.group_id and mim.hos_id =mid.hos_id and mim.copy_code =mid.copy_code
+         join pact_det_fkxy mpd on mid.inv_id =mpd.subject_id and mim.group_id =mid.group_id and mim.hos_id =mid.hos_id and mim.copy_code =mid.copy_code and mim.protocol_code =mpd.pact_code
+       where  mim.protocol_code= #{work_code,jdbcType=VARCHAR}
+          and mim.group_id =#{group_id,jdbcType=INTEGER}
+          and mim.hos_id = #{hos_id,jdbcType=INTEGER}
+          and mim.copy_code =#{copy_code,jdbcType=VARCHAR}
+          <if test="work_update_id != null  and work_update_id != ''">
+             and mim.in_id!=#{work_update_id,jdbcType=INTEGER}
+          </if>        
+    ) exec_money ,
+    (
+    select sum(in_data.inv_money) sum_inv_money
+         from (
+         select mpd.subject_id inv_id
+            from pact_det_fkxy mpd 
+            where mpd.group_id =#{group_id,jdbcType=INTEGER}
+              and mpd.hos_id = #{hos_id,jdbcType=INTEGER}
+              and mpd.copy_code =#{copy_code,jdbcType=VARCHAR}
+              and mpd.pact_code=#{work_code,jdbcType=VARCHAR}             
+         ) fkxy_data
+         join     
+          ( 
+            <foreach collection="detail_data" item="item" index="index" separator=" union all ">
+            select
+              #{item.inv_id,jdbcType=INTEGER} as inv_id,
+              #{item.inv_price,jdbcType=NUMERIC} as inv_price,
+              #{item.inv_money,jdbcType=NUMERIC} as inv_money
+            from dual
+            </foreach>        
+          ) in_data on fkxy_data.inv_id =in_data.inv_id
+      )  sum_inv_money     
+      from dual
+    ) base_data
+    where nvl(exec_money,0) + nvl(sum_inv_money ,0) &gt;= nvl(pact_money ,0)*pact_warn_line
+	</select>
+</mapper>
+

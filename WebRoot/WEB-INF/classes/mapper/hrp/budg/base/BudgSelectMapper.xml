@@ -1,0 +1,2703 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.budg.dao.base.BudgSelectMapper">
+	<resultMap type="com.chd.hrp.budg.entity.BudgSelect" id="hrpBudgSelect">
+		<result property="id" column="id" />
+		<result property="text" column="text" />
+	</resultMap>
+	<select id="queryDept" resultMap="hrpBudgSelect">
+		select distinct hdd.dept_id as id,
+		                hdd.dept_code || ' ' || hdd.dept_name as text
+		  from HOS_DEPT hdd
+		  left join ACC_DEPT_ATTR ada
+		    on ada.group_id = hdd.group_id
+		   and ada.hos_id = hdd.hos_id
+		    and ada.dept_id=hdd.dept_id
+		 where ada.is_budg = 1
+		   and hdd.is_stop = 0
+		   and hdd.group_id =#{group_id}
+		   and hdd.hos_id = #{hos_id}
+		   <if test="key != null and key != ''">
+			AND (hdd.dept_code like '${key}%' or
+				hdd.dept_name like '%${key}%' or
+				hdd.spell_code like '${key}%' or
+				hdd.wbx_code like '${key}%' )
+			</if>
+		   and exists(
+           		select 1 from v_user_data_perm b where
+	            hdd.group_id=b.group_id 
+	            and hdd.hos_id=b.hos_id 
+	            and to_char(hdd.dept_id) = b.perm_code
+	            and user_id=#{user_id}
+	            AND TABLE_CODE = upper('HOS_DEPT_DICT')
+	            and b.is_read = 1
+       		)
+		 order by text
+		 
+	</select>
+	<!-- 医保类型性质下拉框 -->
+	<select id="queryBudgYBTypeNature" resultMap="hrpBudgSelect">
+		SELECT
+		value_code id,
+		value_name text
+		FROM BUDG_SYS_DICT
+		<where>
+			f_code='INSURANCE_NATURE'
+			<if test="key != null and key != ''">
+				AND ( value_code like '${key}%' or
+					value_name like '%${key}%' )
+			</if>
+		</where>
+			order by value_code
+	</select>
+	<!-- 指标性质下拉框 -->
+	<select id="queryBudgIndexNature" resultMap="hrpBudgSelect">
+		SELECT
+		value_code id,
+		 value_code||'  '||value_name text
+		FROM BUDG_SYS_DICT
+		<where>
+			f_code='INDEX_NATURE'
+			<if test="key != null and key != ''">
+				AND ( value_code like '${key}%' or
+					value_name like '%${key}%' )
+			</if>
+		</where>
+			order by value_code
+	</select>
+	<!-- 审批类型下拉框 -->
+	<select id="queryBudgCheckType" resultMap="hrpBudgSelect">
+		SELECT
+		value_code id,
+		 value_code||'  '||value_name text
+		FROM BUDG_SYS_DICT
+		<where>
+			f_code='CHECK_TYPE'
+			<if test="key != null and key != ''">
+				AND ( value_code like '${key}%' or
+					value_name like '%${key}%' )
+			</if>
+		</where>
+			order by value_code
+	</select>
+	<!--  审批状态下拉框-->
+	<select id="queryBudgBcState" resultMap="hrpBudgSelect">
+		SELECT
+		value_code id,
+		 value_code||'  '||value_name text
+		FROM BUDG_SYS_DICT
+		<where>
+			f_code='BC_STATE'
+			<if test="key != null and key != ''">
+				AND ( value_code like '${key}%' or
+					value_name like '%${key}%' )
+			</if>
+		</where>
+			order by value_code
+	</select>
+	<!-- 医保类型下拉框 -->
+	<select id="queryBudgYBType" resultMap="hrpBudgSelect">
+		SELECT
+		insurance_code id,
+		insurance_code ||' '|| insurance_name text
+		FROM BUDG_YB_TYPE_DICT
+		WHERE
+			group_id = #{group_id,jdbcType=INTEGER}
+			
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			
+			AND is_stop = 0
+			
+			<if test="insurance_nature != null and insurance_nature != ''">
+				AND insurance_nature = #{insurance_nature,jdbcType=VARCHAR}
+			</if>
+			<if test="key != null and key != ''">
+				AND (insurance_code like '${key}%' or
+					insurance_name like '%${key}%' or
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%' )
+			</if>
+			order by insurance_code
+	</select>
+	
+	<!-- 根据付费机制 查询 医保类型下拉框（查 医保付费机制维护表 BUDG_YB_PAY_MODE_SET） -->
+	<select id="queryBudgYBTypeByMode" resultMap="hrpBudgSelect">
+		SELECT distinct
+		a.insurance_code id,
+		b.insurance_code ||' '|| b.insurance_name text
+		FROM BUDG_YB_PAY_MODE_SET a
+		left join BUDG_YB_TYPE_DICT b 
+			on
+				a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code
+				and a.insurance_code = b.insurance_code 
+				and b.is_stop = 0
+		<where>
+			<if test="group_id != null and group_id != ''">
+				AND a.group_id = #{group_id,jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			</if>
+			<if test="pay_mode_code != null and pay_mode_code != ''">
+				AND a.pay_mode_code = #{pay_mode_code,jdbcType=VARCHAR}
+			</if>
+			<if test="insurance_nature != null and insurance_nature != ''">
+				AND b.insurance_nature = #{insurance_nature,jdbcType=VARCHAR}
+			</if>
+			<if test="key != null and key != ''">
+				AND (a.insurance_code like '${key}%' or
+					b.insurance_name like '%${key}%' or
+					b.spell_code like '%${key}%' or
+					b.wbx_code like '%${key}%' )
+			</if>
+		</where>
+			order by a.insurance_code
+	</select>
+	<!-- 病种名称下拉框 -->
+	<select id="queryBudgSingleDisease" resultMap="hrpBudgSelect">
+		SELECT
+		disease_code id,
+		disease_code ||' '|| disease_name text
+		FROM BUDG_SINGLE_DISEASE_DICT
+		where
+			group_id = #{group_id,jdbcType=INTEGER}
+			
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			
+			AND is_stop = 0
+			<if test="key != null and key != ''">
+				and (disease_code like '${key}%' or
+					disease_name like '%${key}%' or
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%' )
+			</if>
+		order by disease_code
+	</select>
+	
+	<!-- 病种名称下拉框 (根据医保类型编码 查询对应的 单病种) -->
+	<select id="queryBudgSingleDiseaseByInsCode" resultMap="hrpBudgSelect">
+		SELECT
+		a.disease_code id,
+		a.disease_code ||' '|| b.disease_name text
+		FROM BUDG_YB_SINGLE_DISEASE a
+		LEFT JOIN BUDG_SINGLE_DISEASE_DICT b
+			on
+				a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code
+				and a.disease_code = b.disease_code
+		where
+			a.group_id = #{group_id,jdbcType=INTEGER}
+			
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			
+			AND a.insurance_code = #{insurance_code,jdbcType=VARCHAR}
+			
+			AND b.is_stop = 0
+			<if test="key != null and key != ''">
+				and (a.disease_code like '${key}%' or
+					b.disease_name like '%${key}%' or
+					b.spell_code like '%${key}%' or
+					b.wbx_code like '%${key}%' )
+			</if>
+		order by a.disease_code
+	</select>
+	
+	<!-- 部门类型下拉框 -->
+	<select id="queryBudgDeptType" resultMap="hrpBudgSelect">
+		SELECT
+		type_code id,
+		type_code ||' '|| type_name text
+		FROM ACC_DEPT_TYPE
+		<where>
+			<if test="key != null and key != ''">
+				AND ( type_code like '${key}%' or
+					type_name like '%${key}%')
+			</if>
+		</where>
+			order by type_code
+	</select>
+	
+	<!-- 部门类型下拉框 -->
+	<select id="queryBudgDeptKind" resultMap="hrpBudgSelect">
+		SELECT
+		kind_code id,
+		kind_code ||' '|| kind_name text
+		FROM HOS_DEPT_KIND
+		<where>
+			<if test="group_id != null and group_id != ''">
+				AND group_id = #{group_id,jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND hos_id = #{hos_id,jdbcType=INTEGER}
+			</if>
+			<if test="key != null and key != ''">
+				AND ( kind_code like '${key}%' or
+					kind_name like '%${key}%')
+			</if>
+		</where>
+			order by kind_code
+	</select>
+	
+	<!-- 部门性质下拉框 -->
+	<select id="queryBudgDeptNature" resultMap="hrpBudgSelect">
+		SELECT
+		natur_code id,
+		natur_code ||' '|| natur_name text
+		FROM ACC_DEPT_NATUR
+		<where>
+			<if test="key != null and key != ''">
+				AND ( natur__code like '${key}%' or
+					natur_name like '%${key}%')
+			</if>
+		</where>
+			order by natur_code
+	</select>
+	
+	<!-- 部门支出性质下拉框 -->
+	<select id="queryBudgDeptOut" resultMap="hrpBudgSelect">
+		SELECT
+		out_code id,
+		out_code ||' '|| out_name text
+		FROM ACC_DEPT_OUT
+		<where>
+			<if test="key != null and key != ''">
+				AND ( out_code like '${key}%' or
+					out_name like '%${key}%')
+			</if>
+		</where>
+			order by out_code
+	</select>
+	
+	<!-- 费用标注性质下拉框 -->
+	<select id="queryBudgCharStanNature" resultMap="hrpBudgSelect">
+		SELECT
+		value_code id,
+		value_name text
+		FROM BUDG_SYS_DICT
+		<where>
+			f_code='CHARGE_STAN_NATURE'
+			<if test="key != null and key != ''">
+				AND ( value_code like '${key}%' or
+					value_name like '%${key}%' )
+			</if>
+		</where>
+			order by value_code
+	</select>
+	
+	
+	<!-- 数据性质 -->
+	<select id="queryBudgDataNature" resultMap="hrpBudgSelect">
+		SELECT
+		value_code id,
+		value_name text
+		FROM BUDG_SYS_DICT
+		<where>
+			f_code='DATA_NATURE'
+			<if test="key != null and key != ''">
+				AND ( value_code like '${key}%' or
+					value_name like '%${key}%' )
+			</if>
+		</where>
+			order by value_code
+	</select>
+	
+	<!-- 费用标准下拉框 -->
+	<select id="queryBudgChargeStan" resultMap="hrpBudgSelect">
+		SELECT
+		charge_stan_code id,
+		charge_stan_code ||' '|| charge_stan_name text
+		FROM BUDG_CHARGE_STANDARD_DICT
+		<where>
+			<if test="group_id != null and group_id != ''">
+				AND group_id = #{group_id,jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND hos_id = #{hos_id,jdbcType=INTEGER}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			</if>
+			<if test="charge_stan_nature != null and charge_stan_nature != ''">
+				AND charge_stan_nature = #{charge_stan_nature,jdbcType=VARCHAR}
+			</if>
+			<if test="key != null and key != ''">
+				AND ( charge_stan_code like '${key}%' or
+					charge_stan_name like '%${key}%' or 
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%' )
+			</if>
+			and is_stop = 0
+		</where>
+			order by charge_stan_code
+	</select>
+	
+	<!-- 费用标准下拉框     费用标准取值方法维护 添加、修改页面专用-->
+	<select id="queryBudgChargeStanGetWay" resultMap="hrpBudgSelect">
+		SELECT
+		a.charge_stan_code ||','|| a.charge_stan_nature ||' '|| b.value_name ||','|| a.charge_stan_describe id,
+		a.charge_stan_code ||' '|| a.charge_stan_name text
+		FROM BUDG_CHARGE_STANDARD_DICT a
+		left join budg_sys_dict b
+			on 
+				b.f_code = 'CHARGE_STAN_NATURE'
+				and a.charge_stan_nature = b.value_code
+		where
+			a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			<if test="charge_stan_nature != null and charge_stan_nature != ''">
+				AND a.charge_stan_nature = #{charge_stan_nature,jdbcType=VARCHAR}
+			</if>
+			<if test="key != null and key != ''">
+				AND ( a.charge_stan_code like '${key}%' or
+					a.charge_stan_name like '%${key}%' or 
+					a.spell_code like '%${key}%' or
+					a.wbx_code like '%${key}%' )
+			</if>
+			and a.is_stop = 0
+			order by a.charge_stan_code
+	</select>
+	
+	<!-- 根据费用标准 查询其对应科室 下拉框 -->
+	<select id="queryBudgChargeStanDept" resultMap="hrpBudgSelect">
+		SELECT
+		a.dept_id id,
+		hd.dept_code ||' '|| hd.dept_name text
+		FROM BUDG_CHARGE_STAN_DEPT_SET a
+		left join hos_dept hd
+			on
+				a.group_id = hd.group_id
+				and a.hos_id  = hd.hos_id 
+				and a.dept_id = hd.dept_id 
+				and hd.is_stop = 0
+		<where>
+			<if test="group_id != null and group_id != ''">
+				AND a.group_id = #{group_id,jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			</if>
+			<if test="charge_stan_code != null and charge_stan_code != ''">
+				AND a.charge_stan_code = #{charge_stan_code,jdbcType=VARCHAR}
+			</if>
+			<if test="key != null and key != ''">
+				AND ( hd.dept_code like '${key}%' or
+					hd.dept_name like '%${key}%' or 
+					hd.spell_code like '%${key}%' or
+					hd.wbx_code like '%${key}%' )
+			</if>
+		</where>
+			order by a.dept_id
+	</select>
+	
+	<!-- 取值方法下拉框下拉框 -->
+	<select id="queryBudgGetValueWay" resultMap="hrpBudgSelect">
+		SELECT
+		value_code id,
+		value_name text
+		FROM BUDG_SYS_DICT
+		<where>
+			f_code='GET_VALUE_WAY'
+			<if test="key != null and key != ''">
+				AND ( value_code like '${key}%' or
+					value_name like '%${key}%' )
+			</if>
+		</where>
+			order by value_code
+	</select>
+	
+	<!-- 计算公式下拉框 -->
+	<select id="queryBudgFormula" resultMap="hrpBudgSelect">
+		SELECT
+		formula_id id,
+		formula_id ||' '|| formula_name text
+		FROM BUDG_FORMULA_SET
+		<where>
+			<if test="group_id != null and group_id != ''">
+				AND group_id = #{group_id,jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND hos_id = #{hos_id,jdbcType=INTEGER}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			</if>
+			<if test="key != null and key != ''">
+				AND ( formula_id like '${key}%' or
+					formula_name like '%${key}%' )
+			</if>
+		</where>
+			order by formula_id
+	</select>
+	
+	<!-- 取值函数下拉框 -->
+	<select id="queryBudgFun" resultMap="hrpBudgSelect">
+		SELECT
+		fun_code id,
+		fun_code ||' '|| fun_name text
+		FROM BUDG_FUN
+		<where>
+			<if test="group_id != null and group_id != ''">
+				AND group_id = #{group_id,jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND hos_id = #{hos_id,jdbcType=INTEGER}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			</if>
+			<if test="key != null and key != ''">
+				AND ( fun_code like '${key}%' or
+					fun_name like '%${key}%'  or 
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%' )
+			</if>
+		</where>
+			order by fun_code
+	</select>
+	
+	 <!-- 函数参数取值 下拉框-->
+	<select id="queryBudgFunParaMethod" resultMap="hrpBudgSelect">
+		SELECT 
+			para_code id ,
+			para_code  ||' '||  para_name text
+		FROM BUDG_FUN_PARA_METHOD
+		WHERE
+			group_id = #{group_id}
+			and hos_id = #{hos_id}
+			and copy_code = #{copy_code}
+			<if test="key != null and key != ''">
+				and (
+				para_code like '%${key}%' or
+				para_name like '%${key}%' 
+				or spell_code like '%${key}%' or wbx_code like '%${key}%'
+				)
+			</if>
+		order by para_code
+	</select>
+	
+	<!-- 函数参数 部件类型 下拉框 -->
+	<select id="queryBudgComType" resultMap="hrpBudgSelect">
+		SELECT 
+			com_type_code id ,
+			com_type_code  ||' '||  com_type_name text
+		FROM budg_com_type
+		WHERE 1=1
+			<if test="key != null and key != ''">
+				and (
+				com_type_code like '%${key}%' or
+				com_type_name like '%${key}%'
+				)
+			</if>
+		order by com_type_code
+	</select>
+	
+	<!-- 存储过程包名   下拉框查询  -->
+	<select id="queryBudgOraclePkg" resultMap="hrpBudgSelect">
+		SELECT 
+			object_name id, object_name text
+	  	FROM user_procedures
+		where
+			 object_type = 'PACKAGE'
+			 and subprogram_id = 0
+  		     and object_name like 'PKG_BUDG_FUN%'
+			<if test="key != null and key != ''">
+				and (
+				object_name  like '%${key}%'
+				)
+			</if>
+		order by object_name
+	</select>
+	
+	<!-- 收入科目级次下拉框 收入科目 -->
+	<select id="queryBudgSubjLevel" resultMap="hrpBudgSelect">
+		SELECT
+		t.subj_level id,
+		t.subj_level text
+		FROM (select distinct subj_level  from budg_income_subj
+				where group_id = #{group_id} and hos_id = #{hos_id} and copy_code = #{copy_code}
+					and budg_year = #{budg_year}
+				) t
+		<where>
+			<if test="key != null and key != ''">
+				AND  t.subj_level like '${key}%' 					
+			</if>
+		</where>
+			order by t.subj_level
+	</select>
+	
+	<!-- 支出科目级次下拉框 收入科目 -->
+	<select id="queryBudgCostSubjLevel" resultMap="hrpBudgSelect">
+		SELECT
+		t.subj_level id,
+		t.subj_level text
+		FROM (select distinct subj_level  from budg_cost_subj
+				where group_id = #{group_id} and hos_id = #{hos_id} and copy_code = #{copy_code}
+					and budg_year = #{budg_year}
+				) t
+		<where>
+			<if test="key != null and key != ''">
+				AND  t.subj_level like '${key}%' 
+					
+			</if>
+		</where>
+			order by t.subj_level
+	</select>
+	
+	<!-- 科目性质 下拉框 -->
+	<select id="queryBudgAccSubjNature" resultMap="hrpBudgSelect">
+		SELECT
+		subj_nature_code id,
+		subj_nature_code ||' '|| subj_nature_name text
+		FROM ACC_SUBJ_NATURE
+		<where>
+			<if test="group_id != null and group_id != ''">
+				AND group_id = #{group_id,jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND hos_id = #{hos_id,jdbcType=INTEGER}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			</if>
+			<if test="key != null and key != ''">
+				AND ( subj_nature_code like '${key}%' or
+					subj_nature_name like '%${key}%' )
+			</if>
+		</where>
+			order by subj_nature_code
+	</select>
+	
+	<!-- 预算科目下拉框   参数  table  contoroller 根据 subj_type处理  04 budg_income_subj   05 budg_cost_subj -->
+	<select id="queryBudgSubj" resultMap="hrpBudgSelect">
+		SELECT
+			subj_code  id ,
+			subj_code || ' ' || subj_name text
+		FROM ${table}
+		where
+				group_id = #{group_id}
+				AND hos_id = #{hos_id} 
+				AND copy_code = #{copy_code}
+				AND budg_year = #{budg_year}
+		<!-- 	<if test="is_last != null and is_last != '' ">
+				AND is_last = #{is_last}
+			</if> -->
+			<if test="type_code != null and type_code != '' ">
+				AND type_code = #{type_code}
+			</if>
+			<if test="key != null and key != ''">
+				AND ( subj_code like '${key}%' or
+					subj_name like '%${key}%' or 
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%' )
+			</if>
+		order by subj_code
+	</select>
+	
+	<!-- 物资类别 下拉框 -->
+	<select id="queryMatTypes" resultMap="hrpBudgSelect">
+		SELECT
+			mat_type_id id,
+			mat_type_code || ' ' || mat_type_name  text
+           FROM mat_type_dict
+		where
+			group_id = #{group_id}
+			AND hos_id = #{hos_id} 
+			AND copy_code = #{copy_code} 
+			and is_stop = 0
+			<if test="key != null and key != ''">
+				AND (mat_type_code like '${key}%' or
+					mat_type_name like '%${key}%' or 
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%' )
+			</if>
+			<if test="is_last != null and is_last != ''">
+				AND is_last = #{is_last} 
+			</if>
+		order by mat_type_code
+	</select>
+	<!-- 预算收入科目类别 -->
+	<select id="queryBudgTypeCode" resultMap="hrpBudgSelect">
+	select   VALUE_CODE id , 	VALUE_NAME text from  BUDG_SYS_DICT 
+	where F_CODE='BUDG_IN_SUBJ_TYPE'
+	
+	</select>
+	<!-- 预算年度下拉框 -->
+	<select id="queryBudgYear" resultMap="hrpBudgSelect">
+		SELECT
+		t.acc_year id,
+		t.acc_year text
+		FROM (select distinct acc_year   from acc_year
+				where group_id = #{group_id} and hos_id = #{hos_id} and copy_code = #{copy_code} 
+				) t
+		<where>
+			<if test="key != null and key != ''">
+				AND  t.acc_year like '${key}%' 
+					
+			</if>
+		</where>
+			order by t.acc_year desc
+	</select>
+	
+	<!-- 预算月份下拉框 -->
+	<select id="queryBudgMonth" resultMap="hrpBudgSelect">
+		SELECT
+		t.acc_month id,
+		t.acc_month text
+		FROM (select distinct acc_month   from acc_year_month
+				where group_id = #{group_id} and hos_id = #{hos_id} and copy_code = #{copy_code} 
+				) t
+		<where>
+			<if test="key != null and key != ''">
+				AND  t.acc_month like '${key}%' 
+					
+			</if>
+		</where>
+			order by t.acc_month
+	</select>
+	
+	<!-- 资金流向 下拉框 -->
+	<select id="queryCashDire" resultMap="hrpBudgSelect">
+		select
+			cash_dire id,
+ 			(case when cash_dire = 0 then '0 流入' else '1 流出' end) as text
+	  	from acc_cash_item
+		where group_id = #{group_id} 
+		 	  and hos_id = #{hos_id} 
+		 	  and copy_code = #{copy_code} 
+ 		group by cash_dire 
+ 		order by cash_dire
+	</select>
+	
+	<!-- 会计科目 下拉框 -->
+	<select id="queryAccSubj" resultMap="hrpBudgSelect">
+		SELECT
+			subj_code  id,
+			subj_code || ' ' || subj_name  text
+		FROM ACC_SUBJ
+		<where>
+			<if test="group_id != null and group_id != '' ">
+				group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != '' ">
+				AND hos_id = #{hos_id} 
+			</if>
+			<if test="copy_code != null and copy_code != '' ">
+				AND copy_code = #{copy_code}
+			</if>
+			<if test="acc_year != null and acc_year != '' ">
+				AND acc_year = #{acc_year}
+			</if>
+			<if test="subj_type != null and subj_type != '' ">
+				AND subj_type_code = #{subj_type}
+			</if>
+			<if test="key != null and key != ''">
+				AND ( subj_code like '${key}%' or
+					subj_name like '%${key}%' or 
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%' )
+			</if>
+			and is_stop = 0
+		</where>
+		order by subj_code
+	</select>
+	
+	<!-- 会计科目 下拉框  支出项目字典页面专用  勿动  -->
+	<select id="queryAccSubjDict" resultMap="hrpBudgSelect">
+		SELECT
+			subj_id  id,
+			subj_code || ' ' || subj_name  text
+		FROM ACC_SUBJ
+		where
+			group_id = #{group_id}
+			AND hos_id = #{hos_id} 
+			AND copy_code = #{copy_code}
+			AND acc_year = #{acc_year}
+			<if test="subj_type != null and subj_type != '' ">
+				AND subj_type_code = #{subj_type}
+			</if>
+			<if test="key != null and key != ''">
+				AND ( subj_code like '${key}%' or
+					subj_name like '%${key}%' or 
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%' )
+			</if>
+			and is_stop = 0
+		order by subj_code
+	</select>
+	
+	<!-- 收入预算科目类别 下拉框    -->
+	<select id="queryBudgIncomeSubjType" resultMap="hrpBudgSelect">
+		SELECT
+			income_subj_type_code  id ,
+			income_subj_type_code || ' ' || income_subj_type_name text
+		FROM budg_income_subj_type
+		where
+			group_id = #{group_id}
+			AND hos_id = #{hos_id} 
+			AND copy_code = #{copy_code}
+			<if test="key != null and key != ''">
+				AND ( income_subj_type_code like '${key}%' or
+					income_subj_type_name like '%${key}%' or 
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%' )
+			</if>
+			and is_stop = 0
+		order by income_subj_type_code
+	</select>
+	
+	<!-- 支出预算科目类别 下拉框    -->
+	<select id="queryBudgCostSubjType" resultMap="hrpBudgSelect">
+		SELECT
+			cost_subj_type_code  id ,
+			cost_subj_type_code || ' ' || cost_subj_type_name text
+		FROM budg_cost_subj_type
+		where
+			group_id = #{group_id}
+			AND hos_id = #{hos_id} 
+			AND copy_code = #{copy_code}
+			<if test="key != null and key != ''">
+				AND ( cost_subj_type_code like '${key}%' or
+					cost_subj_type_name like '%${key}%' or 
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%' )
+			</if>
+			and is_stop = 0
+		order by cost_subj_type_code
+	</select>
+	<!-- 收入预算科目下拉框 -->
+	<select id="queryBudgIncomeSubj" resultMap="hrpBudgSelect">
+		SELECT
+		subj_code id,
+		subj_code ||' '|| subj_name text
+		FROM BUDG_INCOME_SUBJ
+		where
+			group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND budg_year = #{budg_year,jdbcType=VARCHAR}
+			<if test="key != null and key != ''">
+				AND ( subj_code like '${key}%' or
+					subj_name like '%${key}%'  or 
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%' )
+			</if>
+			<if test="is_last !=null and is_last != ''">
+			AND is_last = #{is_last,jdbcType=INTEGER}
+			</if>
+		order by subj_code
+	</select>
+	
+	<!-- 根据科目类型 查询  收入预算科目下拉框 -->
+	<select id="queryBudgIncomeTypeSet" resultMap="hrpBudgSelect">
+		SELECT
+			bits.subj_code  id ,
+			bits.subj_code || ' ' || bis.subj_name text
+		FROM BUDG_INCOME_TYPE_SET bits
+		LEFT  JOIN  BUDG_INCOME_SUBJ bis
+			ON
+				bits.group_id = bis.group_id
+				and bits.hos_id = bis.hos_id
+				and bits.copy_code = bis.copy_code
+				and bits.budg_year = bis.budg_year
+				and bits.subj_code = bis.subj_code
+		<where>
+			<if test="group_id != null and group_id != '' ">
+				bits.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != '' ">
+				AND bits.hos_id = #{hos_id} 
+			</if>
+			<if test="copy_code != null and copy_code != '' ">
+				AND bits.copy_code = #{copy_code}
+			</if>
+			<if test="budg_year != null and budg_year != '' ">
+				AND bits.budg_year = #{budg_year}
+			</if>
+			<if test="subj_type != null and subj_type != '' ">
+				AND bits.type_code = #{subj_type}
+			</if>
+			<if test="key != null and key != ''">
+				AND  bits.subj_code like '${key}%'
+			</if>
+		</where>
+		order by bits.subj_code
+	</select>
+	
+	<!-- 根据科目类型 查询  支出预算科目下拉框 -->
+	<select id="queryBudgCostTypeSet" resultMap="hrpBudgSelect">
+		SELECT
+			bcst.subj_code  id ,
+			bcst.subj_code || ' ' || bcs.subj_name text
+		FROM BUDG_COST_TYPE_SET bcst
+		LEFT  JOIN  BUDG_COST_SUBJ bcs
+			ON
+				bcst.group_id = bcs.group_id
+				and bcst.hos_id = bcs.hos_id
+				and bcst.copy_code = bcs.copy_code
+				and bcst.budg_year = bcs.budg_year
+				and bcst.subj_code = bcs.subj_code
+		<where>
+			<if test="group_id != null and group_id != '' ">
+				bcst.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != '' ">
+				AND bcst.hos_id = #{hos_id} 
+			</if>
+			<if test="copy_code != null and copy_code != '' ">
+				AND bcst.copy_code = #{copy_code}
+			</if>
+			<if test="budg_year != null and budg_year != '' ">
+				AND bcst.budg_year = #{budg_year}
+			</if>
+			<if test="subj_type != null and subj_type != '' ">
+				AND bcst.type_code = #{subj_type}
+			</if>
+			<if test="key != null and key != ''">
+				AND  bcst.subj_code like '${key}%'
+			</if>
+		</where>
+		order by bcst.subj_code
+	</select>
+	
+	<!-- 科室 下拉框      医疗收入预算和医疗业务预算中科室均为预算科室（IS_BUDG=1）且部门类型（dept_type）为01和02的部门-->
+	<select id="queryBudgDeptDict" resultMap="hrpBudgSelect">
+		select ada.dept_id id,
+			hd.dept_code||' '||hd.dept_name text
+		from acc_dept_attr ada
+		left join hos_dept hd
+			ON
+				ada.group_id  = hd.group_id 
+				and ada.hos_id  = hd.hos_id 
+				and ada.dept_id  = hd.dept_id 
+				and hd.is_stop  = 0
+     	<where>
+     		<if test="group_id != null  and group_id != ''">
+				and ada.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and ada.hos_id = #{hos_id}
+			</if>
+			<!-- <if test="type_code != null  and type_code != ''">
+				and ada.type_code = #{type_code}
+			</if> 
+			 and ada.type_code in ('01','02') -->
+			and ada.is_budg = 1
+			<if test="key != null and key != ''">
+				and (
+					hd.dept_code like '${key}%' or
+					hd.dept_name like '%${key}%' or
+					hd.spell_code like '%${key}%' or
+					hd.wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by hd.dept_code	
+	</select>
+	
+	<select id="queryBudgDeptDictAll" resultMap="hrpBudgSelect">
+		select dept_id id,
+			dept_code||' '||dept_name text
+		from hos_dept
+     	where
+			group_id = #{group_id}
+			and hos_id = #{hos_id}
+			and is_stop = 0
+			<if test="is_last != null and is_last != '' ">
+			and is_last = #{is_last}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+					dept_code like '${key}%' or
+					dept_name like '%${key}%' or
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%'
+				)
+			</if>
+		order by dept_code	
+	</select>
+	
+	<!-- 基本指标名称下拉框 -->
+	<select id="queryBudgDeptindex_code_name" resultMap="hrpBudgSelect">
+		select index_code id,
+			index_code||' '||index_name text 
+			from budg_basic_index_dict
+		WHERE
+			group_id = #{group_id}
+		
+			AND hos_id = #{hos_id} 
+		
+			and copy_code = #{copy_code}
+			
+			and is_stop = 0
+				
+			<if test="index_nature != null and index_nature != '' ">
+				and index_nature = #{index_nature}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+					index_code like '${key}%' or
+					index_name like '%${key}%' or
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%'
+				)
+			</if>
+		order by index_code
+	</select>
+	
+	<!-- 基本指标名称下拉框  基本指标取值方法维护 添加、修改页面专用 -->
+	<select id="queryBudgIndexCodeGetWay" resultMap="hrpBudgSelect">
+		select 
+			a.index_code ||','|| a.index_nature || ' ' || b.value_name ||','|| a.index_describe id,
+			a.index_code||' '||a.index_name text 
+		from budg_basic_index_dict a
+		left join budg_sys_dict b
+			on
+				b.f_code = 'INDEX_NATURE'
+				and a.index_nature = b.value_code
+		WHERE
+			a.group_id = #{group_id}
+		
+			AND a.hos_id = #{hos_id} 
+		
+			and a.copy_code = #{copy_code}
+			
+			and a.is_stop = 0
+			
+			<if test="index_nature != null and index_nature != '' ">
+				and a.index_nature = #{index_nature}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+					a.index_code like '${key}%' or
+					a.index_name like '%${key}%' or
+					a.spell_code like '%${key}%' or
+					a.wbx_code like '%${key}%'
+				)
+			</if>
+		order by a.index_code
+	</select>
+	
+	<!-- 根据基本指标 查询对应 预算科室 下拉框 -->
+	<select id="queryBudgBasicIndexDept" resultMap="hrpBudgSelect">
+		select a.dept_id id ,
+	  		hd.dept_code ||' '|| hd.dept_name text 
+	  	from budg_basic_index_dept_set a
+	  	
+		left join  hos_dept hd
+			on
+				a.group_id = hd.group_id 
+				and a.hos_id = hd.hos_id 
+				and a.dept_id = hd.dept_id
+		<where>
+			<if test="group_id != null and group_id != '' ">
+				AND a.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != '' ">
+				AND a.hos_id = #{hos_id} 
+			</if>
+			<if test="copy_code != null and copy_code != '' ">
+				and a.copy_code = #{copy_code}
+			</if>
+			<if test="index_code != null and index_code != '' ">
+				and a.index_code = #{index_code}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+					hd.dept_code like '${key}%' or
+					hd.dept_name like '%${key}%' or
+					hd.spell_code like '%${key}%' or
+					hd.wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by index_code
+	</select>
+	
+	<!-- 函数分类下拉框 -->
+	<select id="qureyBudgFunType" resultMap="hrpBudgSelect">
+	  select type_code id,
+	  type_code || ' ' || type_name text from BUDG_FUN_TYPE
+		<where>
+			<if test="group_id != null and group_id != '' ">
+				group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != '' ">
+				AND hos_id = #{hos_id} 
+			</if>
+			<if test="copy_code != null and copy_code != '' ">
+				and copy_code = #{copy_code}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+					type_code like '${key}%' or
+					type_name like '%${key}%' or
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by type_code
+	</select>
+	
+	
+	<!-- 元素类型下拉框（计算公式页面用）-->
+	<select id="queryElementType" resultMap="hrpBudgSelect">
+		SELECT
+		value_code id,
+		value_name text
+		FROM BUDG_SYS_DICT
+		<where>
+			f_code='ELEMENT_TYPE'
+			<if test="key != null and key != ''">
+				AND ( value_code like '${key}%' or
+					value_name like '%${key}%' )
+			</if>
+		</where>
+			order by value_code
+	</select>
+	
+	<!-- 工资项目 下拉框 -->
+	<select id="queryBudgWageItem" resultMap="hrpBudgSelect">
+	  select wage_item_code id,
+	  wage_item_code || ' ' || wage_item_name text from BUDG_WAGE_ITEM_DICT
+		<where>
+			<if test="group_id != null and group_id != '' ">
+				group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != '' ">
+				AND hos_id = #{hos_id} 
+			</if>
+			<if test="copy_code != null and copy_code != '' ">
+				and copy_code = #{copy_code}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+					wage_item_code like '${key}%' or
+					wage_item_name like '%${key}%' or
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%'
+				)
+			</if>
+			and is_stop = 0
+		</where>
+		order by wage_item_code
+	</select>
+	
+	<!-- 期间属性 下拉框 -->
+	<select id="queryBudgPeriodNature" resultMap="hrpBudgSelect">
+		SELECT
+		value_code id,
+		value_name text
+		FROM BUDG_SYS_DICT
+		<where>
+			f_code='PERIOD_NATURE'
+			<if test="key != null and key != ''">
+				AND ( value_code like '${key}%' or
+					value_name like '%${key}%' )
+			</if>
+		</where>
+			order by value_code
+	</select>
+	
+	
+	<!-- 奖金项目 下拉框 -->
+	<select id="queryBudgAwardsItem" resultMap="hrpBudgSelect">
+	  select awards_item_code id,
+	  awards_item_code || ' ' || awards_item_name text from BUDG_AWARDS_ITEM_DICT
+		<where>
+			<if test="group_id != null and group_id != '' ">
+				group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != '' ">
+				AND hos_id = #{hos_id} 
+			</if>
+			<if test="copy_code != null and copy_code != '' ">
+				and copy_code = #{copy_code}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+					awards_item_code like '${key}%' or
+					awards_item_name like '%${key}%' or
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%'
+				)
+			</if>
+			and is_stop = 0
+		</where>
+		order by awards_item_code
+	</select>
+	
+	<!-- 奖金项目 下拉框 -->
+	<select id="queryBudgAwardsItemAll" resultMap="hrpBudgSelect">
+	  select awards_item_code id,
+	  awards_item_code || ' ' || awards_item_name text from BUDG_AWARDS_ITEM_DICT
+		<where>
+			<if test="group_id != null and group_id != '' ">
+				group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != '' ">
+				AND hos_id = #{hos_id} 
+			</if>
+			<if test="copy_code != null and copy_code != '' ">
+				and copy_code = #{copy_code}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+					awards_item_code like '${key}%' or
+					awards_item_name like '%${key}%' or
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%'
+				)
+			</if>
+			and is_stop = 0
+		</where>
+		order by awards_item_code
+	</select>
+	
+	
+	<!-- 编制方法 下拉框 -->
+	<select id="queryBudgEditMethod" resultMap="hrpBudgSelect">
+		SELECT
+		value_code id,
+		value_name text
+		FROM BUDG_SYS_DICT
+		<where>
+			f_code='EDIT_METHOD'
+			<if test="key != null and key != ''">
+				AND ( value_code like '${key}%' or
+					value_name like '%${key}%' )
+			</if>
+		</where>
+			order by value_code
+	</select>
+	
+	<!-- 与编制方法 下拉框 联动 查询  编制方法 下拉框 -->
+	<select id="queryBudgGetWay" resultMap="hrpBudgSelect">
+		SELECT
+		a.get_way id,
+		bsd.value_name text
+		FROM budg_edit_and_get_ship a
+		left join budg_sys_dict bsd
+			ON	
+				bsd.f_code='GET_WAY'
+				and a.get_way = bsd.value_code
+		<where>
+			a.edit_method = #{edit_method}
+			<if test="key != null and key != ''">
+				AND ( a.get_way like '${key}%' or
+					bsd.value_code like '${key}%' or
+					bsd.value_name like '%${key}%' )
+			</if>
+		</where>
+			order by a.get_way
+	</select>
+	
+	<!-- 分解方法（resolve_way） 下拉框 -->
+	<select id="queryBudgResolveWay" resultMap="hrpBudgSelect">
+		SELECT
+		value_code id,
+		value_name text
+		FROM BUDG_SYS_DICT
+		<where>
+			f_code='RESOLVE_WAY'
+			<if test="key != null and key != ''">
+				AND ( value_code like '${key}%' or
+					value_name like '%${key}%' )
+			</if>
+		</where>
+			order by value_code
+	</select>
+	
+	
+	<!-- 药品分类 下拉框 带变更号 -->
+	<select id="queryBudgDrugType" resultMap="hrpBudgSelect">
+	  select med_type_id || ',' || med_type_no id,
+	  med_type_code || ' ' || med_type_name text from MED_TYPE_DICT
+		<where>
+			<if test="group_id != null and group_id != '' ">
+				group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != '' ">
+				AND hos_id = #{hos_id} 
+			</if>
+			<if test="copy_code != null and copy_code != '' ">
+				and copy_code = #{copy_code}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+					med_type_id like '${key}%' or
+					med_type_code like '${key}%' or
+					med_type_name like '%${key}%' or
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%'
+				)
+			</if>
+			and is_stop = 0
+		</where>
+		order by med_type_code
+	</select>
+	
+	<!-- 药品分类 下拉框 带变更号 -->
+	<select id="queryBudgMedType" resultMap="hrpBudgSelect">
+		select 
+			med_type_id  id,
+			med_type_code || ' ' || med_type_name text from MED_TYPE_DICT
+		where
+			group_id = #{group_id}
+			AND hos_id = #{hos_id} 
+			and copy_code = #{copy_code}
+			<if test="key != null and key != ''">
+				and (
+					med_type_id like '${key}%' or
+					med_type_code like '${key}%' or
+					med_type_name like '%${key}%' or
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%'
+				)
+			</if>
+			<if test="is_last != null and is_last !=''">
+				AND is_last = #{is_last,jdbcType=INTEGER}
+			</if>
+			and is_stop = 0
+		order by med_type_code
+	</select>
+	
+	<!-- 固定资产类别 下拉框 -->
+	<select id="queryBudgCostFassetType" resultMap="hrpBudgSelect">
+		select 
+		ass_type_id id ,
+		ass_type_code||' '||ass_type_name text 
+		from ASS_TYPE_DICT
+		<where>
+			<if test="group_id != null and group_id != ''">
+			AND group_id = #{group_id,jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			</if>
+			<if test="key != null and key != ''">
+				and (	ass_type_code like '${key}%' or
+					ass_type_name like '%${key}%' or
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%' 
+				)
+			</if>
+			and is_stop = 0
+		</where>
+		order by ass_type_code
+	</select>
+	
+	<!-- 支出项目下拉框 -->
+	<select id="queryBudgPaymentItem" resultMap="hrpBudgSelect">
+		select 
+		payment_item_id id ,
+		payment_item_code||' '||payment_item_name text 
+		from budg_payment_item
+		<where>
+			<if test="group_id != null and group_id != ''">
+			AND group_id = #{group_id,jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			</if>
+			<if test="is_last != null and is_last != ''">
+			AND is_last = #{is_last,jdbcType=INTEGER}
+			</if>
+			<if test="key != null and key != ''">
+				and (	payment_item_code like '${key}%' or
+					payment_item_name like '%${key}%' or
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%' 
+				)
+			</if>
+			and is_stop = 0
+		</where>
+		order by payment_item_code
+	</select>
+	
+	<!-- 支出项目下拉框  带变更NO-->
+	<select id="queryBudgPaymentItemDict" resultMap="hrpBudgSelect">
+		select 
+		a.payment_item_id || ','|| a.payment_item_no id ,
+		a.payment_item_code||' '|| a.payment_item_name text 
+		from budg_payment_item_dict a
+		<where>
+			<if  test="is_read != null  and is_read != '' or is_write != null  and is_write != '' or read_or_write != null  and read_or_write != ''">
+				 to_char(a.payment_item_id) in (select b.perm_code from V_USER_DATA_PERM b 
+					where b.group_id = #{group_id,jdbcType=INTEGER} and  b.hos_id = #{hos_id,jdbcType=INTEGER}
+					and b.user_id = #{user_id,jdbcType=INTEGER} and b.table_code = 'BUDG_PAYMENT_ITEM_DICT' 
+				
+	          	<if  test="is_read != null  and is_read != ''">
+	                and b.is_read = 1
+	          	</if>
+	          	<if  test="is_write != null and is_write != ''">
+	                 and b.is_write = 1 
+	          	</if>
+	           	<if  test="read_or_write != null and read_or_write != ''">
+	                 and  (b.is_write = 1 or b.is_read = 1 )
+	          	</if>
+					)
+        	</if>
+			<if test="group_id != null and group_id != ''">
+			AND a.group_id = #{group_id,jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			</if>
+			<if test="key != null and key != ''">
+				and (	
+					a.payment_item_code like '${key}%' or
+					a.payment_item_name like '%${key}%' or
+					a.spell_code like '%${key}%' or
+					a.wbx_code like '%${key}%' 
+				)
+			</if>
+			and a.is_stop = 0
+		</where>
+		order by a.payment_item_code
+	</select>
+	
+	<!-- 根据 预算层次 budg_level （01医院年度 02医院月份 03科室年度 04科室月份 ） 
+	 	 编制方法EDIT_METHOD（01零基预算 02增量预算 03确定预算 04概率预算 ） 从  业务预算编制方案表 查询 指标下拉框-->
+	<select id="qureyBudgIndexFromPlan" resultMap="hrpBudgSelect">
+		select distinct
+		bwep.index_code id ,
+		bwep.index_code||' '|| bid.index_name text 
+		from BUDG_WORK_EDIT_PLAN bwep
+		LEFT JOIN BUDG_INDEX_DICT bid
+			ON
+				bwep.group_id = bid.group_id
+				and bwep.hos_id = bid.hos_id
+				and bwep.copy_code = bid.copy_code
+				and bwep.index_code = bid.index_code
+		<where>
+			<if test="group_id != null and group_id != ''">
+			AND bwep.group_id = #{group_id,jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+			AND bwep.hos_id = #{hos_id,jdbcType=INTEGER}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+			AND bwep.copy_code = #{copy_code,jdbcType=VARCHAR}
+			</if>
+			<if test="budg_year != null and budg_year != ''">
+			AND bwep.budg_year = #{budg_year,jdbcType=VARCHAR}
+			</if>
+			<if test="budg_level != null and budg_level != ''">
+			AND bwep.budg_level = #{budg_level,jdbcType=VARCHAR}
+			</if>
+			<if test="is_single_count != null and is_single_count != '' ">
+			AND bwep.is_single_count = #{is_single_count,jdbcType=INTEGER}
+			</if>
+			<if test="edit_method != null and edit_method != ''">
+			AND bwep.edit_method = #{edit_method,jdbcType=VARCHAR}
+			</if>
+			<if test="key != null and key != ''">
+				and (	bwep.index_code like '${key}%' or
+					bid.index_name like '%${key}%' or
+					bid.spell_code like '%${key}%' or
+					bid.wbx_code like '%${key}%' 
+				)
+			</if>
+		</where>
+		order by bwep.index_code
+	</select>
+	
+	<!-- 根据  编制方法EDIT_METHOD（01零基预算 02增量预算 03确定预算 04概率预算 ）
+			从  医院年度收入预算编制方案表 查询 科目下拉框-->
+	<select id="qureySubjIndexFromPlan" resultMap="hrpBudgSelect">
+		select 
+		bmep.subj_code id ,
+		bmep.subj_code||' '|| bis.subj_name text 
+		from BUDG_MED_INCOME_EDIT_PLAN bmep
+		LEFT JOIN budg_income_subj bis
+			ON
+				bmep.group_id = bis.group_id
+				and bmep.hos_id = bis.hos_id
+				and bmep.copy_code = bis.copy_code
+				and bmep.budg_year = bis.budg_year
+				and bmep.subj_code = bis.subj_code
+		LEFT JOIN BUDG_SYS_DICT bsd
+			on
+				bmep.EDIT_METHOD=bsd.value_code
+				and bsd.f_code='EDIT_METHOD'
+		<where>
+			<if test="group_id != null and group_id != ''">
+			AND bmep.group_id = #{group_id,jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+			AND bmep.hos_id = #{hos_id,jdbcType=INTEGER}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+			AND bmep.copy_code = #{copy_code,jdbcType=VARCHAR}
+			</if>
+			<if test="budg_year != null and budg_year != ''">
+			AND bmep.budg_year = #{budg_year,jdbcType=VARCHAR}
+			</if>
+			<if test="edit_method != null and edit_method != ''">
+			AND bmep.edit_method = #{edit_method,jdbcType=VARCHAR}
+			</if>
+			<if test="key != null and key != ''">
+				and (	bmep.subj_code like '${key}%' or
+					bis.subj_name like '%${key}%' or
+					bis.spell_code like '%${key}%' or
+					bis.wbx_code like '%${key}%' 
+				)
+			</if>
+		</where>
+		order by bmep.subj_code
+	</select>
+	
+	<!-- 查询年度收入中为非独立预算方法的科目 -->
+	<select id="qureyResolveSubjIndexFromPlan" resultMap="hrpBudgSelect">
+		select 
+		bmep.subj_code id ,
+		bmep.subj_code||' '|| bis.subj_name text 
+		from budg_med_income_edit_plan bmep
+		LEFT JOIN budg_income_subj bis
+			ON
+				bmep.group_id = bis.group_id
+				and bmep.hos_id = bis.hos_id
+				and bmep.copy_code = bis.copy_code
+				and bmep.budg_year = bis.budg_year
+				and bmep.subj_code = bis.subj_code
+		LEFT JOIN BUDG_SYS_DICT bsd
+			on
+				bmep.subj_code=bsd.value_code
+				and bsd.f_code='RESOLVE_OR_SUM'
+		<where>
+			<if test="group_id != null and group_id != ''">
+			AND bmep.group_id = #{group_id,jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+			AND bmep.hos_id = #{hos_id,jdbcType=INTEGER}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+			AND bmep.copy_code = #{copy_code,jdbcType=VARCHAR}
+			</if>
+			<if test="budg_year != null and budg_year != ''">
+			AND bmep.budg_year = #{budg_year,jdbcType=VARCHAR}
+			</if>
+			<if test="is_single_count != null and is_single_count != ''">
+			AND bmep.is_single_count = #{is_single_count,jdbcType=VARCHAR}
+			</if>
+			<if test="key != null and key != ''">
+				and (	bmep.subj_code like '${key}%' or
+					bis.subj_name like '%${key}%' or
+					bis.spell_code like '%${key}%' or
+					bis.wbx_code like '%${key}%' 
+				)
+			</if>
+		</where>
+		order by bmep.subj_code
+	</select>
+	
+	<!-- 预算指标名称下拉框 -->
+	<select id="queryBudgIndexDict" resultMap="hrpBudgSelect">
+	  select 	
+	  		index_code id,
+	  		index_code||' '||index_name text 
+	  from budg_index_dict
+		<where>
+			<if test="group_id != null and group_id != '' ">
+				group_id = #{group_id,jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != '' ">
+				AND hos_id = #{hos_id,jdbcType=INTEGER}
+			</if>
+			<if test="copy_code != null and copy_code != '' ">
+				and copy_code =  #{copy_code,jdbcType=VARCHAR}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+					index_code like '${key}%' or
+					index_name like '%${key}%' or
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%'
+				)
+			</if>
+			and is_stop = 0
+		</where>
+		order by index_code
+	</select>
+	
+	<!-- 预算指标(可累加)名称下拉框 -->
+	<select id="queryBudgIndexAccumulationDict" resultMap="hrpBudgSelect">
+	  select 	
+	  		index_code id,
+	  		index_code||' '||index_name text 
+	  from budg_index_dict
+		<where>
+			<if test="group_id != null and group_id != '' ">
+				group_id = #{group_id,jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != '' ">
+				AND hos_id = #{hos_id,jdbcType=INTEGER}
+			</if>
+			<if test="copy_code != null and copy_code != '' ">
+				and copy_code =  #{copy_code,jdbcType=VARCHAR}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+					index_code like '${key}%' or
+					index_name like '%${key}%' or
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%'
+				)
+			</if>
+			and data_nature='01'
+			and is_stop = 0
+		</where>
+		order by index_code
+	</select>
+	<!-- 分解或汇总（resolve_or_sum ） 下拉框 -->
+	<select id="queryBudgResolveOrSum" resultMap="hrpBudgSelect">
+		SELECT
+		value_code id,
+		value_name text
+		FROM BUDG_SYS_DICT
+		<where>
+			f_code='RESOLVE_OR_SUM'
+			<if test="key != null and key != ''">
+				AND ( value_code like '${key}%' or
+					value_name like '%${key}%' )
+			</if>
+		</where>
+			order by value_code
+	</select>
+	
+	
+	<!-- 预算层次（budg_level ） 下拉框 -->
+	<select id="queryBudgLevel" resultMap="hrpBudgSelect">
+		SELECT
+		value_code id,
+		value_name text
+		FROM BUDG_SYS_DICT
+		<where>
+			f_code='ELEMENT_LEVEL'
+			<if test="key != null and key != ''">
+				AND ( value_code like '${key}%' or
+					value_name like '%${key}%' )
+			</if>
+			<if test="it != null and it != ''">
+				AND  value_name!= #{it}
+			</if>
+		</where>
+			order by value_code
+	</select>
+	
+	<!-- 业务预算状态（state） 下拉框 -->
+	<select id="queryBudgState" resultMap="hrpBudgSelect">
+		SELECT
+		value_code id,
+		value_code||'  '||value_name text
+		FROM BUDG_SYS_DICT
+		<where>
+			f_code='STATE'
+			<if test="key != null and key != ''">
+				AND ( value_code like '${key}%' or
+					value_name like '%${key}%' )
+			</if>
+		</where>
+			order by value_code
+	</select>
+	
+	<!-- 根据指标查询相应科室下拉框 -->
+	<select id="queryBudgIndexDeptSet" resultMap="hrpBudgSelect">
+		select bids.dept_id id,
+			hd.dept_code||' '||hd.dept_name text
+		from BUDG_INDEX_DEPT_SET bids
+		left join hos_dept hd
+			ON
+				bids.group_id  = hd.group_id 
+				and bids.hos_id  = hd.hos_id 
+				and bids.dept_id  = hd.dept_id 
+				and hd.is_stop  = 0
+     	<where>
+     		<if test="group_id != null  and group_id != ''">
+				and bids.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and bids.hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null  and copy_code != ''">
+				and bids.copy_code = #{copy_code}
+			</if>
+			and bids.index_code = #{index_code}
+			<if test="key != null and key != ''">
+				and (
+					hd.dept_code like '${key}%' or
+					hd.dept_name like '%${key}%' or
+					hd.spell_code like '%${key}%' or
+					hd.wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by hd.dept_code	
+	</select>
+	
+	<!-- 根据  编制方法为分解方法 
+			从  医院年度收入预算编制方案表 查询  分解 科目下拉框-->
+	<select id="qureySubjCodeFromPlan" resultMap="hrpBudgSelect">
+		select 
+		    bmep.subj_code id ,
+		    bmep.subj_code||' '|| bis.subj_name text 
+	    from BUDG_MED_INCOME_EDIT_PLAN bmep
+	    LEFT JOIN budg_income_subj bis
+	      ON
+	        bmep.group_id = bis.group_id
+	        and bmep.hos_id = bis.hos_id
+	        and bmep.copy_code = bis.copy_code
+	        and bmep.subj_code = bis.subj_code
+	        and bmep.budg_year = bis.budg_year     
+	    LEFT JOIN BUDG_SYS_DICT bsd
+	      on
+	        bsd.f_code='RESOLVE_OR_SUM'
+	        and bsd.value_code = bmep.resolve_or_sum 
+	    <where>
+			bmep.group_id = #{group_id}
+		
+			and bmep.hos_id = #{hos_id}
+			
+			and bmep.copy_code = #{copy_code}
+			
+			and bmep.budg_year = #{budg_year}
+			
+			and  bmep.resolve_or_sum = '01'
+			<if test="key != null and key != ''">
+				and (
+					hd.dept_code like '${key}%' or
+					hd.dept_name like '%${key}%' or
+					hd.spell_code like '%${key}%' or
+					hd.wbx_code like '%${key}%'
+				)
+			</if>
+		</where> 
+	    order by bmep.subj_code
+	</select>
+	
+	<!-- 项目状态下拉菜单 -->
+	<select id="qureyProjStateSelect" resultMap="hrpBudgSelect">
+		select value_code as id, 
+			   value_code || ' ' || value_name as text
+		 from budg_sys_dict
+		 where f_code = 'PROJ_STATE'
+     	<if test="key != null and key != ''">
+				and (
+					value_code like '${key}%' or
+					value_name like '%${key}%' 
+				)
+			</if>
+		order by value_code
+	</select>
+	
+	<!-- 资金计划 状态下拉菜单 -->
+	<select id="qureyCashPlanStateSelect" resultMap="hrpBudgSelect">
+		select value_code as id, 
+			   value_code || ' ' || value_name as text
+		 from budg_sys_dict
+		 where f_code = 'STATE'
+     	<if test="key != null and key != ''">
+				and (
+					value_code like '${key}%' or
+					value_name like '%${key}%' 
+				)
+			</if>
+		order by value_code
+	</select>
+	
+	<!-- 立项时项目状态下拉菜单 -->
+	<select id="qureyProjSetUpStateSelect" resultMap="hrpBudgSelect">
+		select value_code as id, 
+			   value_code || ' ' || value_name as text
+		 from budg_sys_dict
+		 where f_code = 'STATE_T'
+     	<if test="key != null and key != ''">
+				and (
+					value_code like '${key}%' or
+					value_name like '%${key}%' 
+				)
+			</if>
+		order by value_code
+	</select>
+	
+	<!-- 	查询项目预算调整状态下拉框 -->
+	<select id="qureyProjAdjState" resultMap="hrpBudgSelect">
+		select value_code as id, 
+			   value_code || ' ' || value_name as text
+		 from budg_sys_dict
+		 where f_code = 'STATE_T'
+     	<if test="key != null and key != ''">
+				and (
+					value_code like '${key}%' or
+					value_name like '%${key}%' 
+				)
+			</if>
+		order by value_code
+	</select>
+
+   <!--  项目名称（proj_name） 下拉框 -->
+	
+	 <select id="queryProjName" resultMap="hrpBudgSelect">
+		  select 
+			  hpd.proj_id ||','|| hpd.proj_no as id ,
+	          hpd.proj_code||' '|| hpd.proj_name as text
+          from hos_proj_dict hpd
+	    where
+	    	hpd.group_id = #{group_id}
+			AND hpd.hos_id = #{hos_id}
+			AND hpd.is_stop = 0 
+			<if test="type_code != null and type_code != '' ">
+			hpd.type_code = #{type_code}
+			</if>
+            <if test="key != null and key != ''">
+				AND (
+					hpd.proj_code like '${key}%' or
+					hpd.proj_name like '%${key}%' or
+					hpd.spell_code like '%${key}%' or
+					hpd.wbx_code like '%${key}%' 
+				)
+			</if>
+		
+	    order by hpd.proj_id
+	</select>
+	
+	<!--  项目负责人（state） 下拉框 -->
+	<select id="queryConEmpId" resultMap="hrpBudgSelect">
+		 select 
+		 	distinct a.con_emp_id as id,
+		 	b.emp_code||' '||b.emp_name as text
+		 from ACC_PROJ_ATTR  a 
+         left join  hos_emp_dict b
+          on a.group_id=b.group_id 
+          and a.hos_id=b.hos_id
+          and a.con_emp_id=b.emp_id
+          and b.is_stop = 0
+	    <where>
+			a.group_id = #{group_id}
+			and a.hos_id = #{hos_id}
+			<if test="proj_id != null and proj_id !='' ">
+			and a.proj_id = #{proj_id}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+					b.emp_code like '${key}%' or
+					b.emp_name like '%${key}%' or
+					b.spell_code like '%${key}%' or
+					b.wbx_code like '%${key}%' 
+				)
+			</if>
+		</where> 
+	</select>
+	 
+	 <!-- 状态 下拉框（01 新建 02已提交 03 已审核） -->
+	<select id="queryBudgApplyState" resultMap="hrpBudgSelect">
+		select value_code as id, 
+			   value_code || ' ' || value_name as text
+		 from budg_sys_dict
+		 where f_code = 'STATE_T'
+     	<if test="key != null and key != ''">
+				and (
+					value_code like '${key}%' or
+					value_name like '%${key}%' 
+				)
+			</if>
+		order by value_code
+	</select>
+	
+	 <!-- 申报类型 下拉框 -->
+	<select id="queryBudgApplyType" resultMap="hrpBudgSelect">
+		select value_code as id, 
+			   value_code || ' ' || value_name as text
+		 from budg_sys_dict
+		 where f_code = 'APPLY_TYPE'
+     	<if test="key != null and key != ''">
+				and (
+					value_code like '${key}%' or
+					value_name like '%${key}%' 
+				)
+			</if>
+		order by value_code
+	</select>
+	
+	<!--  预算申报单号 下拉框-->
+	<select id="queryBudgApplyCode" resultMap="hrpBudgSelect">
+		 select 
+		 	apply_code as id,
+		 	apply_code as text
+		 from (select distinct group_id , hos_id , copy_code, budg_year, apply_code 
+		 		from  BUDG_PROJ_APPLY  
+		 		where group_id  = #{group_id} 
+		 		and hos_id = #{hos_id} 
+		 		and copy_code = #{copy_code} 
+		 		and budg_year = #{budg_year} )
+	    <where>
+			group_id = #{group_id}
+			and hos_id = #{hos_id}
+			and copy_code = #{copy_code}
+			and budg_year = #{budg_year}
+			<if test="key != null and key != ''">
+				and apply_code like '${key}%' 
+					
+			</if>
+		</where> 
+	    order by apply_code
+	</select>
+	
+ 	<!-- 资金来源 下拉框 -->
+	<select id="queryBudgSource" resultMap="hrpBudgSelect">
+		select source_id as id, 
+			   source_code || ' ' || source_name as text
+		 from hos_source
+		 where 
+			group_id = #{group_id}
+			and hos_id = #{hos_id}
+			and is_stop = 0
+			<if test="source_attr != null and source_attr != '' ">
+			and source_attr = #{source_attr}
+			</if>
+     		<if test="key != null and key != ''">
+				and (
+					source_code like '${key}%' or
+					source_name like '%${key}%' or
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%' 
+				)
+			</if>
+		order by source_id
+	</select>
+ 	<!-- 资金来源 下拉框 不包括自筹资金的 -->
+	<select id="queryBudgSourceNotExistsZCZJ" resultMap="hrpBudgSelect">
+		 select source_id as id, 
+		 source_code || ' ' || source_name as text
+		 from hos_source 
+		 where 
+			group_id = #{group_id}
+			and hos_id = #{hos_id}
+			and is_stop = 0
+			and source_code != 1
+     		<if test="key != null and key != ''">
+				and (
+					source_code like '${key}%' or
+					source_name like '%${key}%' or
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%' 
+				)
+			</if>
+		order by source_id
+	</select>
+	
+ 	<!-- 根据项目状态       查询项目下拉框  -->
+	<select id="queryProjByState" resultMap="hrpBudgSelect">
+		 SELECT 
+		      apa.proj_id || ',' || hpd.proj_no as id,
+		      hpd.proj_code || ' ' || hpd.proj_name as text
+		  FROM acc_proj_attr apa
+		  LEFT JOIN hos_proj_dict hpd
+		    ON apa.group_id = hpd.group_id
+		       AND apa.hos_id = hpd.hos_id
+		       AND apa.proj_id = hpd.proj_id
+		       and hpd.is_stop = 0
+		  LEFT JOIN budg_sys_dict bsd
+		    ON apa.proj_state = bsd.value_code
+		   	   AND bsd.f_code = 'proj_state'
+		 WHERE apa.group_id = #{group_id}
+			   AND apa.hos_id = #{hos_id}
+		       AND apa.proj_state = #{proj_state}
+		 ORDER BY apa.proj_id
+	</select>
+	
+	<!-- 项目类型  下拉框 -->
+	<select id="queryBudgProjType" resultMap="hrpBudgSelect">
+		select type_code as id, 
+			   type_code || ' ' || type_name as text
+		 from HOS_PROJ_TYPE
+		 where 
+			group_id = #{group_id}
+			and hos_id = #{hos_id}
+			and is_stop = 0
+     		<if test="key != null and key != ''">
+				and (
+					type_code like '${key}%' or
+					type_name like '%${key}%' or
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%' 
+				)
+			</if>
+		order by type_code
+	</select>
+	
+	<!-- 项目级别  下拉框 -->
+	<select id="queryBudgProjLevel" resultMap="hrpBudgSelect">
+		select level_code as id, 
+			   level_code || ' ' || level_name as text
+		 from hos_proj_level
+		 where 
+			group_id = #{group_id}
+			and hos_id = #{hos_id}
+			and is_stop = 0
+     		<if test="key != null and key != ''">
+				and (
+					level_code like '${key}%' or
+					level_name like '%${key}%' or
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%' 
+				)
+			</if>
+		order by level_code
+	</select>
+	
+	<!-- 医院 下拉框 -->
+	<select id="queryHosInfoDict" resultMap="hrpBudgSelect">
+		SELECT
+		hos_id id,
+		hos_simple text
+		FROM HOS_INFO_DICT
+		<where>
+			is_stop = 0
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test=" key != null and key != ''">
+				and (
+				hos_code like '${key}%' or
+				hos_name like '%${key}%'  or
+				hos_simple like '%${key}%'
+				)
+			</if>
+		</where>
+		order by hos_code
+	</select>
+	
+	<!-- 支出项目 下拉框 -->
+	<select id="queryPaymentItem" resultMap="hrpBudgSelect">
+		SELECT 
+			   payment_item_no || ',' || payment_item_id as id,
+      		   payment_item_code || ' ' || payment_item_name as text
+  		FROM budg_payment_item_dict
+		<where>
+			is_stop = 0
+			and is_last = 1 
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test=" key != null and key != ''">
+				and (
+				payment_item_no like '${key}%' or
+				payment_item_code like '%${key}%'  or
+				payment_item_name like '%${key}%'
+				)
+			</if>
+		</where>
+		order by payment_item_code
+	</select>
+	
+	<!-- 资产性质 下拉框 NATURS_CODE不等于05-->
+	<select id="queryAssNatures" resultMap="hrpBudgSelect">
+		SELECT 
+			   naturs_code as id,
+      		   naturs_name as text
+  		FROM ASS_NATURS
+  		<where>
+  			naturs_code != '05'
+  		</where>
+	</select>
+	<!-- 资产性质 下拉框 NATURS_CODE等于05-->
+	<select id="queryAssNaturesInassets" resultMap="hrpBudgSelect">
+		SELECT 
+			   naturs_code as id,
+      		   naturs_name as text
+  		FROM ASS_NATURS
+  		<where>
+  			naturs_code = '05'
+  		</where>
+	</select>
+	
+	<!-- 采购资产性质 下拉框 -->
+	<select id="queryAssNaturesBuget" resultMap="hrpBudgSelect">
+		SELECT 
+			   naturs_code as id,
+      		   naturs_name as text
+  		FROM ASS_NATURS
+	</select>
+	<!-- 资产字典 下拉框-->
+	<select id="queryAssDict" resultMap="hrpBudgSelect">
+		select 
+		ad.ass_id id ,
+		ad.ass_name text 
+		from ASS_DICT ad
+		left join ASS_TYPE_DICT atd
+	    on ad.group_id = atd.group_id
+	    and ad.hos_id = atd.hos_id
+	    and ad.copy_code = atd.copy_code
+	    and ad.ass_type_id = atd.ass_type_id
+	    left join ASS_NATURS an
+    	on atd.ass_naturs = an.naturs_code
+		<where>
+			<if test="group_id != null and group_id != ''">
+			AND ad.group_id = #{group_id,jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+			AND ad.hos_id = #{hos_id,jdbcType=INTEGER}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+			AND ad.copy_code = #{copy_code,jdbcType=VARCHAR}
+			</if>
+			and an.naturs_code != '05' 
+			and ad.is_stop = 0
+		</where>
+		order by ass_id
+	</select>
+	<!-- 资产字典无形资产 下拉框-->
+	<select id="queryAssDictInassets" resultMap="hrpBudgSelect">
+		select 
+		t.ass_id id ,
+		t.ass_name text 
+		  from ASS_NO_DICT t
+		  left join ASS_TYPE_DICT a
+		    on a.group_id = t.group_id
+		   and a.hos_id = t.hos_id
+		   and a.copy_code = t.copy_code
+		   and a.ass_type_id = t.ass_type_id
+		  left join ASS_NATURS n
+		    on n.naturs_code = a.ass_naturs
+	
+		<where>
+			<if test="group_id != null and group_id != ''">
+			AND t.group_id = #{group_id,jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+			AND t.hos_id = #{hos_id,jdbcType=INTEGER}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+			AND t.copy_code = #{copy_code,jdbcType=VARCHAR}
+			</if>
+			and n.naturs_code = '05' 
+			and t.is_stop = 0
+		</where>
+		order by ass_id
+	</select>
+	<!-- 业务 调整单号下拉框  -->
+	<select id="queryBudgAdjustCode" resultMap="hrpBudgSelect">
+		SELECT 
+			   adj_code as id,
+      		   adj_code as text
+  		FROM BUDG_WORK_ADJ
+  		where
+  			group_id  = #{group_id} 
+		 	and hos_id = #{hos_id} 
+		 	and copy_code = #{copy_code} 
+		 	and budg_year = #{budg_year} 
+		 	<if test="key != null and key != ''">
+				and adj_code like '${key}%' or
+			</if>
+	</select>
+	
+	
+	<!-- 根据主键  查询现金流量项目下拉框 -->
+	<select id="queryCashItem" resultMap="hrpBudgSelect" >
+		SELECT 
+		  cash_item_id as id, 
+		  cash_item_code || ' ' || cash_item_name as text
+  		FROM acc_cash_item
+ 		WHERE
+		   group_id = #{group_id,jdbcType=INTEGER}
+			
+		   AND hos_id = #{hos_id,jdbcType=INTEGER}
+		
+		   AND copy_code = #{copy_code,jdbcType=VARCHAR}
+		   <if test="cash_type_id != null and cash_type_id != ''">
+		   AND cash_type_id = #{cash_type_id,jdbcType=INTEGER}
+		   </if>		   
+		   <if test="is_stop != null and is_stop != ''">
+		   	 AND is_stop = #{is_stop,jdbcType=INTEGER}
+		   </if>
+		   <if test="key != null and key != ''">
+				AND (cash_item_code like '${key}%' or
+					cash_item_name like '%${key}%' or
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%' )
+			</if>
+			order by cash_item_code
+	</select>
+	
+	<!-- 根据主键  查询现金流量类别下拉框 -->
+	<select id="queryCashType" resultMap="hrpBudgSelect" >
+		SELECT 
+		  cash_type_id as id, 
+		  cash_type_code || ' ' || cash_type_name as text
+  		FROM acc_cash_type
+ 		WHERE
+		   group_id = #{group_id,jdbcType=INTEGER}
+			
+		   AND hos_id = #{hos_id,jdbcType=INTEGER}
+		
+		   AND copy_code = #{copy_code,jdbcType=VARCHAR}
+		   <if test="is_stop != null and is_stop != ''">
+		   	 AND is_stop = #{is_stop,jdbcType=INTEGER}
+		   </if>
+		   <if test="key != null and key != ''">
+				AND (cash_type_code like '${key}%' or
+					cash_type_name like '%${key}%' or
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%' )
+			</if>
+			order by cash_type_code
+	</select>
+	
+	<!-- 科室 下拉框 -->
+	<select id="queryBudgHosDept" resultMap="hrpBudgSelect">
+		select 
+		hd.dept_id id,
+		hd.dept_code||' '||hd.dept_name text
+		from hos_dept hd
+     	where
+			hd.group_id = #{group_id}
+			and hd.hos_id = #{hos_id}
+			and hd.is_stop  = 0
+			<if test="type_code != null  and type_code != ''">
+				and hd.type_code = #{type_code}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+					hd.dept_code like '${key}%' or
+					hd.dept_name like '%${key}%' or
+					hd.spell_code like '%${key}%' or
+					hd.wbx_code like '%${key}%'
+				)
+			</if>
+		order by hd.dept_code	
+	</select>
+	
+	<select id="queryBudgMatTypeSubj" resultMap="hrpBudgSelect">
+		select 
+		  a.mat_type_id id,
+		  b.mat_type_code||' '||b.mat_type_name as text
+		 from BUDG_MAT_TYPE_SUBJ a
+		left join MAT_TYPE_DICT b
+		on a.group_id = b.group_id
+		and a.hos_id = b.hos_id
+		and a.copy_code = b.copy_code
+		and a.mat_type_id = b.mat_type_id
+		and b.is_stop = 0
+		where a.group_id = #{group_id}
+		and a.hos_id = #{hos_id}
+		and a.copy_code = #{copy_code}
+		and a.budg_year = #{budg_year}
+		<if test="key != null and key != ''">
+			and (
+				a.mat_type_code like '${key}%' or
+				b.mat_type_name like '%${key}%' or
+				b.spell_code like '%${key}%' or
+				b.wbx_code like '%${key}%'
+			)
+		</if>
+		order by b.mat_type_code
+	</select>
+	
+	<select id="queryBudgSysDict" resultMap="hrpBudgSelect">
+		select
+		value_code id,
+		value_name text
+		from budg_sys_dict
+		where 1 = 1
+			<if test="f_code != null and f_code != ''">
+				and f_code = #{f_code}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+				value_code like '${key}%' or
+				value_name like '%${key}%' 
+				)
+			</if>		
+		order by value_code
+	</select>
+	
+<!-- 	职工类别下拉框 -->
+	<select id="queryBudgEmpType" resultMap="hrpBudgSelect">
+		select 
+		type_code as id, 
+		type_code ||' '|| type_name as text
+  		from budg_emp_type
+		where 
+			group_id = #{group_id}
+			and hos_id = #{hos_id}
+			and copy_code = #{copy_code}
+			and is_stop  = 0
+			<if test="key != null and key != ''">
+				and (
+					type_code like '${key}%' or
+					type_name like '%${key}%' or
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%'
+				)
+			</if>	
+		order by type_code
+	</select>
+	
+<!-- 	职工名称下拉框 -->
+	<select id="queryBudgEmpName" resultMap="hrpBudgSelect">
+		select 
+			emp_id as id , 
+			emp_code ||' '|| emp_name as text 
+		from hos_emp_dict 
+		where 
+			group_id = #{group_id}
+			and hos_id = #{hos_id}
+			and is_stop  = 0
+			<if test="key != null and key != ''">
+				and (
+					emp_code like '${key}%' or
+					emp_name like '%${key}%' or
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%'
+				)
+			</if>	
+		order by emp_code
+	</select>
+	
+	<select id="queryEmpDict" resultMap="hrpBudgSelect">
+		SELECT
+		emp_id||'.'||emp_no id,
+		emp_code||' '||emp_name text
+		FROM HOS_EMP_DICT
+		where
+		group_id = #{group_id}
+		and hos_id = #{hos_id}
+		<if test="key != null and key != ''">
+			and (
+			emp_code like '${key}%' or
+			emp_name like '%${key}%' or
+			spell_code like '%${key}%' or
+			wbx_code like '%${key}%'
+			)
+		</if>
+		and is_stop = 0
+		and is_disable=0
+		order by emp_id
+	</select>
+	
+	<select id="queryEmpType" resultMap="hrpBudgSelect">
+		 select type_code as id, 
+		 type_code || ' ' || type_name as text
+		   from budg_emp_type
+		where
+		group_id = #{group_id}
+		and hos_id = #{hos_id}
+		<if test="key != null and key != ''">
+			and (
+			type_code like '${key}%' or
+			type_name like '%${key}%' or
+			spell_code like '%${key}%' or
+			wbx_code like '%${key}%'
+			)
+		</if>
+		and is_stop = 0
+	</select>
+	
+	<select id="queryEmpTypeAll" resultMap="hrpBudgSelect">
+		 select type_code as id, 
+		 type_code || ' ' || type_name as text
+		   from budg_emp_type
+		where
+		group_id = #{group_id}
+		and hos_id = #{hos_id}
+		and is_stop = 0
+		<if test="key != null and key != ''">
+			and (
+			type_code like '${key}%' or
+			type_name like '%${key}%' or
+			spell_code like '%${key}%' or
+			wbx_code like '%${key}%'
+			)
+		</if>
+	</select>
+	
+	<!-- 计划类型下拉框 -->
+	<select id="queryBudgPlanType" resultMap="hrpBudgSelect">
+		SELECT
+		value_code id,
+		 value_code||'  '||value_name text
+		FROM BUDG_SYS_DICT
+		<where>
+			f_code='PLAN_TYPE'
+			<if test="key != null and key != ''">
+				AND ( value_code like '${key}%' or
+					value_name like '%${key}%' )
+			</if>
+		</where>
+			order by value_code
+	</select>
+	
+	<!-- 医疗收入 调整单号下拉框  -->
+	<select id="queryIncomeAdjustCode" resultMap="hrpBudgSelect">
+		SELECT 
+			   adj_code as id,
+      		   adj_code as text
+  		FROM BUDG_MED_INCOME_ADJ
+  		where
+  			group_id  = #{group_id} 
+		 	and hos_id = #{hos_id} 
+		 	and copy_code = #{copy_code} 
+		 	and budg_year = #{budg_year} 
+		 	<if test="key != null and key != ''">
+				and adj_code like '${key}%' or
+			</if>
+	</select>
+	
+	<!-- 科室 下拉框 (其他费用预算使用   dept_no )   为预算科室（IS_BUDG=1）-->
+	<select id="queryBudgDept" resultMap="hrpBudgSelect">
+		select ada.dept_id || ','|| hd.dept_no id,
+			hd.dept_code||' '||hd.dept_name text
+		from acc_dept_attr ada
+		left join hos_dept_dict hd
+		ON
+			ada.group_id  = hd.group_id 
+			and ada.hos_id  = hd.hos_id 
+			and ada.dept_id  = hd.dept_id 
+			and hd.is_stop  = 0
+     	WHERE
+			ada.group_id = #{group_id}
+			and ada.hos_id = #{hos_id}
+			and ada.is_budg = 1	
+			and hd.is_stop = 0
+			<if test="key != null and key != ''">
+				and (
+					hd.dept_code like '${key}%' or
+					hd.dept_name like '%${key}%' or
+					hd.spell_code like '%${key}%' or
+					hd.wbx_code like '%${key}%'
+				)
+			</if>
+		order by hd.dept_code	
+	</select>
+	
+	<!-- 其他收入 调整单号下拉框  -->
+	<select id="queryElseIncomeAdjustCode" resultMap="hrpBudgSelect">
+		SELECT 
+			   adj_code as id,
+      		   adj_code as text
+  		FROM BUDG_ELSE_INCOME_ADJ
+  		where
+  			group_id  = #{group_id} 
+		 	and hos_id = #{hos_id} 
+		 	and copy_code = #{copy_code} 
+		 	and budg_year = #{budg_year} 
+		 	<if test="key != null and key != ''">
+				and adj_code like '${key}%' 
+			</if>
+	</select>
+	
+	<!--仓库下拉框（所有仓库 不带NO）  -->
+	<select id="queryHosStoreDict" resultMap="hrpBudgSelect">
+		select  store_id id, 
+			store_code||' '||store_name text
+		from HOS_STORE_DICT 
+		WHERE  group_id = #{group_id,jdbcType=INTEGER} 
+			and hos_id = #{hos_id,jdbcType=INTEGER} 
+			and is_stop = 0
+			and is_disable=0
+			<if test="key != null and key != ''">
+				and (
+					store_code like '${key}%' or
+					store_name like '%${key}%' or
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%'
+				)  
+			</if>
+			order by store_code asc
+	</select>
+	
+	<!--仓库下拉框（所有仓库 不带NO）  -->
+	<select id="queryHosStoreDictNo" resultMap="hrpBudgSelect">
+		select  store_id || store_no id, 
+			store_code||' '||store_name text
+		from HOS_STORE_DICT 
+		WHERE  group_id = #{group_id,jdbcType=INTEGER} 
+			and hos_id = #{hos_id,jdbcType=INTEGER} 
+			and is_stop = 0
+			and is_disable=0
+			<if test="key != null and key != ''">
+				and (
+					store_code like '${key}%' or
+					store_name like '%${key}%' or
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%'
+				)  
+			</if>
+			order by store_code asc
+	</select>
+	
+	<!-- 自定义分解系数下拉框 -->
+	<select id="queryBudgResolveDataDict" resultMap="hrpBudgSelect">
+		SELECT
+		resolve_data_code id,
+		resolve_data_code ||' '|| resolve_data_name text
+		FROM BUDG_RESOLVE_DATA_DICT
+		where
+			group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			<if test="budg_level != null and budg_level != '' ">
+			and budg_level = #{budg_level,jdbcType=VARCHAR}
+			</if>
+			<if test="key != null and key != ''">
+				AND ( resolve_data_code like '${key}%' or
+					resolve_data_name like '%${key}%' )
+			</if>
+		order by resolve_data_code
+	</select>
+	<!-- 预算年度下拉框(取系统年上下共10年)-->
+	<select id="queryBudgYearTen" resultMap="hrpBudgSelect">
+	
+		select 
+		
+		years id, 
+		years text 
+  		from (
+  			SELECT to_char(SYSDATE,'YYYY') - LEVEL +1 years
+    		FROM dual
+    		connect by LEVEL &lt;= 5
+    		union all
+    		SELECT to_char(SYSDATE,'YYYY') + LEVEL   years
+    		FROM dual
+    		connect by LEVEL &lt;= 5
+   		) t
+    	ORDER BY years asc
+	</select>
+	<!-- 预算年度下拉框(取启始年上5年)-->
+	<select id="queryBudgYearFive" resultMap="hrpBudgSelect">
+	
+		select 
+		
+		years id, 
+		years text 
+  		from (
+  			SELECT #{start_year,jdbcType=VARCHAR} - LEVEL +1 years
+    		FROM dual
+    		connect by LEVEL &lt;= 5
+    		
+   		) t
+   		
+    	ORDER BY years asc
+	</select>
+	<!-- 预算支出科目类别 -->
+	<select id="queryBudgCostTypeCode" resultMap="hrpBudgSelect">
+		select   VALUE_CODE id , 	VALUE_NAME text 
+		from  BUDG_SYS_DICT 
+		where F_CODE='BUDG_O_SUBJ_TYPE'
+		order by VALUE_CODE 
+	</select>
+		<!-- 控制层次 -->
+	<select id="queryContLSelect" resultMap="hrpBudgSelect">
+	<!-- 	select   VALUE_CODE id , 	VALUE_NAME text 
+		from  budg_sys_dict 
+		where F_CODE='CONT_L'
+		where
+			group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			<if test="budg_level != null and budg_level != '' ">
+			and budg_level = #{budg_level,jdbcType=VARCHAR}
+			</if>
+			<if test="key != null and key != ''">
+				AND ( resolve_data_code like '${key}%' or
+					resolve_data_name like '%${key}%' )
+			</if>
+		order by VALUE_CODE  -->
+			select W.CONT_L id, bsd.value_name text from  BUDG_C_TAB_W W
+left join budg_sys_dict bsd on W.cont_L=bsd.value_code 
+and bsd.f_code='CONT_L'
+		where
+			W.group_id = #{group_id,jdbcType=INTEGER}
+			AND W.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND W.copy_code = #{copy_code,jdbcType=VARCHAR}
+			and W.IS_STOP=0
+			<if test="budg_year != null and budg_year != '' ">
+			and W.budg_year = #{budg_year,jdbcType=VARCHAR}
+			</if>
+			<if test="tab_code != null and tab_code != '' ">
+			and W.tab_code = #{tab_code,jdbcType=VARCHAR}
+			</if>
+				<if test="cont_m != null and cont_m != '' ">
+			and W.cont_m = #{cont_m,jdbcType=VARCHAR}
+			</if>
+			  group by W.CONT_L, bsd.value_name
+	</select>
+		<!-- 控制期间 -->
+	<select id="queryContPSelect" resultMap="hrpBudgSelect">
+	select W.CONT_P id, bsd.value_name text from  BUDG_C_TAB_W W
+left join budg_sys_dict bsd on W.cont_P=bsd.value_code 
+and bsd.f_code='CONT_P'
+		where
+			W.group_id = #{group_id,jdbcType=INTEGER}
+			AND W.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND W.copy_code = #{copy_code,jdbcType=VARCHAR}
+			and W.IS_STOP=0
+			<if test="budg_year != null and budg_year != '' ">
+			and W.budg_year = #{budg_year,jdbcType=VARCHAR}
+			</if>
+			<if test="tab_code != null and tab_code != '' ">
+			and W.tab_code = #{tab_code,jdbcType=VARCHAR}
+			</if>
+				<if test="cont_m != null and cont_m != '' ">
+			and W.cont_m = #{cont_m,jdbcType=VARCHAR}
+			</if>
+				<if test="cont_l != null and cont_l != '' ">
+			and W.cont_l = #{cont_l,jdbcType=VARCHAR}
+			</if>
+			  group by W.CONT_P, bsd.value_name
+	</select>
+		<!-- 控制方式 -->
+	<select id="queryContWSelect" resultMap="hrpBudgSelect">
+		select   VALUE_CODE id , 	VALUE_NAME text 
+		from  BUDG_SYS_DICT 
+		where F_CODE='CONT_W'
+		order by VALUE_CODE 
+	</select>
+	
+		<resultMap type="java.util.Map" id="budgTreeMap">
+		<result property="id" column="id" />
+		<result property="pId" column="pId" />
+		<result property="name" column="name" />
+	</resultMap>
+	<select id="queryBudgCPlan" parameterType="java.util.Map"
+		resultMap="budgTreeMap">
+		select t.plan_code as id, t.plan_name as name, '0'
+		as pId
+		from BUDG_C_PLAN t
+		where 
+		 t.group_id = #{group_id,jdbcType=INTEGER}
+			AND  t.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND  t.copy_code = #{copy_code,jdbcType=VARCHAR}
+			<if test="year != null and year != ''">
+		AND budg_year = #{year}
+		</if>
+		and  t.is_stop=0
+		order by t.plan_code
+		</select>
+		<select id="queryTabCode"  resultMap="hrpBudgSelect">
+		select tab_code id ,tab_name text from  BUDG_C_TAB
+		where
+			group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			and IS_STOP=0
+			<if test="budg_year != null and budg_year != '' ">
+			and budg_year = #{budg_year,jdbcType=VARCHAR}
+			</if>
+				<if test="plan_code != null and plan_code != '' ">
+			and plan_code = #{plan_code,jdbcType=VARCHAR}
+			</if>
+		 </select>
+		 
+		<!--  控制模式-->
+<select id="queryContMSelect"  resultMap="hrpBudgSelect">
+		select W.CONT_M id, bsd.value_name text from  BUDG_C_TAB_W W
+left join budg_sys_dict bsd on W.cont_m=bsd.value_code 
+and bsd.f_code='CONT_M'
+		where
+			W.group_id = #{group_id,jdbcType=INTEGER}
+			AND W.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND W.copy_code = #{copy_code,jdbcType=VARCHAR}
+			and W.IS_STOP=0
+			<if test="budg_year != null and budg_year != '' ">
+			and W.budg_year = #{budg_year,jdbcType=VARCHAR}
+			</if>
+			<if test="tab_code != null and tab_code != '' ">
+			and W.tab_code = #{tab_code,jdbcType=VARCHAR}
+			</if>
+			  group by  W.CONT_M, bsd.value_name
+		 </select>
+	 
+	<!-- 关联环节 -->
+<select id="queryReLinkSelect"  resultMap="hrpBudgSelect">
+		select W.LINK_CODE id, bsd.LINK_NAME text from  BUDG_C_P_L W
+left join BUDG_C_LINK bsd on W.link_code=bsd.link_code
+		where
+			W.group_id = #{group_id,jdbcType=INTEGER}
+			AND W.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND W.copy_code = #{copy_code,jdbcType=VARCHAR}
+			
+			and W.IS_STOP=0
+			<if test="budg_year != null and budg_year != '' ">
+			and W.budg_year = #{budg_year,jdbcType=VARCHAR}
+			</if>
+			<if test="mod_code != null and mod_code != '' ">
+			and W.mod_code = #{mod_code,jdbcType=VARCHAR}
+			</if>
+			<if test="plan_code != null and plan_code != '' ">
+			and W.plan_code = #{plan_code,jdbcType=VARCHAR}
+			</if>
+		 </select>
+	 <!--  控制节点-->
+<select id="queryContNoteSelect"  resultMap="hrpBudgSelect">
+		select W.NOTE_CODE id, w.NOTE_name text from  BUDG_C_NOTE W
+		where
+			W.group_id = #{group_id,jdbcType=INTEGER}
+			AND W.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND W.copy_code = #{copy_code,jdbcType=VARCHAR}
+			
+			and W.IS_STOP=0
+			<if test="budg_year != null and budg_year != '' ">
+			and W.budg_year = #{budg_year,jdbcType=VARCHAR}
+			</if>
+			<if test="mod_code != null and mod_code != '' ">
+			and W.mod_code = #{mod_code,jdbcType=VARCHAR}
+			</if>
+			<if test="link_code != null and link_code != '' ">
+			and W.link_code = #{link_code,jdbcType=VARCHAR}
+			</if>
+		 </select>
+<!-- 占用状态 -->
+<select id="queryUseStateSelect"  resultMap="hrpBudgSelect">
+		select W.STATE_CODE id, w.STATE_name text from  BUDG_C_STATE W
+		where
+			W.group_id = #{group_id,jdbcType=INTEGER}
+			AND W.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND W.copy_code = #{copy_code,jdbcType=VARCHAR}
+			
+			and W.IS_STOP=0
+			<if test="budg_year != null and budg_year != '' ">
+			and W.budg_year = #{budg_year,jdbcType=VARCHAR}
+			</if>
+			<if test="mod_code != null and mod_code != '' ">
+			and W.mod_code = #{mod_code,jdbcType=VARCHAR}
+			</if>
+			<if test="link_code != null and link_code != '' ">
+			and W.link_code = #{link_code,jdbcType=VARCHAR}
+			</if>
+		 </select>
+
+</mapper>

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.hpm.dao.AphiPostBonusRatioMapper">
+	<resultMap type="com.chd.hrp.hpm.entity.AphiPostBonusRatio" id="postBonusRatio">
+	        <result property="group_id"  column="group_id"/>
+	         <result property="hos_id"  column="hos_id"/>
+			<result property="copy_code"  column="copy_code"/>
+			<result property="acct_year"  column="acct_year"/>
+			<result property="duty_code"  column="duty_code"/>
+			<result property="duty_name"  column="duty_name"/>
+			<result property="bonus_money"  column="bonus_money"/>
+			<result property="pro"  column="pro"/>
+			<result property="emp_num"  column="emp_num"/>
+			<result property="av"  column="av"/>
+	
+	</resultMap>
+	<select id="queryPostBonusRatioByCode" resultType="java.util.Map" resultMap="postBonusRatio">
+		select a.acct_year+a.acct_month as acct_year ,c.duty_code
+		,c.duty_name,sum(a.bonus_money) as bonus_money ,Convert(decimal(18,2),sum(a.bonus_money)/(select SUM(bonus_money) from aphi_emp_bonus_data where isnull(#{year_month},'')='' or isnull(#{year_month},'')=acct_year+'年'+acct_month+'月' )*100) as pro,COUNT(a.emp_code) as
+		emp_num,
+		sum(a.bonus_money)/COUNT(a.emp_code) as av
+		from aphi_emp_bonus_data a
+		left join aphi_emp b on a.emp_code =b.emp_code and a.group_id = b.group_id 
+			and a.hos_id = b.hos_id
+			and a.copy_code = b.copy_code
+		left join aphi_emp_duty c on b.duty_code =c.duty_code and b.group_id = c.group_id 
+			and b.hos_id = c.hos_id
+			and b.copy_code = c.copy_code
+		left join aphi_dept d on b.dept_code =d.dept_code and b.group_id = d.group_id 
+			and b.hos_id = d.hos_id
+			and b.copy_code = d.copy_code
+
+
+		<where>
+			<if test="group_id!= null and group_id!=''">
+				AND a.group_id=#{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and a.hos_id = #{hos_id} 
+			</if>
+			<if test="copy_code!= null  and copy_code!=''">
+				AND a.copy_code=#{copy_code}
+			</if>
+			<if test="year_month!= null  and year_month!=''">
+				AND a.acct_year+'年'+a.acct_month+'月'=#{year_month}
+			</if>
+
+		</where>
+		group by
+		a.acct_year,a.acct_month,c.duty_code,c.duty_name
+		order by acct_year,c.duty_code asc
+	</select>
+</mapper>

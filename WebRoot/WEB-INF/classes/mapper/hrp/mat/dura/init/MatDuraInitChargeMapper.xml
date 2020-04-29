@@ -1,0 +1,757 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.mat.dao.dura.init.MatDuraInitChargeMapper">
+	
+	<resultMap id="matDuraInitChargeTree" type="java.util.Map">
+		<result property="id" column="id"/>
+		<result property="super_code" column="super_code"/>
+		<result property="code" column="code"/>
+		<result property="name" column="name"/>
+		<result property="type" column="type"/>
+		<result property="state" column="state"/>
+	</resultMap>
+	
+	<resultMap id="matDuraInitChargeInvList"  type="java.util.Map">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="year" column="year"/>
+		<result property="month" column="month"/>
+		<result property="store_id" column="store_id"/>
+		<result property="dept_id" column="dept_id"/>
+		<result property="inv_id" column="inv_id"/>
+		<result property="bar_code" column="bar_code"/>
+		<result property="price" column="price"/>
+		<result property="begin_amount" column="begin_amount"/>
+		<result property="begin_money" column="begin_money"/>
+		<result property="in_amount" column="in_amount"/>
+		<result property="in_money" column="in_money"/>
+		<result property="out_amount" column="out_amount"/>
+		<result property="out_money" column="out_money"/>
+		<result property="end_amount" column="end_amount"/>
+		<result property="end_money" column="end_money"/>
+		<result property="left_amount" column="left_amount"/>
+		<result property="left_money" column="left_money"/>
+	</resultMap>
+	
+	<resultMap id="matDuraInitChargeInvBarList"  type="java.util.Map">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="store_id" column="store_id"/>
+		<result property="dept_id" column="dept_id"/>
+		<result property="inv_id" column="inv_id"/>
+		<result property="bar_code" column="bar_code"/>
+        <result property="price" column="price"/>
+        <result property="amount" column="amount"/>
+	</resultMap>
+	
+	<resultMap id="matDuraInitChargeStoreDeptList" type="java.util.Map">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="store_id" column="store_id"/>
+		<result property="dept_id" column="dept_id"/>
+		<result property="confirmer" column="confirmer"/>
+		<result property="confirm_date" column="confirm_date"/>
+		<result property="state" column="state"/>
+		<result property="note" column="note"/>
+	</resultMap>
+	
+	<select id="queryTree" parameterType="java.util.Map" resultMap="matDuraInitChargeTree" >
+		<!-- 仓库列表 -->
+		SELECT 0 id, '_1' code, '' super_code, '库房' name, 0 type, 0 state FROM DUAL
+		UNION ALL
+		SELECT a.store_id id, a.store_code code, '_1' super_code, a.store_code || ' ' || a.store_name name, 
+			0 type, nvl(b.state, 0) state
+		FROM hos_store_dict a 
+		LEFT JOIN mat_dura_store_status b 
+			ON a.group_id = b.group_id 
+			AND a.hos_id = b.hos_id 
+			AND b.copy_code = #{copy_code,jdbcType=VARCHAR} 
+			AND a.store_id = b.store_id 
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER} 
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND a.is_stop = 0 
+			AND a.store_id in (
+				SELECT perm_code
+				FROM v_user_data_perm
+				WHERE group_id = #{group_id,jdbcType=INTEGER}  
+					AND hos_id = #{hos_id,jdbcType=INTEGER} 
+					AND user_id = #{user_id,jdbcType=INTEGER} 
+					AND table_code = 'HOS_STORE_DICT'
+					AND is_read = 1 AND is_write = 1 
+			)
+		UNION ALL
+		<!-- 科室列表 -->
+		SELECT 0 id, '_2' code, '' super_code, '科室' name, 1 type, 0 state FROM DUAL
+		UNION ALL
+		SELECT a.dept_id id, a.dept_code code, case when super_code = '0' then '_2' else super_code end super_code, 
+			a.dept_code || ' ' || a.dept_name name, 1 type, nvl(b.state, 0) state
+		FROM hos_dept_dict a 
+		LEFT JOIN mat_dura_dept_status b 
+			ON a.group_id = b.group_id 
+			AND a.hos_id = b.hos_id 
+			AND b.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND a.dept_id = b.dept_id
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER} 
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND a.is_stop = 0 
+			AND a.dept_id in (
+				SELECT perm_code
+				FROM v_user_data_perm
+				WHERE group_id = #{group_id,jdbcType=INTEGER} 
+					AND hos_id = #{hos_id,jdbcType=INTEGER} 
+					AND user_id = #{user_id,jdbcType=INTEGER} 
+					AND table_code = 'HOS_DEPT_DICT'
+					AND is_read = 1 AND is_write = 1 
+			)
+	</select>
+	
+	<insert id="addStore" parameterType="java.util.Map">
+		INSERT INTO MAT_DURA_STORE_STATUS (
+			group_id, hos_id, copy_code, store_id, confirmer, confirm_date, state, note
+		) 
+		<foreach collection="list" item="item" index="index" separator=" union all " >
+			select 
+				#{item.group_id,jdbcType=INTEGER},
+				#{item.hos_id,jdbcType=INTEGER},
+				#{item.copy_code,jdbcType=VARCHAR},
+				#{item.store_id,jdbcType=INTEGER},
+				#{item.confirmer,jdbcType=INTEGER},
+				#{item.confirm_date,jdbcType=DATE},
+				#{item.state,jdbcType=INTEGER},
+				#{item.note,jdbcType=VARCHAR}
+			from dual
+		</foreach>
+	</insert>
+	
+	<insert id="addDept" parameterType="java.util.Map">
+		INSERT INTO MAT_DURA_DEPT_STATUS (
+			group_id, hos_id, copy_code, dept_id, confirmer, confirm_date, state, note
+		) 
+		<foreach collection="list" item="item" index="index" separator=" union all " >
+			select 
+				#{item.group_id,jdbcType=INTEGER},
+				#{item.hos_id,jdbcType=INTEGER},
+				#{item.copy_code,jdbcType=VARCHAR},
+				#{item.dept_id,jdbcType=INTEGER},
+				#{item.confirmer,jdbcType=INTEGER},
+				#{item.confirm_date,jdbcType=DATE},
+				#{item.state,jdbcType=INTEGER},
+				#{item.note,jdbcType=VARCHAR}
+			from dual
+		</foreach>
+	</insert>
+	
+	<!-- 所选库房是否可记账 -->
+	<select id="existsStoreAccount" resultType="Integer" parameterType="java.util.Map" >
+		SELECT count(*)
+		FROM hos_store_dict a 
+		LEFT JOIN mat_dura_store_status b 
+			ON a.group_id = b.group_id 
+			AND a.hos_id = b.hos_id 
+			AND b.copy_code = #{copy_code,jdbcType=VARCHAR} 
+			AND a.store_id = b.store_id 
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER} 
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND a.is_stop = 0 
+			AND nvl(b.state, 0) = 0
+			<if test="store_id != null and store_id !='' and store_id != 0">
+				AND a.store_id = #{store_id,jdbcType=INTEGER} 
+			</if>
+			<if test="store_id == null or store_id == '' or store_id == 0">
+				AND a.store_id in (
+					SELECT perm_code
+					FROM v_user_data_perm
+					WHERE group_id = #{group_id,jdbcType=INTEGER} 
+						AND hos_id = #{hos_id,jdbcType=INTEGER} 
+						AND user_id = #{user_id,jdbcType=INTEGER} 
+						AND table_code = 'HOS_STORE_DICT'
+					AND is_read = 1 AND is_write = 1 
+				)
+			</if>
+	</select>
+	
+	<!-- 所选库房是否含未审核的期初数据 -->
+	<select id="existsStoreInitNotCheck" resultType="Integer" parameterType="java.util.Map" >
+		SELECT count(*) 
+		FROM mat_dura_store_reg
+		WHERE group_id = #{group_id,jdbcType=INTEGER} 
+			AND hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND copy_code = #{copy_code,jdbcType=VARCHAR} 
+			AND state = 1
+			<if test="store_id != null and store_id !='' and store_id != 0">
+				AND store_id = #{store_id,jdbcType=INTEGER} 
+			</if>
+			<if test="store_id == null or store_id == '' or store_id == 0">
+				AND store_id in (
+					SELECT perm_code
+					FROM v_user_data_perm
+					WHERE group_id = #{group_id,jdbcType=INTEGER} 
+						AND hos_id = #{hos_id,jdbcType=INTEGER} 
+						AND user_id = #{user_id,jdbcType=INTEGER} 
+						AND table_code = 'HOS_STORE_DICT'
+					AND is_read = 1 AND is_write = 1 
+				)
+			</if>
+	</select>
+	
+	<!-- 所选科室是否可记账 -->
+	<select id="existsDeptAccount" resultType="Integer" parameterType="java.util.Map" >
+		SELECT count(*)
+		FROM hos_dept_dict a 
+		LEFT JOIN mat_dura_dept_status b 
+			ON a.group_id = b.group_id 
+			AND a.hos_id = b.hos_id 
+			AND b.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND a.dept_id = b.dept_id
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER} 
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND a.is_stop = 0 
+			AND nvl(b.state, 0) = 0
+			<if test="dept_id != null and dept_id !='' and dept_id != 0">
+				AND a.dept_id in (
+					SELECT dept_id FROM hos_dept_dict
+					WHERE is_last = 1
+					START WITH group_id = #{group_id,jdbcType=INTEGER} 
+						AND hos_id = #{hos_id,jdbcType=INTEGER} 
+						AND dept_id = #{dept_id,jdbcType=INTEGER} 
+						AND is_stop = 0
+					CONNECT BY PRIOR dept_code = super_code
+				)
+			</if>
+			<if test="dept_id == null or dept_id == '' or dept_id == 0">
+				AND a.dept_id in (
+					SELECT perm_code
+					FROM v_user_data_perm
+					WHERE group_id = #{group_id,jdbcType=INTEGER} 
+						AND hos_id = #{hos_id,jdbcType=INTEGER} 
+						AND user_id = #{user_id,jdbcType=INTEGER} 
+						AND table_code = 'HOS_DEPT_DICT'
+					AND is_read = 1 AND is_write = 1 
+				)
+			</if>
+	</select>
+	
+	<!-- 所选科室是否含有未审核的期初数据 -->
+	<select id="existsDeptInitNotCheck" resultType="Integer" parameterType="java.util.Map" >
+		SELECT count(*) 
+		FROM mat_dura_dept_reg
+		WHERE group_id = #{group_id,jdbcType=INTEGER} 
+			AND hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND copy_code = #{copy_code,jdbcType=VARCHAR} 
+			AND state = 1
+			<if test="dept_id != null and dept_id !='' and dept_id != 0">
+				AND dept_id in (
+					SELECT dept_id FROM hos_dept_dict
+					WHERE is_last = 1
+					START WITH group_id = #{group_id,jdbcType=INTEGER} 
+						AND hos_id = #{hos_id,jdbcType=INTEGER} 
+						AND dept_id = #{dept_id,jdbcType=INTEGER} 
+						AND is_stop = 0
+					CONNECT BY PRIOR dept_code = super_code
+				)
+			</if>
+			<if test="dept_id == null or dept_id == '' or dept_id == 0">
+				AND dept_id in (
+					SELECT perm_code
+					FROM v_user_data_perm
+					WHERE group_id = #{group_id,jdbcType=INTEGER} 
+						AND hos_id = #{hos_id,jdbcType=INTEGER} 
+						AND user_id = #{user_id,jdbcType=INTEGER} 
+						AND table_code = 'HOS_DEPT_DICT'
+					AND is_read = 1 AND is_write = 1 
+				)
+			</if>
+	</select>
+	
+	<!-- 获取所选库房的期初库存数据用于BALANCE表记账 -->
+	<select id="queryStoreBalanceAddListForCharge" resultMap="matDuraInitChargeInvList" parameterType="java.util.Map" >
+		SELECT group_id, hos_id, copy_code, store_id, inv_id, price, bar_code,
+			sum(amount) in_amount, sum(amount_money) in_money, 
+			0 out_amount, 0 out_money, 
+			sum(amount) left_amount, sum(amount_money) left_money
+		FROM mat_dura_store_reg
+		WHERE group_id = #{group_id,jdbcType=INTEGER} 
+			AND hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND copy_code = #{copy_code,jdbcType=VARCHAR} 
+			AND state = 2
+			<if test="store_id != null and store_id !='' and store_id != 0">
+				AND store_id = #{store_id,jdbcType=INTEGER} 
+			</if>
+			<if test="store_id == null or store_id == '' or store_id == 0">
+				AND store_id in (
+					SELECT perm_code
+					FROM v_user_data_perm
+					WHERE group_id = #{group_id,jdbcType=INTEGER} 
+						AND hos_id = #{hos_id,jdbcType=INTEGER} 
+						AND user_id = #{user_id,jdbcType=INTEGER} 
+						AND table_code = 'HOS_STORE_DICT'
+					AND is_read = 1 AND is_write = 1 
+				)
+			</if>
+			AND NOT EXISTS(
+				SELECT 1 FROM mat_dura_store_balance 
+				WHERE mat_dura_store_reg.group_id = mat_dura_store_balance.group_id 
+					AND mat_dura_store_reg.hos_id = mat_dura_store_balance.hos_id 
+					AND mat_dura_store_reg.copy_code = mat_dura_store_balance.copy_code 
+					AND mat_dura_store_reg.store_id = mat_dura_store_balance.store_id 
+					AND mat_dura_store_reg.inv_id = mat_dura_store_balance.inv_id 
+					AND mat_dura_store_reg.price = mat_dura_store_balance.price 
+					AND mat_dura_store_reg.bar_code = mat_dura_store_balance.bar_code 
+			)
+		GROUP BY group_id, hos_id, copy_code, store_id, inv_id, price, bar_code
+	</select>
+	
+	<!-- 获取所选库房的期初库存数据用于BALANCE表记账 -->
+	<select id="queryStoreBalanceUpdateListForCharge" resultMap="matDuraInitChargeInvList" parameterType="java.util.Map" >
+		SELECT group_id, hos_id, copy_code, store_id, inv_id, price, 
+			sum(in_amount) in_amount, sum(in_money) in_money, 
+			sum(out_amount) out_amount, sum(out_money) out_money, 
+			sum(left_amount) left_amount, sum(left_money) left_money, bar_code 
+		FROM(
+			<!-- 期初业务表 -->
+			SELECT group_id, hos_id, copy_code, store_id, inv_id, price, 
+				amount in_amount, amount_money in_money, 
+				0 out_amount, 0 out_money, 
+				amount left_amount, amount_money left_money, bar_code 
+			FROM mat_dura_store_reg
+			WHERE group_id = #{group_id,jdbcType=INTEGER} 
+				AND hos_id = #{hos_id,jdbcType=INTEGER} 
+				AND copy_code = #{copy_code,jdbcType=VARCHAR} 
+				AND state = 2
+				<if test="store_id != null and store_id !='' and store_id != 0">
+					AND store_id = #{store_id,jdbcType=INTEGER} 
+				</if>
+				<if test="store_id == null or store_id == '' or store_id == 0">
+					AND store_id in (
+						SELECT perm_code
+						FROM v_user_data_perm
+						WHERE group_id = #{group_id,jdbcType=INTEGER} 
+							AND hos_id = #{hos_id,jdbcType=INTEGER} 
+							AND user_id = #{user_id,jdbcType=INTEGER} 
+							AND table_code = 'HOS_STORE_DICT'
+						AND is_read = 1 AND is_write = 1 
+					)
+				</if>
+				AND EXISTS(
+					SELECT 1 FROM mat_dura_store_balance 
+					WHERE mat_dura_store_reg.group_id = mat_dura_store_balance.group_id 
+						AND mat_dura_store_reg.hos_id = mat_dura_store_balance.hos_id 
+						AND mat_dura_store_reg.copy_code = mat_dura_store_balance.copy_code 
+						AND mat_dura_store_reg.store_id = mat_dura_store_balance.store_id 
+						AND mat_dura_store_reg.inv_id = mat_dura_store_balance.inv_id 
+						AND mat_dura_store_reg.price = mat_dura_store_balance.price 
+						AND mat_dura_store_reg.bar_code = mat_dura_store_balance.bar_code
+				)
+			UNION ALL 
+			<!-- 账表 -->
+			SELECT group_id, hos_id, copy_code, store_id, inv_id, price, 
+				in_amount, in_money, out_amount, out_money, left_amount, left_money, bar_code
+			FROM mat_dura_store_balance
+			WHERE group_id = #{group_id,jdbcType=INTEGER} 
+				AND hos_id = #{hos_id,jdbcType=INTEGER} 
+				AND copy_code = #{copy_code,jdbcType=VARCHAR} 
+				<if test="store_id != null and store_id !='' and store_id != 0">
+					AND store_id = #{store_id,jdbcType=INTEGER} 
+				</if>
+				<if test="store_id == null or store_id == '' or store_id == 0">
+					AND store_id in (
+						SELECT perm_code
+						FROM v_user_data_perm
+						WHERE group_id = #{group_id,jdbcType=INTEGER} 
+							AND hos_id = #{hos_id,jdbcType=INTEGER} 
+							AND user_id = #{user_id,jdbcType=INTEGER} 
+							AND table_code = 'HOS_STORE_DICT'
+						AND is_read = 1 AND is_write = 1 
+					)
+				</if>
+		) tmp
+		GROUP BY group_id, hos_id, copy_code, store_id, inv_id, price, bar_code
+	</select>
+	
+	<!-- 获取所选库房的期初库存数据用于SURPLUS表记账 -->
+	<select id="queryStoreSurplusListForCharge" resultMap="matDuraInitChargeInvList" parameterType="java.util.Map" >
+		SELECT group_id, hos_id, copy_code, '0000' year, '00' month, store_id, inv_id, price, 
+			sum(amount) in_amount, sum(amount_money) in_money, 
+			sum(amount) left_amount, sum(amount_money) left_money, 
+			sum(amount) end_amount, sum(amount_money) end_money, 
+			0 begin_amount, 0 begin_money, 0 out_amount, 0 out_money, bar_code 
+		FROM mat_dura_store_reg
+		WHERE group_id = #{group_id,jdbcType=INTEGER} 
+			AND hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND copy_code = #{copy_code,jdbcType=VARCHAR} 
+			AND state = 2
+			<if test="store_id != null and store_id !='' and store_id != 0">
+				AND store_id = #{store_id,jdbcType=INTEGER} 
+			</if>
+			<if test="store_id == null or store_id == '' or store_id == 0">
+				AND store_id in (
+					SELECT perm_code
+					FROM v_user_data_perm
+					WHERE group_id = #{group_id,jdbcType=INTEGER} 
+						AND hos_id = #{hos_id,jdbcType=INTEGER} 
+						AND user_id = #{user_id,jdbcType=INTEGER} 
+						AND table_code = 'HOS_STORE_DICT'
+					AND is_read = 1 AND is_write = 1 
+				)
+			</if>
+		GROUP BY group_id, hos_id, copy_code, store_id, inv_id, price, bar_code
+	</select>
+	
+	<!-- 获取所选库房的Surplus账表中每月的数据用于记账 -->
+	<select id="queryStoreSurplusPeriodListForCharge" resultMap="matDuraInitChargeInvList" parameterType="java.util.Map" >
+		SELECT group_id, hos_id, copy_code, year, month, store_id, inv_id, price, 
+			begin_amount, begin_money, in_amount, in_money, out_amount, 
+			out_money, end_amount, end_money, bar_code
+		FROM mat_dura_store_surplus
+		WHERE group_id = #{group_id,jdbcType=INTEGER} 
+			AND hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND copy_code = #{copy_code,jdbcType=VARCHAR} 
+			<if test="store_id != null and store_id !='' and store_id != 0">
+				AND store_id = #{store_id,jdbcType=INTEGER} 
+			</if>
+			<if test="store_id == null or store_id == '' or store_id == 0">
+				AND store_id in (
+					SELECT perm_code
+					FROM v_user_data_perm
+					WHERE group_id = #{group_id,jdbcType=INTEGER} 
+						AND hos_id = #{hos_id,jdbcType=INTEGER} 
+						AND user_id = #{user_id,jdbcType=INTEGER} 
+						AND table_code = 'HOS_STORE_DICT'
+					AND is_read = 1 AND is_write = 1 
+				)
+			</if>
+	</select>
+	
+	<!-- 获取所选库房的期初材料条码数据用于记账 -->
+	<select id="queryStoreInvBarListForCharge" resultMap="matDuraInitChargeInvBarList" parameterType="java.util.Map" >
+		SELECT group_id, hos_id, copy_code, store_id, inv_id, price, bar_code, sum(amount) amount 
+		FROM mat_dura_store_reg
+		WHERE group_id = #{group_id,jdbcType=INTEGER} 
+			AND hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND copy_code = #{copy_code,jdbcType=VARCHAR} 
+			AND state = 2
+			AND <![CDATA[nvl(bar_code, '-') <> '-']]>
+			<if test="store_id != null and store_id !='' and store_id != 0">
+				AND store_id = #{store_id,jdbcType=INTEGER} 
+			</if>
+			<if test="store_id == null or store_id == '' or store_id == 0">
+				AND store_id in ( 
+					SELECT perm_code 
+					FROM v_user_data_perm 
+					WHERE group_id = #{group_id,jdbcType=INTEGER} 
+						AND hos_id = #{hos_id,jdbcType=INTEGER} 
+						AND user_id = #{user_id,jdbcType=INTEGER} 
+						AND table_code = 'HOS_STORE_DICT'
+					AND is_read = 1 AND is_write = 1 
+				)
+			</if>
+		GROUP BY group_id, hos_id, copy_code, store_id, inv_id, price, bar_code
+	</select>
+	
+	<!-- 获取所选科室的期初库存数据用于BALANCE表记账 -->
+	<select id="queryDeptBalanceAddListForCharge" resultMap="matDuraInitChargeInvList" parameterType="java.util.Map" >
+		SELECT group_id, hos_id, copy_code, dept_id, inv_id, price, 
+			sum(amount) in_amount, sum(amount_money) in_money, 
+			0 out_amount, 0 out_money, 
+			sum(amount) left_amount, sum(amount_money) left_money, bar_code 
+		FROM mat_dura_dept_reg
+		WHERE group_id = #{group_id,jdbcType=INTEGER} 
+			AND hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND copy_code = #{copy_code,jdbcType=VARCHAR} 
+			AND state = 2
+			<if test="dept_id != null and dept_id !='' and dept_id != 0">
+				AND dept_id in (
+					SELECT dept_id FROM hos_dept_dict
+					WHERE is_last = 1
+					START WITH group_id = #{group_id,jdbcType=INTEGER} 
+						AND hos_id = #{hos_id,jdbcType=INTEGER} 
+						AND dept_id = #{dept_id,jdbcType=INTEGER} 
+						AND is_stop = 0
+					CONNECT BY PRIOR dept_code = super_code
+				)
+			</if>
+			<if test="dept_id == null or dept_id == '' or dept_id == 0">
+				AND dept_id in (
+					SELECT perm_code
+					FROM v_user_data_perm
+					WHERE group_id = #{group_id,jdbcType=INTEGER} 
+						AND hos_id = #{hos_id,jdbcType=INTEGER} 
+						AND user_id = #{user_id,jdbcType=INTEGER} 
+						AND table_code = 'HOS_DEPT_DICT'
+					AND is_read = 1 AND is_write = 1 
+				)
+			</if>
+			AND NOT EXISTS(
+				SELECT 1 FROM mat_dura_dept_balance 
+				WHERE mat_dura_dept_reg.group_id = mat_dura_dept_balance.group_id 
+					AND mat_dura_dept_reg.hos_id = mat_dura_dept_balance.hos_id 
+					AND mat_dura_dept_reg.copy_code = mat_dura_dept_balance.copy_code 
+					AND mat_dura_dept_reg.dept_id = mat_dura_dept_balance.dept_id 
+					AND mat_dura_dept_reg.inv_id = mat_dura_dept_balance.inv_id 
+					AND mat_dura_dept_reg.price = mat_dura_dept_balance.price 
+					AND mat_dura_dept_reg.bar_code = mat_dura_dept_balance.bar_code
+			)
+		GROUP BY group_id, hos_id, copy_code, dept_id, inv_id, price, bar_code
+	</select>
+	
+	<!-- 获取所选科室的期初库存数据用于BALANCE表记账 -->
+	<select id="queryDeptBalanceUpdateListForCharge" resultMap="matDuraInitChargeInvList" parameterType="java.util.Map" >
+		SELECT group_id, hos_id, copy_code, dept_id, inv_id, price, 
+			sum(in_amount) in_amount, sum(in_money) in_money, 
+			sum(out_amount) out_amount, sum(out_money) out_money, 
+			sum(left_amount) left_amount, sum(left_money) left_money, bar_code 
+		FROM(
+			<!-- 期初业务表 -->
+			SELECT group_id, hos_id, copy_code, dept_id, inv_id, price, 
+				amount as in_amount, amount_money as in_money, 
+				0 out_amount, 0 out_money, 
+				amount as left_amount, amount_money as left_money, bar_code
+			FROM mat_dura_dept_reg
+			WHERE group_id = #{group_id,jdbcType=INTEGER} 
+				AND hos_id = #{hos_id,jdbcType=INTEGER} 
+				AND copy_code = #{copy_code,jdbcType=VARCHAR} 
+				AND state = 2
+				<if test="dept_id != null and dept_id !='' and dept_id != 0">
+					AND dept_id in (
+						SELECT dept_id FROM hos_dept_dict
+						WHERE is_last = 1
+						START WITH group_id = #{group_id,jdbcType=INTEGER} 
+							AND hos_id = #{hos_id,jdbcType=INTEGER} 
+							AND dept_id = #{dept_id,jdbcType=INTEGER} 
+							AND is_stop = 0
+						CONNECT BY PRIOR dept_code = super_code
+					)
+				</if>
+				<if test="dept_id == null or dept_id == '' or dept_id == 0">
+					AND dept_id in (
+						SELECT perm_code
+						FROM v_user_data_perm
+						WHERE group_id = #{group_id,jdbcType=INTEGER} 
+							AND hos_id = #{hos_id,jdbcType=INTEGER} 
+							AND user_id = #{user_id,jdbcType=INTEGER} 
+							AND table_code = 'HOS_DEPT_DICT'
+						AND is_read = 1 AND is_write = 1 
+					)
+				</if>
+				AND EXISTS(
+					SELECT 1 FROM mat_dura_dept_balance 
+					WHERE mat_dura_dept_reg.group_id = mat_dura_dept_balance.group_id 
+						AND mat_dura_dept_reg.hos_id = mat_dura_dept_balance.hos_id 
+						AND mat_dura_dept_reg.copy_code = mat_dura_dept_balance.copy_code 
+						AND mat_dura_dept_reg.dept_id = mat_dura_dept_balance.dept_id 
+						AND mat_dura_dept_reg.inv_id = mat_dura_dept_balance.inv_id 
+						AND mat_dura_dept_reg.price = mat_dura_dept_balance.price 
+						AND mat_dura_dept_reg.bar_code = mat_dura_dept_balance.bar_code 
+				)
+			UNION ALL 
+			<!-- 账表 -->
+			SELECT group_id, hos_id, copy_code, dept_id, inv_id, price, 
+				in_amount, in_money, out_amount, out_money, left_amount, left_money, bar_code
+			FROM mat_dura_dept_balance
+			WHERE group_id = #{group_id,jdbcType=INTEGER} 
+				AND hos_id = #{hos_id,jdbcType=INTEGER} 
+				AND copy_code = #{copy_code,jdbcType=VARCHAR} 
+				<if test="dept_id != null and dept_id !='' and dept_id != 0">
+					AND dept_id in (
+						SELECT dept_id FROM hos_dept_dict
+						WHERE is_last = 1
+						START WITH group_id = #{group_id,jdbcType=INTEGER} 
+							AND hos_id = #{hos_id,jdbcType=INTEGER} 
+							AND dept_id = #{dept_id,jdbcType=INTEGER} 
+							AND is_stop = 0
+						CONNECT BY PRIOR dept_code = super_code
+					)
+				</if>
+				<if test="dept_id == null or dept_id == '' or dept_id == 0">
+					AND dept_id in (
+						SELECT perm_code
+						FROM v_user_data_perm
+						WHERE group_id = #{group_id,jdbcType=INTEGER} 
+							AND hos_id = #{hos_id,jdbcType=INTEGER} 
+							AND user_id = #{user_id,jdbcType=INTEGER} 
+							AND table_code = 'HOS_DEPT_DICT'
+						AND is_read = 1 AND is_write = 1 
+					)
+				</if>
+		) tmp
+		GROUP BY group_id, hos_id, copy_code, dept_id, inv_id, price, bar_code
+	</select>
+	
+	<!-- 获取所选科室的期初库存数据用于SURPLUS表记账 -->
+	<select id="queryDeptSurplusListForCharge" resultMap="matDuraInitChargeInvList" parameterType="java.util.Map" >
+		SELECT group_id, hos_id, copy_code, '0000' year, '00' month, dept_id, inv_id, price, 
+			sum(amount) in_amount, sum(amount_money) in_money, 
+			sum(amount) left_amount, sum(amount_money) left_money, 
+			sum(amount) end_amount, sum(amount_money) end_money, 
+			0 begin_amount, 0 begin_money, 0 out_amount, 0 out_money, bar_code 
+		FROM mat_dura_dept_reg
+		WHERE group_id = #{group_id,jdbcType=INTEGER} 
+			AND hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND copy_code = #{copy_code,jdbcType=VARCHAR} 
+			AND state = 2
+			<if test="dept_id != null and dept_id !='' and dept_id != 0">
+				AND dept_id in (
+					SELECT dept_id FROM hos_dept_dict
+					WHERE is_last = 1
+					START WITH group_id = #{group_id,jdbcType=INTEGER} 
+						AND hos_id = #{hos_id,jdbcType=INTEGER} 
+						AND dept_id = #{dept_id,jdbcType=INTEGER} 
+						AND is_stop = 0
+					CONNECT BY PRIOR dept_code = super_code
+				)
+			</if>
+			<if test="dept_id == null or dept_id == '' or dept_id == 0">
+				AND dept_id in (
+					SELECT perm_code
+					FROM v_user_data_perm
+					WHERE group_id = #{group_id,jdbcType=INTEGER} 
+						AND hos_id = #{hos_id,jdbcType=INTEGER} 
+						AND user_id = #{user_id,jdbcType=INTEGER} 
+						AND table_code = 'HOS_DEPT_DICT'
+					AND is_read = 1 AND is_write = 1 
+				)
+			</if>
+		GROUP BY group_id, hos_id, copy_code, dept_id, inv_id, price, bar_code
+	</select>
+	
+	<!-- 获取所选科室的Surplus账表中每月的数据用于记账 -->
+	<select id="queryDeptSurplusPeriodListForCharge" resultMap="matDuraInitChargeInvList" parameterType="java.util.Map" >
+		SELECT group_id, hos_id, copy_code, year, month, dept_id, inv_id, price, 
+			begin_amount, begin_money, in_amount, in_money, out_amount, 
+			out_money, end_amount, end_money, bar_code
+		FROM mat_dura_dept_surplus
+		WHERE group_id = #{group_id,jdbcType=INTEGER} 
+			AND hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND copy_code = #{copy_code,jdbcType=VARCHAR} 
+			<if test="dept_id != null and dept_id !='' and dept_id != 0">
+				AND dept_id in (
+					SELECT dept_id FROM hos_dept_dict
+					WHERE is_last = 1
+					START WITH group_id = #{group_id,jdbcType=INTEGER} 
+						AND hos_id = #{hos_id,jdbcType=INTEGER} 
+						AND dept_id = #{dept_id,jdbcType=INTEGER} 
+						AND is_stop = 0
+					CONNECT BY PRIOR dept_code = super_code
+				)
+			</if>
+			<if test="dept_id == null or dept_id == '' or dept_id == 0">
+				AND dept_id in (
+					SELECT perm_code
+					FROM v_user_data_perm
+					WHERE group_id = #{group_id,jdbcType=INTEGER} 
+						AND hos_id = #{hos_id,jdbcType=INTEGER} 
+						AND user_id = #{user_id,jdbcType=INTEGER} 
+						AND table_code = 'HOS_DEPT_DICT'
+					AND is_read = 1 AND is_write = 1 
+				)
+			</if>
+	</select>
+	
+	<!-- 获取所选科室的期初条码数据用于记账 -->
+	<select id="queryDeptInvBarListForCharge" resultMap="matDuraInitChargeInvBarList" parameterType="java.util.Map" >
+		SELECT group_id, hos_id, copy_code, dept_id, inv_id, bar_code, sum(amount) amount,price
+		FROM mat_dura_dept_reg
+		WHERE group_id = #{group_id,jdbcType=INTEGER} 
+			AND hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND copy_code = #{copy_code,jdbcType=VARCHAR} 
+			AND state = 2
+			AND <![CDATA[nvl(bar_code, '-') <> '-']]>
+			<if test="dept_id != null and dept_id !='' and dept_id != 0">
+				AND dept_id in (
+					SELECT dept_id FROM hos_dept_dict
+					WHERE is_last = 1
+					START WITH group_id = #{group_id,jdbcType=INTEGER} 
+						AND hos_id = #{hos_id,jdbcType=INTEGER} 
+						AND dept_id = #{dept_id,jdbcType=INTEGER} 
+						AND is_stop = 0
+					CONNECT BY PRIOR dept_code = super_code
+				)
+			</if>
+			<if test="dept_id == null or dept_id == '' or dept_id == 0">
+				AND dept_id in (
+					SELECT perm_code
+					FROM v_user_data_perm
+					WHERE group_id = #{group_id,jdbcType=INTEGER} 
+						AND hos_id = #{hos_id,jdbcType=INTEGER} 
+						AND user_id = #{user_id,jdbcType=INTEGER} 
+						AND table_code = 'HOS_DEPT_DICT'
+					AND is_read = 1 AND is_write = 1 
+				)
+			</if>
+		GROUP BY group_id, hos_id, copy_code, dept_id, inv_id, bar_code ,price
+	</select>
+	
+	<!-- 所选库房未记账列表用于记账 -->
+	<select id="queryStoreListForChange" resultMap="matDuraInitChargeStoreDeptList" parameterType="java.util.Map" >
+		SELECT a.group_id, a.hos_id, #{copy_code,jdbcType=VARCHAR} copy_code, a.store_id, #{user_id,jdbcType=INTEGER} confirmer, 
+			#{charge_date,jdbcType=DATE} confirm_date, #{state,jdbcType=INTEGER} state, 
+			#{note,jdbcType=VARCHAR} note
+		FROM hos_store_dict a 
+		LEFT JOIN mat_dura_store_status b 
+			ON a.group_id = b.group_id 
+			AND a.hos_id = b.hos_id 
+			AND b.copy_code = #{copy_code,jdbcType=VARCHAR} 
+			AND a.store_id = b.store_id 
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER} 
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND a.is_stop = 0 
+			AND nvl(b.state, 0) = 0
+			<if test="store_id != null and store_id !='' and store_id != 0">
+				AND a.store_id = #{store_id,jdbcType=INTEGER} 
+			</if>
+			<if test="store_id == null or store_id == '' or store_id == 0">
+				AND a.store_id in (
+					SELECT perm_code
+					FROM v_user_data_perm
+					WHERE group_id = #{group_id,jdbcType=INTEGER} 
+						AND hos_id = #{hos_id,jdbcType=INTEGER} 
+						AND user_id = #{user_id,jdbcType=INTEGER} 
+						AND table_code = 'HOS_STORE_DICT'
+					AND is_read = 1 AND is_write = 1 
+				)
+			</if>
+	</select>
+	
+	<!-- 所选科室未记账列表用于记账 -->
+	<select id="queryDeptListForChange" resultMap="matDuraInitChargeStoreDeptList" parameterType="java.util.Map" >
+		SELECT a.group_id, a.hos_id, #{copy_code,jdbcType=VARCHAR} copy_code, a.dept_id, #{user_id,jdbcType=INTEGER} confirmer, 
+			#{charge_date,jdbcType=DATE} confirm_date, #{state,jdbcType=INTEGER} state, 
+			#{note,jdbcType=VARCHAR} note
+		FROM hos_dept_dict a 
+		LEFT JOIN mat_dura_dept_status b 
+			ON a.group_id = b.group_id 
+			AND a.hos_id = b.hos_id 
+			AND b.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND a.dept_id = b.dept_id
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER} 
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND a.is_stop = 0 
+			AND nvl(b.state, 0) = 0
+			<if test="dept_id != null and dept_id !='' and dept_id != 0">
+				AND a.dept_id in (
+					SELECT dept_id FROM hos_dept_dict
+					WHERE is_last = 1
+					START WITH group_id = #{group_id,jdbcType=INTEGER} 
+						AND hos_id = #{hos_id,jdbcType=INTEGER} 
+						AND dept_id = #{dept_id,jdbcType=INTEGER} 
+						AND is_stop = 0
+					CONNECT BY PRIOR dept_code = super_code
+				)
+			</if>
+			<if test="dept_id == null or dept_id == '' or dept_id == 0">
+				AND a.dept_id in (
+					SELECT perm_code
+					FROM v_user_data_perm
+					WHERE group_id = #{group_id,jdbcType=INTEGER} 
+						AND hos_id = #{hos_id,jdbcType=INTEGER} 
+						AND user_id = #{user_id,jdbcType=INTEGER} 
+						AND table_code = 'HOS_DEPT_DICT'
+					AND is_read = 1 AND is_write = 1 
+				)
+			</if>
+	</select>
+</mapper>
+

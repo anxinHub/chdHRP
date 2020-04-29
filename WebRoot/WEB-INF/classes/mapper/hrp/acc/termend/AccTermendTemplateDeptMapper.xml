@@ -1,0 +1,243 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.acc.dao.termend.AccTermendTemplateDeptMapper">
+
+	<resultMap id="accTermendTemplateDept" type="com.chd.hrp.acc.entity.AccTermendTemplateDept">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="template_id" column="template_id" />
+		<result property="template_dept_id" column="template_dept_id" />
+		<result property="dept_id" column="dept_id" />
+		<result property="dept_no" column="dept_no" />
+		<result property="dept_code" column="dept_code" />
+		<result property="dept_name" column="dept_name" />
+		<result property="rate" column="rate" />
+		<result property="money_sum" column="money_sum" />
+	</resultMap>
+	
+	<select id="queryAccTermendTemplateDept" parameterType="java.util.Map"
+		resultMap="accTermendTemplateDept">
+		SELECT a.group_id, a.hos_id, b.copy_code, b.template_id, b.template_dept_id, a.dept_id, a.dept_no, a.dept_code, a.dept_name
+			<if test="template_id != null and template_id != ''">
+				, b.rate
+			</if>
+		FROM hos_dept_dict a
+		<if test="template_id != null and template_id != ''">
+			LEFT JOIN acc_termend_template_dept b
+				ON a.group_id = b.group_id 
+				AND a.hos_id = b.hos_id  
+				AND a.dept_id = b.dept_id 
+				AND b.copy_code = #{copy_code}
+				AND b.template_id = #{template_id}
+		</if>
+		where a.group_id = #{group_id}
+			AND a.hos_id = #{hos_id}
+			AND a.is_stop = 0
+			AND a.is_last = 1
+			<if test="dept_code != null and dept_code != ''">
+				AND a.dept_code like '${dept_code}%'
+			</if>
+			<if test="kind_code != null and kind_code != ''">
+				AND a.kind_code = #{kind_code,jdbcType=VARCHAR}
+			</if>
+		order by a.dept_code
+	</select>	
+	
+	<insert id="addAccTermendTemplateDept" parameterType="java.util.List">
+			INSERT INTO ACC_TERMEND_TEMPLATE_DEPT
+				(
+					template_dept_id, template_id, group_id, hos_id, copy_code, dept_id, rate
+				) 
+				SELECT ACC_TERMEND_TEMPLATE_DEPT_SEQ.nextval,a.template_id,a.group_id,a.hos_id,a.copy_code,a.dept_id,a.rate FROM (
+				<foreach collection="list" item="item" index="index" separator="union all">
+					<if test="item.rate != null and item.rate != ''">
+						SELECT 
+							#{item.template_id, jdbcType=INTEGER} as template_id, 
+							#{item.group_id, jdbcType=INTEGER} as group_id, 
+							#{item.hos_id, jdbcType=INTEGER} as hos_id, 
+							#{item.copy_code, jdbcType=VARCHAR} as copy_code,
+							#{item.dept_id, jdbcType=INTEGER} as dept_id,
+							#{item.rate, jdbcType=FLOAT} as rate
+						FROM dual
+					</if>
+				</foreach>
+				) a
+	</insert>
+	
+	<delete id="deleteBatchAccTermendTemplateDept" parameterType="java.util.List">
+		DELETE FROM ACC_TERMEND_TEMPLATE_DEPT 
+			WHERE 
+			<foreach collection="list" index="index" item="item" open="("
+				separator="or" close=")">
+				group_id = #{item.group_id} 
+				AND hos_id = #{item.hos_id} 
+				AND copy_code = #{item.copy_code} 
+				AND template_id = #{item.template_id}
+			</foreach>
+	</delete>
+	
+	<delete id="deleteAccTermendTemplateDeptForAdd" parameterType="java.util.List">
+		DELETE FROM ACC_TERMEND_TEMPLATE_DEPT
+		WHERE 
+		<foreach collection="list" item="item" index="index" open="(" separator="or" close=")">
+			<if test="item.template_id != null and item.template_id != ''">
+				<if test="item.dept_id != null and item.dept_id != ''">
+					(group_id = #{item.group_id, jdbcType=INTEGER}
+					AND hos_id = #{item.hos_id, jdbcType=INTEGER}
+					AND copy_code = #{item.copy_code, jdbcType=VARCHAR}
+					AND template_id = #{item.template_id, jdbcType=INTEGER}
+					<if test="item.template_dept_id != null and item.template_dept_id != ''">
+						AND template_dept_id = #{item.template_dept_id, jdbcType=INTEGER}
+					</if>
+					AND dept_id = #{item.dept_id, jdbcType=INTEGER})
+				</if>
+			</if>
+		</foreach>
+	</delete>
+	
+	<delete id="deleteAccTermendTemplateDeptForImport" parameterType="java.util.Map">
+		DELETE FROM ACC_TERMEND_TEMPLATE_DEPT
+		WHERE 
+			group_id = #{group_id, jdbcType=INTEGER}
+			AND hos_id = #{hos_id, jdbcType=INTEGER}
+			AND copy_code = #{copy_code, jdbcType=VARCHAR}
+			AND template_id = #{template_id, jdbcType=INTEGER}
+	</delete>
+	
+	<select id="queryAccTermendTemplateDeptIncom" parameterType="java.util.Map" resultType="java.util.TreeMap">
+			SELECT appl_dept_id dept_id, sum(nvl(money, 0)) as money
+			FROM cost_income 
+			WHERE group_id = #{group_id}
+				AND hos_id = #{hos_id}
+				AND copy_code = #{copy_code}
+				AND acc_year||'.'||acc_month = #{year_month}
+				<if test="kind_code != null and kind_code != ''">
+					AND appl_dept_id in(
+						SELECT dept_id 
+						FROM hos_dept 
+						WHERE group_id = #{group_id}
+							AND hos_id = #{hos_id}
+							AND kind_code = #{kind_code,jdbcType=VARCHAR}
+					)
+				</if>
+			GROUP BY appl_dept_id
+			HAVING sum(nvl(money, 0)) > 0
+	</select>
+	
+	<select id="queryAccTermendTemplateDeptIncomSum" parameterType="java.util.Map" resultType="java.lang.Double">
+			SELECT sum(nvl(money, 0)) as money_sum
+			FROM cost_income 
+			WHERE group_id = #{group_id}
+				AND hos_id = #{hos_id}
+				AND copy_code = #{copy_code}
+				AND acc_year||'.'||acc_month = #{year_month}
+				<if test="kind_code != null and kind_code != ''">
+					AND appl_dept_id in(
+						SELECT dept_id 
+						FROM hos_dept 
+						WHERE group_id = #{group_id}
+							AND hos_id = #{hos_id}
+							AND kind_code = #{kind_code,jdbcType=VARCHAR}
+					)
+				</if>
+	</select>
+	
+	<select id="queryAccTermendTemplateDeptByCode" parameterType="java.util.Map"
+		resultMap="accTermendTemplateDept">
+		SELECT a.group_id, a.hos_id, a.copy_code, a.template_id, a.template_dept_id, a.dept_id, b.dept_no, b.dept_code, b.dept_name, a.rate
+		FROM acc_termend_template_dept a
+		LEFT JOIN hos_dept_dict b
+			ON a.group_id = b.group_id AND a.hos_id = b.hos_id
+			AND a.dept_id = b.dept_id AND b.is_stop = 0
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND a.template_id = #{template_id,jdbcType=INTEGER}
+			AND <![CDATA[a.rate <> 0]]>
+		ORDER BY a.dept_id
+	</select>	
+	
+	<select id="queryDeptSumByCode" parameterType="java.util.Map"
+		resultType="java.lang.Double">
+		SELECT sum(nvl(rate, 0))
+		FROM acc_termend_template_dept 
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND template_id = #{template_id,jdbcType=INTEGER}
+			AND <![CDATA[rate <> 0]]>
+	</select>	
+	
+	<!-- 提取总收入(财务数据) -->
+	<select id="queryAccTermendTemplateDeptIncomSumAcc" parameterType="java.util.Map" resultType="java.lang.Double">
+			SELECT sum(nvl(credit, 0)) as money_sum
+			FROM acc_vouch_check a
+			left join  acc_vouch b
+				on	
+					a.group_id = b.group_id
+					and a.hos_id = b.hos_id 
+					and a.copy_code = b.copy_code
+					and a.acc_year = b.acc_year
+					and a.vouch_id = b.vouch_id
+			WHERE a.group_id = #{group_id}
+				AND a.hos_id = #{hos_id}
+				AND a.copy_code = #{copy_code}
+				AND b.acc_year||'.'||b.acc_month = #{year_month}
+				AND a.subj_code  in (
+					select subj_code from acc_subj 
+					where  group_id = #{group_id} 
+					and hos_id = #{hos_id} 
+					and copy_code = #{copy_code} 
+					and acc_year = substr(${year_month},1,4)
+					and subj_code like '410101%'
+				)
+				and a.check1_id is not null
+				<if test="kind_code != null and kind_code != ''">
+					AND a.check1_id in(
+						SELECT dept_id 
+						FROM hos_dept 
+						WHERE group_id = #{group_id}
+							AND hos_id = #{hos_id}
+							AND kind_code = #{kind_code,jdbcType=VARCHAR}
+					)
+				</if>
+	</select>
+	
+	<!-- 提取各科室收入(财务数据) -->
+	<select id="queryAccTermendTemplateDeptIncomAcc" parameterType="java.util.Map" resultType="java.util.Map">
+			SELECT a.check1_id "dept_id", sum(nvl(a.credit, 0)) as "money"
+			FROM acc_vouch_check a
+			left join  acc_vouch b
+				on a.group_id = b.group_id
+				and a.hos_id = b.hos_id 
+				and a.copy_code = b.copy_code
+				and a.acc_year = b.acc_year
+				and a.vouch_id = b.vouch_id
+			WHERE a.group_id = #{group_id}
+				AND a.hos_id = #{hos_id}
+				AND a.copy_code = #{copy_code}
+				AND b.acc_year||'.'||b.acc_month = #{year_month}
+				AND a.subj_code  in (
+					select subj_code from acc_subj 
+					where  group_id = #{group_id} 
+					and hos_id = #{hos_id} 
+					and copy_code = #{copy_code} 
+					and acc_year = substr(${year_month},1,4)
+					and subj_code like '410101%'
+				)
+				and a.check1_id is not null
+				<if test="kind_code != null and kind_code != ''">
+					AND a.check1_id in(
+						SELECT dept_id 
+						FROM hos_dept 
+						WHERE group_id = #{group_id}
+							AND hos_id = #{hos_id}
+							AND kind_code = #{kind_code,jdbcType=VARCHAR}
+					)
+				</if>
+			GROUP BY a.check1_id
+			HAVING sum(nvl(a.credit, 0)) > 0
+	</select>
+</mapper>
+

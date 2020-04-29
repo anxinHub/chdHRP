@@ -1,0 +1,321 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.mat.dao.dura.query.MatDuraQueryAccountStatedMapper">
+<!-- 	<select id="queryMatDuraQueryAccountStated" parameterType="java.util.Map"  resultType="java.util.Map">
+		SELECT hdd.dept_code, hdd.dept_name, mid.inv_code, mid.inv_name, mid.inv_model, hu.unit_name, 
+			mddb.bar_code, mdss.price, mdss.begin_amount, mdss.begin_money, mdss.in_amount, mdss.in_money, 
+			mdss.out_amount, mdss.out_money, mdss.end_amount, mdss.end_money
+		FROM mat_dura_dept_surplus mdss
+		LEFT JOIN mat_dura_dept_bar mddb 
+			ON mdss.group_id = mddb.group_id 
+			AND mdss.hos_id = mddb.hos_id 
+			AND mdss.copy_code = mddb.copy_code 
+			AND mdss.dept_id = mddb.dept_id 
+			AND mdss.inv_id = mddb.inv_id  
+			AND mdss.price = mddb.price 
+		LEFT JOIN hos_dept_dict hdd
+			ON mdss.group_id = hdd.group_id 
+			AND mdss.hos_id = hdd.hos_id 
+			AND mdss.dept_id = hdd.dept_id 
+			AND hdd.is_stop = 0 
+		LEFT JOIN mat_inv_dict mid 
+			ON mdss.group_id = mid.group_id 
+			AND mdss.hos_id = mid.hos_id 
+			AND mdss.copy_code = mid.copy_code 
+			AND mdss.inv_id = mid.inv_id 
+			AND mid.is_stop = 0
+		LEFT JOIN hos_unit hu 
+			ON mid.group_id = hu.group_id 
+			AND mid.hos_id = hu.hos_id 
+			AND mid.unit_code = hu.unit_code 
+		LEFT JOIN hos_fac_dict hfd 
+			ON mid.group_id = hfd.group_id 
+			AND mid.hos_id = hfd.hos_id 
+			AND mid.fac_id = hfd.fac_id 
+			AND mid.fac_no = hfd.fac_no 
+		where mdss.group_id = #{group_id,jdbcType=INTEGER} 
+			AND mdss.hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND mdss.copy_code = #{copy_code,jdbcType=VARCHAR} 
+			AND mdss.year = #{year,jdbcType=VARCHAR} 
+			AND mdss.month = #{month,jdbcType=VARCHAR} 
+			<if test="dept_id != null and dept_id != ''">
+				AND mdss.dept_id = #{dept_id,jdbcType=INTEGER} 
+			</if>
+			<if test="dept_id == null or dept_id == ''">
+				AND exists( 
+					SELECT 1 from v_user_data_perm 
+					WHERE group_id = #{group_id,jdbcType=INTEGER} 
+						AND hos_id = #{hos_id,jdbcType=INTEGER} 
+						AND table_code = 'HOS_DEPT_DICT' 
+						AND user_id = #{user_id,jdbcType=INTEGER} 
+						AND is_read = 1 and is_write = 1 
+						AND perm_code = mdss.dept_id 
+				)
+			</if>
+			<if test="inv_code != null and inv_code != ''">
+				AND (
+					mid.inv_code like '%' || #{inv_code,jdbcType=VARCHAR} || '%'
+					OR
+					mid.inv_name like '%' || #{inv_code,jdbcType=VARCHAR} || '%'
+					OR
+					mid.spell_code like '%' || #{inv_code,jdbcType=VARCHAR} || '%'
+					OR
+					mid.wbx_code like '%' || #{inv_code,jdbcType=VARCHAR} || '%'
+					OR
+					mid.inv_model like '%' || #{inv_code,jdbcType=VARCHAR} || '%'
+					OR
+					mid.alias like '%' || #{inv_code,jdbcType=VARCHAR} || '%'
+					OR
+					mid.alias_spell like '%' || #{inv_code,jdbcType=VARCHAR} || '%'
+				)
+			</if>
+	</select> -->
+	
+	<select id="queryMatDuraQueryAccountStated" parameterType="java.util.Map"  resultType="java.util.Map">
+with temp_dept as(
+
+select mdsd.group_id,mdsd.hos_id,mdsd.copy_code,mdsd.make_date,mdsd.dura_id,mdsd.dura_no,mdsd.bus_type_code,
+mbt.bus_type_name,mdsd.brief,hdd.dept_id,hdd.dept_code,
+hdd.dept_name,mdsd.maker,su.user_code,su.user_name,
+sum(md.begin_amount+md.in_amount-md.out_amount ) as amount,sum(aa.chk_amount ) as chk_amount,mid.inv_code,mid.inv_name, '1' flag 
+ 
+ from  mat_dura_dept_dept   mdsd
+ 
+ left join mat_dura_dept_dept_d mda on
+ mdsd.group_id=mda.group_id
+ and mdsd.hos_id=mda.hos_id
+ and mdsd.copy_code=mda.copy_code
+ and mdsd.dura_id=mda.dura_id
+
+left join mat_bus_type mbt on
+ mdsd.bus_type_code=mbt.bus_type_code
+ 
+ left join hos_dept_dict hdd  on
+ mdsd.group_id=hdd.group_id
+ and mdsd.hos_id=hdd.hos_id
+ and mdsd.dept_id=hdd.dept_id
+ and mdsd.dept_no=hdd.dept_no
+ 
+ left join sys_user su on
+ mdsd.group_id=su.group_id
+ and mdsd.hos_id=su.hos_id
+ and mdsd.copy_code=su.copy_code
+ and mdsd.maker=su.user_id
+ 
+ left join mat_inv_dict mid on
+ mdsd.group_id=mid.group_id
+ and mdsd.hos_id=mid.hos_id
+ and mdsd.copy_code=mid.copy_code
+ and mda.inv_id=mid.inv_id
+ and mda.inv_no=mid.inv_no
+ 
+ left join mat_type_dict mtd on 
+ mdsd.group_id=mtd.group_id
+ and mdsd.hos_id=mtd.hos_id
+ and mdsd.copy_code=mtd.copy_code
+ and mid.mat_type_id=mtd.mat_type_id
+ and mid.mat_type_no=mtd.mat_type_no
+ 
+ left join MAT_DURA_DEPT_SURPLUS md on
+ mdsd.group_id=md.group_id
+ and mdsd.hos_id=md.hos_id
+ and mdsd.copy_code=md.copy_code
+ and mda.inv_id=md.inv_id
+ 
+ 
+ left join mat_dura_dept_check_d aa on
+ mdsd.group_id=aa.group_id
+ and mdsd.hos_id=aa.hos_id
+ and mdsd.copy_code=aa.copy_code
+ and mid.inv_id=aa.inv_id
+ and mid.inv_no=aa.inv_no
+ 
+ <where>
+ mdsd.group_id= #{group_id,jdbcType=INTEGER} 
+ and mdsd.hos_id= #{hos_id,jdbcType=INTEGER} 
+ and mdsd.copy_code= #{copy_code,jdbcType=VARCHAR} 
+
+		 		<if test="inv_code != null and inv_code != ''">
+					and (  mid.inv_code like '%${inv_code}%'
+					or mid.inv_name like '%${inv_code}%'
+					     )
+				</if>
+				<if test="mat_type_id != null and mat_type_id != ''">
+			and	mtd.mat_type_id= #{mat_type_id,jdbcType=VARCHAR}
+				</if>
+					<if test="bus_type_code != null and bus_type_code != ''">
+				and mbt.bus_type_code= #{bus_type_code,jdbcType=VARCHAR}
+				</if>
+				  and mdsd.state=3
+ </where>
+ group by mdsd.group_id,mdsd.hos_id,mdsd.copy_code,mdsd.make_date,mdsd.dura_id,mdsd.dura_no,mdsd.bus_type_code,
+mbt.bus_type_name,mdsd.brief,hdd.dept_id,hdd.dept_code,
+hdd.dept_name,mdsd.maker,su.user_code,su.user_name,mid.inv_code,mid.inv_name
+),
+temp_temp as 
+(
+
+select mdsd.group_id,mdsd.hos_id,mdsd.copy_code,mdsd.make_date,mdsd.dura_id,mdsd.dura_no,mdsd.bus_type_code,
+mbt.bus_type_name,mdsd.brief,hdd.dept_id,hdd.dept_code,
+hdd.dept_name,mdsd.maker,su.user_code,su.user_name,
+sum(md.begin_amount+md.in_amount-md.out_amount ) as amount,sum(aa.chk_amount ) as chk_amount,mid.inv_code,mid.inv_name, '2' flag 
+ 
+ from  MAT_DURA_STORE_DEPT   mdsd
+ 
+ left join mat_dura_store_dept_d mda on
+ mdsd.group_id=mda.group_id
+ and mdsd.hos_id=mda.hos_id
+ and mdsd.copy_code=mda.copy_code
+ and mdsd.dura_id=mda.dura_id
+
+left join mat_bus_type mbt on
+ mdsd.bus_type_code=mbt.bus_type_code
+ 
+ left join hos_dept_dict hdd  on
+ mdsd.group_id=hdd.group_id
+ and mdsd.hos_id=hdd.hos_id
+ and mdsd.dept_id=hdd.dept_id
+ and mdsd.dept_no=hdd.dept_no
+ 
+ left join sys_user su on
+ mdsd.group_id=su.group_id
+ and mdsd.hos_id=su.hos_id
+ and mdsd.copy_code=su.copy_code
+ and mdsd.maker=su.user_id
+ 
+ left join mat_inv_dict mid on
+ mdsd.group_id=mid.group_id
+ and mdsd.hos_id=mid.hos_id
+ and mdsd.copy_code=mid.copy_code
+ and mda.inv_id=mid.inv_id
+ and mda.inv_no=mid.inv_no
+ 
+  left join mat_type_dict mtd on 
+ mdsd.group_id=mtd.group_id
+ and mdsd.hos_id=mtd.hos_id
+ and mdsd.copy_code=mtd.copy_code
+ and mid.mat_type_id=mtd.mat_type_id
+ and mid.mat_type_no=mtd.mat_type_no
+ 
+ 
+ left join MAT_DURA_DEPT_SURPLUS md on
+ mdsd.group_id=md.group_id
+ and mdsd.hos_id=md.hos_id
+ and mdsd.copy_code=md.copy_code
+ and mda.inv_id=md.inv_id
+ 
+ 
+ left join mat_dura_dept_check_d aa on
+ mdsd.group_id=aa.group_id
+ and mdsd.hos_id=aa.hos_id
+ and mdsd.copy_code=aa.copy_code
+ and mid.inv_id=aa.inv_id
+ and mid.inv_no=aa.inv_no
+  
+ <where>
+ mdsd.group_id= #{group_id,jdbcType=INTEGER} 
+ and mdsd.hos_id= #{hos_id,jdbcType=INTEGER} 
+ and mdsd.copy_code= #{copy_code,jdbcType=VARCHAR} 
+
+		 		<if test="inv_code != null and inv_code != ''">
+					and (  mid.inv_code like '%${inv_code}%'
+					or mid.inv_name like '%${inv_code}%'
+					     )
+				</if>
+				<if test="mat_type_id != null and mat_type_id != ''">
+			and	mtd.mat_type_id= #{mat_type_code,jdbcType=VARCHAR}
+				</if>
+					<if test="bus_type_code != null and bus_type_code != ''">
+			and	mbt.bus_type_code= #{bus_type_code,jdbcType=VARCHAR}
+				</if>
+				  and mdsd.state=3
+ </where>
+ group by mdsd.group_id,mdsd.hos_id,mdsd.copy_code,mdsd.make_date,mdsd.dura_id,mdsd.dura_no,mdsd.bus_type_code,
+mbt.bus_type_name,mdsd.brief,hdd.dept_id,hdd.dept_code,
+hdd.dept_name,mdsd.maker,su.user_code,su.user_name,mid.inv_code,mid.inv_name
+),
+store_temp as (
+select mdsd.group_id,mdsd.hos_id,mdsd.copy_code,mdsd.make_date, mdsd.dura_id,mdsd.dura_no, mdsd.bus_type_code, mbt.bus_type_name, mdsd.brief
+          ,  hsd.store_id, hsd.store_code, hsd.store_name,mdsd.maker, su.user_code
+          , su.user_name, sum(md.begin_amount + md.in_amount - md.out_amount) as amount
+          , sum(aa.chk_amount) as chk_amount,mid.inv_code,mid.inv_name,'3' flag 
+          
+        from mat_dura_store_store mdsd
+        left join mat_dura_store_store_d mda on mdsd.group_id = mda.group_id
+        and mdsd.hos_id = mda.hos_id
+        and mdsd.copy_code = mda.copy_code
+        and mdsd.dura_id = mda.dura_id 
+        left join mat_bus_type mbt on mdsd.bus_type_code = mbt.bus_type_code 
+        left join hos_store_dict hsd on 
+         mdsd.hos_id = hsd.hos_id
+        and mdsd.store_id = hsd.store_id
+        and mdsd.store_no = hsd.store_no 
+        
+        
+        left join sys_user su on mdsd.group_id = su.group_id
+        and mdsd.hos_id = su.hos_id
+        and mdsd.copy_code = su.copy_code
+        and mdsd.maker = su.user_id 
+        left join mat_inv_dict mid on mdsd.group_id = mid.group_id
+        and mdsd.hos_id = mid.hos_id
+        and mdsd.copy_code = mid.copy_code
+        and mda.inv_id = mid.inv_id
+        and mda.inv_no = mid.inv_no 
+        left join mat_type_dict mtd on mdsd.group_id = mtd.group_id
+        and mdsd.hos_id = mtd.hos_id
+        and mdsd.copy_code = mtd.copy_code
+        and mid.mat_type_id = mtd.mat_type_id
+        and mid.mat_type_no = mtd.mat_type_no 
+        left join MAT_DURA_DEPT_SURPLUS md on mdsd.group_id = md.group_id
+        and mdsd.hos_id = md.hos_id
+        and mdsd.copy_code = md.copy_code
+        and mda.inv_id = md.inv_id 
+          left join mat_dura_dept_check_d aa on mdsd.group_id = aa.group_id
+        and mdsd.hos_id = aa.hos_id
+        and mdsd.copy_code = aa.copy_code
+        and mid.inv_id = aa.inv_id
+        and mid.inv_no = aa.inv_no 
+        <where>
+        
+      	 mdsd.group_id= #{group_id,jdbcType=INTEGER} 
+		 and mdsd.hos_id= #{hos_id,jdbcType=INTEGER} 
+		 and mdsd.copy_code= #{copy_code,jdbcType=VARCHAR} 
+
+		 <if test="inv_code != null and inv_code != ''">
+					and (  mid.inv_code like '%${inv_code}%'
+					or mid.inv_name like '%${inv_code}%'
+					     )
+		</if>
+				<if test="mat_type_id != null and mat_type_id != ''">
+			and	mtd.mat_type_id= #{mat_type_code,jdbcType=VARCHAR}
+				</if>
+	<if test="bus_type_code != null and bus_type_code != ''">
+			and	mbt.bus_type_code= #{bus_type_code,jdbcType=VARCHAR}
+				</if>
+		  and mdsd.state=3
+        </where> 
+        group by mdsd.group_id,mdsd.hos_id,mdsd.copy_code,mdsd.make_date, mdsd.dura_id,mdsd.dura_no, mdsd.bus_type_code, mbt.bus_type_name, mdsd.brief, hsd.store_id,
+         hsd.store_code, hsd.store_name, mdsd.maker, su.user_code, su.user_name,mid.inv_code,mid.inv_name
+)
+select temp_dept.group_id,temp_dept.hos_id,temp_dept.copy_code,temp_dept.make_date,temp_dept.dura_id,temp_dept.dura_no,temp_dept.bus_type_code,
+temp_dept.bus_type_name,temp_dept.brief,temp_dept.dept_id,temp_dept.dept_code,
+temp_dept.dept_name,temp_dept.maker,temp_dept.user_code,temp_dept.user_name,
+temp_dept.amount,temp_dept.chk_amount ,temp_dept.inv_code,temp_dept.inv_name, temp_dept.flag
+ from temp_dept 
+ union all
+
+
+select temp_temp.group_id,temp_temp.hos_id,temp_temp.copy_code,temp_temp.make_date,temp_temp.dura_id,temp_temp.dura_no,temp_temp.bus_type_code,
+temp_temp.bus_type_name,temp_temp.brief,temp_temp.dept_id,temp_temp.dept_code,
+temp_temp.dept_name,temp_temp.maker,temp_temp.user_code,temp_temp.user_name,
+temp_temp.amount,temp_temp.chk_amount ,temp_temp.inv_code,temp_temp.inv_name, temp_temp.flag
+ from temp_temp 
+  union all
+select store_temp.group_id,store_temp.hos_id,store_temp.copy_code,store_temp.make_date, store_temp.dura_id,store_temp.dura_no, store_temp.bus_type_code, store_temp.bus_type_name, store_temp.brief
+          ,  store_temp.store_id, store_temp.store_code, store_temp.store_name,store_temp.maker, store_temp.user_code
+          , store_temp.user_name, store_temp.amount
+          , store_temp.chk_amount , store_temp.inv_code,store_temp.inv_name,store_temp.flag
+           from store_temp
+	</select>
+</mapper>
+

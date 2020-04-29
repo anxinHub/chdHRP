@@ -1,0 +1,440 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+
+	<sql id="med_in_confirm" type="proc"><![CDATA[
+		CREATE OR REPLACE PROCEDURE med_in_confirm
+
+        /*入库确认*/
+        (
+          p_group_id numeric,  --集团ID
+          p_hos_id numeric,  --医院ID
+          p_copy_code nvarchar2,  --帐套编码
+          p_user_id nvarchar2,  --当前操作用户
+          p_in_ids nvarchar2,  --入库单Ids 1,2,3
+          p_confirm_date nvarchar2,  --入库确认日期
+          msg OUT nvarchar2  --返回值格式："msg":"···","state":"true/false","vouch_id":"···"
+        )
+        IS
+          is_flag numeric;  --判断状态依据
+          sys_date date;  --确认期间(用于同步表里的时间)
+          para_price numeric(1,0);  --单价小数位数
+          para_money numeric(1,0);  --金额小数位数
+          err_msg nvarchar2(4000);  --记录库存不足的材料
+          is_update numeric(1,0);  --是否（材料只要出现库存不足的情况以后的材料就值判断库存，不更新表）
+          start_year nvarchar2(10);
+          start_month nvarchar2(10);
+          acc_year varchar2(10);
+          acc_month varchar2(10);
+        BEGIN
+          /*初始化变量*/
+          sys_date := to_date(p_confirm_date, 'yyyy-MM-dd');/*对传入的期间进行类型转换*/
+          is_update := 0;/*0：材料库存充足，更新表，1：材料库存出现不足，不再更新表，只检查材料库存*/
+
+         /*金额位数 现在金额不控制小数点位数，显示才控制
+          select para_value into para_money from acc_para
+          where group_id = p_group_id and hos_id = p_hos_id and copy_code = p_copy_code
+            and mod_code = '04' and para_code = '04005';
+            */
+           para_money:=6;
+          /*单价位数*/
+          select para_value into para_price from acc_para
+          where group_id = p_group_id and hos_id = p_hos_id and copy_code = p_copy_code
+            and mod_code = '04' and para_code = '04006';
+
+          /*获取当前日期所在会计期间*/
+          select acc_year, acc_month
+            into acc_year, acc_month
+          from acc_year_month
+          where group_id = p_group_id
+            and hos_id = p_hos_id
+            and copy_code = p_copy_code
+            and sys_date between begin_date and end_date;
+
+          /*循环科目插入需要调汇科目的凭证明细表和核算项表*/
+          declare
+            v_year nvarchar2(4);  --年份
+            v_month nvarchar2(2);  --月份
+            v_in_id numeric(16,0);  --入库单ID
+            v_bus_type_code nvarchar2(20);  --业务类型
+            v_store_id numeric(16,0);  --仓库ID
+            v_sup_id numeric(16,0);  --供应商ID
+            v_in_detail_id numeric(16,0);  --入库单明细ID
+            v_inv_id numeric(16,0);  --材料ID
+            v_inv_no numeric(16,0);  --材料变更号
+            v_inv_code nvarchar2(20);  --材料编码
+            v_inv_name nvarchar2(100);  --材料名称
+            v_is_bar numeric(1,0);  --是否条码管理
+            v_is_batch numeric(1,0);  --是否按批管理
+            v_is_quality numeric(1,0);  --是否保质期管理
+            v_is_disinfect numeric(1,0);  --是否为灭菌材料
+            v_amount numeric(16,6);  --数量
+            v_back_amount numeric(16,6);  --退货数量的绝对值用于判断库存是否足够
+            v_price numeric(16,6);  --单价
+            v_amount_money numeric(16,6);  --金额
+            v_sale_price numeric(16,6);  --批发单价
+            v_sale_money numeric(16,6);  --批发金额
+            v_batch_no nvarchar2(100);  --批号
+            v_batch_sn numeric(16,0);  --批次
+            v_bar_code nvarchar2(100);  --条码
+            v_location_id numeric(16,0);  --货位
+            v_inva_date date;  --有效期
+            v_disinfect_date date;  --灭菌日期
+            v_sell_price numeric(16,4);  --当前零售价
+            v_new_sell_price numeric(16,4);  --历史零售价
+            TYPE cur_matIn IS REF CURSOR;  --定义游标指针
+            v_cursor cur_matIn;  --定义游标变量
+            inv_amount numeric(16,6);  --退库时材料库存
+          begin
+            OPEN v_cursor FOR
+              select
+                case when a.bus_type_code = '1' then '0000' else acc_year end,
+                case when a.bus_type_code = '1' then '00' else acc_month end,
+                a.in_id, a.bus_type_code, a.store_id, nvl(a.sup_id, 0), b.in_detail_id,
+                b.inv_id, b.inv_no, d.inv_code, d.inv_name, d.is_batch, d.is_bar, d.is_quality, d.is_disinfect, nvl(b.amount, 0), round(nvl(b.price, 0), para_price),
+                round(nvl(b.amount_money, 0), para_money), round(nvl(b.sale_price, 0), para_price), round(nvl(b.sale_money, 0), para_money),
+                nvl(b.batch_no, '-'), nvl(b.batch_sn, 0), nvl(b.bar_code, '-'), nvl(b.location_id, 0),
+                b.inva_date, b.disinfect_date, round(nvl(b.sell_price, 0), para_price), round(nvl(c.new_sell_price, 0), para_price)
+              from med_in_main a
+              left join med_in_detail b
+                on a.group_id = b.group_id
+                and a.hos_id = b.hos_id
+                and a.copy_code = b.copy_code
+                and a.in_id = b.in_id
+              left join (
+                   select mc.* from med_inv_sell_change mc
+                   join (
+                        select max(auto_id) auto_id, inv_id from med_inv_sell_change
+                        group by inv_id
+                   ) misc
+                   on mc.auto_id = misc.auto_id
+              )c
+                on b.group_id = c.group_id
+                and b.hos_id = c.hos_id
+                and b.copy_code = c.copy_code
+                and b.inv_id = c.inv_id
+              left join med_inv_dict d
+                on b.group_id = d.group_id
+                and b.hos_id = d.hos_id
+                and b.copy_code = d.copy_code
+                and b.inv_id = d.inv_id
+                and b.inv_no = d.inv_no
+              where a.group_id = p_group_id
+                and a.hos_id = p_hos_id
+                and a.copy_code = p_copy_code
+        --        and a.in_id in (p_in_ids)
+                and instr(','||p_in_ids||',',','||a.in_id||',') > 0 --例如：11,22中存在 1、11、2、22,所以前后加','判断,11,、,22,
+                and a.state < 3
+              order by a.in_id, b.in_detail_id;
+            loop  /*开启游标*/
+              FETCH v_cursor into v_year, v_month, v_in_id, v_bus_type_code, v_store_id, v_sup_id, v_in_detail_id,
+                v_inv_id, v_inv_no, v_inv_code, v_inv_name, v_is_batch, v_is_bar, v_is_quality, v_is_disinfect, v_amount, v_price, v_amount_money,
+                v_sale_price, v_sale_money, v_batch_no, v_batch_sn, v_bar_code, v_location_id,
+                v_inva_date, v_disinfect_date, v_sell_price, v_new_sell_price; /*从游标中取一条记录，存放到变量中*/
+              EXIT WHEN v_cursor%NOTFOUND;
+                  --dbms_output.put_line('入库操作');
+                        /*如果不是默认批号需要插入材料批号有效期表*/
+                      /*  if v_batch_no <> '-' and v_is_quality = 1
+                    then*/
+
+                    /*获取库房启用年月*/
+                    select start_year, start_month
+                      into start_year, start_month
+                    from med_store_start
+                    where group_id = p_group_id and hos_id = p_hos_id
+                      and copy_code = p_copy_code and store_id = v_store_id;
+                if v_inva_date is not null
+                    then
+                      /*判断该批号是否存在*/
+                      select count(1) into is_flag from med_batch_validity
+                      where group_id = p_group_id and hos_id = p_hos_id and copy_code = p_copy_code
+                        and inv_id = v_inv_id and batch_no = v_batch_no;
+                      if is_flag = 0
+                        then
+                          /*不存在则插入*/
+                          insert into med_batch_validity(group_id, hos_id, copy_code, inv_id, batch_no, inva_date)
+                          values(p_group_id, p_hos_id, p_copy_code, v_inv_id, v_batch_no, v_inva_date);
+                      end if;
+                  end if;
+                  /*如果不是默认批号需要插入材料批号灭菌期表*/
+                  if v_batch_no <> '-' and v_is_disinfect = 1
+                    then
+                      /*判断该批号是否存在*/
+                      select count(1) into is_flag from med_batch_disinfect
+                      where group_id = p_group_id and hos_id = p_hos_id and copy_code = p_copy_code
+                        and inv_id = v_inv_id and batch_no = v_batch_no;
+                      if is_flag = 0
+                        then
+                          /*不存在则插入*/
+                          insert into med_batch_disinfect(group_id, hos_id, copy_code, inv_id, batch_no, disinfect_date)
+                          values(p_group_id, p_hos_id, p_copy_code, v_inv_id, v_batch_no, v_disinfect_date);
+                      end if;
+                  end if;
+                  /*材料零售价有变化则需插入零售价变更表*/
+                  if v_sell_price <> v_new_sell_price
+                    then
+                      insert into med_inv_sell_change(group_id, hos_id, copy_code, auto_id, inv_id, inv_no, in_detail_id,
+                        old_sell_price, new_sell_price, change_date, oper)
+                      values(p_group_id, p_hos_id, p_copy_code, med_inv_sell_change_seq.nextval, v_inv_id, v_inv_no, v_in_detail_id,
+                        v_new_sell_price, v_sell_price, sys_date, p_user_id);
+                  end if;
+
+                  /*更新出入库结存表 med_fifo_balance*/
+                  /*dbms_output.put_line(p_group_id||','||p_hos_id||','||p_copy_code||','||v_store_id||','||v_inv_id||
+                  ','||v_batch_no||','||v_batch_sn||','||v_bar_code||','||v_sup_id);*/
+                  select count(1) into is_flag from med_fifo_balance
+                  where group_id = p_group_id and hos_id = p_hos_id and copy_code = p_copy_code
+                    and store_id = v_store_id and inv_id = v_inv_id and batch_no = v_batch_no
+                    and batch_sn = v_batch_sn and bar_code = v_bar_code and price = v_price
+                    and sale_price = v_sale_price and nvl(sup_id, 0) = v_sup_id;
+                  if is_flag = 0
+                    then
+                      /*不存在则插入*/
+                      insert into med_fifo_balance(group_id, hos_id, copy_code, store_id, inv_id, batch_no, batch_sn, bar_code, price, sale_price,
+                        in_amount, in_money, in_sale_money, out_amount, out_money, out_sale_money, left_amount, left_money, left_sale_money, location_id, sup_id)
+                      values(p_group_id, p_hos_id, p_copy_code, v_store_id, v_inv_id, v_batch_no, v_batch_sn, v_bar_code, v_price, v_sale_price,
+                        v_amount, v_amount_money, v_sale_money, 0, 0, 0, v_amount, v_amount_money, v_sale_money, v_location_id, v_sup_id);
+                  else
+                    /*存在则修改*/
+                    update med_fifo_balance
+                    set in_amount = in_amount + v_amount, in_money = in_money + v_amount_money, in_sale_money = in_sale_money + v_sale_money,
+                      left_amount = left_amount + v_amount, left_money = left_money + v_amount_money, left_sale_money = left_sale_money + v_sale_money
+                    where group_id = p_group_id and hos_id = p_hos_id and copy_code = p_copy_code
+                      and store_id = v_store_id and inv_id = v_inv_id and batch_no = v_batch_no
+                      and batch_sn = v_batch_sn and bar_code = v_bar_code and price = v_price
+                      and sale_price = v_sale_price and nvl(sup_id, 0) = v_sup_id;
+                  end if;
+                  /*更新物资批次结存表 med_batch_balance*/
+                  select count(1) into is_flag from med_batch_balance
+                  where group_id = p_group_id and hos_id = p_hos_id and copy_code = p_copy_code
+                    and year = v_year and month = v_month and store_id = v_store_id
+                    and inv_id = v_inv_id and batch_no = v_batch_no and batch_sn = v_batch_sn
+                    and bar_code = v_bar_code and price = v_price and sale_price = v_sale_price;
+                  if is_flag = 0
+                    then
+                      /*不存在则插入*/
+                      insert into med_batch_balance(group_id, hos_id, copy_code, year, month, inv_id, store_id, batch_no, batch_sn, bar_code,
+                        price, sale_price, end_amount, end_money, end_sale_money, begin_amount, begin_money, begin_sale_money,
+                        in_amount, in_money, in_sale_money, out_amount, out_money, out_sale_money, y_in_amount, y_in_money, y_in_sale_money,
+                        y_out_amount, y_out_money, y_out_sale_money, location_id)
+                      values(p_group_id, p_hos_id, p_copy_code, v_year, v_month, v_inv_id, v_store_id, v_batch_no, v_batch_sn, v_bar_code,
+                        v_price, v_sale_price, 0, 0, 0, 0, 0, 0, v_amount, v_amount_money, v_sale_money, 0, 0, 0, v_amount, v_amount_money, v_sale_money,
+                        0, 0, 0, v_location_id);
+                  else
+                    /*存在则修改*/
+                    update med_batch_balance
+                    set in_amount = in_amount + v_amount, in_money = in_money + v_amount_money, in_sale_money = in_sale_money + v_sale_money,
+                      y_in_amount = y_in_amount + v_amount, y_in_money = y_in_money + v_amount_money, y_in_sale_money = y_in_sale_money + v_sale_money
+                    where group_id = p_group_id and hos_id = p_hos_id and copy_code = p_copy_code
+                      and year = v_year and month = v_month and store_id = v_store_id
+                      and inv_id = v_inv_id and batch_no = v_batch_no and batch_sn = v_batch_sn
+                      and bar_code = v_bar_code and price = v_price and sale_price = v_sale_price;
+                  end if;
+                    /*如果为期初入库*/
+                    if v_bus_type_code = 1
+                      then
+                        select count(1) into is_flag from med_batch_balance
+                        where group_id = p_group_id and hos_id = p_hos_id and copy_code = p_copy_code
+                          and year = start_year and month = start_month and store_id = v_store_id
+                          and inv_id = v_inv_id and batch_no = v_batch_no and batch_sn = v_batch_sn
+                          and bar_code = v_bar_code and price = v_price and sale_price = v_sale_price;
+                        if is_flag = 0
+                          then
+                            /*不存在则插入*/
+                            insert into med_batch_balance(group_id, hos_id, copy_code, year, month, inv_id, store_id, batch_no, batch_sn, bar_code,
+                              price, sale_price, end_amount, end_money, end_sale_money, begin_amount, begin_money, begin_sale_money,
+                              in_amount, in_money, in_sale_money, out_amount, out_money, out_sale_money, y_in_amount, y_in_money, y_in_sale_money,
+                              y_out_amount, y_out_money, y_out_sale_money, location_id)
+                            values(p_group_id, p_hos_id, p_copy_code, start_year, start_month, v_inv_id, v_store_id, v_batch_no, v_batch_sn, v_bar_code,
+                              v_price, v_sale_price, 0, 0, 0, v_amount, v_amount_money, v_sale_money, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, v_location_id);
+                        else
+                          /*存在则修改*/
+                          update med_batch_balance
+                          set begin_amount = begin_amount + v_amount,
+                            begin_money = begin_money + v_amount_money,
+                            begin_sale_money = begin_sale_money + v_sale_money
+                          where group_id = p_group_id and hos_id = p_hos_id and copy_code = p_copy_code
+                            and year = start_year and month = start_month and store_id = v_store_id
+                            and inv_id = v_inv_id and batch_no = v_batch_no and batch_sn = v_batch_sn
+                            and bar_code = v_bar_code and price = v_price and sale_price = v_sale_price;
+                        end if;
+                    end if;
+                  /*更新材料结余表 med_inv_balance*/
+                  select count(1) into is_flag from med_inv_balance
+                  where group_id = p_group_id and hos_id = p_hos_id and copy_code = p_copy_code
+                    and year = v_year and month = v_month and store_id = v_store_id and inv_id = v_inv_id;
+                  if is_flag = 0
+                    then
+                      /*不存在则插入*/
+                      insert into med_inv_balance(group_id, hos_id, copy_code, year, month, store_id, inv_id, end_amount, end_money, end_sale_money,
+                        begin_amount, begin_money, begin_sale_money, in_amount, in_money, in_sale_money, out_amount, out_money, out_sale_money,
+                        y_in_amount, y_in_money, y_in_sale_money, y_out_amount, y_out_money, y_out_sale_money, location_id)
+                      values(p_group_id, p_hos_id, p_copy_code, v_year, v_month, v_store_id, v_inv_id, 0, 0, 0,
+                        0, 0, 0, v_amount, v_amount_money, v_sale_money, 0, 0, 0,
+                        v_amount, v_amount_money, v_sale_money, 0, 0, 0, v_location_id);
+                  else
+                    /*存在则修改*/
+                    update med_inv_balance
+                    set in_amount = in_amount + v_amount, in_money = in_money + v_amount_money, in_sale_money = in_sale_money + v_sale_money,
+                      y_in_amount = y_in_amount + v_amount, y_in_money = y_in_money + v_amount_money, y_in_sale_money = y_in_sale_money + v_sale_money
+                    where group_id = p_group_id and hos_id = p_hos_id and copy_code = p_copy_code
+                      and year = v_year and month = v_month and store_id = v_store_id and inv_id = v_inv_id;
+                  end if;
+                    /*如果为期初入库*/
+                    if v_bus_type_code = 1
+                      then
+                        select count(1) into is_flag from med_inv_balance
+                        where group_id = p_group_id and hos_id = p_hos_id and copy_code = p_copy_code
+                          and year = start_year and month = start_month and store_id = v_store_id and inv_id = v_inv_id;
+                        if is_flag = 0
+                          then
+                            /*不存在则插入*/
+                            insert into med_inv_balance(group_id, hos_id, copy_code, year, month, store_id, inv_id, end_amount, end_money, end_sale_money,
+                              begin_amount, begin_money, begin_sale_money, in_amount, in_money, in_sale_money, out_amount, out_money, out_sale_money,
+                              y_in_amount, y_in_money, y_in_sale_money, y_out_amount, y_out_money, y_out_sale_money, location_id)
+                            values(p_group_id, p_hos_id, p_copy_code, start_year, start_month, v_store_id, v_inv_id, 0, 0, 0,
+                              v_amount, v_amount_money, v_sale_money, 0, 0, 0, 0, 0, 0,
+                              0, 0, 0, 0, 0, 0, v_location_id);
+                        else
+                          /*存在则修改*/
+                          update med_inv_balance
+                          set begin_amount = begin_amount + v_amount,
+                            begin_money = begin_money + v_amount_money,
+                            begin_sale_money = begin_sale_money + v_sale_money
+                          where group_id = p_group_id and hos_id = p_hos_id and copy_code = p_copy_code
+                            and year = start_year and month = start_month and store_id = v_store_id and inv_id = v_inv_id;
+                        end if;
+                    end if;
+                  /*更新材料结存表 med_inv_hold*/
+                  select count(1) into is_flag from med_inv_hold
+                  where group_id = p_group_id and hos_id = p_hos_id and copy_code = p_copy_code
+                    and store_id = v_store_id and inv_id = v_inv_id;
+                  if is_flag = 0
+                    then
+                      /*不存在则插入*/
+                      insert into med_inv_hold(group_id, hos_id, copy_code, store_id, inv_id, cur_amount, cur_money, location_id)
+                      values(p_group_id, p_hos_id, p_copy_code, v_store_id, v_inv_id, v_amount, v_amount_money, v_location_id);
+                  else
+                    /*存在则修改*/
+                    update med_inv_hold
+                    set cur_amount = cur_amount + v_amount, cur_money = cur_money + v_amount_money
+                    where group_id = p_group_id and hos_id = p_hos_id and copy_code = p_copy_code
+                      and store_id = v_store_id and inv_id = v_inv_id;
+                  end if;
+                  /*期初需要重新计算开始月份到结账月份之间的begin与end*/
+                  /*if v_bus_type_code = 1
+                    then
+                      select count(*) into is_flag from acc_year_month
+                        where group_id = p_group_id and hos_id = p_hos_id
+                          and copy_code = p_copy_code and med_flag = 1;
+                      if is_flag <> 0
+                        then
+                          declare
+                            init_year numeric(16,2); --期间年
+                            init_month numeric(16,6); --期间月
+                            TYPE cur_init IS REF CURSOR;  --定义游标指针
+                            init_cursor cur_init;  --定义游标变量
+                          begin
+                            open init_cursor for
+                              select acc_year, acc_month
+                              from acc_year_month
+                              where group_id = p_group_id and hos_id = p_hos_id
+                                and copy_code = p_copy_code and med_flag = 1
+                                order by acc_year, acc_month;
+                            loop \*开启游标*\
+                              FETCH init_cursor into init_year, init_month; \*从游标中取一条记录，存放到变量中*\
+                              EXIT WHEN init_cursor%NOTFOUND;
+                                if init_year = start_year and init_month = start_month
+                                  then
+                                    \*更新med_batch_balance*\
+                                    update med_batch_balance
+                                    set end_amount = end_amount + v_amount_money,
+                                      end_money = end_money + v_amount_money,
+                                      end_sale_money = end_sale_money + v_sale_money
+                                    where group_id = p_group_id and hos_id = p_hos_id
+                                      and copy_code = p_copy_code and year = init_year
+                                      and month = init_month and store_id = v_store_id
+                                      and inv_id = v_inv_id and batch_no = v_batch_no
+                                      and batch_sn = v_batch_sn and bar_code = v_bar_code
+                                      and location_id = v_location_id;
+                                    \*更新med_inv_balance*\
+                                    update med_inv_balance
+                                    set end_amount = end_amount + v_amount_money,
+                                      end_money = end_money + v_amount_money,
+                                      end_sale_money = end_sale_money + v_sale_money
+                                    where group_id = p_group_id and hos_id = p_hos_id
+                                      and copy_code = p_copy_code and year = init_year
+                                      and month = init_month and store_id = v_store_id
+                                      and inv_id = v_inv_id and location_id = v_location_id;
+                                else
+                                  \*更新med_batch_balance*\
+                                  update med_batch_balance
+                                  set begin_amount = begin_amount + v_amount,
+                                    begin_money = begin_money + v_amount_money,
+                                    begin_sale_money = begin_sale_money + v_sale_money,
+                                    end_amount = end_amount + v_amount_money,
+                                    end_money = end_money + v_amount_money,
+                                    end_sale_money = end_sale_money + v_sale_money
+                                  where group_id = p_group_id and hos_id = p_hos_id
+                                    and copy_code = p_copy_code and year = init_year
+                                    and month = init_month and store_id = v_store_id
+                                    and inv_id = v_inv_id and batch_no = v_batch_no
+                                    and batch_sn = v_batch_sn and bar_code = v_bar_code
+                                    and location_id = v_location_id;
+                                  \*更新med_inv_balance*\
+                                  update med_inv_balance
+                                  set begin_amount = begin_amount + v_amount,
+                                    begin_money = begin_money + v_amount_money,
+                                    begin_sale_money = begin_sale_money + v_sale_money,
+                                    end_amount = end_amount + v_amount_money,
+                                    end_money = end_money + v_amount_money,
+                                    end_sale_money = end_sale_money + v_sale_money
+                                  where group_id = p_group_id and hos_id = p_hos_id
+                                    and copy_code = p_copy_code and year = init_year
+                                    and month = init_month and store_id = v_store_id
+                                    and inv_id = v_inv_id and location_id = v_location_id;
+                                end if;
+                            end loop;  \*结束游标*\
+                            CLOSE init_cursor;  \*关闭游标*\
+                          end;
+                      end if;
+                   end if;*/
+            end loop;  /*结束游标*/
+            CLOSE v_cursor;  --关闭游标
+          end;
+          /*如果存在材料库存不足回滚事物并返回*/
+          if length(err_msg) > 0
+            then
+              msg := '{"error":"'||err_msg||'库存不足！"}';
+              rollback;
+              return;
+          end if;
+
+          /*更新入库单状态*/
+          --处理非期初单据
+          update med_in_main set state = 3, confirmer = p_user_id, confirm_date = sys_date,
+            year = acc_year, month = acc_month
+          where group_id = p_group_id
+            and hos_id = p_hos_id
+            and copy_code = p_copy_code
+            and state < 3
+            and bus_type_code <> '1'
+            and instr(','||p_in_ids||',',','||in_id||',') > 0;
+          --单独处理期初
+          update med_in_main set state = 3, confirmer = p_user_id, confirm_date = sys_date,
+            year = '0000', month = '00'
+          where group_id = p_group_id
+            and hos_id = p_hos_id
+            and copy_code = p_copy_code
+            and state < 3
+            and bus_type_code = '1'
+            and instr(','||p_in_ids||',',','||in_id||',') > 0;
+        --    and in_id in (p_in_ids);
+
+          /*返回信息*/
+          msg := '{"msg":"操作成功","state":"true"}';
+        END med_in_confirm;
+	
+	]]></sql>
+	 
+</root>
+

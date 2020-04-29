@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.acc.dao.autovouch.his.HisAccMedVenRefMapper">
+
+	<resultMap id="hisAccMedVenRef" type="com.chd.hrp.acc.entity.autovouch.HisAccMedVenRef">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="ven_code" column="ven_code" />
+		<result property="ven_name" column="ven_name" />
+		<result property="sup_code" column="sup_code" />
+		<result property="sup_name" column="sup_name" />
+		<result property="sup_id" column="sup_id" />
+		<result property="sup_no" column="sup_no" />
+	</resultMap>
+
+
+	<insert id="addHisAccMedVenRef" parameterType="java.util.List" >
+
+		insert into ACC_MED_VEN_HIS_REF 
+		( group_id, 
+		  hos_id, 
+		  copy_code, 
+		  his_ven_code, 
+		  hrp_ven_id
+		)
+		<foreach collection="list" item="item" index="index" separator=" union all " >
+		select 
+		  #{item.group_id,jdbcType=INTEGER},
+		  #{item.hos_id,jdbcType=INTEGER},
+		  #{item.copy_code,jdbcType=VARCHAR},
+		  #{item.his_ven_code,jdbcType=VARCHAR},
+		  #{item.hrp_ven_id,jdbcType=INTEGER}
+		from dual
+		</foreach>
+	</insert>
+
+	
+	<delete id="deleteHisAccMedVenRef" parameterType="java.util.List">
+		
+		delete ACC_MED_VEN_HIS_REF 
+		
+ 		where 
+ 		<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+ 		group_id =  #{item.group_id,jdbcType=INTEGER} 
+ 		
+   		and hos_id = #{item.hos_id,jdbcType=INTEGER}
+   		
+   		and copy_code = #{item.copy_code,jdbcType=VARCHAR}
+   		 
+   		and his_ven_code = #{item.his_ven_code,jdbcType=VARCHAR}
+   		
+   		and hrp_ven_id = #{item.hrp_ven_id,jdbcType=INTEGER}
+		</foreach>
+	</delete>
+	
+	<update id="updateHisAccMedVenRef"  parameterType="java.util.Map" >
+		
+		update ACC_MED_VEN_HIS_REF  set 
+		
+		hrp_ven_id = #{hrp_ven_id,jdbcType=INTEGER}
+		
+ 		where
+ 		
+ 		group_id =  #{group_id,jdbcType=INTEGER} 
+ 		
+   		and hos_id = #{hos_id,jdbcType=INTEGER}
+   		
+   		and copy_code = #{copy_code,jdbcType=VARCHAR}
+   		 
+   		and his_ven_code = #{his_ven_code,jdbcType=VARCHAR}
+
+	</update>
+	
+	<select id="queryHisAccMedVenRefByCode" parameterType="java.util.Map" resultType="com.chd.hrp.acc.entity.autovouch.HisAccMedVenRef">
+
+		select 
+		group_id, 
+		hos_id, 
+		copy_code, 
+		his_ven_code, 
+		hrp_ven_id
+		from ACC_MED_VEN_HIS_REF 
+		where 
+		group_id = #{group_id}
+		and hos_id = #{hos_id} 
+		and copy_code = #{copy_code} 
+		
+		<if test="his_ven_code != null and his_ven_code != ''">
+				and his_ven_code = #{his_ven_code}
+		</if>
+	
+		order by his_ven_code
+	</select>
+	
+	<select id="queryHisAccMedVenRef" parameterType="java.util.Map" resultMap="hisAccMedVenRef">
+
+	   select 
+       amvh.group_id, 
+       amvh.hos_id, 
+       amvh.copy_code, 
+       amvh.ven_code, 
+       amvh.ven_name,
+       hsd.sup_id,
+       hsd.sup_code,
+       hsd.sup_name
+       from ACC_MED_VEN_HIS amvh
+       left join ACC_MED_VEN_HIS_REF amvhr
+       on amvhr.group_id=amvh.group_id and amvhr.hos_id = amvh.hos_id
+       and amvhr.copy_code = amvh.copy_code and amvhr.his_ven_code=amvh.ven_code
+       left join hos_sup hsd on amvhr.group_id=hsd.group_id and amvhr.hos_id=hsd.hos_id
+       and amvhr.hrp_ven_id=hsd.sup_id and hsd.is_stop=0
+		where 
+		amvh.group_id = #{group_id} and
+		amvh.hos_id = #{hos_id} and
+		amvh.copy_code = #{copy_code} 
+		
+		<if test="ven_code != null and ven_code != ''">
+		
+			and (amvh.ven_code like '${ven_code}%'
+			
+			OR amvh.ven_name like '%${ven_code}%')
+				
+		</if>
+		
+		<if test="ven_name != null and ven_name != ''">
+		
+			and (hsd.sup_code like '${ven_name}%'
+			
+			OR hsd.sup_name like '%${ven_name}%')
+				
+		</if>
+
+		order by amvhr.his_ven_code
+	</select>
+
+
+</mapper>
+

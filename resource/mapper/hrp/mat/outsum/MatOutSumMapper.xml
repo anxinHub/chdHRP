@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.mat.dao.outsum.MatOutSumMapper">
+
+    <resultMap id="singleSum" type="java.util.Map">   
+        <result property="dept_name" column="dept_name"/>
+        <result property="inv_code" column="inv_code"/>
+        <result property="inv_name" column="inv_name"/>
+        <result property="brand_name" column="brand_name"/>
+        <result property="amount" column="amount"/> 
+        <result property="unit_name" column="unit_name"/>
+        <result property="location_name" column="location_name"/>
+        <result property="fac_name" column="fac_name"/>
+    </resultMap>
+    
+    <resultMap id="deptStoreCrossMap" type="java.util.Map">   
+        <result property="mat_type_code" column="mat_type_code"/>
+        <result property="dept_code" column="dept_code"/>
+        <result property="dept_name" column="dept_name"/>
+        <result property="money" column="money"/>
+        <result property="is_last" column="is_last"/> 
+        <result property="type_level" column="type_level"/>
+    </resultMap>
+
+    <resultMap id="matTypesMap" type="java.util.Map">   
+        <result property="id" column="id"/>
+        <result property="text" column="text"/>
+    </resultMap>
+
+    <select id="queryOutSumSingleSum" resultMap="singleSum" parameterType="java.util.Map">
+        SELECT hd.dept_name, mid.inv_code, mid.inv_name, mid.brand_name, sum(maod.amount) as amount, hu.unit_name, mld.location_name, hf.fac_name
+  FROM mat_out_main mom
+  LEFT JOIN hos_dept hd
+    ON mom.group_id = hd.group_id
+   AND mom.hos_id = hd.hos_id
+   AND mom.dept_id = hd.dept_id
+  LEFT JOIN mat_out_detail maod
+    ON mom.group_id = maod.group_id
+   AND mom.hos_id = maod.hos_id 
+   AND mom.copy_code = maod.copy_code
+   AND mom.out_id = maod.out_id
+  LEFT JOIN mat_inv_dict mid
+    ON mom.group_id = mid.group_id
+   AND mom.hos_id = mid.hos_id
+   AND mom.copy_code = mid.copy_code
+   AND maod.inv_id = mid.inv_id
+   AND mid.is_stop = 0
+  LEFT JOIN hos_unit hu
+    ON mom.group_id = hu.group_id
+   AND mom.hos_id = hu.hos_id
+   AND mid.unit_code = hu.unit_code
+  LEFT JOIN mat_location_dict mld
+    ON mom.group_id = mld.group_id
+   AND mom.hos_id = mld.hos_id
+   AND mom.copy_code = mld.copy_code
+   AND maod.location_id = mld.location_id
+  LEFT JOIN hos_fac hf
+    ON mom.group_id = hf.group_id
+   AND mom.hos_id = hf.hos_id
+   AND mid.fac_id = hf.fac_id
+   WHERE 1=1
+   <if test="begin_year_month != null and begin_year_month != ''">
+   AND mom.year || mom.month &gt;= #{begin_year_month} 
+   </if>
+   <if test="end_year_month != null and end_year_month != ''">
+   AND mom.year || mom.month &lt;= #{end_year_month}
+   </if>
+   <if test="store_id != null and store_id != ''">
+   AND mom.store_id = #{store_id}
+   </if>
+   
+   GROUP BY mid.inv_name, hd.dept_name, mid.inv_code, mid.brand_name,hu.unit_name,mld.location_name, hf.fac_name, mom.dept_id
+ORDER BY mom.dept_id, mid.inv_code
+        
+    </select>
+    <select id="queryDeptStoreCross" parameterType="java.util.Map" resultMap="deptStoreCrossMap">
+    WITH mat_out_type as (
+    SELECT a.mat_type_code, b.dept_code, b.dept_name, sum(b.money) as money, a.is_last, a.type_level
+    FROM mat_type_dict a
+      LEFT JOIN (
+        SELECT hsd.dept_code, hsd.dept_name, sum(mid.amount_money) as money, mtd.mat_type_code
+        FROM MAT_OUT_MAIN mim             
+        LEFT JOIN mat_out_detail mid      
+        ON mim.group_id = mid.group_id
+        AND mim.hos_id = mid.hos_id
+        AND mim.copy_code = mid.copy_code
+        AND mim.out_id = mid.out_id 
+        LEFT JOIN mat_inv_dict midd      
+        ON midd.group_id = mim.group_id
+        AND midd.hos_id = mim.hos_id
+        AND midd.copy_code = mim.copy_code
+        AND midd.inv_id = mid.inv_id
+        AND midd.inv_no = mid.inv_no 
+        LEFT JOIN mat_type_dict mtd      
+        ON midd.mat_type_id = mtd.mat_type_id
+        AND mim.group_id = mtd.group_id
+        AND mim.hos_id = mtd.hos_id
+        AND mim.copy_code = mtd.copy_code
+        AND mtd.is_stop = 0 
+        LEFT JOIN hos_dept_dict hsd       
+        ON mim.dept_id = hsd.dept_id
+        AND hsd.is_stop = 0
+        AND hsd.group_id = mim.group_id
+        AND hsd.hos_id = mim.hos_id 
+        WHERE 
+          mim.group_id = #{group_id}
+          AND mim.hos_id = #{hos_id}
+          AND mim.copy_code = #{copy_code}
+          <if test="begin_date != null and begin_date != '' and  end_date != null and end_date != ''">
+            AND mim.confirm_date BETWEEN to_date(#{begin_date}, 'yyyy-MM-dd') AND to_date(#{end_date}, 'yyyy-MM-dd')
+          </if>
+          <if test="store_id != null and store_id != ''">
+            AND mim.store_id = #{store_id}
+          </if>
+        GROUP BY hsd.dept_code, hsd.dept_name, mtd.mat_type_code
+      ) b ON b.mat_type_code like (a.mat_type_code || '%') 
+    WHERE a.is_stop = 0
+      AND b.money != 0
+    GROUP BY a.mat_type_code, b.dept_code, b.dept_name, a.is_last, a.type_level
+  )
+SELECT mat_type_code, dept_code, to_char(dept_name) as dept_name, money
+  , is_last, type_level
+FROM mat_out_type
+UNION ALL
+SELECT mat_type_code, '总合计', to_char(null) as sup_name
+  , sum(money), is_last, type_level
+FROM mat_out_type
+GROUP BY mat_type_code, is_last, type_level
+ORDER BY dept_code
+    </select>
+    
+    <select id="queryALLMatTypes" resultMap="matTypesMap" parameterType="java.util.Map">
+        select distinct mtd.mat_type_code as id,mtd.mat_type_name  as text
+        from  mat_type_dict mtd
+            right join 
+            (
+             select c.mat_type_code , c.mat_type_name 
+               from mat_store_inv a
+               left join mat_inv_dict b
+                 on a.inv_id = b.inv_id
+                and a.group_id = b.group_id
+                and a.hos_id = b.hos_id
+                and a.copy_code = b.copy_code
+                and b.is_stop=0
+               left join mat_type_dict c  
+               on b.MAT_TYPE_ID = c.MAT_TYPE_ID 
+               and b.group_id = c.group_id 
+               and b.hos_id = c.hos_id 
+               and b.copy_code = c.copy_code
+               <if test="set_id ==null or set_id=='' ">
+                    <if test="store_id != null and store_id != ''">
+                        and a.store_id = #{store_id}
+                    </if>
+                    <if test="store_id == null or store_id == ''">
+                        and a.store_id in(
+                            select perm_code from v_user_data_perm vp
+                            where group_id = #{group_id,jdbcType=INTEGER}
+                                and hos_id = #{hos_id,jdbcType=INTEGER}
+                                and user_id = #{user_id,jdbcType=INTEGER}
+                                and is_read = 1
+                                and table_code = 'HOS_STORE_DICT'
+                        )
+                    </if>
+                </if>
+                <if test="set_id!=null and set_id!=''">
+                    and exists (select store_id from MAT_STORE_DETAIL msd  where msd.group_id=a.group_id and msd.hos_id = a.hos_id and set_id = #{set_id})
+                </if>
+              group by c.mat_type_code, c.mat_type_name
+             ) da on da.mat_type_code like mtd.mat_type_code||'%'
+             <where> 
+                 mtd.group_id=#{group_id} 
+             and mtd.hos_id = #{hos_id}
+             and mtd.copy_code=#{copy_code}
+             <if test="type_level!= null and type_level!=''">
+             <if test="type_level==1">
+                 and mtd.type_level= 1
+             </if>
+                    <if test="type_level!=1">
+                        and mtd.is_last=1
+                    </if>
+             </if>
+                
+             </where>
+             order by mtd.mat_type_code
+    </select>
+</mapper>

@@ -1,0 +1,377 @@
+﻿<!doctype html>
+<html>
+<head>
+    <title>Spread.Sheets - Tree Slicer User Case</title>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+
+    <link href="../../../external/spreadjs/css/gc.spread.sheets.excel2013white.10.1.0.css" rel="stylesheet" type="text/css" />
+
+    <script src="../../../external/external/jquery-1.8.2.min.js" type="text/javascript"></script>
+
+    <script type="text/javascript" src="../../../external/spreadjs/gc.spread.sheets.all.10.1.0.min.js"></script>
+
+    <style type="text/css">
+        /*css_begin*/
+        .hover {
+            background-color: lightgray;
+            font-weight: 700 !important;
+        }
+
+        .select {
+            font-weight: 700 !important;
+            color: blue;
+        }
+
+        .active {
+            font-weight: 700 !important;
+            color: red;
+        }
+
+        .treeSlicer_Item {
+            cursor: pointer;
+        }
+
+        .expanded {
+            background-image: url(images/minus.gif);
+            background-repeat: no-repeat;
+            background-position: center;
+            height: 16px;
+            width: 16px;
+            float: left;
+            cursor: pointer;
+        }
+
+        .collapsed {
+            background-image: url(images/plus.gif);
+            background-repeat: no-repeat;
+            background-position: center;
+            height: 16px;
+            width: 16px;
+            float: left;
+            cursor: pointer;
+        }
+
+        li {
+            list-style: none;
+        }
+        /*css_end*/
+    </style>
+
+    <script id="scriptInit" type="text/javascript">
+        /*code_begin*/
+        $(document).ready(function () {
+            spread = new GC.Spread.Sheets.Workbook($("#ss")[0]);
+            var sheet = window.sheet = spread.getActiveSheet();
+            sheet.suspendPaint();
+            var rowCount = 200;
+            sheet.setRowCount(rowCount);
+            var cityCount = cities.length;
+            sheet.setValue(0, 0, "Continent");
+            sheet.setValue(0, 1, "Country");
+            sheet.setValue(0, 2, "City");
+            sheet.setValue(0, 3, "Amount");
+            sheet.setColumnWidth(0, 100);
+            sheet.setColumnWidth(1, 100);
+            sheet.setColumnWidth(2, 100);
+            sheet.setColumnWidth(3, 100);
+            for (var row = 1; row < rowCount; row++) {
+                var cityIndex = Math.floor(cityCount * Math.random());
+                var city = cities[cityIndex];
+                var country = getCountry(city);
+                var continent = getContinent(country);
+                sheet.setValue(row, 0, continent);
+                sheet.setValue(row, 1, country);
+                sheet.setValue(row, 2, city);
+                sheet.setValue(row, 3, Math.floor(10000 * Math.random()));
+            }
+            sheet.tables.add("table1", 0, 0, rowCount, 4, GC.Spread.Sheets.Tables.TableThemes.light19);
+            sheet.resumePaint();
+
+            var table = sheet.tables.find(0, 0);
+            var dataSource = new TreeSlicerData(table, ["Continent", "Country", "City"]);
+            var treeSlicer = new TreeSlicer(dataSource, ["Continent", "Country", "City"]);
+            $("#slicer_Tree").append(treeSlicer.getDOMElement());
+        });
+
+        var cities = ["New York", "Los Angeles", "Chicago", "Bei Jing", "Shang Hai", "Xi An", "Tokyo", "Osaka", "Yokohama", "London", "Liverpool", "Manchester"];
+        function getCountry(city) {
+            switch (city) {
+                case "New York":
+                case "Los Angeles":
+                case "Chicago":
+                    return "USA";
+                case "Bei Jing":
+                case "Shang Hai":
+                case "Xi An":
+                    return "China";
+                case "London":
+                case "Liverpool":
+                case "Manchester":
+                    return "UK";
+            }
+            return "Japan";
+        }
+
+        function getContinent(country) {
+            switch (country) {
+                case "USA":
+                    return "North America";
+                case "UK":
+                    return "Europe";
+            }
+            return "Asia";
+        }
+                
+        function TreeSlicerData(table, treeColumns) {
+            GC.Spread.Sheets.Slicers.TableSlicerData.call(this, table);
+            this.listeners = [];
+            this.suspended = false;
+            this.treeColumns = treeColumns;
+            this.lastFilterPath = [];
+        }
+        TreeSlicerData.prototype = GC.Spread.Sheets.Slicers.TableSlicerData.prototype;
+        TreeSlicerData.prototype.constructor = TreeSlicerData;
+        TreeSlicerData.prototype.buildDataTree = function () {
+            var treeData = this.treeData = {};
+            this.build(treeData, this.treeColumns, 0, null);
+        };
+        TreeSlicerData.prototype.build = function (parentData, treeColumns, index, parentIndexes) {
+            var columnName = treeColumns[index];
+            var currentData;
+            var exclusiveIndexes = [];
+            var map = {};
+            if (!parentIndexes) {
+                var datas = this.getExclusiveData(columnName);
+                for (var k = 0; k < datas.length; k++) {
+                    exclusiveIndexes.push(k);
+                    map[k] = this.getRowIndexes(columnName, k);
+                }
+            }
+            else {
+                for (var k = 0; k < parentIndexes.length; k++) {
+                    var exclusivaIndex = this.getExclusiveRowIndex(columnName, parentIndexes[k]);
+                    if (!map[exclusivaIndex]) {
+                        map[exclusivaIndex] = [];
+                        exclusiveIndexes.push(exclusivaIndex);
+                    }
+                    map[exclusivaIndex].push(parentIndexes[k]);
+                }
+            }
+            parentData.column = columnName;
+            if (!parentData.indexes) {
+                parentData.indexes = [];
+            }
+            for (var dateIndex = 0; dateIndex < exclusiveIndexes.length; dateIndex++) {
+                var exclusivaIndex = exclusiveIndexes[dateIndex];
+                var dataValue = this.getExclusiveData(columnName)[exclusivaIndex];
+                parentData.indexes.push(exclusivaIndex);
+                if (index + 1 < treeColumns.length) {
+                    currentData = parentData[exclusivaIndex] = { indexes: [], value: dataValue };
+                    this.build(currentData, treeColumns, index + 1, map[exclusivaIndex]);
+                }
+                else {
+                    currentData = parentData[exclusivaIndex] = map[exclusivaIndex];
+                    currentData.value = dataValue;
+                }
+            }
+        };
+        TreeSlicerData.prototype.filter = function (path) {
+            this.suspended = true;
+            if (this.lastFilterPath) {
+                for (var i = 0; i < this.lastFilterPath.length; i++) {
+                    this.doUnfilter(this.treeColumns[i]);
+                }
+            }
+            this.lastFilterPath = path;
+            var current = this.treeData;
+            for (var i = 0; i < path.length; i++) {
+                var exclusiveIndex = current.indexes ? current.indexes[path[i]] : path[i];
+                current = current[exclusiveIndex];
+                if (i === path.length - 1) {
+                    this.suspended = false;
+                }
+                this.doFilter(this.treeColumns[i], { exclusiveRowIndexes: [exclusiveIndex] });
+            }
+        };
+        TreeSlicerData.prototype.clearFilter = function () {
+            this.suspended = true;
+            if (this.lastFilterPath) {
+                for (var i = 0; i < this.lastFilterPath.length; i++) {
+                    if (i === this.lastFilterPath.length - 1) {
+                        this.suspended = false;
+                    }
+                    this.doUnfilter(this.treeColumns[i]);
+                }
+            }
+        };
+        TreeSlicerData.prototype.onFiltered = function (filteredIndexes, isPreview) {
+            if (!this.suspended) {
+                for (var i = 0; i < this.listeners.length; i++) {
+                    this.listeners[i].onFiltered({ columnIndexes: filteredIndexes, isPreview: isPreview });
+                }
+            }
+        };
+        TreeSlicerData.prototype.attachListener = function (listener) {
+            this.listeners.push(listener);
+        };
+        TreeSlicerData.prototype.dettachListener = function (listener) {
+            for (var i = 0; i < this.listeners.length; i++) {
+                if (this.listeners[i] === listener) {
+                    this.listeners.splice(i);
+                    break;
+                }
+            }
+        };
+
+        var root = null;
+        function TreeSlicer(slicerData, treeColumns) {
+            slicerData.buildDataTree();
+            this.data = slicerData;
+            this.slicerData = slicerData;
+            this.treeColumns = treeColumns;
+            this.treeDatas = slicerData.treeData;
+            this.slicerData.attachListener(this);
+            this.onDataLoaded();
+        }
+        TreeSlicer.prototype.constructor = TreeSlicer;
+        TreeSlicer.prototype.getDOMElement = function () {
+            return root;
+        }
+        TreeSlicer.prototype.onDataLoaded = function () {
+            var self = this;
+            var treeDatas = this.treeDatas;
+            var treeItems = this.treeItems = {};
+            root = $('<div><span class="expanded"></span><span>All</span></div>');
+            treeItems.dom = root[0].children[1];
+            treeItems.allDoms = [root[0].children[1]];
+            treeItems.allIcons = [root[0].children[0]];
+            treeItems.dom.treeItem = treeItems;
+            self.addOneNode(treeDatas, root, treeItems, treeItems);
+            $(treeItems.allDoms).addClass("treeSlicer_Item").mousemove(function (obj) {
+                if (self.hoverItem === obj.target) {
+                    return;
+                }
+                if (self.hoverItem) {
+                    $(self.hoverItem).removeClass("hover");
+                }
+                self.hoverItem = obj.target;
+                $(obj.target).addClass("hover");
+            }).mouseout(function (obj) {
+                if (self.hoverItem) {
+                    $(self.hoverItem).removeClass("hover");
+                    self.hoverItem = null;
+                }
+            }).mousedown(function (obj) {
+                var childTree = obj.target.parentElement.children[2];
+                if (self.activeItem === obj.target) {
+                    return;
+                }
+                if (self.activeItem) {
+                    $(self.activeItem).removeClass("active");
+                    self.setSelect(self.activeItem.treeItem, false);
+                }
+                self.activeItem = obj.target;
+                var treeItem = self.activeItem.treeItem;
+                self.setSelect(self.activeItem.treeItem, true);
+                $(obj.target).addClass("active");
+                if (treeItem === treeItems) {
+                    self.data.clearFilter();
+                }
+                else if (treeItem) {
+                    var path = [treeItem.index];
+                    treeItem = treeItem.parent;
+                    while (treeItem && treeItem.parent) {
+                        path.unshift(treeItem.index);
+                        treeItem = treeItem.parent;
+                    }
+                    self.data.filter(path);
+                }
+            });
+            $(treeItems.allIcons).mousedown(function (obj) {
+                var childTree = obj.target.parentElement.children[2];
+                var icon = obj.target.parentElement.children[0];
+                if (childTree && childTree.children && childTree.children.length > 0) {
+                    $(childTree).toggle();
+                    if ($(childTree).css("display") === "none") {
+                        $(icon).removeClass("expanded");
+                        $(icon).addClass("collapsed");
+                    }
+                    else {
+                        $(icon).removeClass("collapsed");
+                        $(icon).addClass("expanded");
+                    }
+                }
+            });
+            self.activeItem = treeItems.dom;
+            self.setSelect(treeItems, true);
+            $(treeItems.dom).addClass("active");
+        };
+        TreeSlicer.prototype.setSelect = function (treeItem, isSelect) {
+            if (!treeItem) {
+                return;
+            }
+            if (isSelect) {
+                $(treeItem.dom).addClass("select");
+            }
+            else {
+                $(treeItem.dom).removeClass("select");
+            }
+            for (var i = 0; i < treeItem.children.length; i++) {
+                this.setSelect(treeItem.children[i], isSelect);
+            }
+        };
+        TreeSlicer.prototype.addOneNode = function (treeDatas, parent, parentItem, rootItem) {
+            var indexes = treeDatas.indexes;
+            var current = $("<ul></ul>");
+            parent.append(current);
+            parentItem.children = [];
+            var currentItem;
+            if (indexes) {
+                for (var i = 0; i < indexes.length; i++) {
+                    var childData = treeDatas[indexes[i]];
+                    var value = childData.value;
+                    var childDom = this.addItem(current, value, parentItem, i, rootItem, false);
+                    currentItem = childDom[0].children[1].treeItem;
+                    this.addOneNode(childData, childDom, currentItem, rootItem);
+                }
+            }
+            else {
+                $(parent[0].children[0]).removeClass("expanded");
+            }
+        };
+        TreeSlicer.prototype.addItem = function (current, value, parentItem, index, rootItem, isLeaf) {
+            var childDom;
+            if (isLeaf) {
+                childDom = $("<li><span></span><span>" + value + "</span></li>");
+            }
+            else {
+                childDom = $('<li><span class="expanded"></span><span>' + value + "</span></li>");
+            }
+            current.append(childDom);
+            var content = childDom[0].children[1];
+            rootItem.allDoms.push(content);
+            rootItem.allIcons.push(childDom[0].children[0]);
+            var item = { dom: content, parent: parentItem, index: index };
+            parentItem.children.push(item);
+            content.treeItem = item;
+            parentItem.children.push();
+            if (isLeaf) {
+                current.toggle(false);
+            }
+            return childDom;
+        };
+        TreeSlicer.prototype.onFiltered = function(data) {
+
+        };
+        /*code_end*/
+    </script>
+
+</head>
+<body>
+    <div class="sample-turtorial">
+        <div id="slicer_Tree" style="position: absolute; left: 0; top: 0;"></div>
+        <div id="ss" style="position: absolute; left: 218px; top: 0; width: 85%; height: 423px; border: 1px solid gray;"></div>
+    </div>
+</body>
+</html>

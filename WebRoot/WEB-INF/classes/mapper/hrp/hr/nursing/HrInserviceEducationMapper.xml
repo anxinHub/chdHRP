@@ -1,0 +1,464 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.hr.dao.nursing.HrInserviceEducationMapper">
+
+	<resultMap id="hrEducation" type="com.chd.hrp.hr.entity.nursing.HrInserviceEducation">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="edu_date" column="edu_date" />
+		<result property="classs_name" column="classs_name" />
+		<result property="teacher" column="teacher" />
+		<result property="teacher_name" column="teacher_name" />
+		<result property="hours" column="hours" />
+		<result property="place" column="place" />
+		<result property="student_num" column="student_num" />
+		<result property="state" column="state" />
+		<result property="note" column="note" />
+	</resultMap>
+
+	<resultMap id="hrEducationMap" type="java.util.Map">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="edu_date" column="edu_date" />
+		<result property="classs_name" column="classs_name" />
+		<result property="teacher" column="teacher" />
+		<result property="teacher_name" column="teacher_name" />
+		<result property="hours" column="hours" />
+		<result property="place" column="place" />
+		<result property="student_num" column="student_num" />
+		<result property="state" column="state" />
+		<result property="state_name" column="state_name" />
+		<result property="note" column="note" />
+	</resultMap>
+
+
+	<resultMap id="hrEducationStudent" type="com.chd.hrp.hr.entity.nursing.HrEducationStudent">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="edu_date" column="edu_date" />
+		<result property="classs_name" column="classs_name" />
+		<result property="emp_id" column="emp_id" />
+		<result property="emp_name" column="emp_name" />
+		<result property="dept_no" column="dept_no" />
+		<result property="dept_name" column="dept_name" />
+		<result property="title_code" column="title_code" />
+		<result property="title_name" column="title_name" />
+		<result property="level_code" column="level_code" />
+		<result property="level_name" column="level_name" />
+		<result property="duty_code" column="duty_code" />
+		<result property="duty_name" column="duty_name" />
+		<result property="note" column="note" />
+	</resultMap>
+	
+	<!--增加年度教育培训 -->
+	<insert id="add" useGeneratedKeys="true">
+		INSERT INTO HR_EDUCATION (
+			<trim suffix="" suffixOverrides=",">
+				group_id,
+				hos_id,
+				edu_date,
+				class_name,
+				teacher,
+				hours,
+				place,
+				student_num,
+				state,
+				note,
+			</trim>
+		) VALUES (
+		<trim suffix="" suffixOverrides=",">
+			#{group_id,jdbcType=INTEGER},
+			#{hos_id,jdbcType=INTEGER},
+			#{edu_date,jdbcType=DATE},
+			#{class_name,jdbcType=VARCHAR},
+			#{teacher,jdbcType=VARCHAR},
+			#{hours,jdbcType=INTEGER},
+			#{place,jdbcType=VARCHAR},
+			#{student_num,jdbcType=INTEGER},
+			#{state,jdbcType=INTEGER},
+			#{note,jdbcType=VARCHAR}
+		</trim>
+		)
+	</insert>
+	
+	<!-- 增加学员 -->
+	<insert id="addEducationStudent" parameterType="java.util.List">
+		INSERT INTO HR_EDUCATION_STUDENT (
+			group_id,
+			hos_id,
+			edu_date,
+			class_name,
+			emp_id,
+			duty_code,
+			title_code,
+			level_code,
+			note
+		) (
+			<foreach collection="list" item="item" index="index" separator=" union all ">
+				select
+					#{item.group_id,jdbcType=INTEGER},
+					#{item.hos_id,jdbcType=INTEGER},
+					#{item.edu_date,jdbcType=DATE},
+					#{item.class_name,jdbcType=VARCHAR},
+					#{item.emp_id,jdbcType=INTEGER},
+					#{item.duty_code,jdbcType=VARCHAR},
+					#{item.title_code,jdbcType=VARCHAR},
+					#{item.level_code,jdbcType=VARCHAR},
+					#{item.note,jdbcType=VARCHAR}
+				from dual
+			</foreach>
+		)
+	</insert>
+
+
+	<select id="queryInserviceEducation" parameterType="java.util.Map" resultMap="hrEducation">
+		SELECT
+			t.group_id,
+			t.hos_id,
+			t.edu_date,
+			t.class_name classs_name,
+			t.teacher,
+			hoe.emp_name teacher_name,
+			t.hours,
+			t.place,
+			t.student_num,
+			t.state,
+			case when t.state = 0 then '新建' when
+			t.state = 1
+			then '提交' else '' end state_name ,
+			t.note
+		FROM HR_EDUCATION t
+		left join hos_emp hoe on t.teacher= hoe.emp_id and hoe.group_id =t.group_id and hoe.hos_id = t.hos_id
+			and hoe.is_stop = 0
+		<where>
+			<if test="group_id != null and group_id != ''">
+				t.group_id = #{group_id,jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND t.hos_id = #{hos_id,jdbcType=INTEGER}
+			</if>
+			<if test="edu_date != null and edu_date != ''">
+				AND t.edu_date = #{edu_date,jdbcType=DATE}
+			</if>
+			<if test="classs_name != null and classs_name != ''">
+				AND t.class_name like '${classs_name}%'
+			</if>
+			<if test="teacher != null and teacher != ''">
+				AND t.teacher = #{teacher,jdbcType=VARCHAR}
+			</if>
+			<if test="hours != null and hours != ''">
+				AND t.hours = #{hours,jdbcType=INTEGER}
+			</if>
+			<if test="place != null and place != ''">
+				AND t.place = #{place,jdbcType=VARCHAR}
+			</if>
+			<if test="student_num != null and student_num != ''">
+				AND t.student_num = #{student_num,jdbcType=INTEGER}
+			</if>
+			<if test="state != null and state != ''">
+				AND t.state = #{state,jdbcType=INTEGER}
+			</if>
+			<if test="note != null and note != ''">
+				AND t.note = #{note,jdbcType=VARCHAR}
+			</if>
+			<if test="traning_begin_date != null and traning_begin_date != ''">
+					AND t.edu_date between to_date(#{traning_begin_date},'YYYY/MM/DD') and to_date(#{traning_end_date},'YYYY/MM/DD')
+				</if>
+		</where>
+		order by t.edu_date asc
+	</select>
+
+	<select id="queryByCode" resultMap="hrEducation" parameterType="java.util.Map">
+		SELECT
+			group_id,
+			hos_id,
+			edu_date,
+			class_name classs_name,
+			teacher,
+			hours,
+			place,
+			student_num,
+			state,
+			note
+		FROM hr_education
+		WHERE group_id = #{group_id,jdbcType=INTEGER} 
+			and hos_id = #{hos_id,jdbcType=INTEGER} 
+			and edu_date = to_date(#{edu_date},'YYYY/MM/DD') 
+			and class_name = #{class_name,jdbcType=VARCHAR}
+	</select>
+
+	<update id="update" parameterType="java.util.Map">
+		UPDATE hr_education
+			<trim prefix="SET" suffixOverrides=",">
+				teacher = #{teacher,jdbcType=VARCHAR},
+				hours = #{hours,jdbcType=INTEGER},
+				place = #{place,jdbcType=VARCHAR},
+				student_num = #{student_num,jdbcType=INTEGER},
+				state = #{state,jdbcType=INTEGER},
+				note = #{note,jdbcType=VARCHAR},
+			</trim>
+		<where>
+			AND group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND edu_date = #{edu_date,jdbcType=DATE}
+			AND class_name = #{class_name,jdbcType=VARCHAR}
+		</where>
+	</update>
+	
+	<!-- 查询是否重复 -->
+	<select id="queryInserviceEducationById" parameterType="java.util.Map" resultMap="hrEducation">
+		SELECT
+			group_id,
+			hos_id,
+			edu_date,
+			class_name classs_name,
+			teacher,
+			hours,
+			place,
+			student_num,
+			state,
+			note
+		FROM hr_education
+		<where>
+			<if test="group_id != null and group_id != ''">
+				AND group_id = #{group_id,jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND hos_id = #{hos_id,jdbcType=INTEGER}
+			</if>
+				AND ( class_name = #{class_name,jdbcType=VARCHAR} <!-- or  edu_date = to_date(#{edu_date,jdbcType=DATE}) -->)
+		</where>
+	</select>
+
+
+	<!-- 查询学员 -->
+	<select id="queryEducationStudent" parameterType="java.util.Map" resultMap="hrEducationStudent">
+		select 
+			hde.dept_no dept_no , hde.dept_name dept_name,he.emp_id emp_id,he.emp_name emp_name ,
+			t.field_col_code level_code,t.field_col_name level_name ,ht.title_code
+			title_code,ht.title_name title_name, hd.duty_code duty_code,hd.duty_name duty_name
+		from HR_EDUCATION_STUDENT hred left join hos_emp he on hred.emp_id =he.emp_id
+		left join hos_dept_dict hde on he.dept_no =hde.dept_no and he.group_id=hde.group_id and he.hos_id=hde.hos_id
+		left join HR_HOS_DUTY hhd on he.emp_id=hhd.emp_id and he.group_id=hhd.group_id and he.hos_id=hhd.hos_id
+		left join hos_duty hd on hhd.duty_code=hd.duty_code and hd.group_id=hhd.group_id and hd.hos_id=hhd.hos_id
+		left join HR_EMP_TECHNOLOGY_TITLE het on he.emp_id =het.emp_id and he.group_id=het.group_id and he.hos_id=het.hos_id
+		left join HR_TITLE ht on het.title_code=ht.title_code and ht.group_id=het.group_id and ht.hos_id=het.hos_id
+		left join HR_EMP_PROMOTION hep on he.emp_id = hep.emp_id and he.group_id=hep.group_id and he.hos_id=hep.hos_id
+		left join hr_fiied_data t on hep.level_code =t.field_col_code and field_tab_code = 'DIC_LEVEL'
+			and t.group_id=hep.group_id and t.hos_id=hep.hos_id
+		<where>
+			<if test="group_id != null and group_id != ''">
+				AND hred.group_id = #{group_id,jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND hred.hos_id = #{hos_id,jdbcType=INTEGER}
+			</if>
+			<if test="edu_date != null and edu_date != ''">
+				AND hred.edu_date =to_date(#{edu_date},'YYYY/MM/DD')
+			</if>
+			<if test="class_name != null and class_name != ''">
+				AND hred.class_name = #{class_name,jdbcType=VARCHAR}
+			</if>
+			<if test="emp_id != null and emp_id != ''">
+				AND hred.emp_id = #{emp_id,jdbcType=INTEGER}
+			</if>
+			<if test="duty_code != null and duty_code != ''">
+				AND hred.duty_code = #{duty_code,jdbcType=VARCHAR}
+			</if>
+			<if test="title_code != null and title_code != ''">
+				AND hred.title_code = #{title_code,jdbcType=VARCHAR}
+			</if>
+			<if test="level_code != null and level_code != ''">
+				AND hred.level_code = #{level_code,jdbcType=VARCHAR}
+			</if>
+			<if test="note != null and note != ''">
+				AND hred.note = #{note,jdbcType=VARCHAR}
+			</if>
+		</where>
+		order by hred.group_id asc
+	</select>
+	
+	<!--删除学员 -->
+	<delete id="deleteEducationStudent" parameterType="java.util.Map">
+		DELETE FROM hr_education_student
+		<where>
+				group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND edu_date =#{edu_date,jdbcType=DATE}
+			AND class_name = #{class_name,jdbcType=VARCHAR}
+			<!-- AND emp_id = #{emp_id,jdbcType=CHAR} -->
+		</where>
+	</delete>
+	
+	<!--批量删除学员 -->
+	<delete id="deleteEducationStudentBatch" parameterType="java.util.List">
+		DELETE FROM hr_education_student
+		<where>
+			<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+					AND group_id = #{item.group_id,jdbcType=INTEGER}
+					AND hos_id = #{item.hos_id,jdbcType=INTEGER}
+				<if test="item.edu_date != null and item.edu_date != ''">
+					AND edu_date =to_date(#{item.edu_date,jdbcType=DATE})
+				</if>
+				<if test="item.class_name != null and item.class_name != ''">
+					AND class_name = #{item.class_name,jdbcType=VARCHAR}
+				</if>
+				<!-- <if test="item.class_name != null and item.class_name != ''">
+					AND class_name = #{item.class_name,jdbcType=VARCHAR}
+				</if> -->
+			</foreach>
+		</where>
+	</delete>
+	<delete id="deleteEducationStudentBatc" parameterType="java.util.List">
+		DELETE FROM hr_education_student
+		<where>
+			<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+					 group_id = #{map.group_id,jdbcType=INTEGER}
+					AND hos_id = #{map.hos_id,jdbcType=INTEGER}
+				<if test="map.edu_date != null and map.edu_date != ''">
+					AND edu_date =to_date(#{map.edu_date},'yyyy/mm/dd')
+				</if>
+				<if test="item.class_name != null and item.class_name != ''">
+					AND class_name = #{item.class_name,jdbcType=VARCHAR}
+				</if>
+				<if test="item.emp_id != null and item.emp_id != ''">
+					AND emp_id = #{item.emp_id}
+				</if>
+			</foreach>
+		</where></delete>
+	<!--删除 -->
+	<delete id="deleteInserviceEducation" parameterType="java.util.List">
+		DELETE FROM hr_education
+		<where>
+			<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+					group_id = #{item.group_id,jdbcType=INTEGER}
+					AND hos_id = #{item.hos_id,jdbcType=INTEGER}
+				<if test="item.edu_date != null and item.edu_date != ''">
+					AND edu_date =#{item.edu_date,jdbcType=DATE}
+				</if>
+				<if test="item.classs_name != null and item.classs_name != ''">
+					AND class_name = #{item.classs_name,jdbcType=VARCHAR}
+				</if>
+			</foreach>
+		</where>
+	</delete>
+	
+	<select id="queryEducation" parameterType="java.util.Map" resultMap="hrEducationStudent">
+		select * from HR_PROMOTION_EVALUATE
+		where year=to_char(#{edu_date},'YYYY') and emp_id=#{emp_id,jdbcType=INTEGER}
+	</select>
+	
+	<update id="addConfirmInserviceEducation" parameterType="java.util.Map">
+		UPDATE hr_promotion_evaluate 
+		set education = #{hours,jdbcType=INTEGER}
+		<where>                     
+			AND group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND year =to_char(#{edu_date,jdbcType=DATE},'YYYY')
+			AND emp_id = #{emp_id,jdbcType=INTEGER}
+		</where>  
+	</update>
+	
+	<update id="confirmInserviceEducation" parameterType="java.util.Map">
+		update hr_education set state=1
+		<where>                     
+			AND group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND edu_date = #{edu_date,jdbcType=DATE}
+			AND class_name = #{class_name,jdbcType=VARCHAR}
+		</where> 
+	</update>
+	
+	<update id="reConfirmInserviceEducation" parameterType="java.util.Map">
+		update hr_education set state=0
+		<where>                     
+			AND group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND edu_date = #{edu_date,jdbcType=DATE}
+			AND class_name = #{class_name,jdbcType=VARCHAR}
+		</where> 
+	</update>
+	
+	<!-- 批量提交 -->
+	<update id="confirmBatchInserviceEducation" parameterType="java.util.List">
+		<foreach collection="list" item="item" index="index" open="begin" separator=";" close=";end;">
+			update hr_education set state=1
+			WHERE
+					group_id = #{map.group_id,jdbcType=INTEGER}
+				AND hos_id = #{map.hos_id,jdbcType=INTEGER}
+				and edu_date = #{item.edu_date,jdbcType=DATE}
+				AND class_name = #{item.classs_name,jdbcType=VARCHAR}
+		</foreach>
+	</update>
+	
+	<!-- 批量撤回 -->
+	<update id="reConfirmBatchInserviceEducation" parameterType="java.util.List">
+		<foreach collection="list" item="item" index="index" open="begin" separator=";" close=";end;">
+			update hr_education set state = 0
+			WHERE
+					group_id = #{map.group_id,jdbcType=INTEGER}
+				AND hos_id = #{map.hos_id,jdbcType=INTEGER}
+				and edu_date = #{item.edu_date,jdbcType=DATE}
+				AND class_name = #{item.classs_name,jdbcType=VARCHAR}
+		</foreach>
+	</update>
+	
+	<update id="reConfirmInserviceEducationEvaluate" parameterType="java.util.Map">
+		UPDATE hr_promotion_evaluate  set education = null
+		<where>                     
+			AND group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND year =to_char(#{edu_date,jdbcType=DATE},'YYYY')
+			AND emp_id = #{emp_id,jdbcType=INTEGER}
+		</where>  
+	</update>
+	
+	
+	
+	<select id="queryInserviceEducationByPrint" parameterType="java.util.Map" resultType="java.util.Map">
+
+		SELECT
+			t.group_id,
+			t.hos_id,
+			t.edu_date,
+			t.class_name classs_name,
+			t.teacher,
+			hoe.emp_name teacher_name,
+			t.hours,
+			t.place,
+			t.student_num,
+			t.state,
+			case when t.state = 0 then '新建' when t.state = 1 then '提交' else '' end state_name ,
+			t.note
+		FROM HR_EDUCATION t
+		left join hos_emp hoe on t.teacher= hoe.emp_id and hoe.group_id =t.group_id and hoe.hos_id = t.hos_id
+			and hoe.is_stop = 0
+		<where>
+			<if test="group_id != null and group_id != ''">
+				t.group_id = #{group_id,jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND t.hos_id = #{hos_id,jdbcType=INTEGER}
+			</if>
+			<if test="edu_date != null and edu_date != ''">
+				AND t.edu_date = #{edu_date,jdbcType=DATE}
+			</if>
+			<if test="state != null and state != ''">
+				AND t.state = #{state,jdbcType=INTEGER}
+			</if>
+		</where>
+		order by t.edu_date asc
+	</select>
+	<select id="queryEmp" parameterType="java.util.Map" resultType="java.util.Map">
+	select emp_id,emp_name from hos_emp where 
+group_id =#{group_id,jdbcType=INTEGER}
+	and hos_id = #{hos_id,jdbcType=INTEGER}
+	and emp_id= (
+   select to_number(teacher)  from hr_education where group_id =#{group_id,jdbcType=INTEGER}
+	and hos_id = #{hos_id,jdbcType=INTEGER}
+	and edu_date = to_date(#{edu_date},'YYYY/MM/DD') 
+			and class_name = #{class_name,jdbcType=VARCHAR}
+	)
+	
+	</select>
+</mapper>

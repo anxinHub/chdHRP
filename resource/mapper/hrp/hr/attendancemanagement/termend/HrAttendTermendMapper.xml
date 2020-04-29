@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.hr.dao.attendancemanagement.termend.HrAttendTermendMapper">
+
+	<resultMap id="hrAttendTermendMap" type="java.util.Map">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+	</resultMap>
+	
+	<!-- 获取当前期间 -->
+	<select id="queryYearMonth" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT min(attend_year || attend_month) as "year_month" 
+		FROM hr_period 
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND hr_flag = 0 
+	</select>
+	
+	<!-- 查询历史清除余额 -->
+	<select id="queryAttendXjedDel" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT a.del_year as "del_year", a.del_month as "del_month", b.emp_code || ' ' || b.emp_name as "emp_name",
+			c.attend_name as "attend_name", a.attend_ed as "attend_ed", a.del_date as "del_date", d.user_name as "oper"  
+		FROM hr_attend_xjed_del a 
+		LEFT JOIN hos_emp_dict b 
+			ON a.group_id = b.group_id 
+			AND a.hos_id = b.hos_id 
+			AND a.emp_id = b.emp_id 
+			AND b.is_stop = 0 
+		LEFT JOIN hr_attend_item c 
+			ON a.group_id = c.group_id 
+			AND a.hos_id = c.hos_id 
+			AND a.attend_code = c.attend_code 
+		LEFT JOIN sys_user d 
+			ON a.group_id = d.group_id 
+			AND a.hos_id = d.hos_id 
+			AND a.oper = d.user_id 
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER} 
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND a.del_year = #{year,jdbcType=VARCHAR} 
+			AND a.del_month = #{month,jdbcType=VARCHAR} 
+	</select>
+	
+	<!-- 保存清除余额 -->
+	<insert id="addAttendXjedDel" parameterType="java.util.Map">
+		INSERT INTO hr_attend_xjed_del(
+			group_id, hos_id, del_year, del_month, oper, del_date, 
+			attend_code, emp_id, attend_ed, state
+		)
+		SELECT group_id, hos_id, attend_year, #{month,jdbcType=VARCHAR}, 
+			#{user_id,jdbcType=INTEGER}, #{del_date,jdbcType=DATE}, 
+			attend_code, emp_id, bala_amt, 1
+		FROM hr_attend_vacal_balance 
+		WHERE group_id = #{group_id,jdbcType=INTEGER} 
+			AND hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND attend_year = #{year,jdbcType=VARCHAR} 
+			AND attend_code = #{attend_code,jdbcType=VARCHAR} 
+	</insert>
+	
+	<!-- 清除余额 -->
+	<update id="updateDelAmtByAttendCode" parameterType="java.util.Map">
+		UPDATE hr_attend_vacal_balance 
+		SET del_amt = bala_amt 
+		WHERE group_id = #{group_id,jdbcType=INTEGER} 
+			AND hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND attend_year = #{year,jdbcType=VARCHAR} 
+			AND attend_code = #{attend_code,jdbcType=VARCHAR} 
+	</update>
+	
+	<!-- 修改结账状态 -->
+	<update id="updateHrPeriodFlag" parameterType="java.util.Map">
+		UPDATE hr_period 
+		SET hr_flag = #{hr_flag,jdbcType=INTEGER}, 
+			hr_user = #{hr_user,jdbcType=INTEGER},
+			hr_date = #{hr_date,jdbcType=DATE} 
+		WHERE group_id = #{group_id,jdbcType=INTEGER} 
+			AND hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND attend_year = #{year,jdbcType=VARCHAR} 
+			AND attend_month = #{month,jdbcType=VARCHAR} 
+	</update>
+</mapper>

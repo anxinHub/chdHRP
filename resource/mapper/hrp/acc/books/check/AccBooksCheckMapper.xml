@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.acc.dao.books.check.AccBooksCheckMapper">
+	<resultMap id="accBooksCheck" type="java.util.Map">
+		
+	</resultMap>
+	
+	<!-- 总查询 -->
+	<select id="queryAccBooksCheck" statementType="CALLABLE" parameterType="java.util.Map" >
+		<![CDATA[{call PROC_ACC_BOOKS_CHECK( 
+			#{group_id,jdbcType=INTEGER}, 
+			#{hos_id,jdbcType=INTEGER}, 
+			#{copy_code,jdbcType=VARCHAR}, 
+			#{acc_year_b,jdbcType=VARCHAR}, 
+		    #{acc_month_b,jdbcType=VARCHAR}, 
+		    #{acc_year_e,jdbcType=VARCHAR}, 
+		    #{acc_month_e,jdbcType=VARCHAR}, 
+			#{p_flag,jdbcType=VARCHAR}, 
+		    #{subj_code,jdbcType=VARCHAR}, 
+			#{sch_id,jdbcType=BIGINT}, 
+			#{order_by,jdbcType=INTEGER}, 
+			#{begin_subj_code,jdbcType=VARCHAR}, 
+			#{end_subj_code,jdbcType=VARCHAR}, 
+			#{check_item_type1,jdbcType=VARCHAR}, 
+			#{check_item_code1_b,jdbcType=VARCHAR}, 
+			#{check_item_code1_e,jdbcType=VARCHAR}, 
+			#{check_item_type2,jdbcType=VARCHAR}, 
+			#{check_item_code2_b,jdbcType=VARCHAR}, 
+			#{check_item_code2_e,jdbcType=VARCHAR}, 
+			#{check_item_type3,jdbcType=VARCHAR}, 
+			#{check_item_code3_b,jdbcType=VARCHAR}, 
+			#{check_item_code3_e,jdbcType=VARCHAR}, 
+			#{check_item_type4,jdbcType=VARCHAR}, 
+			#{check_item_code4_b,jdbcType=VARCHAR}, 
+			#{check_item_code4_e,jdbcType=VARCHAR}, 
+			#{proj_type, jdbcType=VARCHAR}, 
+			#{subj_kind, jdbcType=VARCHAR}, 
+			#{only_last,jdbcType=INTEGER}, 
+			#{show_zero,jdbcType=INTEGER}, 
+			#{pagesize,jdbcType=INTEGER}, 
+			#{page,jdbcType=INTEGER}, 
+			#{tcount,mode=OUT,jdbcType=INTEGER}, 
+			#{error_msg,mode=OUT,jdbcType=VARCHAR}, 
+			#{tmop_code, jdbcType=VARCHAR}, 
+			#{dang_code, jdbcType=VARCHAR}, 
+			#{aff_code, jdbcType=VARCHAR}, 
+			#{inst_code, jdbcType=VARCHAR}, 
+			#{rst,jdbcType=CURSOR,mode=OUT,resultMap=com.chd.hrp.acc.dao.books.check.AccBooksCheckMapper.accBooksCheck,javaType=java.sql.ResultSet})}
+		]]>
+	</select>
+	<!-- #{aff_code,jdbcType=VARCHAR}, #{inst_code,jdbcType=VARCHAR},  #{dang_code,jdbcType=VARCHAR}, #{tmop_code,jdbcType=VARCHAR}, -->	
+	<!-- 交叉表查询表头 -->
+	<select id="querySubjHeadByJCB" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT DISTINCT subj_code "subj_code", subj_name "subj_name"
+		FROM acc_subj 
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND acc_year between #{year_b,jdbcType=VARCHAR} and #{year_e,jdbcType=VARCHAR}
+			AND kind_code = #{kind_code,jdbcType=VARCHAR}
+			AND is_last = 1
+			<if test="sch_id != null and sch_id != ''">
+			AND subj_code in (
+				SELECT distinct subj_code
+				FROM acc_subj
+				WHERE group_id = #{group_id,jdbcType=INTEGER}
+					AND hos_id = #{hos_id,jdbcType=INTEGER}
+					AND copy_code = #{copy_code,jdbcType=VARCHAR}
+					AND acc_year between #{year_b,jdbcType=VARCHAR} and #{year_e,jdbcType=VARCHAR}
+					AND kind_code = #{kind_code,jdbcType=VARCHAR}
+					AND subj_code &gt;= (
+						SELECT subj_code_begin 
+						FROM acc_book_sch_con 
+						WHERE group_id = #{group_id,jdbcType=INTEGER}
+							AND hos_id = #{hos_id,jdbcType=INTEGER}
+							AND copy_code = #{copy_code,jdbcType=VARCHAR}
+							AND sch_id = #{sch_id,jdbcType=INTEGER}
+							AND is_fw = 1
+					)
+					AND subj_code &lt;= (
+						SELECT max(t2.subj_code) subj_code_begin 
+						FROM acc_book_sch_con t1
+						LEFT JOIN acc_subj t2
+							ON t1.group_id = t2.group_id 
+							AND t1.hos_id = t2.hos_id 
+							AND t1.copy_code = t2.copy_code 
+							AND t2.acc_year between #{year_b,jdbcType=VARCHAR} and #{year_e,jdbcType=VARCHAR}
+							AND t2.subj_code like t1.subj_code_end || '%'
+						WHERE t1.group_id = #{group_id,jdbcType=INTEGER}
+							AND t1.hos_id = #{hos_id,jdbcType=INTEGER}
+							AND t1.copy_code = #{copy_code,jdbcType=VARCHAR}
+							AND t1.sch_id = #{sch_id,jdbcType=INTEGER}
+							AND t1.is_fw = 1
+					)
+				UNION
+				SELECT subj_code 
+				FROM acc_book_sch_subj 
+				WHERE group_id = #{group_id,jdbcType=INTEGER}
+					AND hos_id = #{hos_id,jdbcType=INTEGER}
+					AND copy_code = #{copy_code,jdbcType=VARCHAR}
+					AND sch_id = #{sch_id,jdbcType=INTEGER}
+					AND is_fw = 0
+			)
+			</if>
+			<if test="begin_subj_code != null and begin_subj_code != ''">
+			AND subj_code &gt;= #{begin_subj_code,jdbcType=VARCHAR}
+			</if>
+			<if test="end_subj_code != null and end_subj_code != ''">
+			AND subj_code &lt;= (
+				SELECT max(subj_code) 
+				FROM acc_subj
+				WHERE group_id = #{group_id,jdbcType=INTEGER}
+					AND hos_id = #{hos_id,jdbcType=INTEGER}
+					AND copy_code = #{copy_code,jdbcType=VARCHAR}
+					AND acc_year between #{year_b,jdbcType=VARCHAR} and #{year_e,jdbcType=VARCHAR}
+					AND kind_code = #{kind_code,jdbcType=VARCHAR}
+					AND subj_code like #{end_subj_code,jdbcType=VARCHAR} || '%'
+			)
+			</if>
+			AND subj_code in (
+				select subj_code 
+				from ACC_SUBJ 
+				where group_id = #{group_id,jdbcType=INTEGER}
+					AND hos_id = #{hos_id,jdbcType=INTEGER}
+					AND copy_code = #{copy_code,jdbcType=VARCHAR}
+					AND acc_year between #{year_b,jdbcType=VARCHAR} and #{year_e,jdbcType=VARCHAR}
+					and is_check = #{is_check}
+					and (check1 = #{check_type_id}
+						or check2 = #{check_type_id}
+						or check3 = #{check_type_id}
+						or check4 = #{check_type_id})
+			)
+		ORDER BY subj_code
+	</select>
+	
+	 <!-- 根据核算项名称获取核算项ID -->
+	<select id="queryCheckTypeByCheck" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT check_type_id, check_type_name 
+		FROM ACC_CHECK_TYPE
+		WHERE group_id = #{group_id,jdbcType=INTEGER} 
+			AND hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND copy_code = #{copy_code,jdbcType=VARCHAR} 
+			AND column_check = #{column_check,jdbcType=VARCHAR}
+	</select>
+</mapper>

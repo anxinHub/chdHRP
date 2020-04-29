@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.acc.dao.paper.AccEInvoiceMapper">
+	<resultMap id="eInvoiceMap" type="java.util.Map"> 
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="ei_id" column="ei_id" />
+		<result property="ei_code" column="ei_code" />
+		<result property="ei_date" column="ei_date" />
+		<result property="check_code" column="check_code" />
+		<result property="ei_money" column="ei_money" />
+		<result property="reimburse_man" column="reimburse_man" />
+		<result property="reimburse_date" column="reimburse_date" />
+	</resultMap>
+	
+	<insert id="addAccEInvoice" useGeneratedKeys="true">
+		INSERT INTO ACC_E_INVOICE
+		  (group_id,
+		   hos_id,
+		   copy_code,
+		   ei_id,
+		   ei_code,
+		   ei_date,
+		   check_code,
+		   ei_money,
+		   reimburse_man,
+		   reimburse_date)
+		VALUES
+		  (#{group_id},
+		   #{hos_id},
+		   #{copy_code},
+		   e_invoice_sequence.nextval,
+		   #{ei_code},
+		   to_date(#{ei_date}, 'yyyy-MM-dd'),
+		   #{check_code},
+		   #{ei_money},
+		   #{reimburse_man},
+		   to_date(#{reimburse_date}, 'yyyy-MM-dd')
+		  ) 
+	</insert>
+
+	<delete id="deleteAccEInvoice" parameterType="java.util.Map">
+		DELETE FROM ACC_E_INVOICE
+		 WHERE group_id = #{group_id}
+		   and hos_id = #{hos_id}
+		   and copy_code = #{copy_code}
+		   and ei_id = #{ei_id}
+		   and ei_code = #{ei_code}
+		   and check_code = #{check_code}
+	</delete>
+
+	<delete id="deleteBatchAccEInvoice" parameterType="java.util.List">
+		DELETE FROM ACC_E_INVOICE 
+		<where>
+			<foreach collection="list" index="index" item="item" open="("
+				separator="or" close=")">
+				   group_id = #{item.group_id}
+		   		and hos_id = #{item.hos_id}
+		   		and copy_code = #{item.copy_code}
+		   		and ei_id = #{item.ei_id}
+		   		and ei_code = #{item.ei_code}
+		  		and check_code = #{item.check_code}
+			</foreach>
+		</where>
+	</delete>
+
+	<update id="updateAccEInvoice" parameterType="java.util.Map">
+		UPDATE ACC_E_INVOICE
+		<trim prefix="SET" suffixOverrides=",">
+			<if test="ei_date != null and ei_date != ''">
+				ei_date = to_date(#{ei_date}, 'yyyy-MM-dd'),
+			</if>
+			<if test="ei_money != null and ei_money != ''">
+				ei_money = #{ei_money},
+			</if>
+			<if test="reimburse_man != null and reimburse_man != ''">
+				reimburse_man = #{reimburse_man},
+			</if>
+			<if test="reimburse_date != null and reimburse_date != ''">
+				reimburse_date = to_date(#{reimburse_date}, 'yyyy-MM-dd'),
+			</if>
+		</trim>
+		 WHERE group_id = #{group_id}
+		   and hos_id = #{hos_id}
+		   and copy_code = #{copy_code}
+		   and ei_id = #{ei_id}
+		   and ei_code = #{ei_code}
+		   and check_code = #{check_code}
+	</update>
+	
+	<select id="queryAccEInvoice" parameterType="java.util.Map" resultMap="eInvoiceMap">
+		SELECT aei.group_id,
+		       aei.hos_id,
+		       aei.copy_code,
+		       aei.ei_id,
+		       aei.ei_code,
+		       aei.ei_date,
+		       aei.check_code,
+		       aei.ei_money,
+		       he.emp_name reimburse_man,
+		       aei.reimburse_date
+		  FROM ACC_E_INVOICE aei
+		  LEFT JOIN HOS_EMP he
+		  on aei.group_id = he.group_id
+		  and aei.hos_id = he.hos_id
+		  and aei.reimburse_man = he.emp_id
+		  <where>
+		  		aei.group_id = #{group_id}
+		  	and aei.hos_id = #{hos_id}
+		  	and aei.copy_code = #{copy_code}	
+		  	<if test="ei_id != null and ei_id != ''">
+		  	and aei.ei_id = #{ei_id}
+		  	</if>
+		  	<if test="ei_code != null and ei_code != ''">
+		  	and aei.ei_code = #{ei_code}
+		  	</if>
+		  	<if test="begin_date != null and begin_date != ''">
+		  	and to_char(aei.ei_date, 'yyyy-MM-dd') &gt;= #{begin_date}
+		  	</if>
+		  	<if test="end_date != null and end_date != ''">
+		  	and to_char(aei.ei_date, 'yyyy-MM-dd') &lt;= #{end_date}
+		  	</if>
+		  	<if test="check_code != null and check_code != ''">
+		  	and aei.check_code = #{check_code}
+		  	</if>
+		  	<if test="ei_money != null and ei_money != ''">
+		  	and aei.ei_money = #{ei_money}
+		  	</if>
+		  	<if test="reimburse_man != null and reimburse_man != ''">
+		  	and aei.reimburse_man = #{reimburse_man}
+		  	</if>
+		  	<if test="bill_begin_date != null and bill_begin_date != ''">
+		  	and to_char(aei.reimburse_date, 'yyyy-MM-dd') &gt;= #{bill_begin_date}
+		  	</if>
+		  	<if test="bill_end_date != null and bill_end_date != ''">
+		  	and to_char(aei.reimburse_date, 'yyyy-MM-dd') &lt;= #{bill_end_date}
+		  	</if>
+		  </where>
+	</select>
+	
+	<select id="queryAccEInvoiceByCode" parameterType="java.util.Map" resultType="com.chd.hrp.acc.entity.AccEInvoice">
+		SELECT aei.group_id,
+		       aei.hos_id,
+		       aei.copy_code,
+		       aei.ei_id,
+		       aei.ei_code,
+		       aei.ei_date,
+		       aei.check_code,
+		       aei.ei_money,
+		       he.emp_code || ' ' || he.emp_name reimburse_man,
+		       aei.reimburse_date
+		  FROM ACC_E_INVOICE aei
+		  LEFT JOIN HOS_EMP he
+		  on aei.group_id = he.group_id
+		  and aei.hos_id = he.hos_id
+		  and aei.reimburse_man = he.emp_id
+		  <where>
+		  		aei.group_id = #{group_id}
+		  	and aei.hos_id = #{hos_id}
+		  	and aei.copy_code = #{copy_code}	
+		  	<if test="ei_id != null and ei_id != ''">
+		  	and aei.ei_id = #{ei_id}
+		  	</if>
+		  	<if test="ei_code != null and ei_code != ''">
+		  	and aei.ei_code = #{ei_code}
+		  	</if>
+		  	<if test="ei_date != null and ei_date != ''">
+		  	and to_char(aei.ei_date, 'yyyy-MM-dd') = #{ei_date}
+		  	</if>
+		  	<if test="check_code != null and check_code != ''">
+		  	and aei.check_code = #{check_code}
+		  	</if>
+		  	<if test="ei_money != null and ei_money != ''">
+		  	and aei.ei_money = #{ei_money}
+		  	</if>
+		  	<if test="reimburse_man != null and reimburse_man != ''">
+		  	and aei.reimburse_man = #{reimburse_man}
+		  	</if>
+		  	<if test="reimburse_date != null and reimburse_date != ''">
+		  	and to_char(aei.reimburse_date, 'yyyy-MM-dd') = #{reimburse_date}
+		  	</if>
+		  </where>
+	</select>
+	
+</mapper>
+

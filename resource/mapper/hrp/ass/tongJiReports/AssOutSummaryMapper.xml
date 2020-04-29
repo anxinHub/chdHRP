@@ -1,0 +1,689 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.ass.dao.tongJiReports.AssOutSummaryMapper">    
+
+	<resultMap id="assOutSummaryMap" type="java.util.Map">
+		<result property="dept_code" column="dept_code" />
+		<result property="dept_name" column="dept_name" />
+		<result property="ass_code" column="ass_code" />
+		<result property="ass_name" column="ass_name" />
+		<result property="price" column="price" />
+		<result property="amount" column="amount" />
+		<result property="unit_name" column="unit_name" />
+		<result property="sum_price" column="sum_price" />
+	</resultMap>
+
+	<select id="queryAssOutSummary" parameterType="java.util.Map"
+		resultMap="assOutSummaryMap">
+		with out_in as (
+			select dept.dept_code,dept.dept_name,sum(t3.price) price
+			  from v_ass_out_detail t1
+			  
+			  left join v_ass_out_main t2
+			    on t1.GROUP_ID = t2.GROUP_ID
+			   and t1.HOS_ID = t2.HOS_ID
+			   and t1.COPY_CODE = t2.COPY_CODE
+			   and t1.OUT_NO = t2.OUT_NO
+			   and t1.ass_naturs = t2.ass_naturs
+			   
+			  left join v_ass_card t3 
+			    on t1.GROUP_ID = t3.GROUP_ID
+			    and t1.HOS_ID = t3.HOS_ID
+			    and t1.COPY_CODE = t3.COPY_CODE
+			    and t1.ASS_CARD_NO = t3.ASS_CARD_NO
+			    and t1.ass_naturs = t3.ass_naturs 
+			
+			  left join hos_dept_dict dept
+			    on t2.dept_id = dept.dept_id
+			   and t2.group_id = dept.group_id
+			   and t2.hos_id = dept.hos_id
+			   and dept.is_stop = 0
+			   
+			   where t2.BILL_TYPE = '01'
+			   and t2.STATE = 2
+			   and t1.group_id = #{group_id}
+				 and t1.hos_id = #{hos_id}
+				 and t1.copy_code = #{copy_code}
+			   <if test="dept_id != null and dept_id != ''">
+						   and t2.dept_id = #{dept_id}
+				 </if>
+			   <if test="store_id != null and store_id != ''">
+							AND t2.store_id = #{store_id}
+				 </if>
+			   <if test="out_date_beg != null and out_date_beg != ''">
+					   	 and t2.audit_date &gt;= to_date(#{out_date_beg},'YYYY-MM-DD')
+				 </if>
+				 <if test="out_date_end != null and out_date_end != ''">
+					   	 and t2.audit_date &lt;= to_date(#{out_date_end},'YYYY-MM-DD')
+				 </if>
+			group by dept.dept_code,dept.dept_name   
+			), out_out as (   
+			select dept.dept_code,dept.dept_name,sum(t3.price) price
+			  from v_ass_out_detail t1
+			  
+			  left join v_ass_out_main t2
+			    on t1.GROUP_ID = t2.GROUP_ID
+			   and t1.HOS_ID = t2.HOS_ID
+			   and t1.COPY_CODE = t2.COPY_CODE
+			   and t1.OUT_NO = t2.OUT_NO
+			   and t1.ass_naturs = t2.ass_naturs
+			   
+			  left join v_ass_card t3 
+			    on t1.GROUP_ID = t3.GROUP_ID
+			    and t1.HOS_ID = t3.HOS_ID
+			    and t1.COPY_CODE = t3.COPY_CODE
+			    and t1.ASS_CARD_NO = t3.ASS_CARD_NO
+			    and t1.ass_naturs = t3.ass_naturs 
+			
+			  left join hos_dept_dict dept
+			    on t2.dept_id = dept.dept_id
+			   and t2.group_id = dept.group_id
+			   and t2.hos_id = dept.hos_id
+			   and dept.is_stop = 0
+			   
+			   where t2.BILL_TYPE = '04'   
+			   and t2.STATE = 2
+			   and t1.group_id = #{group_id}
+				 and t1.hos_id = #{hos_id}
+				 and t1.copy_code = #{copy_code}
+			   <if test="dept_id != null and dept_id != ''">
+						   and t2.dept_id = #{dept_id}
+				 </if>
+			   <if test="store_id != null and store_id != ''">
+							AND t2.store_id = #{store_id}
+				 </if>
+			   <if test="out_date_beg != null and out_date_beg != ''">
+					   	 and t2.audit_date &gt;= to_date(#{out_date_beg},'YYYY-MM-DD')
+				 </if>
+				 <if test="out_date_end != null and out_date_end != ''">
+					   	 and t2.audit_date &lt;= to_date(#{out_date_end},'YYYY-MM-DD')
+				 </if>
+			   group by dept.dept_code,dept.dept_name   
+			)
+			select * from (
+				select t.dept_code,t.dept_name,nvl((t.price-nvl(t1.price,0)),0) sum_price from out_in t
+				left join out_out t1 on
+				t.dept_code = t1.dept_code
+				union all
+				select '合计'  dept_code,null dept_name,sum(nvl((t.price-nvl(t1.price,0)),0)) sum_price from out_in t
+				left join out_out t1 on
+				t.dept_code = t1.dept_code   
+			) t
+			order by t.dept_code
+		
+	</select>
+	
+	<select id="queryAssOutMainSummaryPrint" parameterType="java.util.Map"
+		resultMap="assOutSummaryMap">
+		with out_in as (
+			select dept.dept_code,dept.dept_name,sum(t3.price) price
+			  from v_ass_out_detail t1
+			  
+			  left join v_ass_out_main t2
+			    on t1.GROUP_ID = t2.GROUP_ID
+			   and t1.HOS_ID = t2.HOS_ID
+			   and t1.COPY_CODE = t2.COPY_CODE
+			   and t1.OUT_NO = t2.OUT_NO
+			   and t1.ass_naturs = t2.ass_naturs
+			   
+			  left join v_ass_card t3 
+			    on t1.GROUP_ID = t3.GROUP_ID
+			    and t1.HOS_ID = t3.HOS_ID
+			    and t1.COPY_CODE = t3.COPY_CODE
+			    and t1.ASS_CARD_NO = t3.ASS_CARD_NO
+			    and t1.ass_naturs = t3.ass_naturs 
+			
+			  left join hos_dept_dict dept
+			    on t2.dept_id = dept.dept_id
+			   and t2.group_id = dept.group_id
+			   and t2.hos_id = dept.hos_id
+			   and dept.is_stop = 0
+			   
+			   where t2.BILL_TYPE = '01'
+			   and t2.STATE = 2
+			   and t1.group_id = #{group_id}
+				 and t1.hos_id = #{hos_id}
+				 and t1.copy_code = #{copy_code}
+			   <if test="dept_id != null and dept_id != ''">
+						   and t2.dept_id = #{dept_id}
+				 </if>
+			   <if test="store_id != null and store_id != ''">
+							AND t2.store_id = #{store_id}
+				 </if>
+			   <if test="out_date_beg != null and out_date_beg != ''">
+					   	 and t2.audit_date &gt;= to_date(#{out_date_beg},'YYYY-MM-DD')
+				 </if>
+				 <if test="out_date_end != null and out_date_end != ''">
+					   	 and t2.audit_date &lt;= to_date(#{out_date_end},'YYYY-MM-DD')
+				 </if>
+			group by dept.dept_code,dept.dept_name   
+			), out_out as (   
+			select dept.dept_code,dept.dept_name,sum(t3.price) price
+			  from v_ass_out_detail t1
+			  
+			  left join v_ass_out_main t2
+			    on t1.GROUP_ID = t2.GROUP_ID
+			   and t1.HOS_ID = t2.HOS_ID
+			   and t1.COPY_CODE = t2.COPY_CODE
+			   and t1.OUT_NO = t2.OUT_NO
+			   and t1.ass_naturs = t2.ass_naturs
+			   
+			  left join v_ass_card t3 
+			    on t1.GROUP_ID = t3.GROUP_ID
+			    and t1.HOS_ID = t3.HOS_ID
+			    and t1.COPY_CODE = t3.COPY_CODE
+			    and t1.ASS_CARD_NO = t3.ASS_CARD_NO
+			    and t1.ass_naturs = t3.ass_naturs 
+			
+			  left join hos_dept_dict dept
+			    on t2.dept_id = dept.dept_id
+			   and t2.group_id = dept.group_id
+			   and t2.hos_id = dept.hos_id
+			   and dept.is_stop = 0
+			   
+			   where t2.BILL_TYPE = '04'   
+			   and t2.STATE = 2
+			   and t1.group_id = #{group_id}
+				 and t1.hos_id = #{hos_id}
+				 and t1.copy_code = #{copy_code}
+			   <if test="dept_id != null and dept_id != ''">
+						   and t2.dept_id = #{dept_id}
+				 </if>
+			   <if test="store_id != null and store_id != ''">
+							AND t2.store_id = #{store_id}
+				 </if>
+			   <if test="out_date_beg != null and out_date_beg != ''">
+					   	 and t2.audit_date &gt;= to_date(#{out_date_beg},'YYYY-MM-DD')
+				 </if>
+				 <if test="out_date_end != null and out_date_end != ''">
+					   	 and t2.audit_date &lt;= to_date(#{out_date_end},'YYYY-MM-DD')
+				 </if>
+			   group by dept.dept_code,dept.dept_name   
+			)
+			select * from (
+				select t.dept_code,t.dept_name,nvl((t.price-nvl(t1.price,0)),0) sum_price from out_in t
+				left join out_out t1 on
+				t.dept_code = t1.dept_code
+				union all
+				select '合计'  dept_code,null dept_name,sum(nvl((t.price-nvl(t1.price,0)),0)) sum_price from out_in t
+				left join out_out t1 on
+				t.dept_code = t1.dept_code   
+			) t
+			order by t.dept_code
+	</select>
+	
+	<resultMap id="outSituationMap" type="java.util.Map">
+		<result property="ven_name" column="ven_name"/>
+		<result property="dept_name" column="dept_name"/>
+		<result property="store_name" column="store_name"/>
+		<result property="ass_type_name" column="ass_type_name"/> 
+		<result property="ass_code" column="ass_code"/>
+		<result property="ass_name" column="ass_name"/>
+		<result property="ass_spec" column="ass_spec"/>
+		<result property="unit_name" column="unit_name"/>
+		<result property="fac_name" column="fac_name"/>
+		<result property="ass_amount" column="ass_amount"/>
+		<result property="price" column="price"/>
+		<result property="sum_price" column="sum_price"/>
+	</resultMap>
+	
+	<select id="queryOutSituation" parameterType="java.util.Map" resultMap="outSituationMap">
+		select     t2.store_name,
+			       atd.ass_type_name,
+			       t3.ass_code,
+			       t3.ass_name,
+			       t1.ASS_SPEC || t1.ASS_MONDL ASS_SPEC,
+			       unit.unit_name,
+			       t1.PRICE,
+			       sum(t1.ASS_AMOUNT) ASS_AMOUNT,
+			       t1.PRICE * sum(t1.ASS_AMOUNT) sum_price,
+			       t5.fac_name,
+			       t6.sup_name ven_name,
+			       t7.dept_name
+		  from v_ass_out_detail t
+		
+		  left join v_ass_out_main t_m
+		    on t.GROUP_ID = t_m.group_id
+		   and t.hos_id = t_m.hos_id
+		   and t.copy_code = t_m.COPY_CODE
+		   and t.OUT_NO = t_m.out_no
+		
+		  left join v_ass_card t1
+		    on t.GROUP_ID = t1.GROUP_ID
+		   and t.hos_id = t1.hos_id
+		   and t.copy_code = t1.copy_code
+		   and t.ASS_CARD_NO = t1.ass_card_no
+		
+		  left join hos_store_dict t2
+		    on t1.GROUP_ID = t2.group_id
+		   and t1.hos_id = t2.hos_id
+		   and t1.STORE_ID = t2.store_id
+		   and t2.is_stop = 0
+		
+		  left join ass_no_dict t3
+		    on t1.group_id = t3.group_id
+		   and t1.hos_id = t3.hos_id
+		   and t1.copy_code = t3.copy_code
+		   and t1.ass_id = t3.ass_id
+		   and t3.is_stop = 0
+		
+		  left join hos_unit unit
+		    on t1.GROUP_ID = unit.group_id
+		   and t1.HOS_ID = unit.hos_id
+		   and t1.UNIT_CODE = unit.unit_code
+		
+		  left join ass_type_dict atd
+		    on t3.group_id = atd.group_id
+		   and t3.hos_id = atd.hos_id
+		   and t3.copy_code = atd.copy_code
+		   and t3.ass_type_id = atd.ass_type_id
+		   and atd.is_stop = 0
+		
+		  left join hos_fac_dict t5
+		    on t1.group_id = t5.group_id
+		   and t1.hos_id = t5.hos_id
+		   and t1.FAC_ID = t5.fac_id
+		   and t5.is_stop = 0
+		
+		  left join hos_sup_dict t6
+		    on t1.group_id = t6.group_id
+		   and t1.hos_id = t6.hos_id
+		   and t1.ven_id = t6.sup_id
+		   and t6.is_stop = 0
+		
+		  left join hos_dept_dict t7
+		    on t1.GROUP_ID = t7.group_id
+		   and t1.hos_id = t7.hos_id
+		   and t1.dept_id = t7.dept_id
+		   and t7.is_stop = 0
+		
+		 where 
+		    t.group_id = #{group_id}
+		    and t.hos_id = #{hos_id}
+		    and t.copy_code = #{copy_code}
+		 	<if test="out_date_beg != null and out_date_beg != ''">
+			AND t_m.AUDIT_DATE &gt;= to_date(#{out_date_beg},'YYYY-MM-DD')
+			</if>
+			<if test="out_date_end != null and out_date_end != ''">
+			AND t_m.AUDIT_DATE &lt;= to_date(#{out_date_end},'YYYY-MM-DD')
+			</if>
+		    <if test="store_id != null and store_id !=''">
+	        and t1.store_id = #{store_id}
+		    </if> 
+		    <if test="use_dept_id != null and use_dept_id !=''">
+		    and t_m.dept_id = #{use_dept_id}
+		    </if>
+		    <if test="ven_id != null and ven_id !=''">  
+		    and t1.ven_id = #{ven_id}
+		    </if>
+		    <if test="ass_type_id != null and ass_type_id !=''">
+		    and t3.ass_type_id = #{ass_type_id}
+		    </if>  
+		    <if test="bill_type != null and bill_type !=''">
+		    and t_m.bill_type = #{bill_type}
+		    </if> 
+		    <if test="ass_name != null and ass_name !=''">
+		    and t3.ass_name like '%${ass_name}%'
+		    </if>
+		    <if test="out_no != null and out_no !=''">
+		    and t.out_no like '%${out_no}%'
+		    </if>
+		    <if test="ass_spec != null and ass_spec !=''">
+		    and t1.ASS_SPEC || t1.ASS_MONDL like '%${ass_spec}%'
+		    </if>
+		    <if test="dept_id != null and dept_id !=''">
+		    and t7.dept_id like '%${dept_id}%'
+		    </if>
+		
+		 group by t2.store_name,
+		          atd.ass_type_name,
+		          t3.ass_code,
+		          t3.ass_name,
+		          t1.ASS_SPEC || t1.ASS_MONDL,
+		          unit.unit_name,
+		          t1.PRICE,
+		          t5.fac_name,
+		          t6.sup_name,
+		          t7.dept_name
+		
+		union all
+		
+		select null store_name,
+		       null ass_type_name,
+		       null ass_code,
+		       '总合计' vass_name,
+		       null ASS_SPEC,
+		       null unit_name,
+		       null PRICE,
+		       sum(t1.ASS_AMOUNT) ASS_AMOUNT,
+		       sum(t1.PRICE * t1.ASS_AMOUNT) sum_price,
+		       null fac_name,
+		       null sup_name,
+		       null dept_name
+		  from v_ass_out_detail t
+		
+		  left join v_ass_out_main t_m
+		    on t.GROUP_ID = t_m.group_id
+		   and t.hos_id = t_m.hos_id
+		   and t.copy_code = t_m.COPY_CODE
+		   and t.OUT_NO = t_m.out_no
+		
+		  left join v_ass_card t1
+		    on t.GROUP_ID = t1.GROUP_ID
+		   and t.hos_id = t1.hos_id
+		   and t.copy_code = t1.copy_code
+		   and t.ASS_CARD_NO = t1.ass_card_no
+		
+		  left join hos_store_dict t2
+		    on t1.GROUP_ID = t2.group_id
+		   and t1.hos_id = t2.hos_id
+		   and t1.STORE_ID = t2.store_id
+		   and t2.is_stop = 0
+		
+		  left join ass_no_dict t3
+		    on t1.group_id = t3.group_id
+		   and t1.hos_id = t3.hos_id
+		   and t1.copy_code = t3.copy_code
+		   and t1.ass_id = t3.ass_id
+		   and t3.is_stop = 0
+		
+		  left join hos_unit unit
+		    on t1.GROUP_ID = unit.group_id
+		   and t1.HOS_ID = unit.hos_id
+		   and t1.UNIT_CODE = unit.unit_code
+		
+		  left join ass_type_dict atd
+		    on t3.group_id = atd.group_id
+		   and t3.hos_id = atd.hos_id
+		   and t3.copy_code = atd.copy_code
+		   and t3.ass_type_id = atd.ass_type_id
+		   and atd.is_stop = 0
+		
+		  left join hos_fac_dict t5
+		    on t1.group_id = t5.group_id
+		   and t1.hos_id = t5.hos_id
+		   and t1.FAC_ID = t5.fac_id
+		   and t5.is_stop = 0
+		
+		  left join hos_sup_dict t6
+		    on t1.group_id = t6.group_id
+		   and t1.hos_id = t6.hos_id
+		   and t1.ven_id = t6.sup_id
+		   and t6.is_stop = 0
+		
+		  left join hos_dept_dict t7
+		    on t1.GROUP_ID = t7.group_id
+		   and t1.hos_id = t7.hos_id
+		   and t1.dept_id = t7.dept_id
+		   and t7.is_stop = 0
+		   
+		  where 
+		    t.group_id = #{group_id}
+		    and t.hos_id = #{hos_id}
+		    and t.copy_code = #{copy_code}
+		 	<if test="out_date_beg != null and out_date_beg != ''">
+			AND t_m.AUDIT_DATE &gt;= to_date(#{out_date_beg},'YYYY-MM-DD')
+			</if>
+			<if test="out_date_end != null and out_date_end != ''">
+			AND t_m.AUDIT_DATE &lt;= to_date(#{out_date_end},'YYYY-MM-DD')
+			</if>
+		    <if test="store_id != null and store_id !=''">
+	        and t1.store_id = #{store_id}
+		    </if> 
+		    <if test="use_dept_id != null and use_dept_id !=''">
+		    and t_m.dept_id = #{use_dept_id}
+		    </if>
+		    <if test="ven_id != null and ven_id !=''">
+		    and t1.ven_id = #{ven_id}
+		    </if>
+		    <if test="ass_type_id != null and ass_type_id !=''">
+		    and t3.ass_type_id = #{ass_type_id}
+		    </if>  
+		    <if test="bill_type != null and bill_type !=''">
+		    and t_m.bill_type = #{bill_type}
+		    </if> 
+		    <if test="ass_name != null and ass_name !=''">
+		    and t3.ass_name like '%${ass_name}%'
+		    </if>
+		    <if test="out_no != null and out_no !=''">
+		    and t.out_no like '%${out_no}%'
+		    </if>
+		    <if test="ass_spec != null and ass_spec !=''">
+		    and t1.ASS_SPEC || t1.ASS_MONDL like '%${ass_spec}%'
+		    </if> 
+			 <if test="dept_id != null and dept_id !=''">
+		    and t7.dept_id like '%${dept_id}%'
+		    </if>	
+	</select>
+	
+	<select id="queryOutSituationPrint" parameterType="java.util.Map" resultMap="outSituationMap">
+		select     t2.store_name,
+			       atd.ass_type_name,
+			       t3.ass_code,
+			       t3.ass_name,
+			       t1.ASS_SPEC || t1.ASS_MONDL ASS_SPEC,
+			       unit.unit_name,
+			       t1.PRICE,
+			       sum(t1.ASS_AMOUNT) ASS_AMOUNT,
+			       t1.PRICE * sum(t1.ASS_AMOUNT) sum_price,
+			       t5.fac_name,
+			       t6.sup_name ven_name,
+			       t7.dept_name
+		  from v_ass_out_detail t
+		
+		  left join v_ass_out_main t_m
+		    on t.GROUP_ID = t_m.group_id
+		   and t.hos_id = t_m.hos_id
+		   and t.copy_code = t_m.COPY_CODE
+		   and t.OUT_NO = t_m.out_no
+		
+		  left join v_ass_card t1
+		    on t.GROUP_ID = t1.GROUP_ID
+		   and t.hos_id = t1.hos_id
+		   and t.copy_code = t1.copy_code
+		   and t.ASS_CARD_NO = t1.ass_card_no
+		
+		  left join hos_store_dict t2
+		    on t1.GROUP_ID = t2.group_id
+		   and t1.hos_id = t2.hos_id
+		   and t1.STORE_ID = t2.store_id
+		   and t2.is_stop = 0
+		
+		  left join ass_no_dict t3
+		    on t1.group_id = t3.group_id
+		   and t1.hos_id = t3.hos_id
+		   and t1.copy_code = t3.copy_code
+		   and t1.ass_id = t3.ass_id
+		   and t3.is_stop = 0
+		
+		  left join hos_unit unit
+		    on t1.GROUP_ID = unit.group_id
+		   and t1.HOS_ID = unit.hos_id
+		   and t1.UNIT_CODE = unit.unit_code
+		
+		  left join ass_type_dict atd
+		    on t3.group_id = atd.group_id
+		   and t3.hos_id = atd.hos_id
+		   and t3.copy_code = atd.copy_code
+		   and t3.ass_type_id = atd.ass_type_id
+		   and atd.is_stop = 0
+		
+		  left join hos_fac_dict t5
+		    on t1.group_id = t5.group_id
+		   and t1.hos_id = t5.hos_id
+		   and t1.FAC_ID = t5.fac_id
+		   and t5.is_stop = 0
+		
+		  left join hos_sup_dict t6
+		    on t1.group_id = t6.group_id
+		   and t1.hos_id = t6.hos_id
+		   and t1.ven_id = t6.sup_id
+		   and t6.is_stop = 0
+		
+		  left join hos_dept_dict t7
+		    on t1.GROUP_ID = t7.group_id
+		   and t1.hos_id = t7.hos_id
+		   and t1.dept_id = t7.dept_id
+		   and t7.is_stop = 0
+		
+		 where 
+		    t.group_id = #{group_id}
+		    and t.hos_id = #{hos_id}
+		    and t.copy_code = #{copy_code}
+		 	<if test="out_date_beg != null and out_date_beg != ''">
+			AND t_m.AUDIT_DATE &gt;= to_date(#{out_date_beg},'YYYY-MM-DD')
+			</if>
+			<if test="out_date_end != null and out_date_end != ''">
+			AND t_m.AUDIT_DATE &lt;= to_date(#{out_date_end},'YYYY-MM-DD')
+			</if>
+		    <if test="store_id != null and store_id !=''">
+	        and t1.store_id = #{store_id}
+		    </if> 
+		    <if test="use_dept_id != null and use_dept_id !=''">
+		    and t_m.dept_id = #{use_dept_id}
+		    </if>
+		    <if test="ven_id != null and ven_id !=''">
+		    and t1.ven_id = #{ven_id}
+		    </if>
+		    <if test="ass_type_id != null and ass_type_id !=''">
+		    and t3.ass_type_id = #{ass_type_id}
+		    </if>  
+		    <if test="bill_type != null and bill_type !=''">
+		    and t_m.bill_type = #{bill_type}
+		    </if> 
+		    <if test="ass_name != null and ass_name !=''">
+		    and t3.ass_name like '%${ass_name}%'
+		    </if>
+		    <if test="out_no != null and out_no !=''">
+		    and t.out_no like '%${out_no}%'
+		    </if>
+		    <if test="ass_spec != null and ass_spec !=''">
+		    and t1.ASS_SPEC || t1.ASS_MONDL like '%${ass_spec}%'
+		    </if>
+		    <if test="dept_id != null and dept_id !=''">
+		    and t7.dept_id like '%${dept_id}%'
+		    </if>
+		   
+		
+		 group by t2.store_name,
+		          atd.ass_type_name,
+		          t3.ass_code,
+		          t3.ass_name,
+		          t1.ASS_SPEC || t1.ASS_MONDL,
+		          unit.unit_name,
+		          t1.PRICE,
+		          t5.fac_name,
+		          t6.sup_name,
+		          t7.dept_name
+		
+		union all
+		
+		select null store_name,
+		       null ass_type_name,
+		       null ass_code,
+		       '总合计' vass_name,
+		       null ASS_SPEC,
+		       null unit_name,
+		       null PRICE,
+		       sum(t1.ASS_AMOUNT) ASS_AMOUNT,
+		       sum(t1.PRICE * t1.ASS_AMOUNT) sum_price,
+		       null fac_name,
+		       null sup_name,
+		       null dept_name
+		  from v_ass_out_detail t
+		
+		  left join v_ass_out_main t_m
+		    on t.GROUP_ID = t_m.group_id
+		   and t.hos_id = t_m.hos_id
+		   and t.copy_code = t_m.COPY_CODE
+		   and t.OUT_NO = t_m.out_no
+		
+		  left join v_ass_card t1
+		    on t.GROUP_ID = t1.GROUP_ID
+		   and t.hos_id = t1.hos_id
+		   and t.copy_code = t1.copy_code
+		   and t.ASS_CARD_NO = t1.ass_card_no
+		
+		  left join hos_store_dict t2
+		    on t1.GROUP_ID = t2.group_id
+		   and t1.hos_id = t2.hos_id
+		   and t1.STORE_ID = t2.store_id
+		   and t2.is_stop = 0
+		
+		  left join ass_no_dict t3
+		    on t1.group_id = t3.group_id
+		   and t1.hos_id = t3.hos_id
+		   and t1.copy_code = t3.copy_code
+		   and t1.ass_id = t3.ass_id
+		   and t3.is_stop = 0
+		
+		  left join hos_unit unit
+		    on t1.GROUP_ID = unit.group_id
+		   and t1.HOS_ID = unit.hos_id
+		   and t1.UNIT_CODE = unit.unit_code
+		
+		  left join ass_type_dict atd
+		    on t3.group_id = atd.group_id
+		   and t3.hos_id = atd.hos_id
+		   and t3.copy_code = atd.copy_code
+		   and t3.ass_type_id = atd.ass_type_id
+		   and atd.is_stop = 0
+		
+		  left join hos_fac_dict t5
+		    on t1.group_id = t5.group_id
+		   and t1.hos_id = t5.hos_id
+		   and t1.FAC_ID = t5.fac_id
+		   and t5.is_stop = 0
+		
+		  left join hos_sup_dict t6
+		    on t1.group_id = t6.group_id
+		   and t1.hos_id = t6.hos_id
+		   and t1.ven_id = t6.sup_id
+		   and t6.is_stop = 0
+		
+		  left join hos_dept_dict t7
+		    on t1.GROUP_ID = t7.group_id
+		   and t1.hos_id = t7.hos_id
+		   and t1.dept_id = t7.dept_id
+		   and t7.is_stop = 0
+		   
+		  where 
+		    t.group_id = #{group_id}
+		    and t.hos_id = #{hos_id}
+		    and t.copy_code = #{copy_code}
+		 	<if test="out_date_beg != null and out_date_beg != ''">
+			AND t_m.AUDIT_DATE &gt;= to_date(#{out_date_beg},'YYYY-MM-DD')
+			</if>
+			<if test="out_date_end != null and out_date_end != ''">
+			AND t_m.AUDIT_DATE &lt;= to_date(#{out_date_end},'YYYY-MM-DD')
+			</if>
+		    <if test="store_id != null and store_id !=''">
+	        and t1.store_id = #{store_id}
+		    </if> 
+		    <if test="use_dept_id != null and use_dept_id !=''">
+		    and t_m.dept_id = #{use_dept_id}
+		    </if>
+		    <if test="ven_id != null and ven_id !=''">
+		    and t1.ven_id = #{ven_id}
+		    </if>
+		    <if test="ass_type_id != null and ass_type_id !=''">
+		    and t3.ass_type_id = #{ass_type_id}
+		    </if>  
+		    <if test="bill_type != null and bill_type !=''">
+		    and t_m.bill_type = #{bill_type}
+		    </if> 
+		    <if test="ass_name != null and ass_name !=''">
+		    and t3.ass_name like '%${ass_name}%'
+		    </if>
+		    <if test="out_no != null and out_no !=''">
+		    and t.out_no like '%${out_no}%'
+		    </if>
+		    <if test="ass_spec != null and ass_spec !=''">
+		    and t1.ASS_SPEC || t1.ASS_MONDL like '%${ass_spec}%'
+		    </if> 
+			 <if test="dept_id != null and dept_id !=''">
+		    and t7.dept_id like '%${dept_id}%'
+		    </if>	
+	</select>
+</mapper>
+

@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.mat.dao.matpayquery.MatPayQueryMapper">
+	
+	<!-- 入库发票查询 -->
+	<select id="queryMatInBillReport" parameterType="java.util.Map" resultType="java.util.Map" >
+		WITH tmp AS (
+			SELECT mim.group_id, mim.hos_id, mim.copy_code, mim.in_id, mim.in_no, 
+				hsd.store_code || ' ' || hsd.store_name store_name, 
+				to_char(mim.in_date, 'yyyy-MM-dd') in_date, 
+				mir.source_money amount_money, 
+				hsp.sup_code || ' ' || hsp.sup_name sup_name, 
+				bill.bill_no, to_char(bill.bill_date, 'yyyy-MM-dd') bill_date, 
+				case mim.bill_state when 0 then '货到票未到' when 1 then '货票同到' end in_state, 
+				case bill.bill_state when 0 then '货到票未到' when 1 then '货票同到' end bill_state, 
+				bill.payable_money, bill.bill_money 
+			FROM mat_in_main mim 
+			LEFT JOIN mat_in_resource mir 
+				ON mim.group_id = mir.group_id 
+				AND mim.hos_id = mir.hos_id 
+				AND mim.copy_code = mir.copy_code 
+				AND mim.in_id = mir.in_id 
+			LEFT JOIN hos_store_dict hsd 
+				ON mim.group_id = hsd.group_id 
+				AND mim.hos_id = hsd.hos_id 
+				AND mim.store_id = hsd.store_id 
+				<if test="show_history != null and show_history == 1">
+				AND mim.store_no = hsd.store_no
+				</if>
+				<if test="show_history == null or show_history == '' or show_history == 0">
+				AND hsd.is_stop = 0
+				</if>
+			LEFT JOIN hos_sup_dict hsp 
+				ON mim.group_id = hsp.group_id 
+				AND mim.hos_id = hsp.hos_id 
+				AND mim.sup_id = hsp.sup_id 
+				<if test="show_history != null and show_history == 1">
+				AND mim.sup_no = hsp.sup_no
+				</if>
+				<if test="show_history == null or show_history == '' or show_history == 0">
+				AND hsp.is_stop = 0
+				</if>
+			LEFT JOIN (
+				SELECT mbd.in_id, mbm.bill_date, mbm.bill_no, mbm.bill_state, 
+					sum(mbd.payable_money) payable_money, sum(mbd.bill_money) bill_money 
+				FROM mat_bill_main mbm
+				LEFT JOIN mat_bill_detail mbd
+					ON mbm.group_id = mbd.group_id 
+					AND mbm.hos_id = mbd.hos_id 
+					AND mbm.copy_code = mbd.copy_code 
+					AND mbm.bill_id = mbd.bill_id 
+				WHERE mbm.group_id = #{group_id,jdbcType=INTEGER}
+					AND mbm.hos_id = #{hos_id,jdbcType=INTEGER} 
+					AND mbm.copy_code = #{copy_code,jdbcType=VARCHAR}
+				GROUP BY mbd.in_id, mbm.bill_date, mbm.bill_no, mbm.bill_state
+			) bill
+				ON mim.in_id = bill.in_id 
+			WHERE mim.group_id = #{group_id,jdbcType=INTEGER}
+				AND mim.hos_id = #{hos_id,jdbcType=INTEGER} 
+				AND mim.copy_code = #{copy_code,jdbcType=VARCHAR}
+				AND mim.state = 3
+				<if test="begin_in_date != null and begin_in_date != ''">
+				AND mim.in_date &gt;= #{begin_in_date,jdbcType=DATE}
+				</if>
+				<if test="end_in_date != null and end_in_date != ''">
+				AND mim.in_date &lt;= #{end_in_date,jdbcType=DATE}
+				</if>
+				<if test="begin_bill_date != null and begin_bill_date != ''">
+				AND bill.bill_date &gt;= #{begin_bill_date,jdbcType=DATE}
+				</if>
+				<if test="end_bill_date != null and end_bill_date != ''">
+				AND bill.bill_date &lt;= #{end_bill_date,jdbcType=DATE}
+				</if>
+				<if test="store_id != null and store_id != ''">
+				AND mim.store_id = #{store_id,jdbcType=INTEGER}
+				</if>
+				<if test="set_id != null and set_id != ''">
+				AND mim.store_id in(
+					SELECT store_id 
+					FROM mat_store_detail 
+					WHERE group_id = #{group_id,jdbcType=INTEGER}
+						AND hos_id = #{hos_id,jdbcType=INTEGER} 
+						AND set_id = #{set_id,jdbcType=INTEGER}
+				)
+				</if>
+				<if test="store_id == null or store_id == ''">
+				AND exists(
+					SELECT 1
+					FROM v_user_data_perm
+					WHERE group_id = #{group_id,jdbcType=INTEGER}
+						AND hos_id = #{hos_id,jdbcType=INTEGER}
+						AND user_id = #{user_id,jdbcType=INTEGER}
+						AND table_code = 'HOS_STORE_DICT'
+						AND is_read = 1
+						AND perm_code = mim.store_id 
+				)
+				</if>
+				<if test="bill_state != null and bill_state != ''">
+					AND mim.bill_state = #{bill_state,jdbcType=INTEGER}
+				</if>
+				<if test="sup_id != null and sup_id != ''">
+					AND mim.sup_id = #{sup_id,jdbcType=INTEGER}
+				</if>
+		)
+		SELECT null "group_id", null "hos_id", null "copy_code", null "in_id", '合计' "in_no", 
+			null "store_name", null "in_date", sum(amount_money) "amount_money", 
+			null "sup_name", null "bill_no", null "bill_date", null "in_state", null "bill_state", 
+			sum(payable_money) "payable_money", sum(bill_money) "bill_money" 
+		FROM tmp
+		UNION ALL
+		SELECT group_id "group_id", hos_id "hos_id", copy_code "copy_code", in_id "in_id", in_no "in_no", 
+			store_name "store_name", in_date "in_date", amount_money "amount_money", 
+			sup_name "sup_name", bill_no "bill_no", bill_date "bill_date", in_state "in_state", 
+			bill_state "bill_state", payable_money "payable_money", bill_money "bill_money" 
+		FROM tmp
+	</select>
+</mapper>
+

@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+
+	<sql id="v_mat_bill_main" type="view" desc="物流发票主表视图"><![CDATA[
+	CREATE OR REPLACE VIEW v_mat_bill_main AS
+	SELECT 
+      MBM.GROUP_ID,  --集团ID
+      MBM.HOS_ID,    --医院ID
+      MBM.COPY_CODE, --账套编码
+      MBM.BILL_ID AS BUSINESS_ID,     --发票单ID
+      MBM.BILL_NO AS BUSINESS_NO,     --发票号
+      MBM.BILL_NO ,     --发票号
+      MBM.SUP_ID,  --供应商ID
+      HSD.SUP_NO,  --供应商变更ID
+      HSD.SUP_CODE,    --供应商编码
+      HSD.SUP_NAME,    --供应商名称
+      MBM.NOTE,    --摘要
+      MBM.PAYABLE_MONEY, --应付金额
+      MBM.BILL_MONEY AMOUNT_MONEY,  --发票金额
+      MBM.MAKER,    --制单人ID
+      SM.USER_NAME AS MAKER_NAME, --制单人名称
+      MBM.BILL_DATE AS BUSI_DATE,    --发票日期
+      MBM.CHECKER,    --审核人ID
+      SC.USER_NAME AS CHECKER_NAME,    --审核人名称
+      MBM.CHK_DATE,    --审核日期
+      nvl(MBM.BILL_STATE,0) BILL_STATE, --发票状态
+      case MBM.BILL_STATE when 1 then '货票同到' else '货到票未到' end BILL_TEXT, --发票状态
+      MBM.STATE,       --状态
+      MBM.BILL_TYPE --业务状态
+   FROM MAT_BILL_MAIN MBM
+   LEFT JOIN HOS_SUP_DICT HSD --供应商
+   ON 
+      MBM.GROUP_ID=HSD.GROUP_ID 
+      AND MBM.HOS_ID=HSD.HOS_ID
+      AND MBM.SUP_ID=HSD.SUP_ID
+      AND MBM.SUP_NO=HSD.SUP_NO
+   LEFT JOIN SYS_USER SM  --制单人
+   ON 
+      MBM.GROUP_ID=SM.GROUP_ID
+      AND MBM.HOS_ID=SM.HOS_ID
+      AND MBM.COPY_CODE=SM.COPY_CODE
+      AND MBM.MAKER=SM.USER_ID
+   LEFT JOIN SYS_USER SC   --审核人
+   ON 
+      MBM.GROUP_ID=SC.GROUP_ID
+      AND MBM.HOS_ID=SC.HOS_ID
+      AND MBM.COPY_CODE=SC.COPY_CODE
+      AND MBM.CHECKER=SC.USER_ID
+   WHERE MBM.STATE=2
+ 
+	]]></sql>
+	<sql id="v_mat_bill_detail" type="view" desc="物流发票明细视图"><![CDATA[
+	CREATE OR REPLACE VIEW v_mat_bill_detail AS
+	SELECT 
+     MBD.GROUP_ID,  --集团ID
+     MBD.HOS_ID,    --单位ID
+     MBD.COPY_CODE, --账套编码
+     MBD.BILL_ID AS BUSINESS_ID,     --发票ID
+     MBD.BILL_NO  AS BUSINESS_NO,     --发票号
+     MBD.BILL_DETAIL_ID AS DETAIL_ID,--明细ID
+     MBD.IN_ID ,--入库单ID
+     MIM.IN_NO ,--入库单号
+     MBD.IN_DETAIL_ID ,--入库单明细ID
+     MIM.PROTOCOL_CODE,--协议编号
+     MIV.MAT_TYPE_ID AS SUB_TYPE_ID, --物资分类ID
+     MIV.INV_CODE,  --材料编码
+     MID.BATCH_NO,  --批号
+     MID.PRICE,     --单价
+     MID.AMOUNT,    --数量
+     MBD.PAYABLE_MONEY, --应付金额
+     MBD.BILL_MONEY AMOUNT_MONEY, --发票金额
+	 HS.SOURCE_ID,    --资金来源ID
+	 HS.SOURCE_CODE,    --资金来源编码
+	 HS.SOURCE_NAME,    --资金来源名称
+	 HSN.NATURE_CODE AS SOURCE_NATURE_CODE, --资金来源属性
+	 HSN.NATURE_NAME AS SOURCE_NATURE_NAME, --资金来源性质名称
+     MIV.AMORTIZE_TYPE  --摊销方式
+    FROM MAT_BILL_DETAIL MBD
+    LEFT JOIN MAT_IN_MAIN MIM
+    ON
+         MBD.GROUP_ID=MIM.GROUP_ID
+      AND MBD.HOS_ID=MIM.HOS_ID
+      AND MBD.COPY_CODE=MIM.COPY_CODE
+      AND MBD.IN_ID=MIM.IN_ID
+    LEFT JOIN MAT_IN_DETAIL MID
+    ON 
+          MBD.GROUP_ID=MID.GROUP_ID
+      AND MBD.HOS_ID=MID.HOS_ID
+      AND MBD.COPY_CODE=MID.COPY_CODE
+      AND MBD.IN_ID=MID.IN_ID
+      AND MBD.IN_DETAIL_ID=MID.IN_DETAIL_ID
+    LEFT JOIN MAT_IN_RESOURCE MIR
+    ON
+         MIR.GROUP_ID=MIM.GROUP_ID
+      AND MIR.HOS_ID=MIM.HOS_ID
+      AND MIR.COPY_CODE=MIM.COPY_CODE
+      AND MIR.IN_ID=MIM.IN_ID
+    LEFT JOIN HOS_SOURCE HS
+    ON 
+          MIR.GROUP_ID=HS.GROUP_ID
+      AND MIR.HOS_ID=HS.HOS_ID
+      AND MIR.SOURCE_ID=HS.SOURCE_ID
+    LEFT JOIN HOS_SOURCE_NATURE HSN
+    ON 
+         HS.SOURCE_ATTR=HSN.NATURE_CODE
+    LEFT JOIN MAT_INV_DICT MIV
+    ON 
+          MID.GROUP_ID=MIV.GROUP_ID
+      AND MID.HOS_ID=MIV.HOS_ID
+      AND MID.COPY_CODE=MIV.COPY_CODE
+      AND MID.INV_ID=MIV.INV_ID
+      AND MID.INV_NO=MIV.INV_NO
+ 
+	]]></sql>
+	
+</root>
+

@@ -1,0 +1,534 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.hr.dao.salarymanagement.HrStandardMapper">
+
+	<resultMap type="java.util.Map" id="hrWageStanMap">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="stan_id" column="stan_id"/>
+		<result property="stan_code" column="stan_code"/>
+		<result property="stan_name" column="stan_name"/>
+		<result property="tab_code" column="tab_code"/>
+		<result property="col_code" column="col_code"/>
+		<result property="start_date" column="start_date"/>
+		<result property="column_id" column="column_id"/>
+		<result property="state" column="state"/>
+		<result property="id" column="id"/>
+		<result property="vlaue1" column="vlaue1"/>
+		<result property="vlaue2" column="vlaue2"/>
+		<result property="vlaue3" column="vlaue3"/>
+		<result property="vlaue4" column="vlaue4"/>
+		<result property="vlaue5" column="vlaue5"/>
+		<result property="vlaue6" column="vlaue6"/>
+		<result property="vlaue7" column="vlaue7"/>
+		<result property="vlaue8" column="vlaue8"/>
+		<result property="wage_stan" column="wage_stan"/>
+	</resultMap>
+	
+	<!-- 表字段查询 -->
+	<select id="queryStandardTabCodeOption" resultType="java.util.Map">
+		SELECT 
+			 TAB_NAME "label",
+			 TAB_CODE "id"
+		FROM 
+			HR_TAB_STRUC
+		WHERE 
+			GROUP_ID = #{group_id,jdbcType=INTEGER}
+			AND HOS_ID = #{hos_id,jdbcType=INTEGER}
+			ORDER BY SORT
+	</select>
+
+	<!-- 列字段查询二级联动 -->
+	<select id="queryStandardColCodeOption" resultType="java.util.Map">
+		SELECT 
+			COL_NAME "label",
+			COL_CODE "id"
+		FROM 
+			HR_COL_STRUC 
+		WHERE 
+			GROUP_ID = #{group_id,jdbcType=INTEGER}
+			AND HOS_ID = #{hos_id,jdbcType=INTEGER}
+			AND TAB_CODE = #{code,jdbcType=VARCHAR}
+			AND FIELD_TAB_CODE IS NOT NULL
+		ORDER BY 
+			SORT
+	</select>
+
+	<!-- 薪资标准添加 -->
+	<insert id="addStandard">
+		INSERT INTO 
+			HR_WAGE_STAN 
+				(GROUP_ID,HOS_ID,STAN_ID,STAN_CODE,STAN_NAME,START_DATE,STATE)
+			VALUES 
+				(#{group_id,jdbcType=INTEGER},#{hos_id,jdbcType=INTEGER},
+				#{stan_id,jdbcType=INTEGER},#{stan_code,jdbcType=VARCHAR},#{stan_name,jdbcType=VARCHAR},
+				TO_DATE(#{start_date,jdbcType=VARCHAR},'yyyy-MM-dd'),#{state,jdbcType=INTEGER})
+	</insert>
+	
+	<!-- 相关条件添加 -->
+	<insert id="addStandardCdt">
+		INSERT INTO
+			HR_WAGE_STAN_COND 
+				(GROUP_ID,HOS_ID,STAN_ID,TAB_CODE,COL_CODE,COLUMN_ID)
+				(	
+					<foreach collection="list" item="item" separator=" UNION ALL " >
+					SELECT 
+						#{vo.group_id,jdbcType=INTEGER},#{vo.hos_id,jdbcType=INTEGER},
+						#{vo.stan_id,jdbcType=INTEGER},#{item.tab_code,jdbcType=VARCHAR},
+						#{item.col_code,jdbcType=VARCHAR},#{item.column_id,jdbcType=INTEGER}
+					FROM 
+						DUAL
+					</foreach>
+				)
+	</insert>
+
+	<!-- 查询自增序列 -->
+	<select id="queryStanId" resultType="int">
+		SELECT HR_WAGE_STAN_SEQ.NEXTVAL FROM DUAL
+	</select>
+
+	<!-- 薪资标准查询 -->
+	<select id="queryStandard" resultType="java.util.Map">
+		SELECT 
+			P1.STAN_ID,
+			P1.STAN_CODE,
+			P1.STAN_NAME,
+			WM_CONCAT(P3.COL_NAME) COND,
+			P1.START_DATE,P1.STATE
+		FROM
+			HR_WAGE_STAN P1
+			LEFT JOIN HR_WAGE_STAN_COND P2 
+		       ON P1.STAN_ID = P2.STAN_ID
+		  	LEFT JOIN HR_COL_STRUC P3 
+		       ON P1.GROUP_ID = P3.GROUP_ID
+		       AND P1.HOS_ID = P3.HOS_ID
+		       AND P2.TAB_CODE = P3.TAB_CODE
+		       AND P2.COL_CODE = P3.COL_CODE
+		WHERE 
+			P1.GROUP_ID = #{group_id,jdbcType=INTEGER}
+			AND P1.HOS_ID = #{hos_id,jdbcType=INTEGER}
+			<if test=" state != null and state != '' ">AND P1.STATE = #{state,jdbcType=INTEGER} </if>
+			<if test=" stan_name != null and stan_name != '' ">
+				AND (
+				P1.STAN_CODE like '%${stan_name}%' or
+				P1.STAN_NAME like '%${stan_name}%'
+				)
+			</if>
+		GROUP BY 
+			P1.STAN_ID,
+			P1.STAN_CODE,
+			P1.STAN_NAME,
+			P1.START_DATE,
+			P1.STATE
+		ORDER BY 
+			P1.STAN_ID DESC
+	</select>
+	
+	<!--  删除薪资标准维护数据 -->
+	<delete id="deleteweihu">
+		DELETE FROM
+			HR_WAGE_STAN_DATA
+		WHERE
+			GROUP_ID = #{vo.group_id,jdbcType=INTEGER}
+			AND HOS_ID = #{vo.hos_id,jdbcType=INTEGER}
+			AND STAN_ID IN (
+				<foreach collection="list" item="item" separator=" , " >
+					#{item}
+				</foreach>
+				)
+	</delete>
+
+	<!-- 删除薪资标准相关条件 -->
+	<delete id="deleteStandardCond">
+		DELETE FROM 
+			HR_WAGE_STAN_COND 
+		WHERE 
+			GROUP_ID = #{vo.group_id,jdbcType=INTEGER}
+			AND HOS_ID = #{vo.hos_id,jdbcType=INTEGER}
+			AND STAN_ID IN (
+				<foreach collection="list" item="item" separator=" , " >
+					#{item}
+				</foreach>
+				)
+	</delete>
+
+	<!-- 删除薪资标准 -->
+	<delete id="deleteStandard">
+		DELETE FROM 
+			HR_WAGE_STAN 
+		WHERE 
+			GROUP_ID = #{vo.group_id,jdbcType=INTEGER}
+			AND HOS_ID = #{vo.hos_id,jdbcType=INTEGER}
+			AND STAN_ID IN (
+				<foreach collection="list" item="item" separator=" , " >
+					#{item}
+				</foreach>
+				)
+	</delete>
+
+	<!-- 启用薪资标准 -->
+	<update id="qiyongStandard">
+		UPDATE
+			HR_WAGE_STAN SET
+			STATE = #{vo.state}			 
+		WHERE 
+			GROUP_ID = #{vo.group_id,jdbcType=INTEGER}
+			AND HOS_ID = #{vo.hos_id,jdbcType=INTEGER}
+			AND STAN_ID IN (
+				<foreach collection="list" item="item" separator=" , " >
+					#{item}
+				</foreach>
+				)
+	</update>
+
+	<!-- 薪资标准数据回显 -->
+	<select id="queryStandardUpdate" resultType="java.util.Map">
+		SELECT 
+			STAN_ID,
+			STAN_CODE,
+			STAN_NAME,
+			STATE,
+			START_DATE
+		FROM 
+			HR_WAGE_STAN
+		WHERE
+			GROUP_ID = #{group_id,jdbcType=INTEGER}
+			AND HOS_ID = #{hos_id,jdbcType=INTEGER}
+			AND STAN_ID = #{id,jdbcType=INTEGER}
+	</select>
+
+	<!-- 修改之删除明细数据 -->
+	<delete id="deleteStandardCdt">
+		DELETE FROM 
+			HR_WAGE_STAN_COND
+		WHERE
+			GROUP_ID = #{group_id,jdbcType=INTEGER}
+			AND HOS_ID = #{hos_id,jdbcType=INTEGER}
+			AND STAN_ID = #{stan_id,jdbcType=INTEGER}
+	</delete>
+
+	<!-- 修改薪资标准 -->
+	<update id="updateStandard">
+		UPDATE 
+			HR_WAGE_STAN 
+		SET
+			STAN_CODE = #{stan_code,jdbcType=VARCHAR},
+			STAN_NAME = #{stan_name,jdbcType=VARCHAR},
+			STATE = #{state,jdbcType=INTEGER},
+			START_DATE = TO_DATE(#{start_date,jdbcType=VARCHAR},'yyyy-MM-dd')
+		WHERE
+			STAN_ID = #{stan_id,jdbcType=INTEGER}
+			AND GROUP_ID = #{group_id,jdbcType=INTEGER}
+			AND HOS_ID = #{hos_id,jdbcType=INTEGER}
+	</update>
+
+	<!-- 薪资标准修改明细回显 -->
+	<select id="queryStandardCtd" resultType="java.util.Map">
+		SELECT 
+			P1.TAB_CODE "tab_code",
+			P1.COL_CODE	"col_code",
+			P2.TAB_NAME "tab_codes", 
+			P3.COL_NAME "col_codes",
+			P1.COLUMN_ID "column_id"
+		FROM 
+			HR_WAGE_STAN_COND P1
+		LEFT JOIN HR_TAB_STRUC P2
+			ON P1.GROUP_ID = P2.GROUP_ID
+			AND P1.HOS_ID = P2.HOS_ID
+			AND P1.TAB_CODE = P2.TAB_CODE
+		LEFT JOIN HR_COL_STRUC P3 ON P1.GROUP_ID = P3.GROUP_ID
+	        AND P1.HOS_ID = P3.HOS_ID
+	        AND P1.TAB_CODE = P3.TAB_CODE
+	        AND P1.COL_CODE = P3.COL_CODE
+		WHERE P1.GROUP_ID = #{group_id,jdbcType=INTEGER}
+		   AND P1.HOS_ID = #{hos_id,jdbcType=INTEGER}
+		   AND P1.STAN_ID = #{id,jdbcType=INTEGER}
+		ORDER BY
+			P1.COLUMN_ID
+	</select>
+
+	<!-- 薪资标准添加时验证是否有重复的数据 -->
+	<select id="queryStandardStateCount" resultType="int">
+		SELECT COUNT(1) FROM 
+			HR_WAGE_STAN
+		WHERE 
+			GROUP_ID = #{group_id,jdbcType=INTEGER}
+			AND HOS_ID = #{hos_id,jdbcType=INTEGER}
+			AND (STAN_CODE = #{stan_code,jdbcType=VARCHAR} or
+				STAN_NAME = #{stan_name,jdbcType=VARCHAR})
+			AND STATE = 1
+			<if test=" stan_id != null and stan_id != '' "> 
+			AND STAN_ID != #{stan_id,jdbcType=INTEGER}
+			</if>
+	</select>
+
+	<!-- 查询是否存在重复的启用数据 -->
+	<select id="queryCopyStateStandardCount" resultType="int">
+		SELECT 
+			COUNT(1)
+  		FROM 
+  			HR_WAGE_STAN F1,
+       		(SELECT 
+       			STAN_CODE, 
+       			STAN_NAME
+          	FROM 
+          		HR_WAGE_STAN
+         	WHERE 
+         		GROUP_ID = #{group_id,jdbcType=INTEGER}
+         		AND HOS_ID = #{hos_id,jdbcType=INTEGER}
+         		AND STAN_ID = #{id,jdbcType=INTEGER}) F2
+		WHERE 
+			F1.STAN_CODE = F2.STAN_CODE
+			AND F1.STAN_NAME = F2.STAN_NAME
+			AND F1.GROUP_ID = #{group_id,jdbcType=INTEGER}
+			AND F1.HOS_ID = #{hos_id,jdbcType=INTEGER}
+			AND F1.STATE = 1
+	</select>
+
+	<!-- 明细数据复制 -->
+	<insert id="addCopyStandardCdt">
+		INSERT INTO
+			HR_WAGE_STAN_COND 
+				(GROUP_ID,HOS_ID,STAN_ID,TAB_CODE,COL_CODE,COLUMN_ID)
+				(	
+					<foreach collection="list" item="item" separator=" UNION ALL " >
+					SELECT 
+						#{vo.group_id,jdbcType=INTEGER},#{vo.hos_id,jdbcType=INTEGER},
+						#{vo.stan_id,jdbcType=INTEGER},#{item.tab_code,jdbcType=VARCHAR},
+						#{item.col_code,jdbcType=VARCHAR},#{item.column_id,jdbcType=INTEGER}
+					FROM 
+						DUAL
+					</foreach>
+				)
+	</insert>
+	
+	<!-- 薪资标准复制 -->
+	<insert id="addCopyStandard">
+		INSERT INTO 
+			HR_WAGE_STAN (GROUP_ID,HOS_ID,STAN_ID,STAN_CODE,STAN_NAME,START_DATE,STATE)
+				 (	select
+						GROUP_ID ,
+						HOS_ID ,
+						#{stan_id,jdbcType=INTEGER},
+						STAN_CODE ,
+						STAN_NAME ,
+						SYSDATE,
+	      				1
+					FROM 
+						HR_WAGE_STAN
+					WHERE
+						GROUP_ID = #{group_id,jdbcType=INTEGER}	
+						AND HOS_ID = #{hos_id,jdbcType=INTEGER}
+						AND STAN_ID = #{id,jdbcType=INTEGER}
+					)
+	</insert>
+
+	<!-- 维护表下拉查询 -->
+	<select id="queryStandardRankodeOption" resultType="java.util.Map">
+	SELECT
+		FIELD_COL_CODE "id",
+		FIELD_COL_NAME "label"
+	FROM 
+		HR_FIIED_DATA 
+	WHERE 
+		GROUP_ID = #{group_id,jdbcType=INTEGER}
+		AND HOS_ID = #{hos_id,jdbcType=INTEGER}
+		AND FIELD_TAB_CODE = #{field_tab_code,jdbcType=VARCHAR}
+		AND IS_STOP = 0
+	</select>
+
+	<!-- 薪资标准维护表头查询 -->
+	<select id="queryStandardMaintain" resultType="java.util.Map">
+		SELECT
+			P2.FIELD_TAB_CODE,
+			P2.COL_NAME
+		FROM
+			HR_WAGE_STAN_COND P1,
+			HR_COL_STRUC P2
+		WHERE
+			P1.GROUP_ID = P2.GROUP_ID
+			AND P1.HOS_ID = P2.HOS_ID
+			AND P1.TAB_CODE = P2.TAB_CODE
+			AND P1.COL_CODE = P2.COL_CODE
+			AND P1.GROUP_ID = #{group_id,jdbcType=INTEGER}
+			AND P1.HOS_ID = #{hos_id,jdbcType=INTEGER}
+			AND P1.STAN_ID = #{id,jdbcType=INTEGER}
+		ORDER BY 
+			P1.COLUMN_ID
+	</select>
+
+	<!-- 薪资维护数据添加 -->
+	<insert id="addMaintain">
+		INSERT INTO 
+			HR_WAGE_STAN_DATA (ID,GROUP_ID,HOS_ID,STAN_ID,
+						VLAUE1,
+						VLAUE2,
+						VLAUE3,
+						VLAUE4,
+						VLAUE5,
+						VLAUE6,
+						VLAUE7,
+						VLAUE8,
+						WAGE_STAN)
+				SELECT HR_WAGE_STAN_DATA_SEQ.NEXTVAL,OM.* FROM (
+					<foreach collection="list" item="item" separator=" UNION ALL " >
+					SELECT 
+						#{vo.group_id,jdbcType=INTEGER} group_id,#{vo.hos_id,jdbcType=INTEGER} hos_id,
+						#{vo.stan_id,jdbcType=INTEGER} stan_id,
+						#{item.val1,jdbcType=VARCHAR} val1,
+						<if test="item.val2 == null or item.val2 == '' ">null val2,</if><if test="item.val2 != null and item.val2 != '' ">#{item.val2,jdbcType=VARCHAR} val2,</if>
+						<if test="item.val3 == null or item.val3 == '' ">null val3,</if><if test="item.val3 != null and item.val3 != '' ">#{item.val3,jdbcType=VARCHAR} val3,</if>
+						<if test="item.val4 == null or item.val4 == '' ">null val4,</if><if test="item.val4 != null and item.val4 != '' ">#{item.val4,jdbcType=VARCHAR} val4,</if>
+						<if test="item.val5 == null or item.val5 == '' ">null val5,</if><if test="item.val5 != null and item.val5 != '' ">#{item.val5,jdbcType=VARCHAR} val5,</if>
+						<if test="item.val6 == null or item.val6 == '' ">null val6,</if><if test="item.val6 != null and item.val6 != '' ">#{item.val6,jdbcType=VARCHAR} val6,</if>
+						<if test="item.val7 == null or item.val7 == '' ">null val7,</if><if test="item.val7 != null and item.val7 != '' ">#{item.val7,jdbcType=VARCHAR} val7,</if>
+						<if test="item.val8 == null or item.val8 == '' ">null val8,</if><if test="item.val8 != null and item.val8 != '' ">#{item.val8,jdbcType=VARCHAR} val8,</if>
+						CONCAT(#{item.wage_stan,jdbcType=INTEGER},'') wage_stan
+					FROM 
+						DUAL
+					</foreach>
+				) OM
+	</insert>
+	
+	<!-- 薪资维护查询 -->
+	<select id="queryMaintain" resultType="java.util.Map">
+		SELECT
+	      hwsd.vlaue1 "val1",t1.field_col_name VALUE1,hwsd.vlaue2 "val2",t2.field_col_name VALUE2,
+	      hwsd.vlaue3 "val3",t3.field_col_name VALUE3,hwsd.vlaue4 "val4",t4.field_col_name VALUE4,
+	      hwsd.vlaue5 "val5",t5.field_col_name VALUE5,hwsd.vlaue6 "val6",t6.field_col_name VALUE6,
+	      hwsd.vlaue7 "val7",t7.field_col_name VALUE7,hwsd.vlaue8 "val8",t8.field_col_name VALUE8,
+	      hwsd.WAGE_STAN "wage_stan"
+    	FROM
+	      HR_WAGE_STAN_DATA HWSD LEFT JOIN 
+	      HR_WAGE_STAN_DATA_VIEW T1 
+	      ON HWSD.STAN_ID = T1.STAN_ID AND
+	      HWSD.GROUP_ID = T1.GROUP_ID AND HWSD.HOS_ID = T1.HOS_ID AND T1.COLUMN_ID = 1 AND  HWSD.VLAUE1 = T1.FIELD_COL_CODE
+	      LEFT JOIN
+	      HR_WAGE_STAN_DATA_VIEW T2 
+	      ON HWSD.STAN_ID = T2.STAN_ID AND
+	      HWSD.GROUP_ID = T2.GROUP_ID AND HWSD.HOS_ID = T2.HOS_ID AND T2.COLUMN_ID = 2 AND HWSD.VLAUE2 = T2.FIELD_COL_CODE
+	      LEFT JOIN
+	      HR_WAGE_STAN_DATA_VIEW T3 
+	      ON HWSD.STAN_ID = T3.STAN_ID AND
+	      HWSD.GROUP_ID = T3.GROUP_ID AND HWSD.HOS_ID = T3.HOS_ID AND T3.COLUMN_ID = 3 AND HWSD.VLAUE3 = T3.FIELD_COL_CODE
+	      LEFT JOIN
+	      HR_WAGE_STAN_DATA_VIEW T4
+	      ON HWSD.STAN_ID = T4.STAN_ID AND
+	      HWSD.GROUP_ID = T4.GROUP_ID AND HWSD.HOS_ID = T4.HOS_ID AND T4.COLUMN_ID = 4 AND HWSD.VLAUE4 = T4.FIELD_COL_CODE
+	      LEFT JOIN
+	      HR_WAGE_STAN_DATA_VIEW T5
+	      ON HWSD.STAN_ID = T5.STAN_ID AND
+	      HWSD.GROUP_ID = T5.GROUP_ID AND HWSD.HOS_ID = T5.HOS_ID AND T5.COLUMN_ID = 5 AND HWSD.VLAUE5 = T5.FIELD_COL_CODE
+	      LEFT JOIN
+	      HR_WAGE_STAN_DATA_VIEW T6 
+	      ON HWSD.STAN_ID = T6.STAN_ID AND
+	      HWSD.GROUP_ID = T6.GROUP_ID AND HWSD.HOS_ID = T6.HOS_ID AND T6.COLUMN_ID = 6 AND HWSD.VLAUE6 = T6.FIELD_COL_CODE
+	      LEFT JOIN
+	      HR_WAGE_STAN_DATA_VIEW T7 
+	      ON HWSD.STAN_ID = T7.STAN_ID AND
+	      HWSD.GROUP_ID = T7.GROUP_ID AND HWSD.HOS_ID = T7.HOS_ID AND T7.COLUMN_ID = 7 AND HWSD.VLAUE7 = T7.FIELD_COL_CODE
+	      LEFT JOIN
+	      HR_WAGE_STAN_DATA_VIEW T8 
+	      ON HWSD.STAN_ID = T8.STAN_ID AND
+	      HWSD.GROUP_ID = T8.GROUP_ID AND HWSD.HOS_ID = T8.HOS_ID AND T8.COLUMN_ID = 8 AND HWSD.VLAUE8 = T8.FIELD_COL_CODE
+		WHERE
+			HWSD.GROUP_ID = #{group_id,jdbcType=INTEGER}
+			AND HWSD.HOS_ID = #{hos_id,jdbcType=INTEGER}
+			AND HWSD.STAN_ID = #{stan_id,jdbcType=INTEGER}
+	</select>
+	
+	<!-- 维护数据之先删除所有数据 -->
+	<delete id="deleteMaintain">
+		DELETE FROM
+			HR_WAGE_STAN_DATA
+        WHERE GROUP_ID = #{group_id,jdbcType=INTEGER}
+               AND HOS_ID = #{hos_id,jdbcType=INTEGER}
+               AND STAN_ID = #{stan_id,jdbcType=INTEGER}
+	</delete>
+	
+	<!-- 查询是否存在维护数据 -->
+	<select id="querStandardUpdateCode" resultType="int">
+		SELECT
+			COUNT(1)
+		FROM
+			HR_WAGE_STAN_DATA
+		WHERE
+			GROUP_ID = #{group_id,jdbcType=INTEGER}
+			AND HOS_ID = #{hos_id,jdbcType=INTEGER}
+			AND STAN_ID = #{id,jdbcType=INTEGER}
+	</select>
+	
+	<!-- 查询需要复制的维护信息 -->
+	<select id="queryStandardMaintainList" resultType="java.util.Map">
+		SELECT
+			VLAUE1 "val1",
+			VLAUE2 "val2",
+			VLAUE3 "val3",
+			VLAUE4 "val4",
+			VLAUE5 "val5",
+			VLAUE6 "val6",
+			VLAUE7 "val7",
+			VLAUE8 "val8",
+			WAGE_STAN "wage_stan"
+		FROM
+			HR_WAGE_STAN_DATA
+		WHERE
+			GROUP_ID = #{group_id,jdbcType=INTEGER}
+			AND HOS_ID = #{hos_id,jdbcType=INTEGER}
+			AND STAN_ID = #{id,jdbcType=INTEGER}
+	</select>
+	
+	<!-- 薪资标准表下拉选 用 -->
+	<resultMap type="java.util.Map" id="selectMap">
+		<result property="id" column="id"/>
+		<result property="text" column="text"/>
+	</resultMap>
+	<select id="selectHrWageStan" resultMap="selectMap" parameterType="java.util.Map">
+		select stan_id id, stan_name text
+		from hr_wage_stan
+		where group_id = #{group_id, jdbcType=INTEGER}
+		  and hos_id = #{hos_id, jdbcType=INTEGER}
+		  and state = 1<!-- 1:启用，2：停用 -->
+		order by stan_id
+	</select>
+	
+	<!-- 通过外键取薪资标准条件 -->
+	<select id="findHrWageStanCondByFK" resultMap="hrWageStanMap" parameterType="java.util.Map">
+		select tab_code, col_code, column_id 
+		from hr_wage_stan_cond 
+		where group_id = #{group_id, jdbcType=INTEGER} 
+		  and hos_id = #{hos_id, jdbcType=INTEGER} 
+		  and stan_id = #{stan_id, jdbcType=INTEGER}
+	</select>
+	
+	<!-- 表数据加载**只查询人员基本情况 -->
+	<select id="queryStandardTabCodeOptionEditable" resultType="java.util.Map">
+		SELECT
+			TAB_CODE "tab_code",
+			TAB_NAME "tab_codes"
+		FROM
+			HR_TAB_STRUC
+		WHERE 
+			TAB_CODE = 'HOS_EMP'
+			AND GROUP_ID = #{group_id,jdbcType=INTEGER}
+			AND HOS_ID = #{hos_id,jdbcType=INTEGER}
+	</select>
+	
+	<!-- 关联字段**只查询人员基本情况数据 -->
+	<select id="queryStandardColCodeOptionEditable" resultType="java.util.Map">
+	SELECT
+		COL_NAME "label",
+		COL_CODE "id"
+	FROM
+		HR_COL_STRUC
+	WHERE
+		GROUP_ID = #{group_id,jdbcType=INTEGER}
+		AND HOS_ID = #{hos_id,jdbcType=INTEGER}
+		AND TAB_CODE = #{code,jdbcType=VARCHAR}
+		AND FIELD_TAB_CODE IS NOT NULL
+		AND COL_NAME NOT LIKE '%ID%'
+	ORDER BY
+		SORT
+	</select>
+	
+</mapper>

@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.flw.dao.flow.FlowDesignerMapper">
+
+	<resultMap id="actReProcdefMap" type="com.chd.hrp.flw.entity.flow.ActReProcdef">
+      
+	</resultMap>
+    
+    <!-- 根据部署ID查询流程 -->
+    <select id="queryFlowActReProcdefByCode" resultType="com.chd.hrp.flw.entity.flow.ActReProcdef" parameterType="string" >
+	  
+	    select id_,rev_,category_,name_,key_,version_,deployment_id_,resource_name_,dgrm_resource_name_,description_,
+		has_start_form_key_,has_graphical_notation_,suspension_state_,tenant_id_ from ACT_RE_PROCDEF
+		where deployment_id_=#{deployment_id_}
+		order by version_ desc  
+
+	</select>
+	
+	<!-- 根据部署ID查询流程的二进制 -->
+	<select id="queryFlowByBlob" resultType="com.chd.hrp.flw.entity.flow.ActGeBytearray" parameterType="string">
+	  
+ 		 SELECT a.bytes_
+	     FROM act_ge_bytearray a
+	     left join ACT_RE_DEPLOYMENT d on a.deployment_id_=d.id_
+	     left join sys_user u on d.tenant_id_=u.user_id
+		<where>
+		 	a.deployment_id_ = #{deployment_id_} 
+	    	and a.generated_=#{generated_}
+      		   <if test="hos_id == '0'">
+                    AND u.group_id=#{group_id}
+               </if>
+               <if test="hos_id != '0'">
+                    AND u.hos_id=#{hos_id}
+               </if>
+        </where>   
+	</select>
+	
+	<!-- 查询最新版本的流程 -->
+	<select id="queryFlowActReProcdef" parameterType="java.util.Map" resultMap="actReProcdefMap" >
+      
+      	select  b.id_,b.rev_,b.category_,b.name_,b.key_,b.version_,b.deployment_id_,b.resource_name_,b.dgrm_resource_name_,b.description_,
+    	b.has_start_form_key_,b.has_graphical_notation_,b.suspension_state_,u.user_name,to_char(c.deploy_time_,'yyyy-mm-dd hh24:mi:ss') deploy_time_
+    	 from ACT_RE_PROCDEF b    	
+		inner join 
+		(select a.key_,max(a.version_) version_ from ACT_RE_PROCDEF a group by a.key_ ) t1
+		on b.key_=t1.key_ and b.version_=t1.version_
+		left join act_re_deployment c on b.deployment_id_=c.id_ and b.tenant_id_=c.tenant_id_  
+		left join sys_user u on b.tenant_id_=u.user_id
+      	<where>
+      		   <if test="category_ != ''">
+                    b.category_=#{category_}
+               </if>
+      		   <if test="hos_id == '0'">
+                    AND u.group_id=#{group_id}
+               </if>
+               <if test="hos_id != '0'">
+                    AND u.hos_id=#{hos_id}
+               </if>
+			   <if test="name_ != null and name_ != ''">
+                    AND b.name_  like  #{name_}
+               </if>
+               <if test="suspension_state_ != null and suspension_state_ != ''">
+                    AND b.suspension_state_= #{suspension_state_}
+               </if>
+        </where>   
+		order by b.category_,b.name_ asc      
+    </select>
+    
+    <!-- 查询历史版本的流程 -->
+	<select id="queryFlowActReProcdefVersion" parameterType="java.util.Map" resultMap="actReProcdefMap" >
+      
+      	select  b.id_,b.rev_,b.category_,b.name_,b.key_,b.version_,b.deployment_id_,b.resource_name_,b.dgrm_resource_name_,b.description_,
+    	b.has_start_form_key_,b.has_graphical_notation_,b.suspension_state_,u.user_name,to_char(c.deploy_time_,'yyyy-mm-dd hh24:mi:ss') deploy_time_
+    	 from ACT_RE_PROCDEF b    	
+		left join act_re_deployment c on b.deployment_id_=c.id_ and b.tenant_id_=c.tenant_id_  
+		left join sys_user u on b.tenant_id_=u.user_id
+      	<where>
+      			b.key_=#{key_} and b.version_!=#{version_}
+      		   <if test="hos_id == '0'">
+                    AND u.group_id=#{group_id}
+               </if>
+               <if test="hos_id != '0'">
+                    AND u.hos_id=#{hos_id}
+               </if>
+               <if test="name_ != null and name_ != ''">
+                    AND b.name_  like  #{name_}
+               </if>
+        </where>   
+		order by b.category_,b.name_ asc      
+    </select>
+    
+     <!-- 查询最新版本的流程类别 -->
+	<select id="queryFlowCategory" parameterType="java.util.Map" resultType="String" >
+      
+      	select distinct b.category_ from ACT_RE_PROCDEF b    	
+		inner join 
+		(select a.key_,max(a.version_) version_ from ACT_RE_PROCDEF a group by a.key_ ) t1
+		on b.key_=t1.key_ and b.version_=t1.version_
+		left join act_re_deployment c on b.deployment_id_=c.id_ and b.tenant_id_=c.tenant_id_  
+		left join sys_user u on b.tenant_id_=u.user_id
+      	<where>
+      			b.suspension_state_=1 
+      		   <if test="hos_id == '0'">
+                    AND u.group_id=#{group_id}
+               </if>
+               <if test="hos_id != '0'">
+                    AND u.hos_id=#{hos_id}
+               </if>
+        </where>   
+		order by b.category_ asc      
+    </select>
+    
+    <!-- 查询激活状态的流程类别、部署ID，发送选模板的时候调用 -->
+	<select id="queryFlowCategoryDeploymentId" parameterType="java.util.Map" resultMap="actReProcdefMap" >
+      
+      	select b.category_,b.name_,b.deployment_id_ from ACT_RE_PROCDEF b    	
+		inner join 
+		(select a.key_,max(a.version_) version_ from ACT_RE_PROCDEF a group by a.key_ ) t1
+		on b.key_=t1.key_ and b.version_=t1.version_
+		left join act_re_deployment c on b.deployment_id_=c.id_ and b.tenant_id_=c.tenant_id_  
+		left join sys_user u on b.tenant_id_=u.user_id
+      	<where>
+      			b.suspension_state_=1 
+      		   <if test="hos_id == '0'">
+                    AND u.group_id=#{group_id}
+               </if>
+               <if test="hos_id != '0'">
+                    AND u.hos_id=#{hos_id}
+               </if>
+        </where>   
+		order by b.category_,b.name_ asc      
+    </select>
+	
+</mapper>
+

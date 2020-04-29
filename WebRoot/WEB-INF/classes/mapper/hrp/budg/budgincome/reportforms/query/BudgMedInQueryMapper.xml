@@ -1,0 +1,307 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.budg.dao.budgincome.reportforms.query.BudgMedInQueryMapper">
+	
+	<resultMap id="budgMedInQueryMap" type="java.util.Map">
+	<result property="group_id" column="group_id"/>
+	<result property="hos_id" column="hos_id"/>
+	<result property="copy_code" column="copy_code"/>
+	<result property="year" column="year"/>
+	<result property="dept_id" column="dept_id"/>
+	<result property="month" column="month"/>
+	<result property="subj_code" column="subj_code"/>
+	<result property="amount" column="amount"/>
+	<result property="remark" column="remark"/>
+	<result property="dept_code" column="dept_code"/>
+	<result property="dept_name" column="dept_name"/>
+	<result property="subj_name" column="subj_name"/>
+	<result property="subj_level" column="subj_level"/>
+	<result property="last_month_carried" column="last_month_carried"/>
+	<result property="budg_value" column="budg_value"/>
+	<result property="carried_next_month" column="carried_next_month"/>
+	<result property="year_sum" column="year_sum"/>
+	<result property="plan_num" column="plan_num"/>
+	<result property="item" column="item"/>
+	<result property="month_1" column="month_1"/>
+	<result property="month_2" column="month_2"/>
+	<result property="month_3" column="month_3"/>
+	<result property="month_4" column="month_4"/>
+	<result property="month_5" column="month_5"/>
+	<result property="month_6" column="month_6"/>
+	<result property="month_7" column="month_7"/>
+	<result property="month_8" column="month_8"/>
+	<result property="month_9" column="month_9"/>
+	<result property="month_10" column="month_10"/>
+	<result property="month_11" column="month_11"/>
+	<result property="month_12" column="month_12"/>
+	</resultMap>
+	
+	<!-- 科室医疗收入预算 报表查询 -->
+	<select id="queryMedInDeptBudg" parameterType="java.util.Map" resultMap="budgMedInQueryMap" >
+	 	with budgVlaue as(
+	 		select 
+		    '2' as b_no,bmidm.group_id,bmidm.hos_id,bmidm.copy_code,'预算值' as item,bmidm.year,bmidm.subj_code,
+		    	asj.subj_name,asj.subj_level,bmidm.dept_id,hdd.dept_code,hdd.dept_name,
+		   
+		    sum(case when bmidm.MONTH='01' then nvl(bmidm.budg_value,0) else 0 end) month_1,
+		    sum(case when bmidm.MONTH='02' then nvl(bmidm.budg_value,0) else 0 end) month_2,
+		    sum(case when bmidm.MONTH='03' then nvl(bmidm.budg_value,0) else 0 end) month_3,
+		    sum(case when bmidm.MONTH='04' then nvl(bmidm.budg_value,0) else 0 end) month_4,
+		    sum(case when bmidm.MONTH='05' then nvl(bmidm.budg_value,0) else 0 end) month_5,
+		    sum(case when bmidm.MONTH='06' then nvl(bmidm.budg_value,0) else 0 end) month_6,
+		    sum(case when bmidm.MONTH='07' then nvl(bmidm.budg_value,0) else 0 end) month_7,
+		    sum(case when bmidm.MONTH='08' then nvl(bmidm.budg_value,0) else 0 end) month_8,
+		    sum(case when bmidm.MONTH='09' then nvl(bmidm.budg_value,0) else 0 end) month_9,
+		    sum(case when bmidm.MONTH='10' then nvl(bmidm.budg_value,0) else 0 end) month_10,
+		    sum(case when bmidm.MONTH='11' then nvl(bmidm.budg_value,0) else 0 end) month_11,
+		    sum(case when bmidm.MONTH='12' then nvl(bmidm.budg_value,0) else 0 end) month_12,
+		   	sum(nvl(bmidm.budg_value,0)) year_sum
+		    from budg_med_income_dept_month bmidm
+		    left join budg_income_subj asj 
+		    	on  bmidm.group_id = asj.group_id 
+		    		and bmidm.hos_id = asj.hos_id 
+		    		and bmidm.copy_code = asj.copy_code 
+		      		and bmidm.subj_code = asj.subj_code 
+		      		and bmidm.year=asj.budg_year
+		    left join hos_dept_dict hdd 
+		    	on  bmidm.group_id = hdd.group_id 
+		    		and bmidm.hos_id = hdd.hos_id 
+		    		and bmidm.dept_id=hdd.dept_id 
+		    		and hdd.is_stop = 0 
+		    where bmidm.group_id = #{group_id} and  bmidm.hos_id = #{hos_id} 
+		    		and bmidm.copy_code = #{copy_code} and bmidm.year= #{year}
+		    group by bmidm.group_id,bmidm.hos_id,bmidm.copy_code,bmidm.year,bmidm.subj_code,asj.subj_name,
+		    		asj.subj_level,bmidm.dept_id,hdd.dept_code,hdd.dept_name
+	 	),
+	 	<!-- 基础数据 -->
+	 	baseData as (
+	 		 select * from(
+					 select 
+					    '1' as b_no,bhm.group_id,bhm.hos_id,bhm.copy_code,'上月结转' as item,bhm.year,bhm.subj_code,asj.subj_name,
+					    	asj.subj_level,bhm.dept_id,hdd.dept_code,hdd.dept_name,
+					   
+					    sum(case when bhm.MONTH='01' then nvl(bhm.last_month_carried,0) else 0 end) month_1,
+					    sum(case when bhm.MONTH='02' then nvl(bhm.last_month_carried,0) else 0 end) month_2,
+					    sum(case when bhm.MONTH='03' then nvl(bhm.last_month_carried,0) else 0 end) month_3,
+					    sum(case when bhm.MONTH='04' then nvl(bhm.last_month_carried,0) else 0 end) month_4,
+					    sum(case when bhm.MONTH='05' then nvl(bhm.last_month_carried,0) else 0 end) month_5,
+					    sum(case when bhm.MONTH='06' then nvl(bhm.last_month_carried,0) else 0 end) month_6,
+					    sum(case when bhm.MONTH='07' then nvl(bhm.last_month_carried,0) else 0 end) month_7,
+					    sum(case when bhm.MONTH='08' then nvl(bhm.last_month_carried,0) else 0 end) month_8,
+					    sum(case when bhm.MONTH='09' then nvl(bhm.last_month_carried,0) else 0 end) month_9,
+					    sum(case when bhm.MONTH='10' then nvl(bhm.last_month_carried,0) else 0 end) month_10,
+					    sum(case when bhm.MONTH='11' then nvl(bhm.last_month_carried,0) else 0 end) month_11,
+					    sum(case when bhm.MONTH='12' then nvl(bhm.last_month_carried,0) else 0 end) month_12,
+					    0 as year_sum
+					    from budg_med_income_dept_month bhm
+					    left join budg_income_subj asj 
+					    	on  bhm.group_id = asj.group_id 
+					    		and bhm.hos_id = asj.hos_id 
+					    		and bhm.copy_code = asj.copy_code 
+					      		and bhm.subj_code = asj.subj_code 
+					      		and bhm.year=asj.budg_year
+					    left join hos_dept_dict hdd 
+					    	on  bhm.group_id = hdd.group_id 
+					    		and bhm.hos_id = hdd.hos_id 
+					    		and bhm.dept_id=hdd.dept_id 
+					    		and hdd.is_stop = 0 
+					    where bhm.group_id = #{group_id} and  bhm.hos_id = #{hos_id} and bhm.copy_code = #{copy_code} and bhm.year= #{year}
+					    group by bhm.group_id,bhm.hos_id,bhm.copy_code,bhm.year,bhm.subj_code,asj.subj_name,asj.subj_level,
+					    		bhm.dept_id,hdd.dept_code,hdd.dept_name
+			     union all
+			   		select * from budgVlaue
+			     union all
+				   select 
+				    '3' as b_no,bhm.group_id,bhm.hos_id,bhm.copy_code,'结转下月' as item,bhm.year,bhm.subj_code,asj.subj_name,
+				    	asj.subj_level,bhm.dept_id,hdd.dept_code,hdd.dept_name,
+				   
+				    sum(case when bhm.MONTH='01' then nvl(bhm.carried_next_month,0) else 0 end) month_1,
+				    sum(case when bhm.MONTH='02' then nvl(bhm.carried_next_month,0) else 0 end) month_2,
+				    sum(case when bhm.MONTH='03' then nvl(bhm.carried_next_month,0) else 0 end) month_3,
+				    sum(case when bhm.MONTH='04' then nvl(bhm.carried_next_month,0) else 0 end) month_4,
+				    sum(case when bhm.MONTH='05' then nvl(bhm.carried_next_month,0) else 0 end) month_5,
+				    sum(case when bhm.MONTH='06' then nvl(bhm.carried_next_month,0) else 0 end) month_6,
+				    sum(case when bhm.MONTH='07' then nvl(bhm.carried_next_month,0) else 0 end) month_7,
+				    sum(case when bhm.MONTH='08' then nvl(bhm.carried_next_month,0) else 0 end) month_8,
+				    sum(case when bhm.MONTH='09' then nvl(bhm.carried_next_month,0) else 0 end) month_9,
+				    sum(case when bhm.MONTH='10' then nvl(bhm.carried_next_month,0) else 0 end) month_10,
+				    sum(case when bhm.MONTH='11' then nvl(bhm.carried_next_month,0) else 0 end) month_11,
+				    sum(case when bhm.MONTH='12' then nvl(bhm.carried_next_month,0) else 0 end) month_12,
+				    0 year_sum
+				    from budg_med_income_dept_month bhm
+				    left join budg_income_subj asj 
+				    	on  bhm.group_id = asj.group_id 
+				    		and bhm.hos_id = asj.hos_id 
+				    		and bhm.copy_code = asj.copy_code 
+				      		and bhm.subj_code = asj.subj_code 
+				      		and bhm.year=asj.budg_year
+				     left join hos_dept_dict hdd 
+				     	on  
+				     		bhm.group_id = hdd.group_id 
+				     		and bhm.hos_id = hdd.hos_id 
+				     		and bhm.dept_id=hdd.dept_id 
+				     		and hdd.is_stop = 0 
+				     where bhm.group_id = #{group_id} and  bhm.hos_id = #{hos_id} and bhm.copy_code = #{copy_code} and bhm.year= #{year}
+				    	group by bhm.group_id,bhm.hos_id,bhm.copy_code,bhm.year,bhm.subj_code,asj.subj_name,asj.subj_level,
+				    			bhm.dept_id,hdd.dept_code,hdd.dept_name
+			  ) a
+			where                    
+				a.group_id = #{group_id,jdbcType=INTEGER}
+				AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+				<if test="year != null and year != ''">
+				AND a.year = #{year,jdbcType=VARCHAR}
+				</if>
+				<if test="dept_id != null and dept_id != ''">
+				AND a.dept_id = #{dept_id,jdbcType=VARCHAR}
+				</if>
+					<if test="subj_code != null and subj_code != ''">
+				  and a.subj_code in (
+	          select bis2.subj_code from budg_income_subj bis2
+	          start with bis2.subj_code=#{subj_code,jdbcType=VARCHAR} connect by bis2.super_code=prior bis2.subj_code
+	        )  
+			</if>
+				<if test="subj_level != null and subj_level != ''">
+				AND a.subj_level = #{subj_level,jdbcType=VARCHAR}
+				</if>
+			order by a.group_id,a.hos_id,a.copy_code,a.year,a.subj_code,a.dept_id, b_no asc
+	 	)
+	 select null b_no ,null group_id ,null hos_id ,null copy_code , '预算值合计' item ,  null year , null subj_code ,
+	 		null subj_name , null subj_level ,  null dept_id , null dept_code  , null dept_name  ,
+	 		sum(month_1) month_1 , sum(month_2) month_2 , sum(month_3) month_3 , sum(month_4) month_4 ,
+	 		sum(month_5) month_5 , sum(month_6) month_6 , sum(month_7) month_7 , sum(month_8) month_8 , 
+	 		sum(month_9) month_9 , sum(month_10) month_10 , sum(month_11) month_11 , sum(month_12) month_12 ,
+	 		sum(year_sum) year_sum 
+	 from budgVlaue
+	 group by group_id,hos_id,copy_code,year
+	 union all
+		select * from baseData
+	</select>
+	
+	<!-- 医院医疗收入预算 报表查询 -->
+	<select id="queryMedInHosBudg" parameterType="java.util.Map" resultMap="budgMedInQueryMap" >
+	 	with budgVlaue as(
+	 		select 
+		    '2' as b_no,bmidm.group_id,bmidm.hos_id,bmidm.copy_code,'预算值' as item,bmidm.year,bmidm.subj_code,
+		    	asj.subj_name,asj.subj_level,
+		   
+		    sum(case when bmidm.MONTH='01' then nvl(bmidm.budg_value,0) else 0 end) month_1,
+		    sum(case when bmidm.MONTH='02' then nvl(bmidm.budg_value,0) else 0 end) month_2,
+		    sum(case when bmidm.MONTH='03' then nvl(bmidm.budg_value,0) else 0 end) month_3,
+		    sum(case when bmidm.MONTH='04' then nvl(bmidm.budg_value,0) else 0 end) month_4,
+		    sum(case when bmidm.MONTH='05' then nvl(bmidm.budg_value,0) else 0 end) month_5,
+		    sum(case when bmidm.MONTH='06' then nvl(bmidm.budg_value,0) else 0 end) month_6,
+		    sum(case when bmidm.MONTH='07' then nvl(bmidm.budg_value,0) else 0 end) month_7,
+		    sum(case when bmidm.MONTH='08' then nvl(bmidm.budg_value,0) else 0 end) month_8,
+		    sum(case when bmidm.MONTH='09' then nvl(bmidm.budg_value,0) else 0 end) month_9,
+		    sum(case when bmidm.MONTH='10' then nvl(bmidm.budg_value,0) else 0 end) month_10,
+		    sum(case when bmidm.MONTH='11' then nvl(bmidm.budg_value,0) else 0 end) month_11,
+		    sum(case when bmidm.MONTH='12' then nvl(bmidm.budg_value,0) else 0 end) month_12,
+		   	sum(nvl(bmidm.budg_value,0)) year_sum
+		    from budg_med_income_hos_month bmidm
+		    left join budg_income_subj asj 
+		    	on  bmidm.group_id = asj.group_id 
+		    		and bmidm.hos_id = asj.hos_id 
+		    		and bmidm.copy_code = asj.copy_code 
+		      		and bmidm.subj_code = asj.subj_code 
+		      		and bmidm.year=asj.budg_year
+		    where  bmidm.group_id = #{group_id,jdbcType=INTEGER}
+			AND bmidm.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND bmidm.copy_code = #{copy_code,jdbcType=VARCHAR} and bmidm.year= #{year}
+		    group by bmidm.group_id,bmidm.hos_id,bmidm.copy_code,bmidm.year,bmidm.subj_code,asj.subj_name,asj.subj_level
+	 	),
+	 	baseData as (
+	 		select * from(
+				select 
+				    '1' as b_no,bhm.group_id,bhm.hos_id,bhm.copy_code,'上月结转' as item,bhm.year,bhm.subj_code,asj.subj_name,
+				    	asj.subj_level,
+				   
+				    sum(case when bhm.MONTH='01' then nvl(bhm.last_month_carried,0) else 0 end) month_1,
+				    sum(case when bhm.MONTH='02' then nvl(bhm.last_month_carried,0) else 0 end) month_2,
+				    sum(case when bhm.MONTH='03' then nvl(bhm.last_month_carried,0) else 0 end) month_3,
+				    sum(case when bhm.MONTH='04' then nvl(bhm.last_month_carried,0) else 0 end) month_4,
+				    sum(case when bhm.MONTH='05' then nvl(bhm.last_month_carried,0) else 0 end) month_5,
+				    sum(case when bhm.MONTH='06' then nvl(bhm.last_month_carried,0) else 0 end) month_6,
+				    sum(case when bhm.MONTH='07' then nvl(bhm.last_month_carried,0) else 0 end) month_7,
+				    sum(case when bhm.MONTH='08' then nvl(bhm.last_month_carried,0) else 0 end) month_8,
+				    sum(case when bhm.MONTH='09' then nvl(bhm.last_month_carried,0) else 0 end) month_9,
+				    sum(case when bhm.MONTH='10' then nvl(bhm.last_month_carried,0) else 0 end) month_10,
+				    sum(case when bhm.MONTH='11' then nvl(bhm.last_month_carried,0) else 0 end) month_11,
+				    sum(case when bhm.MONTH='12' then nvl(bhm.last_month_carried,0) else 0 end) month_12,
+				    0 as year_sum
+				    from budg_med_income_hos_month bhm
+				    left join budg_income_subj asj 
+				    	on  bhm.group_id = asj.group_id 
+				    		and bhm.hos_id = asj.hos_id 
+				    		and bhm.copy_code = asj.copy_code 
+				      		and bhm.subj_code = asj.subj_code 
+				      		and bhm.year=asj.budg_year
+				    where  bhm.group_id = #{group_id,jdbcType=INTEGER}
+			AND bhm.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND bhm.copy_code = #{copy_code,jdbcType=VARCHAR} and bhm.year= #{year}
+				    group by bhm.group_id,bhm.hos_id,bhm.copy_code,bhm.year,bhm.subj_code,asj.subj_name,asj.subj_level
+		     union all
+		   		select * from budgVlaue
+		     union all
+			   select 
+			    '3' as b_no,bhm.group_id,bhm.hos_id,bhm.copy_code,'结转下月' as item,bhm.year,bhm.subj_code,asj.subj_name,
+			    	asj.subj_level,
+			   
+			    sum(case when bhm.MONTH='01' then nvl(bhm.carried_next_month,0) else 0 end) month_1,
+			    sum(case when bhm.MONTH='02' then nvl(bhm.carried_next_month,0) else 0 end) month_2,
+			    sum(case when bhm.MONTH='03' then nvl(bhm.carried_next_month,0) else 0 end) month_3,
+			    sum(case when bhm.MONTH='04' then nvl(bhm.carried_next_month,0) else 0 end) month_4,
+			    sum(case when bhm.MONTH='05' then nvl(bhm.carried_next_month,0) else 0 end) month_5,
+			    sum(case when bhm.MONTH='06' then nvl(bhm.carried_next_month,0) else 0 end) month_6,
+			    sum(case when bhm.MONTH='07' then nvl(bhm.carried_next_month,0) else 0 end) month_7,
+			    sum(case when bhm.MONTH='08' then nvl(bhm.carried_next_month,0) else 0 end) month_8,
+			    sum(case when bhm.MONTH='09' then nvl(bhm.carried_next_month,0) else 0 end) month_9,
+			    sum(case when bhm.MONTH='10' then nvl(bhm.carried_next_month,0) else 0 end) month_10,
+			    sum(case when bhm.MONTH='11' then nvl(bhm.carried_next_month,0) else 0 end) month_11,
+			    sum(case when bhm.MONTH='12' then nvl(bhm.carried_next_month,0) else 0 end) month_12,
+			    0 year_sum
+			    from budg_med_income_hos_month bhm
+			    left join budg_income_subj asj 
+			    	on  bhm.group_id = asj.group_id 
+			    		and bhm.hos_id = asj.hos_id 
+			    		and bhm.copy_code = asj.copy_code 
+			      		and bhm.subj_code = asj.subj_code 
+			      		and bhm.year=asj.budg_year
+			     where bhm.group_id = #{group_id,jdbcType=INTEGER}
+			AND bhm.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND bhm.copy_code = #{copy_code,jdbcType=VARCHAR} and bhm.year= #{year}
+			    	group by bhm.group_id,bhm.hos_id,bhm.copy_code,bhm.year,bhm.subj_code,asj.subj_name,asj.subj_level
+		  )a
+		where                    
+			a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			<if test="year != null and year != ''">
+			AND a.year = #{year,jdbcType=VARCHAR}
+			</if>
+				<if test="subj_code != null and subj_code != ''">
+				  and a.subj_code in (
+	          select bis2.subj_code from budg_income_subj bis2
+	          start with bis2.subj_code=#{subj_code,jdbcType=VARCHAR} connect by bis2.super_code=prior bis2.subj_code
+	        )  
+			</if>
+			<if test="subj_level != null and subj_level != ''">
+			AND a.subj_level = #{subj_level,jdbcType=VARCHAR}
+			</if>
+		order by a.group_id,a.hos_id,a.copy_code,a.year,a.subj_code,b_no asc
+	 )
+	 
+	 select null b_no ,null group_id ,null hos_id ,null copy_code , '预算值合计' item ,  null year , null subj_code ,
+	 		null subj_name , null subj_level ,
+	 		sum(month_1) month_1 , sum(month_2) month_2 , sum(month_3) month_3 , sum(month_4) month_4 ,
+	 		sum(month_5) month_5 , sum(month_6) month_6 , sum(month_7) month_7 , sum(month_8) month_8 , 
+	 		sum(month_9) month_9 , sum(month_10) month_10 , sum(month_11) month_11 , sum(month_12) month_12 ,
+	 		sum(year_sum) year_sum 
+	 from budgVlaue
+	 group by group_id,hos_id,copy_code,year
+	 union all
+		select * from baseData
+	</select>
+	
+</mapper>
+

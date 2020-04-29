@@ -1,0 +1,2347 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">  
+<mapper namespace="com.chd.hrp.ass.dao.tongJiReports.AssInMainSummaryMapper">    
+	
+	<resultMap id="AssInMainSummaryMap" type="java.util.Map">
+	<result property="group_id" column="group_id"/>
+	<result property="hos_id" column="hos_id"/>
+	<result property="copy_code" column="copy_code"/>
+	<result property="ass_year" column="ass_year"/>
+	<result property="store_id" column="store_id"/>
+	<result property="store_no" column="store_no"/>
+	<result property="store_name" column="store_name"/>
+	<result property="ven_id" column="ven_id"/>
+	<result property="ven_no" column="ven_no"/>
+	<result property="ven_name" column="ven_name"/>
+	<result property="in_money" column="in_money"/>
+	<result property="ass_year" column="ass_year"/> <!-- 统计年度 -->
+	<result property="ass_month" column="ass_month"/> <!-- 统计月份 -->
+	</resultMap>
+
+	<select id="queryAssInMainBySummary" parameterType="java.util.Map" resultMap="AssInMainSummaryMap" >
+			with temp as (
+	      SELECT arss.group_id,
+	             arss.hos_id,
+	             arss.copy_code,
+	             to_char(arss.in_date,'yyyy') ass_year,
+	             to_char(arss.in_date,'MM') ass_month,
+	             arss.store_id,
+	             hs.store_no,
+	             hs.store_name,
+	             arss.ven_id,
+	             hfd.sup_name ven_name,
+	             arss.in_money,
+			     '02' ass_nature
+	        FROM ASS_IN_MAIN_SPECIAL arss
+	        LEFT JOIN HOS_STORE_DICT hs
+	          ON arss.store_id = hs.store_id
+	        LEFT JOIN hos_sup_dict hfd
+	          ON arss.ven_id = hfd.sup_id
+	          AND arss.ven_no = hfd.sup_no 
+	        WHERE 
+	            arss.group_id = #{group_id,jdbcType=INTEGER}
+				AND arss.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND arss.copy_code = #{copy_code,jdbcType=VARCHAR}
+	        	AND arss.state = 2 
+	        	<if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(arss.in_date,'yyyyMM') between #{year_month_begin} and #{year_month_end}
+				</if>
+	      UNION ALL
+	      SELECT args.group_id,
+	             args.hos_id,
+	             args.copy_code,
+	             to_char(args.in_date,'yyyy') ass_year,
+	             to_char(args.in_date,'MM') ass_month,
+	             args.store_id,
+	             hs.store_no,
+	             hs.store_name ,
+	             args.ven_id,
+	             hfd.sup_name ven_name,
+	             args.in_money,
+			     '03' ass_nature
+	        FROM ASS_IN_MAIN_GENERAL args
+	        LEFT JOIN HOS_STORE_DICT hs
+	          ON args.store_id = hs.store_id
+	        LEFT JOIN hos_sup_dict hfd
+	          ON args.ven_id = hfd.sup_id
+	          AND args.ven_no = hfd.sup_no 
+	       WHERE 
+	           args.group_id = #{group_id,jdbcType=INTEGER}
+			   AND args.hos_id = #{hos_id,jdbcType=INTEGER}
+			   AND args.copy_code = #{copy_code,jdbcType=VARCHAR}
+	           AND args.state = 2 
+	           <if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(args.in_date,'yyyyMM') between #{year_month_begin} and #{year_month_end}
+			   </if>
+	      UNION ALL
+	      SELECT arhs.group_id,
+	             arhs.hos_id,
+	             arhs.copy_code,
+	             to_char(arhs.in_date,'yyyy') ass_year,
+	             to_char(arhs.in_date,'MM') ass_month,
+	             null store_id,
+	             null store_no,
+	             null store_name,
+	             arhs.ven_id,
+	             hfd.sup_name ven_name,
+	             arhs.in_money,
+			     '01' ass_nature
+	        FROM ASS_IN_MAIN_HOUSE arhs
+	        LEFT JOIN hos_sup_dict hfd
+	          ON arhs.ven_id = hfd.sup_id
+	          AND arhs.ven_no = hfd.sup_no 
+	       WHERE 
+	            arhs.group_id = #{group_id,jdbcType=INTEGER}
+				AND arhs.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND arhs.copy_code = #{copy_code,jdbcType=VARCHAR}
+	            AND arhs.state = 2
+	            <if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(arhs.in_date,'yyyyMM') between #{year_month_begin} and #{year_month_end}
+			   </if> 
+	      UNION ALL
+	      SELECT aros.group_id,
+	             aros.hos_id,
+	             aros.copy_code,
+	             to_char(aros.in_date,'yyyy') ass_year,
+	             to_char(aros.in_date,'MM') ass_month,
+	             aros.store_id,
+	             hs.store_no,
+	             hs.store_name,
+	             aros.ven_id,
+	             hfd.sup_name ven_name,
+	             aros.in_money,
+			     '04' ass_nature
+	        FROM ASS_IN_MAIN_OTHER aros
+	        LEFT JOIN HOS_STORE_DICT hs
+	          ON aros.store_id = hs.store_id
+         	LEFT JOIN hos_sup_dict hfd
+          	  ON aros.ven_id = hfd.sup_id
+              AND aros.ven_no = hfd.sup_no 
+	       WHERE 
+	            aros.group_id = #{group_id,jdbcType=INTEGER}
+				AND aros.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND aros.copy_code = #{copy_code,jdbcType=VARCHAR}
+	        	AND aros.state = 2 
+	        	<if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(aros.in_date,'yyyyMM') between #{year_month_begin} and #{year_month_end}
+			    </if>
+	      UNION ALL
+	      SELECT aris.group_id,
+	             aris.hos_id,
+	             aris.copy_code,
+	             to_char(aris.in_date,'yyyy') ass_year,
+	             to_char(aris.in_date,'MM') ass_month,
+	             aris.store_id,
+	             hs.store_no,
+	             hs.store_name,
+	             aris.ven_id,
+	             hfd.sup_name  ven_name,
+	             aris.in_money,
+			     '05' ass_nature
+	        FROM ASS_IN_MAIN_INASSETS aris
+	        LEFT JOIN HOS_STORE_DICT hs
+	         ON aris.store_id = hs.store_id
+	        LEFT JOIN hos_sup_dict hfd
+	         ON aris.ven_id = hfd.sup_id
+	         AND aris.ven_no = hfd.sup_no 
+	       WHERE 
+	            aris.group_id = #{group_id,jdbcType=INTEGER}
+				AND aris.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND aris.copy_code = #{copy_code,jdbcType=VARCHAR}
+	        	AND aris.state = 2 
+	        	<if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(aris.in_date,'yyyyMM') between #{year_month_begin} and #{year_month_end}
+			   </if>
+	      UNION ALL
+	      SELECT arls.group_id,
+	             arls.hos_id,
+	             arls.copy_code,
+	             to_char(arls.in_date,'yyyy') ass_year,
+	             to_char(arls.in_date,'MM') ass_month,
+	             null store_id,
+	             null store_no,
+	             null store_name,
+	             arls.ven_id,
+	             hfd.sup_name ven_name,
+	             arls.in_money,
+			     '06' ass_nature
+	        FROM ASS_IN_MAIN_LAND arls
+	        LEFT JOIN hos_sup_dict hfd
+	          ON arls.ven_id = hfd.sup_id
+	          AND arls.ven_no = hfd.sup_no 
+	       WHERE 
+	           arls.group_id = #{group_id,jdbcType=INTEGER}
+			   AND arls.hos_id = #{hos_id,jdbcType=INTEGER}
+			   AND arls.copy_code = #{copy_code,jdbcType=VARCHAR}
+	           AND arls.state = 2 
+	           <if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(arls.in_date,'yyyyMM') between #{year_month_begin} and #{year_month_end}
+			   </if>
+	        ),
+	       back_temp as(
+	       	select   arss.group_id,
+			         arss.hos_id,
+			         arss.copy_code, 
+	       		     to_char(arss.back_date,'yyyy') ass_year,
+	                 to_char(arss.back_date,'MM') ass_month,
+	                 arss.store_id,
+		             hs.store_no,
+		             hs.store_name,
+		             arss.ven_id,
+		             hfd.sup_name ven_name,
+		             arss.back_money,
+				     '02' ass_nature
+				   from ass_back_special arss   
+			       LEFT JOIN HOS_STORE_DICT hs
+			          ON arss.store_id = hs.store_id
+			        LEFT JOIN hos_sup_dict hfd
+			          ON arss.ven_id = hfd.sup_id
+			          AND arss.ven_no = hfd.sup_no 
+			          
+			          WHERE 
+	            arss.group_id = #{group_id,jdbcType=INTEGER}
+				AND arss.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND arss.copy_code = #{copy_code,jdbcType=VARCHAR}
+	        	AND arss.state = 2 
+	        	<if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(arss.back_date,'yyyyMM') between #{year_month_begin} and #{year_month_end}
+				</if>
+	        union all 	
+	        
+	        select   arss.group_id,
+			         arss.hos_id,
+			         arss.copy_code, 
+	       		     to_char(arss.back_date,'yyyy') ass_year,
+	                 to_char(arss.back_date,'MM') ass_month,
+	                 arss.store_id,
+		             hs.store_no,
+		             hs.store_name,
+		             arss.ven_id,
+		             hfd.sup_name ven_name,
+		             arss.back_money,
+				     '03' ass_nature
+				   from ass_back_GENERAL arss   
+			       LEFT JOIN HOS_STORE_DICT hs
+			          ON arss.store_id = hs.store_id
+			        LEFT JOIN hos_sup_dict hfd
+			          ON arss.ven_id = hfd.sup_id
+			          AND arss.ven_no = hfd.sup_no 
+			          
+			          WHERE 
+	            arss.group_id = #{group_id,jdbcType=INTEGER}
+				AND arss.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND arss.copy_code = #{copy_code,jdbcType=VARCHAR}
+	        	AND arss.state = 2 
+	       		<if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(arss.back_date,'yyyyMM') between #{year_month_begin} and #{year_month_end}
+				</if>
+	        union all 
+	        
+	        select   arss.group_id,
+			         arss.hos_id,
+			         arss.copy_code, 
+	       		     to_char(arss.back_date,'yyyy') ass_year,
+	                 to_char(arss.back_date,'MM') ass_month,
+	                 null store_id,
+		             null store_no,
+		             null store_name,
+		             arss.ven_id,
+		             hfd.sup_name ven_name,
+		             arss.back_money,
+				     '01' ass_nature
+				   from ass_back_house arss   
+			       
+			        LEFT JOIN hos_sup_dict hfd
+			          ON arss.ven_id = hfd.sup_id
+			          AND arss.ven_no = hfd.sup_no 
+			          
+			          WHERE 
+	            arss.group_id = #{group_id,jdbcType=INTEGER}
+				AND arss.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND arss.copy_code = #{copy_code,jdbcType=VARCHAR}
+	        	AND arss.state = 2 
+	       		 <if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(arss.back_date,'yyyyMM') between #{year_month_begin} and #{year_month_end}
+				</if>
+	        union all
+	        
+	        select   arss.group_id,
+			         arss.hos_id,
+			         arss.copy_code, 
+	       		     to_char(arss.back_date,'yyyy') ass_year,
+	                 to_char(arss.back_date,'MM') ass_month,
+	                 null store_id,
+		             null store_no,
+		             null store_name,
+		             arss.ven_id,
+		             hfd.sup_name ven_name,
+		             arss.back_money,
+				     '06' ass_nature
+				   from ass_back_land arss   
+			       
+			        LEFT JOIN hos_sup_dict hfd
+			          ON arss.ven_id = hfd.sup_id
+			          AND arss.ven_no = hfd.sup_no 
+			          
+			          WHERE 
+	            arss.group_id = #{group_id,jdbcType=INTEGER}
+				AND arss.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND arss.copy_code = #{copy_code,jdbcType=VARCHAR}
+	        	AND arss.state = 2 
+	        	<if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(arss.back_date,'yyyyMM') between #{year_month_begin} and #{year_month_end}
+				</if>
+	        union all 	
+	        
+	        select   arss.group_id,
+			         arss.hos_id,
+			         arss.copy_code, 
+	       		     to_char(arss.back_date,'yyyy') ass_year,
+	                 to_char(arss.back_date,'MM') ass_month,
+	                 arss.store_id,
+		             hs.store_no,
+		             hs.store_name,
+		             arss.ven_id,
+		             hfd.sup_name ven_name,
+		             arss.back_money,
+				     '05' ass_nature
+				   from ass_back_inassets arss   
+			       LEFT JOIN HOS_STORE_DICT hs
+			          ON arss.store_id = hs.store_id
+			        LEFT JOIN hos_sup_dict hfd
+			          ON arss.ven_id = hfd.sup_id
+			          AND arss.ven_no = hfd.sup_no 
+			          
+			          WHERE 
+	            arss.group_id = #{group_id,jdbcType=INTEGER}
+				AND arss.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND arss.copy_code = #{copy_code,jdbcType=VARCHAR}
+	        	AND arss.state = 2
+	        	<if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(arss.back_date,'yyyyMM') between #{year_month_begin} and #{year_month_end}
+				</if>
+	        union all 	
+	        
+	        select   arss.group_id,
+			         arss.hos_id,
+			         arss.copy_code, 
+	       		     to_char(arss.back_date,'yyyy') ass_year,
+	                 to_char(arss.back_date,'MM') ass_month,
+	                 arss.store_id,
+		             hs.store_no,
+		             hs.store_name,
+		             arss.ven_id,
+		             hfd.sup_name ven_name,
+		             arss.back_money,
+				     '04' ass_nature
+				   from ass_back_other arss   
+			       LEFT JOIN HOS_STORE_DICT hs
+			          ON arss.store_id = hs.store_id
+			        LEFT JOIN hos_sup_dict hfd
+			          ON arss.ven_id = hfd.sup_id
+			          AND arss.ven_no = hfd.sup_no 
+			          
+			          WHERE 
+	            arss.group_id = #{group_id,jdbcType=INTEGER}
+				AND arss.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND arss.copy_code = #{copy_code,jdbcType=VARCHAR}
+	        	AND arss.state = 2 	
+	        	<if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(arss.back_date,'yyyyMM') between #{year_month_begin} and #{year_month_end}
+				</if>
+	        	
+	       ) 
+	       select * from (
+	      select t.group_id, t.hos_id, t.copy_code, t.store_id, t.store_no, t.store_name, t.ven_id, t.ven_name,nvl(t.in_money,0) - nvl(t1.back_money,0) in_money from (
+					 SELECT t.group_id, t.hos_id, t.copy_code,t.store_id, t.store_no, t.store_name, t.ven_id, t.ven_name,sum(t.in_money) in_money FROM temp t
+						WHERE
+					        t.group_id = #{group_id,jdbcType=INTEGER}
+							AND t.hos_id = #{hos_id,jdbcType=INTEGER}
+							AND t.copy_code = #{copy_code,jdbcType=VARCHAR}
+							<if test="store_id != null and store_id != ''">
+								AND t.store_id = #{store_id,jdbcType=INTEGER}
+							</if>
+							<if test="ven_id != null and ven_id != ''">
+								AND t.ven_id = #{ven_id,jdbcType=INTEGER}
+							</if>
+						group by t.group_id, t.hos_id, t.copy_code, t.store_id, t.store_no, t.store_name, t.ven_id, t.ven_name
+			) t	
+			left join (
+				SELECT t.group_id, t.hos_id, t.copy_code,t.store_id, t.store_no, t.store_name, t.ven_id, t.ven_name,sum(nvl(t.back_money,0)) back_money FROM back_temp t
+						WHERE
+					        t.group_id = #{group_id,jdbcType=INTEGER}
+							AND t.hos_id = #{hos_id,jdbcType=INTEGER}
+							AND t.copy_code = #{copy_code,jdbcType=VARCHAR}
+							<if test="store_id != null and store_id != ''">
+								AND t.store_id = #{store_id,jdbcType=INTEGER}
+							</if>
+							<if test="ven_id != null and ven_id != ''">
+								AND t.ven_id = #{ven_id,jdbcType=INTEGER}
+							</if>
+						group by t.group_id, t.hos_id, t.copy_code, t.store_id, t.store_no, t.store_name, t.ven_id, t.ven_name
+			) t1 
+			on
+				 t.group_id = t1.group_id
+				 and t.hos_id = t1.hos_id
+				 and t.copy_code=  t1.copy_code
+				 and t.store_id = t1.store_id
+				 and t.ven_id = t1.ven_id
+				 where  nvl(t.in_money,0) - nvl(t1.back_money,0) > 0
+			union all
+			
+			
+			select null group_id, null hos_id, null copy_code, null store_id, null store_no, '合计' store_name, null ven_id, null ven_name,sum(nvl(t.in_money,0)) - sum(nvl(t1.back_money,0)) in_money from (
+					 SELECT t.group_id, t.hos_id, t.copy_code,t.store_id, t.store_no, t.store_name, t.ven_id, t.ven_name,sum(t.in_money) in_money FROM temp t
+						WHERE
+					        t.group_id = #{group_id,jdbcType=INTEGER}
+							AND t.hos_id = #{hos_id,jdbcType=INTEGER}
+							AND t.copy_code = #{copy_code,jdbcType=VARCHAR}
+							<if test="store_id != null and store_id != ''">
+								AND t.store_id = #{store_id,jdbcType=INTEGER}
+							</if>
+							<if test="ven_id != null and ven_id != ''">
+								AND t.ven_id = #{ven_id,jdbcType=INTEGER}
+							</if>
+						group by t.group_id, t.hos_id, t.copy_code, t.store_id, t.store_no, t.store_name, t.ven_id, t.ven_name
+			) t	
+			left join (
+				SELECT t.group_id, t.hos_id, t.copy_code,t.store_id, t.store_no, t.store_name, t.ven_id, t.ven_name,sum(nvl(t.back_money,0)) back_money FROM back_temp t
+						WHERE
+					        t.group_id = #{group_id,jdbcType=INTEGER}
+							AND t.hos_id = #{hos_id,jdbcType=INTEGER}
+							AND t.copy_code = #{copy_code,jdbcType=VARCHAR}
+							<if test="store_id != null and store_id != ''">
+								AND t.store_id = #{store_id,jdbcType=INTEGER}
+							</if>
+							<if test="ven_id != null and ven_id != ''">
+								AND t.ven_id = #{ven_id,jdbcType=INTEGER}
+							</if>
+						group by t.group_id, t.hos_id, t.copy_code, t.store_id, t.store_no, t.store_name, t.ven_id, t.ven_name
+			) t1 
+			on
+				 t.group_id = t1.group_id
+				 and t.hos_id = t1.hos_id
+				 and t.copy_code=  t1.copy_code
+				 and t.store_id = t1.store_id
+				 and t.ven_id = t1.ven_id
+
+			
+			) tt
+			
+			order by tt.ven_name
+	</select>
+	
+	
+	<select id="queryAssInMainBySummaryByIn" parameterType="java.util.Map" resultMap="AssInMainSummaryMap" >
+			with temp as (
+	      SELECT arss.group_id,
+	             arss.hos_id,
+	             arss.copy_code,
+	             to_char(arss.in_date,'yyyy') ass_year,
+	             to_char(arss.in_date,'MM') ass_month,
+	             arss.store_id,
+	             hs.store_no,
+	             hs.store_name,
+	             arss.ven_id,
+	             hfd.sup_name ven_name,
+	             arss.in_money,
+			     '02' ass_nature
+	        FROM ASS_IN_MAIN_SPECIAL arss
+	        LEFT JOIN HOS_STORE_DICT hs
+	          ON arss.store_id = hs.store_id
+	        LEFT JOIN hos_sup_dict hfd
+	          ON arss.ven_id = hfd.sup_id
+	          AND arss.ven_no = hfd.sup_no 
+	        WHERE 
+	            arss.group_id = #{group_id,jdbcType=INTEGER}
+				AND arss.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND arss.copy_code = #{copy_code,jdbcType=VARCHAR}
+	        	AND arss.state = 2 
+	        	<if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(arss.in_date,'yyyyMM') between  #{year_month_begin,jdbcType=VARCHAR} and
+					 #{year_month_end,jdbcType=VARCHAR}
+				</if>
+	      UNION ALL
+	      SELECT args.group_id,
+	             args.hos_id,
+	             args.copy_code,
+	             to_char(args.in_date,'yyyy') ass_year,
+	             to_char(args.in_date,'MM') ass_month,
+	             args.store_id,
+	             hs.store_no,
+	             hs.store_name ,
+	             args.ven_id,
+	             hfd.sup_name ven_name,
+	             args.in_money,
+			     '03' ass_nature
+	        FROM ASS_IN_MAIN_GENERAL args
+	        LEFT JOIN HOS_STORE_DICT hs
+	          ON args.store_id = hs.store_id
+	        LEFT JOIN hos_sup_dict hfd
+	          ON args.ven_id = hfd.sup_id
+	          AND args.ven_no = hfd.sup_no 
+	       WHERE 
+	           args.group_id = #{group_id,jdbcType=INTEGER}
+			   AND args.hos_id = #{hos_id,jdbcType=INTEGER}
+			   AND args.copy_code = #{copy_code,jdbcType=VARCHAR}
+	           AND args.state = 2 
+	           <if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(args.in_date,'yyyyMM')  between  #{year_month_begin,jdbcType=VARCHAR} and
+					 #{year_month_end,jdbcType=VARCHAR}
+			   </if>
+	      UNION ALL
+	      SELECT arhs.group_id,
+	             arhs.hos_id,
+	             arhs.copy_code,
+	             to_char(arhs.in_date,'yyyy') ass_year,
+	             to_char(arhs.in_date,'MM') ass_month,
+	             null store_id,
+	             null store_no,
+	             null store_name,
+	             arhs.ven_id,
+	             hfd.sup_name ven_name,
+	             arhs.in_money,
+			     '01' ass_nature
+	        FROM ASS_IN_MAIN_HOUSE arhs
+	        LEFT JOIN hos_sup_dict hfd
+	          ON arhs.ven_id = hfd.sup_id
+	          AND arhs.ven_no = hfd.sup_no 
+	       WHERE 
+	            arhs.group_id = #{group_id,jdbcType=INTEGER}
+				AND arhs.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND arhs.copy_code = #{copy_code,jdbcType=VARCHAR}
+	            AND arhs.state = 2
+	            <if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(arhs.in_date,'yyyyMM')  between  #{year_month_begin,jdbcType=VARCHAR} and
+					 #{year_month_end,jdbcType=VARCHAR}
+			   </if> 
+	      UNION ALL
+	      SELECT aros.group_id,
+	             aros.hos_id,
+	             aros.copy_code,
+	             to_char(aros.in_date,'yyyy') ass_year,
+	             to_char(aros.in_date,'MM') ass_month,
+	             aros.store_id,
+	             hs.store_no,
+	             hs.store_name,
+	             aros.ven_id,
+	             hfd.sup_name ven_name,
+	             aros.in_money,
+			     '04' ass_nature
+	        FROM ASS_IN_MAIN_OTHER aros
+	        LEFT JOIN HOS_STORE_DICT hs
+	          ON aros.store_id = hs.store_id
+         	LEFT JOIN hos_sup_dict hfd
+          	  ON aros.ven_id = hfd.sup_id
+              AND aros.ven_no = hfd.sup_no 
+	       WHERE 
+	            aros.group_id = #{group_id,jdbcType=INTEGER}
+				AND aros.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND aros.copy_code = #{copy_code,jdbcType=VARCHAR}
+	        	AND aros.state = 2 
+	        	<if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(aros.in_date,'yyyyMM')  between  #{year_month_begin,jdbcType=VARCHAR} and
+					 #{year_month_end,jdbcType=VARCHAR}
+			    </if>
+	      UNION ALL
+	      SELECT aris.group_id,
+	             aris.hos_id,
+	             aris.copy_code,
+	             to_char(aris.in_date,'yyyy') ass_year,
+	             to_char(aris.in_date,'MM') ass_month,
+	             aris.store_id,
+	             hs.store_no,
+	             hs.store_name,
+	             aris.ven_id,
+	             hfd.sup_name  ven_name,
+	             aris.in_money,
+			     '05' ass_nature
+	        FROM ASS_IN_MAIN_INASSETS aris
+	        LEFT JOIN HOS_STORE_DICT hs
+	         ON aris.store_id = hs.store_id
+	        LEFT JOIN hos_sup_dict hfd
+	         ON aris.ven_id = hfd.sup_id
+	         AND aris.ven_no = hfd.sup_no 
+	       WHERE 
+	            aris.group_id = #{group_id,jdbcType=INTEGER}
+				AND aris.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND aris.copy_code = #{copy_code,jdbcType=VARCHAR}
+	        	AND aris.state = 2 
+	        	<if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(aris.in_date,'yyyyMM')  between  #{year_month_begin,jdbcType=VARCHAR} and
+					 #{year_month_end,jdbcType=VARCHAR}
+			   </if>
+	      UNION ALL
+	      SELECT arls.group_id,
+	             arls.hos_id,
+	             arls.copy_code,
+	             to_char(arls.in_date,'yyyy') ass_year,
+	             to_char(arls.in_date,'MM') ass_month,
+	             null store_id,
+	             null store_no,
+	             null store_name,
+	             arls.ven_id,
+	             hfd.sup_name ven_name,
+	             arls.in_money,
+			     '06' ass_nature
+	        FROM ASS_IN_MAIN_LAND arls
+	        LEFT JOIN hos_sup_dict hfd
+	          ON arls.ven_id = hfd.sup_id
+	          AND arls.ven_no = hfd.sup_no 
+	       WHERE 
+	           arls.group_id = #{group_id,jdbcType=INTEGER}
+			   AND arls.hos_id = #{hos_id,jdbcType=INTEGER}
+			   AND arls.copy_code = #{copy_code,jdbcType=VARCHAR}
+	           AND arls.state = 2 
+	           <if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(arls.in_date,'yyyyMM')  between  #{year_month_begin,jdbcType=VARCHAR} and
+					 #{year_month_end,jdbcType=VARCHAR} 
+			   </if>
+	        )
+	       select * from (
+	      select t.group_id, t.hos_id, t.copy_code, t.store_id, t.store_no, t.store_name, t.ven_id, t.ven_name,nvl(t.in_money,0) in_money from (
+					 SELECT t.group_id, t.hos_id, t.copy_code,t.store_id, t.store_no, t.store_name, t.ven_id, t.ven_name,sum(t.in_money) in_money FROM temp t
+						WHERE
+					        t.group_id = #{group_id,jdbcType=INTEGER}
+							AND t.hos_id = #{hos_id,jdbcType=INTEGER}
+							AND t.copy_code = #{copy_code,jdbcType=VARCHAR}
+							<if test="store_id != null and store_id != ''">
+								AND t.store_id = #{store_id,jdbcType=INTEGER}
+							</if>
+							<if test="ven_id != null and ven_id != ''">
+								AND t.ven_id = #{ven_id,jdbcType=INTEGER}
+							</if>
+						group by t.group_id, t.hos_id, t.copy_code, t.store_id, t.store_no, t.store_name, t.ven_id, t.ven_name
+			) t	
+				 
+			union all
+			
+			
+			select null group_id, null hos_id, null copy_code, null store_id, null store_no, '合计' store_name, null ven_id, null ven_name,sum(nvl(t.in_money,0)) in_money from (
+					 SELECT t.group_id, t.hos_id, t.copy_code,t.store_id, t.store_no, t.store_name, t.ven_id, t.ven_name,sum(t.in_money) in_money FROM temp t
+						WHERE
+					        t.group_id = #{group_id,jdbcType=INTEGER}
+							AND t.hos_id = #{hos_id,jdbcType=INTEGER}
+							AND t.copy_code = #{copy_code,jdbcType=VARCHAR}
+							<if test="store_id != null and store_id != ''">
+								AND t.store_id = #{store_id,jdbcType=INTEGER}
+							</if>
+							<if test="ven_id != null and ven_id != ''">
+								AND t.ven_id = #{ven_id,jdbcType=INTEGER}
+							</if>
+						group by t.group_id, t.hos_id, t.copy_code, t.store_id, t.store_no, t.store_name, t.ven_id, t.ven_name
+			) t
+
+			
+			) tt
+			
+			order by tt.group_id, tt.hos_id, tt.copy_code,tt.store_name
+	</select>
+	
+	
+	<select id="queryAssInMainBySummaryByBack" parameterType="java.util.Map" resultMap="AssInMainSummaryMap" >
+			with back_temp as(
+	       	select   arss.group_id,
+			         arss.hos_id,
+			         arss.copy_code, 
+	       		     to_char(arss.back_date,'yyyy') ass_year,
+	                 to_char(arss.back_date,'MM') ass_month,
+	                 arss.store_id,
+		             hs.store_no,
+		             hs.store_name,
+		             arss.ven_id,
+		             hfd.sup_name ven_name,
+		             arss.back_money,
+				     '02' ass_nature
+				   from ass_back_special arss   
+			       LEFT JOIN HOS_STORE_DICT hs
+			          ON arss.store_id = hs.store_id
+			        LEFT JOIN hos_sup_dict hfd
+			          ON arss.ven_id = hfd.sup_id
+			          AND arss.ven_no = hfd.sup_no 
+			          
+			          WHERE 
+	            arss.group_id = #{group_id,jdbcType=INTEGER}
+				AND arss.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND arss.copy_code = #{copy_code,jdbcType=VARCHAR}
+	        	AND arss.state = 2 
+	        	<if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(arss.back_date,'yyyyMM')  between  #{year_month_begin,jdbcType=VARCHAR} and
+					 #{year_month_end,jdbcType=VARCHAR}
+				</if>
+	        union all 	
+	        
+	        select   arss.group_id,
+			         arss.hos_id,
+			         arss.copy_code, 
+	       		     to_char(arss.back_date,'yyyy') ass_year,
+	                 to_char(arss.back_date,'MM') ass_month,
+	                 arss.store_id,
+		             hs.store_no,
+		             hs.store_name,
+		             arss.ven_id,
+		             hfd.sup_name ven_name,
+		             arss.back_money,
+				     '03' ass_nature
+				   from ass_back_GENERAL arss   
+			       LEFT JOIN HOS_STORE_DICT hs
+			          ON arss.store_id = hs.store_id
+			        LEFT JOIN hos_sup_dict hfd
+			          ON arss.ven_id = hfd.sup_id
+			          AND arss.ven_no = hfd.sup_no 
+			          
+			          WHERE 
+	            arss.group_id = #{group_id,jdbcType=INTEGER}
+				AND arss.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND arss.copy_code = #{copy_code,jdbcType=VARCHAR}
+	        	AND arss.state = 2 
+	       		<if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(arss.back_date,'yyyyMM')  between  #{year_month_begin,jdbcType=VARCHAR} and
+					 #{year_month_end,jdbcType=VARCHAR}
+				</if>
+	        union all 
+	        
+	        select   arss.group_id,
+			         arss.hos_id,
+			         arss.copy_code, 
+	       		     to_char(arss.back_date,'yyyy') ass_year,
+	                 to_char(arss.back_date,'MM') ass_month,
+	                 null store_id,
+		             null store_no,
+		             null store_name,
+		             arss.ven_id,
+		             hfd.sup_name ven_name,
+		             arss.back_money,
+				     '01' ass_nature
+				   from ass_back_house arss   
+			       
+			        LEFT JOIN hos_sup_dict hfd
+			          ON arss.ven_id = hfd.sup_id
+			          AND arss.ven_no = hfd.sup_no 
+			          
+			          WHERE 
+	            arss.group_id = #{group_id,jdbcType=INTEGER}
+				AND arss.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND arss.copy_code = #{copy_code,jdbcType=VARCHAR}
+	        	AND arss.state = 2 
+	       		 <if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(arss.back_date,'yyyyMM')  between  #{year_month_begin,jdbcType=VARCHAR} and
+					 #{year_month_end,jdbcType=VARCHAR}
+				</if>
+	        union all
+	        
+	        select   arss.group_id,
+			         arss.hos_id,
+			         arss.copy_code, 
+	       		     to_char(arss.back_date,'yyyy') ass_year,
+	                 to_char(arss.back_date,'MM') ass_month,
+	                 null store_id,
+		             null store_no,
+		             null store_name,
+		             arss.ven_id,
+		             hfd.sup_name ven_name,
+		             arss.back_money,
+				     '06' ass_nature
+				   from ass_back_land arss   
+			       
+			        LEFT JOIN hos_sup_dict hfd
+			          ON arss.ven_id = hfd.sup_id
+			          AND arss.ven_no = hfd.sup_no 
+			          
+			          WHERE 
+	            arss.group_id = #{group_id,jdbcType=INTEGER}
+				AND arss.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND arss.copy_code = #{copy_code,jdbcType=VARCHAR}
+	        	AND arss.state = 2 
+	        	<if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(arss.back_date,'yyyyMM')  between  #{year_month_begin,jdbcType=VARCHAR} and
+					 #{year_month_end,jdbcType=VARCHAR}
+				</if>
+	        union all 	
+	        
+	        select   arss.group_id,
+			         arss.hos_id,
+			         arss.copy_code, 
+	       		     to_char(arss.back_date,'yyyy') ass_year,
+	                 to_char(arss.back_date,'MM') ass_month,
+	                 arss.store_id,
+		             hs.store_no,
+		             hs.store_name,
+		             arss.ven_id,
+		             hfd.sup_name ven_name,
+		             arss.back_money,
+				     '05' ass_nature
+				   from ass_back_inassets arss   
+			       LEFT JOIN HOS_STORE_DICT hs
+			          ON arss.store_id = hs.store_id
+			        LEFT JOIN hos_sup_dict hfd
+			          ON arss.ven_id = hfd.sup_id
+			          AND arss.ven_no = hfd.sup_no 
+			          
+			          WHERE 
+	            arss.group_id = #{group_id,jdbcType=INTEGER}
+				AND arss.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND arss.copy_code = #{copy_code,jdbcType=VARCHAR}
+	        	AND arss.state = 2
+	        	<if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(arss.back_date,'yyyyMM')  between  #{year_month_begin,jdbcType=VARCHAR} and
+					 #{year_month_end,jdbcType=VARCHAR}
+				</if>
+	        union all 	
+	        
+	        select   arss.group_id,
+			         arss.hos_id,
+			         arss.copy_code, 
+	       		     to_char(arss.back_date,'yyyy') ass_year,
+	                 to_char(arss.back_date,'MM') ass_month,
+	                 arss.store_id,
+		             hs.store_no,
+		             hs.store_name,
+		             arss.ven_id,
+		             hfd.sup_name ven_name,
+		             arss.back_money,
+				     '04' ass_nature
+				   from ass_back_other arss   
+			       LEFT JOIN HOS_STORE_DICT hs
+			          ON arss.store_id = hs.store_id
+			        LEFT JOIN hos_sup_dict hfd
+			          ON arss.ven_id = hfd.sup_id
+			          AND arss.ven_no = hfd.sup_no 
+			          
+			          WHERE 
+	            arss.group_id = #{group_id,jdbcType=INTEGER}
+				AND arss.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND arss.copy_code = #{copy_code,jdbcType=VARCHAR}
+	        	AND arss.state = 2 	
+	        	<if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(arss.back_date,'yyyyMM')  between  #{year_month_begin,jdbcType=VARCHAR} and
+					 #{year_month_end,jdbcType=VARCHAR}
+				</if>
+	        	
+	       ) 
+	       select * from (
+	     	 select t.group_id, t.hos_id, t.copy_code, t.store_id, t.store_no, t.store_name, t.ven_id, t.ven_name,nvl(t.back_money,0) in_money from (
+				SELECT t.group_id, t.hos_id, t.copy_code,t.store_id, t.store_no, t.store_name, t.ven_id, t.ven_name,sum(nvl(t.back_money,0)) back_money FROM back_temp t
+						WHERE
+					        t.group_id = #{group_id,jdbcType=INTEGER}
+							AND t.hos_id = #{hos_id,jdbcType=INTEGER}
+							AND t.copy_code = #{copy_code,jdbcType=VARCHAR}
+							<if test="store_id != null and store_id != ''">
+								AND t.store_id = #{store_id,jdbcType=INTEGER}
+							</if>
+							<if test="ven_id != null and ven_id != ''">
+								AND t.ven_id = #{ven_id,jdbcType=INTEGER}
+							</if>
+						group by t.group_id, t.hos_id, t.copy_code, t.store_id, t.store_no, t.store_name, t.ven_id, t.ven_name
+			) t
+			
+				 
+			union all
+			
+			
+			select null group_id, null hos_id, null copy_code, null store_id, null store_no, '合计' store_name, null ven_id, null ven_name,sum(nvl(t.back_money,0)) in_money from (
+				SELECT t.group_id, t.hos_id, t.copy_code,t.store_id, t.store_no, t.store_name, t.ven_id, t.ven_name,sum(nvl(t.back_money,0)) back_money FROM back_temp t
+						WHERE
+					        t.group_id = #{group_id,jdbcType=INTEGER}
+							AND t.hos_id = #{hos_id,jdbcType=INTEGER}
+							AND t.copy_code = #{copy_code,jdbcType=VARCHAR}
+							<if test="store_id != null and store_id != ''">
+								AND t.store_id = #{store_id,jdbcType=INTEGER}
+							</if>
+							<if test="ven_id != null and ven_id != ''">
+								AND t.ven_id = #{ven_id,jdbcType=INTEGER}
+							</if>
+						group by t.group_id, t.hos_id, t.copy_code, t.store_id, t.store_no, t.store_name, t.ven_id, t.ven_name
+			) t 		
+			) tt
+			
+			order by tt.group_id, tt.hos_id, tt.copy_code,tt.store_name
+	</select>
+	
+	<!-- 不选择业务类型打印 -->
+	<select id="queryAssInMainSummaryPrint" parameterType="java.util.Map" resultMap="AssInMainSummaryMap" >
+				with temp as (
+	      SELECT arss.group_id,
+	             arss.hos_id,
+	             arss.copy_code,
+	             to_char(arss.in_date,'yyyy') ass_year,
+	             to_char(arss.in_date,'MM') ass_month,
+	             arss.store_id,
+	             hs.store_no,
+	             hs.store_name,
+	             arss.ven_id,
+	             hfd.sup_name ven_name,
+	             arss.in_money,
+			     '02' ass_nature
+	        FROM ASS_IN_MAIN_SPECIAL arss
+	        LEFT JOIN HOS_STORE_DICT hs
+	          ON arss.store_id = hs.store_id
+	        LEFT JOIN hos_sup_dict hfd
+	          ON arss.ven_id = hfd.sup_id
+	          AND arss.ven_no = hfd.sup_no 
+	        WHERE 
+	            arss.group_id = #{group_id,jdbcType=INTEGER}
+				AND arss.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND arss.copy_code = #{copy_code,jdbcType=VARCHAR}
+	        	AND arss.state = 2 
+	        	<if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(arss.in_date,'yyyyMM') between #{year_month_begin} and #{year_month_end}
+				</if>
+	      UNION ALL
+	      SELECT args.group_id,
+	             args.hos_id,
+	             args.copy_code,
+	             to_char(args.in_date,'yyyy') ass_year,
+	             to_char(args.in_date,'MM') ass_month,
+	             args.store_id,
+	             hs.store_no,
+	             hs.store_name ,
+	             args.ven_id,
+	             hfd.sup_name ven_name,
+	             args.in_money,
+			     '03' ass_nature
+	        FROM ASS_IN_MAIN_GENERAL args
+	        LEFT JOIN HOS_STORE_DICT hs
+	          ON args.store_id = hs.store_id
+	        LEFT JOIN hos_sup_dict hfd
+	          ON args.ven_id = hfd.sup_id
+	          AND args.ven_no = hfd.sup_no 
+	       WHERE 
+	           args.group_id = #{group_id,jdbcType=INTEGER}
+			   AND args.hos_id = #{hos_id,jdbcType=INTEGER}
+			   AND args.copy_code = #{copy_code,jdbcType=VARCHAR}
+	           AND args.state = 2 
+	           <if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(args.in_date,'yyyyMM') between #{year_month_begin} and #{year_month_end}
+			   </if>
+	      UNION ALL
+	      SELECT arhs.group_id,
+	             arhs.hos_id,
+	             arhs.copy_code,
+	             to_char(arhs.in_date,'yyyy') ass_year,
+	             to_char(arhs.in_date,'MM') ass_month,
+	             null store_id,
+	             null store_no,
+	             null store_name,
+	             arhs.ven_id,
+	             hfd.sup_name ven_name,
+	             arhs.in_money,
+			     '01' ass_nature
+	        FROM ASS_IN_MAIN_HOUSE arhs
+	        LEFT JOIN hos_sup_dict hfd
+	          ON arhs.ven_id = hfd.sup_id
+	          AND arhs.ven_no = hfd.sup_no 
+	       WHERE 
+	            arhs.group_id = #{group_id,jdbcType=INTEGER}
+				AND arhs.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND arhs.copy_code = #{copy_code,jdbcType=VARCHAR}
+	            AND arhs.state = 2
+	            <if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(arhs.in_date,'yyyyMM') between #{year_month_begin} and #{year_month_end}
+			   </if> 
+	      UNION ALL
+	      SELECT aros.group_id,
+	             aros.hos_id,
+	             aros.copy_code,
+	             to_char(aros.in_date,'yyyy') ass_year,
+	             to_char(aros.in_date,'MM') ass_month,
+	             aros.store_id,
+	             hs.store_no,
+	             hs.store_name,
+	             aros.ven_id,
+	             hfd.sup_name ven_name,
+	             aros.in_money,
+			     '04' ass_nature
+	        FROM ASS_IN_MAIN_OTHER aros
+	        LEFT JOIN HOS_STORE_DICT hs
+	          ON aros.store_id = hs.store_id
+         	LEFT JOIN hos_sup_dict hfd
+          	  ON aros.ven_id = hfd.sup_id
+              AND aros.ven_no = hfd.sup_no 
+	       WHERE 
+	            aros.group_id = #{group_id,jdbcType=INTEGER}
+				AND aros.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND aros.copy_code = #{copy_code,jdbcType=VARCHAR}
+	        	AND aros.state = 2 
+	        	<if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(aros.in_date,'yyyyMM') between #{year_month_begin} and #{year_month_end}
+			    </if>
+	      UNION ALL
+	      SELECT aris.group_id,
+	             aris.hos_id,
+	             aris.copy_code,
+	             to_char(aris.in_date,'yyyy') ass_year,
+	             to_char(aris.in_date,'MM') ass_month,
+	             aris.store_id,
+	             hs.store_no,
+	             hs.store_name,
+	             aris.ven_id,
+	             hfd.sup_name  ven_name,
+	             aris.in_money,
+			     '05' ass_nature
+	        FROM ASS_IN_MAIN_INASSETS aris
+	        LEFT JOIN HOS_STORE_DICT hs
+	         ON aris.store_id = hs.store_id
+	        LEFT JOIN hos_sup_dict hfd
+	         ON aris.ven_id = hfd.sup_id
+	         AND aris.ven_no = hfd.sup_no 
+	       WHERE 
+	            aris.group_id = #{group_id,jdbcType=INTEGER}
+				AND aris.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND aris.copy_code = #{copy_code,jdbcType=VARCHAR}
+	        	AND aris.state = 2 
+	        	<if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(aris.in_date,'yyyyMM') between #{year_month_begin} and #{year_month_end}
+			   </if>
+	      UNION ALL
+	      SELECT arls.group_id,
+	             arls.hos_id,
+	             arls.copy_code,
+	             to_char(arls.in_date,'yyyy') ass_year,
+	             to_char(arls.in_date,'MM') ass_month,
+	             null store_id,
+	             null store_no,
+	             null store_name,
+	             arls.ven_id,
+	             hfd.sup_name ven_name,
+	             arls.in_money,
+			     '06' ass_nature
+	        FROM ASS_IN_MAIN_LAND arls
+	        LEFT JOIN hos_sup_dict hfd
+	          ON arls.ven_id = hfd.sup_id
+	          AND arls.ven_no = hfd.sup_no 
+	       WHERE 
+	           arls.group_id = #{group_id,jdbcType=INTEGER}
+			   AND arls.hos_id = #{hos_id,jdbcType=INTEGER}
+			   AND arls.copy_code = #{copy_code,jdbcType=VARCHAR}
+	           AND arls.state = 2 
+	           <if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(arls.in_date,'yyyyMM') between #{year_month_begin} and #{year_month_end}
+			   </if>
+	        ),
+	       back_temp as(
+	       	select   arss.group_id,
+			         arss.hos_id,
+			         arss.copy_code, 
+	       		     to_char(arss.back_date,'yyyy') ass_year,
+	                 to_char(arss.back_date,'MM') ass_month,
+	                 arss.store_id,
+		             hs.store_no,
+		             hs.store_name,
+		             arss.ven_id,
+		             hfd.sup_name ven_name,
+		             arss.back_money,
+				     '02' ass_nature
+				   from ass_back_special arss   
+			       LEFT JOIN HOS_STORE_DICT hs
+			          ON arss.store_id = hs.store_id
+			        LEFT JOIN hos_sup_dict hfd
+			          ON arss.ven_id = hfd.sup_id
+			          AND arss.ven_no = hfd.sup_no 
+			          
+			          WHERE 
+	            arss.group_id = #{group_id,jdbcType=INTEGER}
+				AND arss.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND arss.copy_code = #{copy_code,jdbcType=VARCHAR}
+	        	AND arss.state = 2 
+	        	<if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(arss.back_date,'yyyyMM') between #{year_month_begin} and #{year_month_end}
+				</if>
+	        union all 	
+	        
+	        select   arss.group_id,
+			         arss.hos_id,
+			         arss.copy_code, 
+	       		     to_char(arss.back_date,'yyyy') ass_year,
+	                 to_char(arss.back_date,'MM') ass_month,
+	                 arss.store_id,
+		             hs.store_no,
+		             hs.store_name,
+		             arss.ven_id,
+		             hfd.sup_name ven_name,
+		             arss.back_money,
+				     '03' ass_nature
+				   from ass_back_GENERAL arss   
+			       LEFT JOIN HOS_STORE_DICT hs
+			          ON arss.store_id = hs.store_id
+			        LEFT JOIN hos_sup_dict hfd
+			          ON arss.ven_id = hfd.sup_id
+			          AND arss.ven_no = hfd.sup_no 
+			          
+			          WHERE 
+	            arss.group_id = #{group_id,jdbcType=INTEGER}
+				AND arss.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND arss.copy_code = #{copy_code,jdbcType=VARCHAR}
+	        	AND arss.state = 2 
+	       		<if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(arss.back_date,'yyyyMM') between #{year_month_begin} and #{year_month_end}
+				</if>
+	        union all 
+	        
+	        select   arss.group_id,
+			         arss.hos_id,
+			         arss.copy_code, 
+	       		     to_char(arss.back_date,'yyyy') ass_year,
+	                 to_char(arss.back_date,'MM') ass_month,
+	                 null store_id,
+		             null store_no,
+		             null store_name,
+		             arss.ven_id,
+		             hfd.sup_name ven_name,
+		             arss.back_money,
+				     '01' ass_nature
+				   from ass_back_house arss   
+			       
+			        LEFT JOIN hos_sup_dict hfd
+			          ON arss.ven_id = hfd.sup_id
+			          AND arss.ven_no = hfd.sup_no 
+			          
+			          WHERE 
+	            arss.group_id = #{group_id,jdbcType=INTEGER}
+				AND arss.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND arss.copy_code = #{copy_code,jdbcType=VARCHAR}
+	        	AND arss.state = 2 
+	       		 <if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(arss.back_date,'yyyyMM') between #{year_month_begin} and #{year_month_end}
+				</if>
+	        union all
+	        
+	        select   arss.group_id,
+			         arss.hos_id,
+			         arss.copy_code, 
+	       		     to_char(arss.back_date,'yyyy') ass_year,
+	                 to_char(arss.back_date,'MM') ass_month,
+	                 null store_id,
+		             null store_no,
+		             null store_name,
+		             arss.ven_id,
+		             hfd.sup_name ven_name,
+		             arss.back_money,
+				     '06' ass_nature
+				   from ass_back_land arss   
+			       
+			        LEFT JOIN hos_sup_dict hfd
+			          ON arss.ven_id = hfd.sup_id
+			          AND arss.ven_no = hfd.sup_no 
+			          
+			          WHERE 
+	            arss.group_id = #{group_id,jdbcType=INTEGER}
+				AND arss.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND arss.copy_code = #{copy_code,jdbcType=VARCHAR}
+	        	AND arss.state = 2 
+	        	<if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(arss.back_date,'yyyyMM') between #{year_month_begin} and #{year_month_end}
+				</if>
+	        union all 	
+	        
+	        select   arss.group_id,
+			         arss.hos_id,
+			         arss.copy_code, 
+	       		     to_char(arss.back_date,'yyyy') ass_year,
+	                 to_char(arss.back_date,'MM') ass_month,
+	                 arss.store_id,
+		             hs.store_no,
+		             hs.store_name,
+		             arss.ven_id,
+		             hfd.sup_name ven_name,
+		             arss.back_money,
+				     '05' ass_nature
+				   from ass_back_inassets arss   
+			       LEFT JOIN HOS_STORE_DICT hs
+			          ON arss.store_id = hs.store_id
+			        LEFT JOIN hos_sup_dict hfd
+			          ON arss.ven_id = hfd.sup_id
+			          AND arss.ven_no = hfd.sup_no 
+			          
+			          WHERE 
+	            arss.group_id = #{group_id,jdbcType=INTEGER}
+				AND arss.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND arss.copy_code = #{copy_code,jdbcType=VARCHAR}
+	        	AND arss.state = 2
+	        	<if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(arss.back_date,'yyyyMM') between #{year_month_begin} and #{year_month_end}
+				</if>
+	        union all 	
+	        
+	        select   arss.group_id,
+			         arss.hos_id,
+			         arss.copy_code, 
+	       		     to_char(arss.back_date,'yyyy') ass_year,
+	                 to_char(arss.back_date,'MM') ass_month,
+	                 arss.store_id,
+		             hs.store_no,
+		             hs.store_name,
+		             arss.ven_id,
+		             hfd.sup_name ven_name,
+		             arss.back_money,
+				     '04' ass_nature
+				   from ass_back_other arss   
+			       LEFT JOIN HOS_STORE_DICT hs
+			          ON arss.store_id = hs.store_id
+			        LEFT JOIN hos_sup_dict hfd
+			          ON arss.ven_id = hfd.sup_id
+			          AND arss.ven_no = hfd.sup_no 
+			          
+			          WHERE 
+	            arss.group_id = #{group_id,jdbcType=INTEGER}
+				AND arss.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND arss.copy_code = #{copy_code,jdbcType=VARCHAR}
+	        	AND arss.state = 2 	
+	        	<if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(arss.back_date,'yyyyMM') between #{year_month_begin} and #{year_month_end}
+				</if>
+	        	
+	       ) 
+	       select * from (
+	      select t.group_id, t.hos_id, t.copy_code, t.store_id, t.store_no, t.store_name, t.ven_id, t.ven_name,nvl(t.in_money,0) - nvl(t1.back_money,0) in_money from (
+					 SELECT t.group_id, t.hos_id, t.copy_code,t.store_id, t.store_no, t.store_name, t.ven_id, t.ven_name,sum(t.in_money) in_money FROM temp t
+						WHERE
+					        t.group_id = #{group_id,jdbcType=INTEGER}
+							AND t.hos_id = #{hos_id,jdbcType=INTEGER}
+							AND t.copy_code = #{copy_code,jdbcType=VARCHAR}
+							<if test="store_id != null and store_id != ''">
+								AND t.store_id = #{store_id,jdbcType=INTEGER}
+							</if>
+							<if test="ven_id != null and ven_id != ''">
+								AND t.ven_id = #{ven_id,jdbcType=INTEGER}
+							</if>
+						group by t.group_id, t.hos_id, t.copy_code, t.store_id, t.store_no, t.store_name, t.ven_id, t.ven_name
+			) t	
+			left join (
+				SELECT t.group_id, t.hos_id, t.copy_code,t.store_id, t.store_no, t.store_name, t.ven_id, t.ven_name,sum(nvl(t.back_money,0)) back_money FROM back_temp t
+						WHERE
+					        t.group_id = #{group_id,jdbcType=INTEGER}
+							AND t.hos_id = #{hos_id,jdbcType=INTEGER}
+							AND t.copy_code = #{copy_code,jdbcType=VARCHAR}
+							<if test="store_id != null and store_id != ''">
+								AND t.store_id = #{store_id,jdbcType=INTEGER}
+							</if>
+							<if test="ven_id != null and ven_id != ''">
+								AND t.ven_id = #{ven_id,jdbcType=INTEGER}
+							</if>
+						group by t.group_id, t.hos_id, t.copy_code, t.store_id, t.store_no, t.store_name, t.ven_id, t.ven_name
+			) t1 
+			on
+				 t.group_id = t1.group_id
+				 and t.hos_id = t1.hos_id
+				 and t.copy_code=  t1.copy_code
+				 and t.store_id = t1.store_id
+				 and t.ven_id = t1.ven_id
+				 where  nvl(t.in_money,0) - nvl(t1.back_money,0) > 0
+			union all
+			
+			
+			select null group_id, null hos_id, null copy_code, null store_id, null store_no, '合计' store_name, null ven_id, null ven_name,sum(nvl(t.in_money,0)) - sum(nvl(t1.back_money,0)) in_money from (
+					 SELECT t.group_id, t.hos_id, t.copy_code,t.store_id, t.store_no, t.store_name, t.ven_id, t.ven_name,sum(t.in_money) in_money FROM temp t
+						WHERE
+					        t.group_id = #{group_id,jdbcType=INTEGER}
+							AND t.hos_id = #{hos_id,jdbcType=INTEGER}
+							AND t.copy_code = #{copy_code,jdbcType=VARCHAR}
+							<if test="store_id != null and store_id != ''">
+								AND t.store_id = #{store_id,jdbcType=INTEGER}
+							</if>
+							<if test="ven_id != null and ven_id != ''">
+								AND t.ven_id = #{ven_id,jdbcType=INTEGER}
+							</if>
+						group by t.group_id, t.hos_id, t.copy_code, t.store_id, t.store_no, t.store_name, t.ven_id, t.ven_name
+			) t	
+			left join (
+				SELECT t.group_id, t.hos_id, t.copy_code,t.store_id, t.store_no, t.store_name, t.ven_id, t.ven_name,sum(nvl(t.back_money,0)) back_money FROM back_temp t
+						WHERE
+					        t.group_id = #{group_id,jdbcType=INTEGER}
+							AND t.hos_id = #{hos_id,jdbcType=INTEGER}
+							AND t.copy_code = #{copy_code,jdbcType=VARCHAR}
+							<if test="store_id != null and store_id != ''">
+								AND t.store_id = #{store_id,jdbcType=INTEGER}
+							</if>
+							<if test="ven_id != null and ven_id != ''">
+								AND t.ven_id = #{ven_id,jdbcType=INTEGER}
+							</if>
+						group by t.group_id, t.hos_id, t.copy_code, t.store_id, t.store_no, t.store_name, t.ven_id, t.ven_name
+			) t1 
+			on
+				 t.group_id = t1.group_id
+				 and t.hos_id = t1.hos_id
+				 and t.copy_code=  t1.copy_code
+				 and t.store_id = t1.store_id
+				 and t.ven_id = t1.ven_id
+
+			
+			) tt
+			 
+			order by tt.ven_name
+	</select>
+	
+	<!-- 采购入库打印 -->
+	<select id="queryAssInMainSummaryPrintByIn" parameterType="java.util.Map" resultMap="AssInMainSummaryMap" >
+		with temp as (
+	      SELECT arss.group_id,
+	             arss.hos_id,
+	             arss.copy_code,
+	             to_char(arss.in_date,'yyyy') ass_year,
+	             to_char(arss.in_date,'MM') ass_month,
+	             arss.store_id,
+	             hs.store_no,
+	             hs.store_name,
+	             arss.ven_id,
+	             hfd.sup_name ven_name,
+	             arss.in_money,
+			     '02' ass_nature
+	        FROM ASS_IN_MAIN_SPECIAL arss
+	        LEFT JOIN HOS_STORE_DICT hs
+	          ON arss.store_id = hs.store_id
+	        LEFT JOIN hos_sup_dict hfd
+	          ON arss.ven_id = hfd.sup_id
+	          AND arss.ven_no = hfd.sup_no 
+	        WHERE 
+	            arss.group_id = #{group_id,jdbcType=INTEGER}
+				AND arss.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND arss.copy_code = #{copy_code,jdbcType=VARCHAR}
+	        	AND arss.state = 2 
+	        	<if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(arss.in_date,'yyyyMM') between  #{year_month_begin,jdbcType=VARCHAR} and
+					 #{year_month_end,jdbcType=VARCHAR}
+				</if>
+	      UNION ALL
+	      SELECT args.group_id,
+	             args.hos_id,
+	             args.copy_code,
+	             to_char(args.in_date,'yyyy') ass_year,
+	             to_char(args.in_date,'MM') ass_month,
+	             args.store_id,
+	             hs.store_no,
+	             hs.store_name ,
+	             args.ven_id,
+	             hfd.sup_name ven_name,
+	             args.in_money,
+			     '03' ass_nature
+	        FROM ASS_IN_MAIN_GENERAL args
+	        LEFT JOIN HOS_STORE_DICT hs
+	          ON args.store_id = hs.store_id
+	        LEFT JOIN hos_sup_dict hfd
+	          ON args.ven_id = hfd.sup_id
+	          AND args.ven_no = hfd.sup_no 
+	       WHERE 
+	           args.group_id = #{group_id,jdbcType=INTEGER}
+			   AND args.hos_id = #{hos_id,jdbcType=INTEGER}
+			   AND args.copy_code = #{copy_code,jdbcType=VARCHAR}
+	           AND args.state = 2 
+	           <if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(args.in_date,'yyyyMM')  between  #{year_month_begin,jdbcType=VARCHAR} and
+					 #{year_month_end,jdbcType=VARCHAR}
+			   </if>
+	      UNION ALL
+	      SELECT arhs.group_id,
+	             arhs.hos_id,
+	             arhs.copy_code,
+	             to_char(arhs.in_date,'yyyy') ass_year,
+	             to_char(arhs.in_date,'MM') ass_month,
+	             null store_id,
+	             null store_no,
+	             null store_name,
+	             arhs.ven_id,
+	             hfd.sup_name ven_name,
+	             arhs.in_money,
+			     '01' ass_nature
+	        FROM ASS_IN_MAIN_HOUSE arhs
+	        LEFT JOIN hos_sup_dict hfd
+	          ON arhs.ven_id = hfd.sup_id
+	          AND arhs.ven_no = hfd.sup_no 
+	       WHERE 
+	            arhs.group_id = #{group_id,jdbcType=INTEGER}
+				AND arhs.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND arhs.copy_code = #{copy_code,jdbcType=VARCHAR}
+	            AND arhs.state = 2
+	            <if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(arhs.in_date,'yyyyMM')  between  #{year_month_begin,jdbcType=VARCHAR} and
+					 #{year_month_end,jdbcType=VARCHAR}
+			   </if> 
+	      UNION ALL
+	      SELECT aros.group_id,
+	             aros.hos_id,
+	             aros.copy_code,
+	             to_char(aros.in_date,'yyyy') ass_year,
+	             to_char(aros.in_date,'MM') ass_month,
+	             aros.store_id,
+	             hs.store_no,
+	             hs.store_name,
+	             aros.ven_id,
+	             hfd.sup_name ven_name,
+	             aros.in_money,
+			     '04' ass_nature
+	        FROM ASS_IN_MAIN_OTHER aros
+	        LEFT JOIN HOS_STORE_DICT hs
+	          ON aros.store_id = hs.store_id
+         	LEFT JOIN hos_sup_dict hfd
+          	  ON aros.ven_id = hfd.sup_id
+              AND aros.ven_no = hfd.sup_no 
+	       WHERE 
+	            aros.group_id = #{group_id,jdbcType=INTEGER}
+				AND aros.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND aros.copy_code = #{copy_code,jdbcType=VARCHAR}
+	        	AND aros.state = 2 
+	        	<if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(aros.in_date,'yyyyMM')  between  #{year_month_begin,jdbcType=VARCHAR} and
+					 #{year_month_end,jdbcType=VARCHAR}
+			    </if>
+	      UNION ALL
+	      SELECT aris.group_id,
+	             aris.hos_id,
+	             aris.copy_code,
+	             to_char(aris.in_date,'yyyy') ass_year,
+	             to_char(aris.in_date,'MM') ass_month,
+	             aris.store_id,
+	             hs.store_no,
+	             hs.store_name,
+	             aris.ven_id,
+	             hfd.sup_name  ven_name,
+	             aris.in_money,
+			     '05' ass_nature
+	        FROM ASS_IN_MAIN_INASSETS aris
+	        LEFT JOIN HOS_STORE_DICT hs
+	         ON aris.store_id = hs.store_id
+	        LEFT JOIN hos_sup_dict hfd
+	         ON aris.ven_id = hfd.sup_id
+	         AND aris.ven_no = hfd.sup_no 
+	       WHERE 
+	            aris.group_id = #{group_id,jdbcType=INTEGER}
+				AND aris.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND aris.copy_code = #{copy_code,jdbcType=VARCHAR}
+	        	AND aris.state = 2 
+	        	<if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(aris.in_date,'yyyyMM')  between  #{year_month_begin,jdbcType=VARCHAR} and
+					 #{year_month_end,jdbcType=VARCHAR}
+			   </if>
+	      UNION ALL
+	      SELECT arls.group_id,
+	             arls.hos_id,
+	             arls.copy_code,
+	             to_char(arls.in_date,'yyyy') ass_year,
+	             to_char(arls.in_date,'MM') ass_month,
+	             null store_id,
+	             null store_no,
+	             null store_name,
+	             arls.ven_id,
+	             hfd.sup_name ven_name,
+	             arls.in_money,
+			     '06' ass_nature
+	        FROM ASS_IN_MAIN_LAND arls
+	        LEFT JOIN hos_sup_dict hfd
+	          ON arls.ven_id = hfd.sup_id
+	          AND arls.ven_no = hfd.sup_no 
+	       WHERE 
+	           arls.group_id = #{group_id,jdbcType=INTEGER}
+			   AND arls.hos_id = #{hos_id,jdbcType=INTEGER}
+			   AND arls.copy_code = #{copy_code,jdbcType=VARCHAR}
+	           AND arls.state = 2 
+	           <if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(arls.in_date,'yyyyMM')  between  #{year_month_begin,jdbcType=VARCHAR} and
+					 #{year_month_end,jdbcType=VARCHAR} 
+			   </if>
+	        )
+	       select * from (
+	      select t.group_id, t.hos_id, t.copy_code, t.store_id, t.store_no, t.store_name, t.ven_id, t.ven_name,nvl(t.in_money,0) in_money from (
+					 SELECT t.group_id, t.hos_id, t.copy_code,t.store_id, t.store_no, t.store_name, t.ven_id, t.ven_name,sum(t.in_money) in_money FROM temp t
+						WHERE
+					        t.group_id = #{group_id,jdbcType=INTEGER}
+							AND t.hos_id = #{hos_id,jdbcType=INTEGER}
+							AND t.copy_code = #{copy_code,jdbcType=VARCHAR}
+							<if test="store_id != null and store_id != ''">
+								AND t.store_id = #{store_id,jdbcType=INTEGER}
+							</if>
+							<if test="ven_id != null and ven_id != ''">
+								AND t.ven_id = #{ven_id,jdbcType=INTEGER}
+							</if>
+						group by t.group_id, t.hos_id, t.copy_code, t.store_id, t.store_no, t.store_name, t.ven_id, t.ven_name
+			) t	
+				 
+			union all
+			
+			
+			select null group_id, null hos_id, null copy_code, null store_id, null store_no, '合计' store_name, null ven_id, null ven_name,sum(nvl(t.in_money,0)) in_money from (
+					 SELECT t.group_id, t.hos_id, t.copy_code,t.store_id, t.store_no, t.store_name, t.ven_id, t.ven_name,sum(t.in_money) in_money FROM temp t
+						WHERE
+					        t.group_id = #{group_id,jdbcType=INTEGER}
+							AND t.hos_id = #{hos_id,jdbcType=INTEGER}
+							AND t.copy_code = #{copy_code,jdbcType=VARCHAR}
+							<if test="store_id != null and store_id != ''">
+								AND t.store_id = #{store_id,jdbcType=INTEGER}
+							</if>
+							<if test="ven_id != null and ven_id != ''">
+								AND t.ven_id = #{ven_id,jdbcType=INTEGER}
+							</if>
+						group by t.group_id, t.hos_id, t.copy_code, t.store_id, t.store_no, t.store_name, t.ven_id, t.ven_name
+			) t
+
+			
+			) tt
+			
+			order by tt.group_id, tt.hos_id, tt.copy_code,tt.store_name	
+	</select>
+	
+	<!-- 采购退货打印 -->
+	<select id="queryAssInMainSummaryPrintByBack" parameterType="java.util.Map" resultMap="AssInMainSummaryMap" >
+		with back_temp as(
+	       	select   arss.group_id,
+			         arss.hos_id,
+			         arss.copy_code, 
+	       		     to_char(arss.back_date,'yyyy') ass_year,
+	                 to_char(arss.back_date,'MM') ass_month,
+	                 arss.store_id,
+		             hs.store_no,
+		             hs.store_name,
+		             arss.ven_id,
+		             hfd.sup_name ven_name,
+		             arss.back_money,
+				     '02' ass_nature
+				   from ass_back_special arss   
+			       LEFT JOIN HOS_STORE_DICT hs
+			          ON arss.store_id = hs.store_id
+			        LEFT JOIN hos_sup_dict hfd
+			          ON arss.ven_id = hfd.sup_id
+			          AND arss.ven_no = hfd.sup_no 
+			          
+			          WHERE 
+	            arss.group_id = #{group_id,jdbcType=INTEGER}
+				AND arss.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND arss.copy_code = #{copy_code,jdbcType=VARCHAR}
+	        	AND arss.state = 2 
+	        	<if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(arss.back_date,'yyyyMM')  between  #{year_month_begin,jdbcType=VARCHAR} and
+					 #{year_month_end,jdbcType=VARCHAR}
+				</if>
+	        union all 	
+	        
+	        select   arss.group_id,
+			         arss.hos_id,
+			         arss.copy_code, 
+	       		     to_char(arss.back_date,'yyyy') ass_year,
+	                 to_char(arss.back_date,'MM') ass_month,
+	                 arss.store_id,
+		             hs.store_no,
+		             hs.store_name,
+		             arss.ven_id,
+		             hfd.sup_name ven_name,
+		             arss.back_money,
+				     '03' ass_nature
+				   from ass_back_GENERAL arss   
+			       LEFT JOIN HOS_STORE_DICT hs
+			          ON arss.store_id = hs.store_id
+			        LEFT JOIN hos_sup_dict hfd
+			          ON arss.ven_id = hfd.sup_id
+			          AND arss.ven_no = hfd.sup_no 
+			          
+			          WHERE 
+	            arss.group_id = #{group_id,jdbcType=INTEGER}
+				AND arss.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND arss.copy_code = #{copy_code,jdbcType=VARCHAR}
+	        	AND arss.state = 2 
+	       		<if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(arss.back_date,'yyyyMM')  between  #{year_month_begin,jdbcType=VARCHAR} and
+					 #{year_month_end,jdbcType=VARCHAR}
+				</if>
+	        union all 
+	        
+	        select   arss.group_id,
+			         arss.hos_id,
+			         arss.copy_code, 
+	       		     to_char(arss.back_date,'yyyy') ass_year,
+	                 to_char(arss.back_date,'MM') ass_month,
+	                 null store_id,
+		             null store_no,
+		             null store_name,
+		             arss.ven_id,
+		             hfd.sup_name ven_name,
+		             arss.back_money,
+				     '01' ass_nature
+				   from ass_back_house arss   
+			       
+			        LEFT JOIN hos_sup_dict hfd
+			          ON arss.ven_id = hfd.sup_id
+			          AND arss.ven_no = hfd.sup_no 
+			          
+			          WHERE 
+	            arss.group_id = #{group_id,jdbcType=INTEGER}
+				AND arss.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND arss.copy_code = #{copy_code,jdbcType=VARCHAR}
+	        	AND arss.state = 2 
+	       		 <if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(arss.back_date,'yyyyMM')  between  #{year_month_begin,jdbcType=VARCHAR} and
+					 #{year_month_end,jdbcType=VARCHAR}
+				</if>
+	        union all
+	        
+	        select   arss.group_id,
+			         arss.hos_id,
+			         arss.copy_code, 
+	       		     to_char(arss.back_date,'yyyy') ass_year,
+	                 to_char(arss.back_date,'MM') ass_month,
+	                 null store_id,
+		             null store_no,
+		             null store_name,
+		             arss.ven_id,
+		             hfd.sup_name ven_name,
+		             arss.back_money,
+				     '06' ass_nature
+				   from ass_back_land arss   
+			       
+			        LEFT JOIN hos_sup_dict hfd
+			          ON arss.ven_id = hfd.sup_id
+			          AND arss.ven_no = hfd.sup_no 
+			          
+			          WHERE 
+	            arss.group_id = #{group_id,jdbcType=INTEGER}
+				AND arss.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND arss.copy_code = #{copy_code,jdbcType=VARCHAR}
+	        	AND arss.state = 2 
+	        	<if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(arss.back_date,'yyyyMM')  between  #{year_month_begin,jdbcType=VARCHAR} and
+					 #{year_month_end,jdbcType=VARCHAR}
+				</if>
+	        union all 	
+	        
+	        select   arss.group_id,
+			         arss.hos_id,
+			         arss.copy_code, 
+	       		     to_char(arss.back_date,'yyyy') ass_year,
+	                 to_char(arss.back_date,'MM') ass_month,
+	                 arss.store_id,
+		             hs.store_no,
+		             hs.store_name,
+		             arss.ven_id,
+		             hfd.sup_name ven_name,
+		             arss.back_money,
+				     '05' ass_nature
+				   from ass_back_inassets arss   
+			       LEFT JOIN HOS_STORE_DICT hs
+			          ON arss.store_id = hs.store_id
+			        LEFT JOIN hos_sup_dict hfd
+			          ON arss.ven_id = hfd.sup_id
+			          AND arss.ven_no = hfd.sup_no 
+			          
+			          WHERE 
+	            arss.group_id = #{group_id,jdbcType=INTEGER}
+				AND arss.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND arss.copy_code = #{copy_code,jdbcType=VARCHAR}
+	        	AND arss.state = 2
+	        	<if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(arss.back_date,'yyyyMM')  between  #{year_month_begin,jdbcType=VARCHAR} and
+					 #{year_month_end,jdbcType=VARCHAR}
+				</if>
+	        union all 	
+	        
+	        select   arss.group_id,
+			         arss.hos_id,
+			         arss.copy_code, 
+	       		     to_char(arss.back_date,'yyyy') ass_year,
+	                 to_char(arss.back_date,'MM') ass_month,
+	                 arss.store_id,
+		             hs.store_no,
+		             hs.store_name,
+		             arss.ven_id,
+		             hfd.sup_name ven_name,
+		             arss.back_money,
+				     '04' ass_nature
+				   from ass_back_other arss   
+			       LEFT JOIN HOS_STORE_DICT hs
+			          ON arss.store_id = hs.store_id
+			        LEFT JOIN hos_sup_dict hfd
+			          ON arss.ven_id = hfd.sup_id
+			          AND arss.ven_no = hfd.sup_no 
+			          
+			          WHERE 
+	            arss.group_id = #{group_id,jdbcType=INTEGER}
+				AND arss.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND arss.copy_code = #{copy_code,jdbcType=VARCHAR}
+	        	AND arss.state = 2 	
+	        	<if test="year_month_begin != null and year_month_begin != ''">
+					AND to_char(arss.back_date,'yyyyMM')  between  #{year_month_begin,jdbcType=VARCHAR} and
+					 #{year_month_end,jdbcType=VARCHAR}
+				</if>
+	        	
+	       ) 
+	       select * from (
+	     	 select t.group_id, t.hos_id, t.copy_code, t.store_id, t.store_no, t.store_name, t.ven_id, t.ven_name,nvl(t.back_money,0) in_money from (
+				SELECT t.group_id, t.hos_id, t.copy_code,t.store_id, t.store_no, t.store_name, t.ven_id, t.ven_name,sum(nvl(t.back_money,0)) back_money FROM back_temp t
+						WHERE
+					        t.group_id = #{group_id,jdbcType=INTEGER}
+							AND t.hos_id = #{hos_id,jdbcType=INTEGER}
+							AND t.copy_code = #{copy_code,jdbcType=VARCHAR}
+							<if test="store_id != null and store_id != ''">
+								AND t.store_id = #{store_id,jdbcType=INTEGER}
+							</if>
+							<if test="ven_id != null and ven_id != ''">
+								AND t.ven_id = #{ven_id,jdbcType=INTEGER}
+							</if>
+						group by t.group_id, t.hos_id, t.copy_code, t.store_id, t.store_no, t.store_name, t.ven_id, t.ven_name
+			) t
+			
+				 
+			union all
+			
+			
+			select null group_id, null hos_id, null copy_code, null store_id, null store_no, '合计' store_name, null ven_id, null ven_name,sum(nvl(t.back_money,0)) in_money from (
+				SELECT t.group_id, t.hos_id, t.copy_code,t.store_id, t.store_no, t.store_name, t.ven_id, t.ven_name,sum(nvl(t.back_money,0)) back_money FROM back_temp t
+						WHERE
+					        t.group_id = #{group_id,jdbcType=INTEGER}
+							AND t.hos_id = #{hos_id,jdbcType=INTEGER}
+							AND t.copy_code = #{copy_code,jdbcType=VARCHAR}
+							<if test="store_id != null and store_id != ''">
+								AND t.store_id = #{store_id,jdbcType=INTEGER}
+							</if>
+							<if test="ven_id != null and ven_id != ''">
+								AND t.ven_id = #{ven_id,jdbcType=INTEGER}
+							</if>
+						group by t.group_id, t.hos_id, t.copy_code, t.store_id, t.store_no, t.store_name, t.ven_id, t.ven_name
+			) t 		
+			) tt
+			
+			order by tt.group_id, tt.hos_id, tt.copy_code,tt.store_name
+	</select>
+	
+	
+	<!-- 资产入库分类汇总 -->
+	<resultMap type="java.util.Map" id="AssInMainSummaryByTypeMap">
+		<result property="ass_type_code" column="ass_type_code"/>
+		<result property="ass_type_name" column="ass_type_name"/>
+		<result property="ass_code" column="ass_code"/>
+		<result property="ass_name" column="ass_name"/>
+		<result property="price" column="price"/>
+		<result property="unit_name" column="unit_name"/>
+		<result property="amount" column="amount"/>
+		<result property="sum_price" column="sum_price"/>
+	</resultMap>
+	
+	<select id="queryAssInMainSummaryByType" parameterType="java.util.Map" resultMap="AssInMainSummaryByTypeMap">
+		select 
+	         t.group_id,
+	         t.hos_id,
+	         t.copy_code,
+	         type.ass_type_code,
+	         type.ass_type_name,
+	         ass.ass_code,
+	         ass.ass_name,
+	         t.price,
+	         unit.unit_name,
+	         sum(t.ass_amount) amount,
+	         sum(t.price) sum_price
+	    from v_ass_card t
+	    left join ass_bus_type_dict bus
+	      on t.group_id = bus.group_id
+	     and t.hos_id = bus.hos_id
+	     and t.copy_code = bus.copy_code
+	     and t.buy_type = bus.bus_type_code
+	     and bus.in_out_type = 0
+	  
+	    left join ass_no_dict ass
+	      on t.group_id = ass.group_id
+	     and t.hos_id = ass.hos_id
+	     and t.copy_code = ass.copy_code
+	     and t.ass_id = ass.ass_id
+	     and t.ass_no = ass.ass_no
+	     
+	   left join ass_type_dict type
+	     on t.group_id = type.group_id
+	    and t.hos_id = type.hos_id
+	    and t.copy_code = type.copy_code
+	    and ass.ass_type_id = type.ass_type_id
+	    
+	   left join hos_unit unit
+	     on t.GROUP_ID = unit.group_id
+	    and t.HOS_ID = unit.hos_id
+	    and t.UNIT_CODE = unit.unit_code
+	  
+	   where t.group_id = #{group_id}
+	     and t.hos_id = #{hos_id}
+	     and t.copy_code = #{copy_code}
+	     <if test="ass_type_id != null and ass_type_id !=''">
+	       and ass.ass_type_id = #{ass_type_id}
+	     </if>
+	     <if test="in_date_beg != null and in_date_beg != ''">
+	   	   and t.in_date &gt;= to_date(#{in_date_beg},'YYYYMMDD')
+	     </if>
+	     <if test="in_date_end != null and in_date_end != ''">
+	   	   and t.in_date &lt;= to_date(#{in_date_end},'YYYYMMDD')
+	     </if>
+	   group by t.group_id, t.hos_id, t.copy_code, type.ass_type_code, type.ass_type_name, ass.ass_code, ass.ass_name, t.price, unit.unit_name
+	   order by type.ass_type_code
+	</select>
+	
+	
+	<select id="queryAssInMainSummaryByTypePrint" parameterType="java.util.Map" resultMap="AssInMainSummaryByTypeMap">
+	select 
+	         t.group_id,
+	         t.hos_id,
+	         t.copy_code,
+	         type.ass_type_code,
+	         type.ass_type_name,
+	         ass.ass_code,
+	         ass.ass_name,
+	         t.price,
+	         unit.unit_name,
+	         sum(t.ass_amount) amount,
+	         sum(t.price) sum_price
+	    from v_ass_card t
+	    left join ass_bus_type_dict bus
+	      on t.group_id = bus.group_id
+	     and t.hos_id = bus.hos_id
+	     and t.copy_code = bus.copy_code
+	     and t.buy_type = bus.bus_type_code
+	     and bus.in_out_type = 0
+	  
+	    left join ass_no_dict ass
+	      on t.group_id = ass.group_id
+	     and t.hos_id = ass.hos_id
+	     and t.copy_code = ass.copy_code
+	     and t.ass_id = ass.ass_id
+	     and t.ass_no = ass.ass_no
+	     
+	   left join ass_type_dict type
+	     on t.group_id = type.group_id
+	    and t.hos_id = type.hos_id
+	    and t.copy_code = type.copy_code
+	    and ass.ass_type_id = type.ass_type_id
+	    
+	   left join hos_unit unit
+	     on t.GROUP_ID = unit.group_id
+	    and t.HOS_ID = unit.hos_id
+	    and t.UNIT_CODE = unit.unit_code
+	  
+	   where t.group_id = #{group_id}
+	     and t.hos_id = #{hos_id}
+	     and t.copy_code = #{copy_code}
+	     <if test="ass_type_id != null and ass_type_id !=''">
+	       and ass.ass_type_id = #{ass_type_id}
+	     </if>
+	     <if test="in_date_beg != null and in_date_beg != ''">
+	   	   and t.in_date &gt;= to_date(#{in_date_beg},'YYYYMMDD')
+	     </if>
+	     <if test="in_date_end != null and in_date_end != ''">
+	   	   and t.in_date &lt;= to_date(#{in_date_end},'YYYYMMDD')
+	     </if>
+	   group by t.group_id, t.hos_id, t.copy_code, type.ass_type_code, type.ass_type_name, ass.ass_code, ass.ass_name, t.price, unit.unit_name
+	   order by type.ass_type_code
+	
+	</select>
+	
+	<resultMap id="situationMap" type="java.util.Map">
+		<result property="ven_name" column="ven_name"/>
+		<result property="store_name" column="store_name"/>
+		<result property="ass_type_name" column="ass_type_name"/> 
+		<result property="ass_code" column="ass_code"/>
+		<result property="ass_name" column="ass_name"/>
+		<result property="ass_spec" column="ass_spec"/>
+		<result property="unit_name" column="unit_name"/>
+		<result property="fac_name" column="fac_name"/>
+		<result property="ass_amount" column="ass_amount"/>
+		<result property="price" column="price"/>
+		<result property="sum_price" column="sum_price"/>
+	</resultMap>
+	
+	<select id="queryInMainSituation" parameterType="java.util.Map" resultMap="situationMap">
+		select 
+		           t6.sup_code || '   ' || t6.sup_name ven_name,
+			       t4.store_name,
+			       atd.ass_type_name,
+			       t2.ass_code,
+			       t2.ass_name,
+			       t1.ASS_SPEC || t1.ASS_MODEL ass_spec,
+			       unit.unit_name,
+			       t5.fac_name,
+			       sum(t1.in_amount) ass_amount,
+			       t1.price,
+			       sum(t1.in_amount) * t1.price sum_price
+		  from v_ass_in_detail t1
+		  left join ass_no_dict t2
+		    on t1.group_id = t2.group_id
+		   and t1.hos_id = t2.hos_id
+		   and t1.copy_code = t2.copy_code
+		   and t1.ass_id = t2.ass_id
+		   and t2.is_stop = 0
+		
+		  left join hos_unit unit
+		    on t1.GROUP_ID = unit.group_id
+		   and t1.HOS_ID = unit.hos_id
+		   and t1.UNIT_CODE = unit.unit_code
+		
+		  left join ass_type_dict atd
+		    on t2.group_id = atd.group_id
+		   and t2.hos_id = atd.hos_id
+		   and t2.copy_code = atd.copy_code
+		   and t2.ass_type_id = atd.ass_type_id
+		   and atd.is_stop = 0
+		
+		  left join v_ass_in_main t3
+		    on t1.group_id = t3.group_id
+		   and t1.hos_id = t3.hos_id
+		   and t1.copy_code = t3.copy_code
+		   and t1.ass_in_no = t3.ass_in_no
+		
+		  left join hos_store_dict t4
+		    on t3.group_id = t4.group_id
+		   and t3.hos_id = t4.hos_id
+		   and t3.store_id = t4.store_id
+		   and t4.is_stop = 0
+		
+		  left join hos_fac_dict t5
+		    on t1.group_id = t5.group_id
+		   and t1.hos_id = t5.hos_id
+		   and t1.FAC_ID = t5.fac_id
+		   and t5.is_stop = 0
+		
+		  left join hos_sup_dict t6
+		    on t3.group_id = t6.group_id
+		   and t3.hos_id = t6.hos_id
+		   and t3.ven_id = t6.sup_id
+		   and t6.is_stop = 0
+		   
+		   
+		 where t1.group_id = #{group_id}
+	     and t1.hos_id = #{hos_id}
+	     and t1.copy_code = #{copy_code}
+	     <if test="ass_type_id != null and ass_type_id !=''">
+	       and t2.ass_type_id = #{ass_type_id}
+	     </if> 
+	     <if test="ass_name != null and ass_name !=''">
+	       and t2.ass_name like '%${ass_name}%'
+	     </if> 
+		 <if test="ass_in_no != null and ass_in_no !=''">
+	       and t1.ass_in_no like '%${ass_in_no}%'
+	     </if>   
+		 <if test="store_id != null and store_id !=''">
+	       and t3.store_id = #{store_id}
+	     </if> 
+	     <if test="use_dept_id != null and use_dept_id !=''">
+	       and t3.dept_id = #{use_dept_id}
+	     </if>
+	     <if test="ven_id != null and ven_id !=''">
+	       and t3.ven_id = #{ven_id}
+	     </if>  
+	     <if test="ass_naturs != null and ass_naturs !=''">
+	       and t1.ass_naturs = #{ass_naturs}
+	     </if>
+	     <if test="price_beg != null and price_beg != ''">
+		 AND t1.price &gt;= #{price_beg}
+		 </if>
+		 <if test="price_end != null and price_end != ''">
+		 AND t1.price  &lt;= #{price_end}
+		 </if>
+		 <if test="is_measure != null and is_measure !=''">
+	       and t2.is_measure = #{is_measure}
+	     </if>
+	     
+	     and exists (
+	         select 1 from v_ass_card t
+	         where t1.ass_id = t.ASS_ID and t1.ass_in_no = t.ASS_IN_NO
+	         and t.is_init = 0
+	        <if test="use_state != null and use_state !=''">
+		    and t.use_state = #{use_state}
+		    </if>
+		    <if test="is_dept != null and is_dept !=''">
+		    and t.is_dept = #{is_dept}
+		    </if>
+		    <if test="bar_code != null and bar_code !=''">
+		    and t.bar_code like '%${bar_code}%'
+		    </if>
+		    <if test="in_date_beg != null and in_date_beg != ''">
+			AND t.in_date &gt;= to_date(#{in_date_beg},'YYYY-MM-DD')
+			</if>
+			<if test="in_date_end != null and in_date_end != ''">
+			AND t.in_date &lt;= to_date(#{in_date_end},'YYYY-MM-DD')
+			</if>
+			<if test="run_date_beg != null and run_date_beg != '' ">
+			AND t.run_date &gt;= to_date(#{run_date_beg},'YYYY-MM-DD')
+			</if>
+			<if test="run_date_end != null and run_date_end != ''">
+			AND t.run_date &lt;= to_date(#{run_date_end},'YYYY-MM-DD')
+			</if>
+         ) 
+		 
+	     
+		 group by t6.sup_code || '   ' || t6.sup_name,
+		          t4.store_name,
+		          atd.ass_type_name,
+		          t2.ass_code,
+		          t2.ass_name,
+		          t1.ASS_SPEC || t1.ASS_MODEL,
+		          unit.unit_name,
+		          t5.fac_name,
+		          t1.price
+		
+		
+		union all
+
+		select null ven_name,
+		       null store_name,
+		       null ass_type_name,
+		       null ass_code,
+		       '总合计' ass_name,
+		       null ass_spec,
+		       null unit_name,
+		       null fac_name,
+		       sum(t1.in_amount) ass_amount,
+		       null price,
+		       sum(t1.in_amount * t1.price) sum_price
+		  from v_ass_in_detail t1
+		  
+		  
+		  left join ass_no_dict t2
+		    on t1.group_id = t2.group_id
+		   and t1.hos_id = t2.hos_id
+		   and t1.copy_code = t2.copy_code
+		   and t1.ass_id = t2.ass_id
+		   and t2.is_stop = 0
+		
+		  left join hos_unit unit
+		    on t1.GROUP_ID = unit.group_id
+		   and t1.HOS_ID = unit.hos_id
+		   and t1.UNIT_CODE = unit.unit_code
+		
+		  left join ass_type_dict atd
+		    on t2.group_id = atd.group_id
+		   and t2.hos_id = atd.hos_id
+		   and t2.copy_code = atd.copy_code
+		   and t2.ass_type_id = atd.ass_type_id
+		   and atd.is_stop = 0
+		
+		  left join v_ass_in_main t3
+		    on t1.group_id = t3.group_id
+		   and t1.hos_id = t3.hos_id
+		   and t1.copy_code = t3.copy_code
+		   and t1.ass_in_no = t3.ass_in_no
+		
+		  left join hos_store_dict t4
+		    on t3.group_id = t4.group_id
+		   and t3.hos_id = t4.hos_id
+		   and t3.store_id = t4.store_id
+		   and t4.is_stop = 0
+		
+		  left join hos_fac_dict t5
+		    on t1.group_id = t5.group_id
+		   and t1.hos_id = t5.hos_id
+		   and t1.FAC_ID = t5.fac_id
+		   and t5.is_stop = 0
+		
+		  left join hos_sup_dict t6
+		    on t3.group_id = t6.group_id
+		   and t3.hos_id = t6.hos_id
+		   and t3.ven_id = t6.sup_id
+		   and t6.is_stop = 0
+		   
+		   where t1.group_id = #{group_id}
+	     and t1.hos_id = #{hos_id}
+	     and t1.copy_code = #{copy_code}
+	     <if test="ass_type_id != null and ass_type_id !=''">
+	       and t2.ass_type_id = #{ass_type_id}
+	     </if> 
+	     <if test="ass_name != null and ass_name !=''">
+	       and t2.ass_name like '%${ass_name}%'
+	     </if> 
+		 <if test="ass_in_no != null and ass_in_no !=''">
+	       and t1.ass_in_no like '%${ass_in_no}%'
+	     </if>   
+		 <if test="store_id != null and store_id !=''">
+	       and t3.store_id = #{store_id}
+	     </if> 
+	     <if test="use_dept_id != null and use_dept_id !=''">
+	       and t3.dept_id = #{use_dept_id}
+	     </if>
+	     <if test="ven_id != null and ven_id !=''">
+	       and t3.ven_id = #{ven_id}
+	     </if>  
+	     <if test="ass_naturs != null and ass_naturs !=''">
+	       and t1.ass_naturs = #{ass_naturs}
+	     </if>
+	     <if test="price_beg != null and price_beg != ''">
+		 AND t1.price &gt;= #{price_beg}
+		 </if>
+		 <if test="price_end != null and price_end != ''">
+		 AND t1.price  &lt;= #{price_end}
+		 </if>
+		 <if test="is_measure != null and is_measure !=''">
+	       and t2.is_measure = #{is_measure}
+	     </if>
+	     
+	     and exists (
+	         select 1 from v_ass_card t
+	         where t1.ass_id = t.ASS_ID and t1.ass_in_no = t.ASS_IN_NO
+	         and t.is_init = 0
+	        <if test="use_state != null and use_state !=''">
+		    and t.use_state = #{use_state}
+		    </if>
+		    <if test="is_dept != null and is_dept !=''">
+		    and t.is_dept = #{is_dept}
+		    </if>
+		    <if test="bar_code != null and bar_code !=''">
+		    and t.bar_code like '%${bar_code}%'
+		    </if>
+		    <if test="in_date_beg != null and in_date_beg != ''">
+			AND t.in_date &gt;= to_date(#{in_date_beg},'YYYY-MM-DD')
+			</if>
+			<if test="in_date_end != null and in_date_end != ''">
+			AND t.in_date &lt;= to_date(#{in_date_end},'YYYY-MM-DD')
+			</if>
+			<if test="run_date_beg != null and run_date_beg != '' ">
+			AND t.run_date &gt;= to_date(#{run_date_beg},'YYYY-MM-DD')
+			</if>
+			<if test="run_date_end != null and run_date_end != ''">
+			AND t.run_date &lt;= to_date(#{run_date_end},'YYYY-MM-DD')
+			</if>
+         ) 
+				
+	</select>
+	
+	<select id="queryInMainSituationPrint" parameterType="java.util.Map" resultMap="situationMap">
+		select 
+		           t6.sup_code || '   ' || t6.sup_name ven_name,
+			       t4.store_name,
+			       atd.ass_type_name,
+			       t2.ass_code,
+			       t2.ass_name,
+			       t1.ASS_SPEC || t1.ASS_MODEL ass_spec,
+			       unit.unit_name,
+			       t5.fac_name,
+			       sum(t1.in_amount) ass_amount,
+			       t1.price,
+			       sum(t1.in_amount) * t1.price sum_price
+		  from v_ass_in_detail t1
+		  left join ass_no_dict t2
+		    on t1.group_id = t2.group_id
+		   and t1.hos_id = t2.hos_id
+		   and t1.copy_code = t2.copy_code
+		   and t1.ass_id = t2.ass_id
+		   and t2.is_stop = 0
+		
+		  left join hos_unit unit
+		    on t1.GROUP_ID = unit.group_id
+		   and t1.HOS_ID = unit.hos_id
+		   and t1.UNIT_CODE = unit.unit_code
+		
+		  left join ass_type_dict atd
+		    on t2.group_id = atd.group_id
+		   and t2.hos_id = atd.hos_id
+		   and t2.copy_code = atd.copy_code
+		   and t2.ass_type_id = atd.ass_type_id
+		   and atd.is_stop = 0
+		
+		  left join v_ass_in_main t3
+		    on t1.group_id = t3.group_id
+		   and t1.hos_id = t3.hos_id
+		   and t1.copy_code = t3.copy_code
+		   and t1.ass_in_no = t3.ass_in_no
+		
+		  left join hos_store_dict t4
+		    on t3.group_id = t4.group_id
+		   and t3.hos_id = t4.hos_id
+		   and t3.store_id = t4.store_id
+		   and t4.is_stop = 0
+		
+		  left join hos_fac_dict t5
+		    on t1.group_id = t5.group_id
+		   and t1.hos_id = t5.hos_id
+		   and t1.FAC_ID = t5.fac_id
+		   and t5.is_stop = 0
+		
+		  left join hos_sup_dict t6
+		    on t3.group_id = t6.group_id
+		   and t3.hos_id = t6.hos_id
+		   and t3.ven_id = t6.sup_id
+		   and t6.is_stop = 0
+		   
+		   
+		 where t1.group_id = #{group_id}
+	     and t1.hos_id = #{hos_id}
+	     and t1.copy_code = #{copy_code}
+	     <if test="ass_type_id != null and ass_type_id !=''">
+	       and t2.ass_type_id = #{ass_type_id}
+	     </if> 
+	     <if test="ass_name != null and ass_name !=''">
+	       and t2.ass_name like '%${ass_name}%'
+	     </if> 
+		 <if test="ass_in_no != null and ass_in_no !=''">
+	       and t1.ass_in_no like '%${ass_in_no}%'
+	     </if>   
+		 <if test="store_id != null and store_id !=''">
+	       and t3.store_id = #{store_id}
+	     </if> 
+	     <if test="use_dept_id != null and use_dept_id !=''">
+	       and t3.dept_id = #{use_dept_id}
+	     </if>
+	     <if test="ven_id != null and ven_id !=''">
+	       and t3.ven_id = #{ven_id}
+	     </if>  
+	     <if test="ass_naturs != null and ass_naturs !=''">
+	       and t1.ass_naturs = #{ass_naturs}
+	     </if>
+	     <if test="price_beg != null and price_beg != ''">
+		 AND t1.price &gt;= #{price_beg}
+		 </if>
+		 <if test="price_end != null and price_end != ''">
+		 AND t1.price  &lt;= #{price_end}
+		 </if>
+		 <if test="is_measure != null and is_measure !=''">
+	       and t2.is_measure = #{is_measure}
+	     </if>
+	     
+	     and exists (
+	         select 1 from v_ass_card t
+	         where t1.ass_id = t.ASS_ID and t1.ass_in_no = t.ASS_IN_NO
+	         and t.is_init = 0
+	        <if test="use_state != null and use_state !=''">
+		    and t.use_state = #{use_state}
+		    </if>
+		    <if test="is_dept != null and is_dept !=''">
+		    and t.is_dept = #{is_dept}
+		    </if>
+		    <if test="bar_code != null and bar_code !=''">
+		    and t.bar_code like '%${bar_code}%'
+		    </if>
+		    <if test="in_date_beg != null and in_date_beg != ''">
+			AND t.in_date &gt;= to_date(#{in_date_beg},'YYYY-MM-DD')
+			</if>
+			<if test="in_date_end != null and in_date_end != ''">
+			AND t.in_date &lt;= to_date(#{in_date_end},'YYYY-MM-DD')
+			</if>
+			<if test="run_date_beg != null and run_date_beg != '' ">
+			AND t.run_date &gt;= to_date(#{run_date_beg},'YYYY-MM-DD')
+			</if>
+			<if test="run_date_end != null and run_date_end != ''">
+			AND t.run_date &lt;= to_date(#{run_date_end},'YYYY-MM-DD')
+			</if>
+         ) 
+		 
+	     
+		 group by t6.sup_code || '   ' || t6.sup_name,
+		          t4.store_name,
+		          atd.ass_type_name,
+		          t2.ass_code,
+		          t2.ass_name,
+		          t1.ASS_SPEC || t1.ASS_MODEL,
+		          unit.unit_name,
+		          t5.fac_name,
+		          t1.price
+		
+		
+		union all
+
+		select null ven_name,
+		       null store_name,
+		       null ass_type_name,
+		       null ass_code,
+		       '总合计' ass_name,
+		       null ass_spec,
+		       null unit_name,
+		       null fac_name,
+		       sum(t1.in_amount) ass_amount,
+		       null price,
+		       sum(t1.in_amount * t1.price) sum_price
+		  from v_ass_in_detail t1
+		  
+		  
+		  left join ass_no_dict t2
+		    on t1.group_id = t2.group_id
+		   and t1.hos_id = t2.hos_id
+		   and t1.copy_code = t2.copy_code
+		   and t1.ass_id = t2.ass_id
+		   and t2.is_stop = 0
+		
+		  left join hos_unit unit
+		    on t1.GROUP_ID = unit.group_id
+		   and t1.HOS_ID = unit.hos_id
+		   and t1.UNIT_CODE = unit.unit_code
+		
+		  left join ass_type_dict atd
+		    on t2.group_id = atd.group_id
+		   and t2.hos_id = atd.hos_id
+		   and t2.copy_code = atd.copy_code
+		   and t2.ass_type_id = atd.ass_type_id
+		   and atd.is_stop = 0
+		
+		  left join v_ass_in_main t3
+		    on t1.group_id = t3.group_id
+		   and t1.hos_id = t3.hos_id
+		   and t1.copy_code = t3.copy_code
+		   and t1.ass_in_no = t3.ass_in_no
+		
+		  left join hos_store_dict t4
+		    on t3.group_id = t4.group_id
+		   and t3.hos_id = t4.hos_id
+		   and t3.store_id = t4.store_id
+		   and t4.is_stop = 0
+		
+		  left join hos_fac_dict t5
+		    on t1.group_id = t5.group_id
+		   and t1.hos_id = t5.hos_id
+		   and t1.FAC_ID = t5.fac_id
+		   and t5.is_stop = 0
+		
+		  left join hos_sup_dict t6
+		    on t3.group_id = t6.group_id
+		   and t3.hos_id = t6.hos_id
+		   and t3.ven_id = t6.sup_id
+		   and t6.is_stop = 0
+		   
+		   where t1.group_id = #{group_id}
+	     and t1.hos_id = #{hos_id}
+	     and t1.copy_code = #{copy_code}
+	     <if test="ass_type_id != null and ass_type_id !=''">
+	       and t2.ass_type_id = #{ass_type_id}
+	     </if> 
+	     <if test="ass_name != null and ass_name !=''">
+	       and t2.ass_name like '%${ass_name}%'
+	     </if> 
+		 <if test="ass_in_no != null and ass_in_no !=''">
+	       and t1.ass_in_no like '%${ass_in_no}%'
+	     </if>   
+		 <if test="store_id != null and store_id !=''">
+	       and t3.store_id = #{store_id}
+	     </if> 
+	     <if test="use_dept_id != null and use_dept_id !=''">
+	       and t3.dept_id = #{use_dept_id}
+	     </if>
+	     <if test="ven_id != null and ven_id !=''">
+	       and t3.ven_id = #{ven_id}
+	     </if>  
+	     <if test="ass_naturs != null and ass_naturs !=''">
+	       and t1.ass_naturs = #{ass_naturs}
+	     </if>
+	     <if test="price_beg != null and price_beg != ''">
+		 AND t1.price &gt;= #{price_beg}
+		 </if>
+		 <if test="price_end != null and price_end != ''">
+		 AND t1.price  &lt;= #{price_end}
+		 </if>
+		 <if test="is_measure != null and is_measure !=''">
+	       and t2.is_measure = #{is_measure}
+	     </if>
+	     
+	     and exists (
+	         select 1 from v_ass_card t
+	         where t1.ass_id = t.ASS_ID and t1.ass_in_no = t.ASS_IN_NO
+	         and t.is_init = 0
+	        <if test="use_state != null and use_state !=''">
+		    and t.use_state = #{use_state}
+		    </if>
+		    <if test="is_dept != null and is_dept !=''">
+		    and t.is_dept = #{is_dept}
+		    </if>
+		    <if test="bar_code != null and bar_code !=''">
+		    and t.bar_code like '%${bar_code}%'
+		    </if>
+		    <if test="in_date_beg != null and in_date_beg != ''">
+			AND t.in_date &gt;= to_date(#{in_date_beg},'YYYY-MM-DD')
+			</if>
+			<if test="in_date_end != null and in_date_end != ''">
+			AND t.in_date &lt;= to_date(#{in_date_end},'YYYY-MM-DD')
+			</if>
+			<if test="run_date_beg != null and run_date_beg != '' ">
+			AND t.run_date &gt;= to_date(#{run_date_beg},'YYYY-MM-DD')
+			</if>
+			<if test="run_date_end != null and run_date_end != ''">
+			AND t.run_date &lt;= to_date(#{run_date_end},'YYYY-MM-DD')
+			</if>
+         ) 
+
+	</select>
+</mapper>
+

@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.mat.dao.cert.MatCertTypeMapper">
+	<!-- 定义证件类型数据集 -->
+	<resultMap id="matCertType" type="java.util.Map">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="cert_type_code" column="cert_type_code"/>
+		<result property="cert_type_name" column="cert_type_name"/>
+		<result property="is_cert_busi" column="is_cert_busi"/>
+		<result property="is_cert_busi_name" column="is_cert_busi_name"/>
+		<result property="is_cert_name" column="is_cert_name"/>
+		<result property="is_cert_name_name" column="is_cert_name_name"/>
+		<result property="is_stop" column="is_stop"/>
+		<result property="is_stop_name" column="is_stop_name"/>
+		<result property="spell_code" column="spell_code"/>
+		<result property="wbx_code" column="wbx_code"/>
+		<result property="oper_name" column="oper_name"/>
+		<result property="oper_date" column="oper_date"/>
+		<result property="sort_code" column="sort_code"/>
+		<result property="note" column="note"/>
+	</resultMap>
+	
+	<!-- 证件类型查询 -->
+	<select id="queryMatCertTypeList" parameterType="java.util.Map" resultMap="matCertType">
+		SELECT group_id, hos_id, copy_code, cert_type_code, cert_type_name, is_cert_busi, 
+			is_cert_name, is_stop, spell_code, wbx_code, oper_name, oper_date, sort_code, note, 
+			case is_cert_busi when 1 then '是' else '否' end is_cert_busi_name,
+			case is_cert_name when 1 then '是' else '否' end is_cert_name_name,
+			case is_stop when 1 then '是' else '否' end is_stop_name
+		FROM mat_cert_type
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			<if test="cert_type_text != null and cert_type_text != ''">
+			AND (
+				cert_type_code like '%'||#{cert_type_text,jdbcType=VARCHAR}||'%'
+				or
+				cert_type_name like '%'||#{cert_type_text,jdbcType=VARCHAR}||'%'
+			)
+			</if>
+			<if test="is_stop != null and is_stop != ''">
+			AND is_stop = #{is_stop,jdbcType=INTEGER}
+			</if>
+		ORDER BY sort_code, cert_type_code
+	</select>
+	
+	<!-- 证件类型新增 -->
+	<insert id="addMatCertType" parameterType="java.util.Map">
+		INSERT INTO mat_cert_type(
+			group_id, hos_id, copy_code, cert_type_code, cert_type_name, 
+			is_cert_busi, is_cert_name, is_stop, spell_code, wbx_code, 
+			oper_name, oper_date, sort_code, note
+		)
+		VALUES(
+			#{group_id,jdbcType=INTEGER}, 
+			#{hos_id,jdbcType=INTEGER},
+			#{copy_code,jdbcType=VARCHAR}, 
+			#{cert_type_code,jdbcType=VARCHAR}, 
+			#{cert_type_name,jdbcType=VARCHAR}, 
+			#{is_cert_busi,jdbcType=INTEGER}, 
+			#{is_cert_name,jdbcType=INTEGER}, 
+			#{is_stop,jdbcType=INTEGER},
+			#{spell_code,jdbcType=VARCHAR}, 
+			#{wbx_code,jdbcType=VARCHAR}, 
+			#{oper_name,jdbcType=VARCHAR}, 
+			#{oper_date,jdbcType=TIMESTAMP}, 
+			#{sort_code,jdbcType=INTEGER}, 
+			#{note,jdbcType=VARCHAR}
+		)
+	</insert>
+	
+	<!-- 证件类型修改 -->
+	<update id="updateMatCertType" parameterType="java.util.Map">
+		UPDATE mat_cert_type 
+		SET cert_type_name = #{cert_type_name,jdbcType=VARCHAR}, 
+			is_cert_busi = #{is_cert_busi,jdbcType=INTEGER}, 
+			is_cert_name = #{is_cert_name,jdbcType=INTEGER}, 
+			is_stop = #{is_stop,jdbcType=INTEGER}, 
+			spell_code = #{spell_code,jdbcType=VARCHAR}, 
+			wbx_code = #{wbx_code,jdbcType=VARCHAR}, 
+			oper_name = #{oper_name,jdbcType=VARCHAR}, 
+			oper_date = #{oper_date,jdbcType=TIMESTAMP}, 
+			sort_code = #{sort_code,jdbcType=INTEGER}, 
+			note = #{note,jdbcType=VARCHAR}
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND cert_type_code = #{cert_type_code,jdbcType=VARCHAR}
+	</update>
+	
+	<!-- 证件类型修改停用标 -->
+	<update id="updateMatCertTypeIsStop" parameterType="java.util.Map">
+		UPDATE mat_cert_type 
+		SET is_stop = #{map.is_stop,jdbcType=INTEGER}, 
+			oper_name = #{map.oper_name,jdbcType=VARCHAR}, 
+			oper_date = #{map.oper_date,jdbcType=TIMESTAMP}
+		WHERE group_id = #{map.group_id,jdbcType=INTEGER}
+			AND hos_id = #{map.hos_id,jdbcType=INTEGER}
+			AND copy_code = #{map.copy_code,jdbcType=VARCHAR}
+			AND cert_type_code in(
+				<foreach collection="list" item="item" separator="union all">
+				SELECT #{item.cert_type_code,jdbcType=VARCHAR} cert_type_code FROM dual
+				</foreach>
+			)
+	</update>
+	
+	<!-- 证件类型删除 -->
+	<delete id="deleteMatCertType" parameterType="java.util.Map">
+		DELETE FROM mat_cert_type
+		WHERE group_id = #{map.group_id,jdbcType=INTEGER}
+			AND hos_id = #{map.hos_id,jdbcType=INTEGER}
+			AND copy_code = #{map.copy_code,jdbcType=VARCHAR}
+			AND cert_type_code in(
+				<foreach collection="list" item="item" separator="union all">
+				SELECT #{item.cert_type_code,jdbcType=VARCHAR} cert_type_code FROM dual
+				</foreach>
+			)
+	</delete>
+	
+	<!-- 证件类型导入 -->
+	<insert id="addMatCertTypeByImp" parameterType="java.util.Map">
+		INSERT INTO mat_cert_type(
+			group_id, hos_id, copy_code, cert_type_code, cert_type_name, 
+			is_cert_busi, is_cert_name, is_stop, spell_code, wbx_code, 
+			sort_code, note, oper_name, oper_date
+		)
+		SELECT #{map.group_id,jdbcType=INTEGER} group_id, 
+			#{map.group_id,jdbcType=INTEGER} hos_id, 
+			#{map.group_id,jdbcType=VARCHAR} copy_code, 
+			cert_type_code, cert_type_name, is_cert_busi, is_cert_name, 
+			is_stop, spell_code, wbx_code, sort_code, note, 
+			#{map.oper_name,jdbcType=VARCHAR} oper_name, 
+			#{map.oper_date,jdbcType=TIMESTAMP} oper_date
+		FROM (
+			<foreach collection="list" item="item" separator="union all">
+				SELECT 
+					#{item.cert_type_code,jdbcType=VARCHAR} cert_type_code, 
+					#{item.cert_type_name,jdbcType=VARCHAR} cert_type_name, 
+					#{item.is_cert_busi,jdbcType=INTEGER} is_cert_busi, 
+					#{item.is_cert_name,jdbcType=INTEGER} is_cert_name, 
+					#{item.is_stop,jdbcType=INTEGER} is_stop,
+					#{item.spell_code,jdbcType=VARCHAR} spell_code, 
+					#{item.wbx_code,jdbcType=VARCHAR} wbx_code, 
+					#{item.sort_code,jdbcType=INTEGER} sort_code, 
+					#{item.note,jdbcType=VARCHAR} note
+				FROM DUAL 
+			</foreach>
+		) tmp
+	</insert>
+</mapper>
+

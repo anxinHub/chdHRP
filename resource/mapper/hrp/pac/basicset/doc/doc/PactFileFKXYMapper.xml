@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper
+	namespace="com.chd.hrp.pac.dao.basicset.doc.doc.PactFileFKXYMapper">
+	<resultMap id="docMap" type="java.util.Map">
+		<result property="doc_id" column="doc_id" />
+		<result property="doc_name" column="doc_name" />
+		<result property="type_code" column="type_code" />
+		<result property="type_name" column="type_name" />
+		<result property="file_path" column="file_path" />
+		<result property="note" column="note" />
+	</resultMap>
+
+	<select id="queryPactFileTypeFKXY" parameterType="java.util.Map"
+		resultMap="docMap">
+		SELECT
+		ft.TYPE_CODE,
+		ft.TYPE_NAME,
+		pdf.doc_id,
+		pdf.DOC_NAME,
+		pdf.FILE_PATH,
+		ff.note
+		FROM
+		PACT_FILE_FKXY ff
+		LEFT JOIN PACT_File_TYPE ft ON ff.FILE_TYPE = ft.TYPE_CODE AND ff.group_id = ft.group_id AND ff.hos_id = ft.hos_id AND ff.copy_code = ft.copy_code
+		LEFT JOIN PACT_FILE_DOC_FKXY fdf ON ff.group_id = fdf.group_id AND ff.hos_id = fdf.hos_id AND ff.copy_code = fdf.copy_code AND fdf.PACT_CODE = ff.PACT_CODE AND fdf.FILE_TYPE = ff.FILE_TYPE
+		LEFT JOIN PACT_DOC_FKXY pdf ON ff.group_id = pdf.group_id AND ff.hos_id = pdf.hos_id AND ff.copy_code = pdf.copy_code AND pdf.PACT_CODE = ff.PACT_CODE AND fdf.doc_id = pdf.doc_id
+		WHERE
+		ff.group_id=#{group_id,jdbcType=NUMERIC}
+		AND ff.hos_id=#{hos_id,jdbcType=NUMERIC}
+		AND ff.copy_code=#{copy_code,jdbcType=VARCHAR}
+		AND ff.pact_code=#{pact_code,jdbcType=VARCHAR}
+		ORDER BY ff.SORT_ID
+	</select>
+
+	<select id="queryPactExecFile" parameterType="java.util.Map"
+		resultMap="docMap">
+		SELECT
+		ft.TYPE_CODE,
+		ft.type_name
+		FROM
+		PACT_File_TYPE ft
+		LEFT JOIN PACT_FILE_TEMP_FKXY ftf ON ftf.FILE_TYPE = ft.TYPE_CODE AND ftf.group_id = ft.group_id AND ftf.hos_id = ft.hos_id AND ftf.copy_code = ft.copy_code
+		where
+		ft.group_id=#{group_id,jdbcType=NUMERIC}
+		and ft.hos_id=#{hos_id,jdbcType=NUMERIC}
+		and ft.copy_code=#{copy_code,jdbcType=VARCHAR}
+		and ftf.pact_type=#{pact_type_code,jdbcType=VARCHAR}
+	</select>
+
+	<select id="queryPactExecDoc" parameterType="java.util.Map"
+		resultMap="docMap">
+		SELECT
+		fdf.doc_id,
+		df.DOC_NAME
+		FROM
+		PACT_FILE_DOC_FKXY fdf
+		LEFT JOIN PACT_DOC_FKXY df ON fdf.COPY_CODE = df.COPY_CODE AND fdf.GROUP_ID = df.GROUP_ID AND fdf.HOS_ID = df.HOS_ID AND fdf.PACT_CODE = df.PACT_CODE AND fdf.DOC_ID = df.DOC_ID
+		where
+		fdf.group_id=#{group_id,jdbcType=NUMERIC}
+		and fdf.hos_id=#{hos_id,jdbcType=NUMERIC}
+		and fdf.copy_code=#{copy_code,jdbcType=VARCHAR}
+		and fdf.pact_code=#{pact_code,jdbcType=VARCHAR}
+		and fdf.file_type = #{file_type,jdbcType=VARCHAR}
+	</select>
+	<select id="queryExistsFile" parameterType="java.util.Map" resultType="java.lang.Integer">
+		SELECT
+		count(1)
+		FROM
+		PACT_FILE_DOC_FKXY
+		where
+		group_id=#{group_id,jdbcType=NUMERIC}
+		and hos_id=#{hos_id,jdbcType=NUMERIC}
+		and copy_code=#{copy_code,jdbcType=VARCHAR}
+		and pact_code=#{pact_code,jdbcType=VARCHAR}
+		and file_type = #{file_type,jdbcType=VARCHAR}
+	</select>
+
+	<insert id="addExecSelectDoc" parameterType="java.util.List">
+		INSERT INTO PACT_FILE_DOC_FKXY
+		(group_id,hos_id,copy_code,pact_code,file_type,doc_id)
+		<foreach close=")" collection="list" item="item" index="index"
+			open="(" separator="union">
+			select
+			#{item.group_id,jdbcType=NUMERIC},
+			#{item.hos_id,jdbcType=NUMERIC},
+			#{item.copy_code,jdbcType=VARCHAR},
+			#{item.pact_code,jdbcType=VARCHAR},
+			#{item.file_type,jdbcType=VARCHAR},
+			#{item.doc_id,jdbcType=VARCHAR}
+			from dual
+		</foreach>
+	</insert>
+	<insert id="addPactExecFKXYFileBatch" parameterType="java.util.List">
+		INSERT INTO PACT_FILE_FKXY
+		(group_id,hos_id,copy_code,pact_code,file_type,sort_id,note)
+		<foreach close=")" collection="list" item="item" index="index"
+			open="(" separator="union">
+			select
+			#{item.group_id,jdbcType=NUMERIC},
+			#{item.hos_id,jdbcType=NUMERIC},
+			#{item.copy_code,jdbcType=VARCHAR},
+			#{item.pact_code,jdbcType=VARCHAR},
+			#{item.file_type,jdbcType=VARCHAR},
+			#{item.sort_id,jdbcType=NUMERIC},
+			#{item.note,jdbcType=VARCHAR}
+			from dual
+		</foreach>
+	</insert>
+
+	<delete id="deletePactExecFKXYFile"
+		parameterType="java.util.List">
+		DELETE FROM PACT_FILE_FKXY
+		<where>
+			<foreach collection="list" index="index" item="item" open="("
+				separator="or" close=")">
+				GROUP_ID = #{item.group_id,jdbcType=NUMERIC}
+				and HOS_ID =#{item.hos_id,jdbcType=NUMERIC}
+				AND COPY_CODE = #{item.copy_code,jdbcType=VARCHAR}
+				and pact_code= #{item.pact_code,jdbcType=VARCHAR}
+				and file_type= #{item.file_type,jdbcType=VARCHAR}
+			</foreach>
+		</where>
+	</delete>
+	<delete id="deletePactExecFKXYFileDoc"
+		parameterType="java.util.List">
+		DELETE FROM PACT_FILE_DOC_FKXY
+		<where>
+			<foreach collection="list" index="index" item="item" open="("
+				separator="or" close=")">
+				GROUP_ID = #{item.group_id,jdbcType=NUMERIC}
+				and HOS_ID =#{item.hos_id,jdbcType=NUMERIC}
+				AND COPY_CODE = #{item.copy_code,jdbcType=VARCHAR}
+				and pact_code= #{item.pact_code,jdbcType=VARCHAR}
+				and file_type= #{item.file_type,jdbcType=VARCHAR}
+				and doc_id = #{item.doc_id,jdbcType=VARCHAR}
+			</foreach>
+		</where>
+	</delete>
+	
+	<delete id="deleteByPactCodeList" parameterType="java.util.List">
+		DELETE FROM PACT_FILE_FKXY
+		<where>
+			<foreach collection="list" index="index" item="item" open="("
+				separator="or" close=")">
+				GROUP_ID = #{item.group_id,jdbcType=NUMERIC}
+				and HOS_ID = #{item.hos_id,jdbcType=NUMERIC}
+				AND COPY_CODE = #{item.copy_code,jdbcType=VARCHAR}
+				AND pact_code = #{item.pact_code,jdbcType=VARCHAR}
+			</foreach>
+		</where>
+	</delete>
+	<delete id="deleteDocFileByPactCodeList" parameterType="java.util.List">
+		DELETE FROM PACT_FILE_DOC_FKXY
+		<where>
+			<foreach collection="list" index="index" item="item" open="("
+				separator="or" close=")">
+				GROUP_ID = #{item.group_id,jdbcType=NUMERIC}
+				and HOS_ID = #{item.hos_id,jdbcType=NUMERIC}
+				AND COPY_CODE = #{item.copy_code,jdbcType=VARCHAR}
+				AND pact_code = #{item.pact_code,jdbcType=VARCHAR}
+			</foreach>
+		</where>
+	</delete>
+</mapper>

@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.cost.dao.CostIncomeMainMapper">
+	<resultMap id="costIncomeMain" type="com.chd.hrp.cost.entity.CostIncomeMain">
+        <result property="acc_year" column="acc_year"/>
+        <result property="acc_month" column="acc_month"/>
+        <result property="year_month" column="year_month"/>
+        <result property="income_id" column="income_id"/>
+        <result property="charge_kind_code" column="charge_kind_code"/>
+        <result property="charge_kind_name" column="charge_kind_name"/>
+        <result property="appl_dept_code" column="appl_dept_code"/>
+        <result property="appl_dept_name" column="appl_dept_name"/>
+        <result property="exec_dept_code" column="exec_dept_code"/>
+        <result property="exec_dept_name" column="exec_dept_name"/>
+        <result property="busi_data_source_code" column="busi_data_source_code"/>
+        <result property="busi_data_source_name" column="busi_data_source_name"/>
+        <result property="money" column="money"/>
+	</resultMap>
+	
+   <insert id="addCostIncomeMain" useGeneratedKeys="true" >
+              insert into cost_income_main
+						  (income_id,
+						   acc_year,
+						   acc_month,
+						   appl_dept_code,
+						   appl_dept_name,
+						   exec_dept_code,
+						   exec_dept_name,
+						   charge_kind_code,
+						   charge_kind_name,
+						   busi_data_source_code,
+						   money)
+						values
+						  (cost_income_main_seq.nextval,
+						   #{acc_year},
+						   #{acc_month},
+						   #{appl_dept_code},
+						   #{appl_dept_name},
+						   #{exec_dept_code},
+						   #{exec_dept_name},
+						   #{charge_kind_code},
+						   #{charge_kind_name},
+						   #{busi_data_source_code},
+						   #{money})
+    </insert>
+    
+	<insert id="addBatchCostIncomeMain" parameterType="java.util.List" >
+             insert into cost_income_main
+						  (income_id,
+						   acc_year,
+						   acc_month,
+						   appl_dept_code,
+						   appl_dept_name,
+						   exec_dept_code,
+						   exec_dept_name,
+						   charge_kind_code,
+						   charge_kind_name,
+						   busi_data_source_code,
+						   money)
+		select cost_income_main_seq.nextval, t.*  from(
+		 <foreach collection="list" item="item" index="index" separator=" union all " >
+		        select 		
+					   #{item.acc_year},
+					   #{item.acc_month},
+					   #{item.appl_dept_code},
+					   #{item.appl_dept_name},
+					   #{item.exec_dept_code},
+					   #{item.exec_dept_name},
+					   #{item.charge_kind_code},
+					   #{item.charge_kind_name},
+					   #{item.busi_data_source_code},
+					   #{item.money}
+				 from dual 
+		</foreach>
+		) t
+    </insert>
+    
+    <delete id="deleteBatchCostIncomeMain" parameterType="java.util.List">
+        delete from cost_income_main where
+		<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+		   income_id = #{item.income_id}
+		</foreach>
+    </delete>
+    
+    <delete id="deleteMonthlyCostIncomeMain" parameterType="java.util.Map">
+               delete from cost_income_main 
+               where   acc_year || acc_month between #{begin_year_month} and #{end_year_month}
+    </delete>
+    
+	<select id="queryCostIncomeMain" parameterType="java.util.Map" resultMap="costIncomeMain" >
+	    	with temp as (
+					select cim.income_id,
+						   cim.acc_year,
+						   cim.acc_month,
+						   cim.appl_dept_code,
+						   cim.appl_dept_name,
+						   cim.exec_dept_code,
+						   cim.exec_dept_name,
+						   cim.charge_kind_code,
+						   cim.charge_kind_name,
+						   cim.busi_data_source_code,
+						   cbsd.busi_data_source_name,
+						   cim.money
+						from cost_income_main cim
+						left join cost_busi_sourec_dict cbsd
+						on cim.busi_data_source_code = cbsd.busi_data_source_code
+						and cbsd.busi_data_source_type = 1
+						where cim.acc_year || cim.acc_month between #{begin_year_month} and #{end_year_month}
+						<if test="busi_data_source_code != null and busi_data_source_code != ''">
+						  and cim.busi_data_source_code = #{busi_data_source_code,jdbcType=VARCHAR}
+						</if>
+					)select income_id,acc_year||acc_month year_month,appl_dept_code,
+					 appl_dept_name,exec_dept_code,exec_dept_name,
+					 charge_kind_code,charge_kind_name,busi_data_source_code,busi_data_source_name
+					 ,money from temp
+					 union all
+					 select null,'合计',null,null,null,
+					 null,null,null,null,null
+					 ,sum(money) from temp
+					 order by year_month,appl_dept_code,exec_dept_code,charge_kind_code
+    </select>
+	
+	<insert id="addCostIncomeMainByHis">
+		begin 
+			<!-- 删除当月数据重新插入 -->
+			delete from cost_income_main 
+			where  acc_year = #{acc_year}
+			and acc_month = #{acc_month};
+				
+			<!-- 插入收入数据 -->
+			insert into cost_income_main
+						  (income_id,
+						   acc_year,
+						   acc_month,
+						   appl_dept_code,
+						   appl_dept_name,
+						   exec_dept_code,
+						   exec_dept_name,
+						   charge_kind_code,
+						   charge_kind_name,
+						   busi_data_source_code,
+						   money)
+		select 
+		   cost_income_main_seq.nextval, t.*
+		 from (			   
+			select 
+			   acc_year,
+			   acc_month,
+			   appl_dept_code,
+			   appl_dept_name,
+			   exec_dept_code,
+			   exec_dept_name,
+			   charge_kind_code,
+			   charge_kind_name,
+			   busi_data_source_code,
+			   money
+			from 
+			<if test="dblink != null and dblink != ''">
+			  his_cost_income_detail@${dblink}
+			</if>
+			<if test="dblink == null or dblink == ''">
+			  his_cost_income_detail
+			</if> 
+			where  acc_year = #{acc_year,jdbcType=VARCHAR}
+			   and a.acc_month = #{acc_month,jdbcType=VARCHAR}
+		  )t
+		  
+		end;
+	</insert>
+</mapper>
+

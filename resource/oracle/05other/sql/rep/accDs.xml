@@ -1,0 +1,2960 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+	<sql id="ZREP_HBZJ" type="sql" desc="货币资金"><![CDATA[
+	with tmp_subj as ( 
+    select distinct subj_code, subj_name 
+    from acc_subj 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code 
+      and acc_year = @acc_year 
+      and subj_nature_code in ('02', '03') 
+      and subj_level = '1' 
+  ), tmp as ( 
+    select a.subj_code, a.subj_name, sum(d.bal_os) bal_os, sum(d.end_os) end_os 
+    from tmp_subj a 
+    left join ( 
+      select b.subj_code, b.bal_os, c.end_os 
+      from ( 
+        /*年初*/ 
+        select subj_code, bal_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and acc_month = '00' 
+      ) b  
+      left join ( 
+        /*期末*/ 
+        select subj_code, end_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and acc_month = '12' 
+      ) c 
+        on b.subj_code = c.subj_code 
+    ) d 
+      on d.subj_code like a.subj_code || '%' 
+    group by a.subj_code, a.subj_name 
+  )  
+  select subj_code, subj_name, bal_os, end_os 
+  from tmp 
+  union all 
+  select '9999999' subj_code, '合计' subj_name, 
+    sum(bal_os) bal_os, sum(end_os) end_os 
+  from tmp 
+  order by subj_code
+	]]></sql> 
+	
+	<sql id="ZREP_YSZK" type="sql" desc="应收账款"><![CDATA[
+  with tmp_subj as ( 
+    select distinct subj_code, subj_name 
+    from acc_subj 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code 
+      and acc_year = @acc_year 
+      and subj_code like '1212%' 
+  ), tmp as ( 
+    select 1 type, a.subj_code, a.subj_name, 
+      sum(d.bal_os) bal_os, sum(d.end_os) end_os 
+    from tmp_subj a 
+    left join ( 
+      select b.subj_code, c.bal_os, b.end_os 
+      from (
+        /*期末*/
+        select subj_code, end_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and acc_month = '12' 
+          and subj_code like '1212%' 
+      ) b 
+      left join ( 
+        /*期初*/
+        select subj_code, bal_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code
+          and acc_year = @acc_year 
+          and acc_month = '00' 
+          and subj_code like '1212%' 
+      ) c 
+        on b.subj_code = c.subj_code 
+    ) d 
+      on d.subj_code like a.subj_code || '%' 
+    group by a.subj_code, a.subj_name 
+  ), ctmp as ( 
+    select 2 type, a.subj_code, c.sup_name subj_name, 
+      sum(b.bal_os) bal_os, sum(a.end_os) end_os 
+    from (
+      /*期末*/
+      select subj_code, check6_id, end_os 
+      from acc_leder_check 
+      where group_id = @group_id 
+        and hos_id = @hos_id 
+        and copy_code = @copy_code 
+        and acc_year = @acc_year 
+        and acc_month = '12' 
+        and subj_code like '1212%' 
+    ) a 
+    left join ( 
+      /*期初*/
+      select subj_code, check6_id, bal_os 
+      from acc_leder_check 
+      where group_id = @group_id 
+        and hos_id = @hos_id 
+        and copy_code = @copy_code
+        and acc_year = @acc_year 
+        and acc_month = '00' 
+        and subj_code like '1212%' 
+    ) b 
+      on a.subj_code = b.subj_code 
+      and a.check6_id = b.check6_id 
+    left join hos_sup_dict c 
+      on c.group_id = @group_id 
+      and c.hos_id = @hos_id 
+      and a.check6_id = c.sup_id 
+      and c.is_stop = 0 
+    group by a.subj_code, c.sup_name 
+  ) 
+
+  select type, subj_code, subj_name, bal_os, end_os 
+  from tmp 
+  union all 
+  select type, subj_code, subj_name, bal_os, end_os 
+  from ctmp 
+  union all 
+  select 3 type, '9999999' subj_code, '合计' subj_name, 
+    sum(bal_os) bal_os, sum(end_os) end_os 
+  from tmp 
+  order by subj_code, type 
+	]]></sql> 
+	
+	<sql id="ZREP_YSPZ" type="sql" desc="应收票据"><![CDATA[
+
+  with tmp_subj as ( 
+    select distinct subj_code, subj_name 
+    from acc_subj 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code 
+      and acc_year = @acc_year 
+      and subj_code like '1211%' 
+  ), tmp as ( 
+    select 1 type, a.subj_code, a.subj_name, 
+      sum(d.bal_os) bal_os, sum(d.end_os) end_os 
+    from tmp_subj a 
+    left join ( 
+      select b.subj_code, c.bal_os, b.end_os 
+      from (
+        /*期末*/
+        select subj_code, end_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and acc_month = '12' 
+          and subj_code like '1211%' 
+      ) b 
+      left join ( 
+        /*期初*/
+        select subj_code, bal_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code
+          and acc_year = @acc_year 
+          and acc_month = '00' 
+          and subj_code like '1211%' 
+      ) c 
+        on b.subj_code = c.subj_code 
+    ) d 
+      on d.subj_code like a.subj_code || '%' 
+    group by a.subj_code, a.subj_name 
+  )
+  select subj_code, subj_name, bal_os, end_os 
+  from tmp 
+  union all 
+  select '9999999' subj_code, '合计' subj_name, 
+    sum(bal_os) bal_os, sum(end_os) end_os 
+  from tmp 
+  order by subj_code 
+	]]></sql> 
+	
+	<sql id="ZREP_YUFZK" type="sql" desc="预付账款"><![CDATA[
+  with tmp_subj as ( 
+    select distinct subj_code, subj_name 
+    from acc_subj 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code 
+      and acc_year = @acc_year 
+      and subj_code like '1214%' 
+  ), tmp as ( 
+    select 1 type, a.subj_code, a.subj_name, 
+      sum(d.bal_os) bal_os, sum(d.end_os) end_os 
+    from tmp_subj a 
+    left join ( 
+      select b.subj_code, c.bal_os, b.end_os 
+      from (
+        /*期末*/
+        select subj_code, end_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and acc_month = '12' 
+          and subj_code like '1214%' 
+      ) b 
+      left join ( 
+        /*期初*/
+        select subj_code, bal_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code
+          and acc_year = @acc_year 
+          and acc_month = '00' 
+          and subj_code like '1214%' 
+      ) c 
+        on b.subj_code = c.subj_code 
+    ) d 
+      on d.subj_code like a.subj_code || '%' 
+    group by a.subj_code, a.subj_name 
+  ), ctmp as ( 
+    select 2 type, a.subj_code, c.sup_name subj_name, 
+      sum(b.bal_os) bal_os, sum(a.end_os) end_os 
+    from (
+      /*期末*/
+      select subj_code, check6_id, end_os 
+      from acc_leder_check 
+      where group_id = @group_id 
+        and hos_id = @hos_id 
+        and copy_code = @copy_code 
+        and acc_year = @acc_year 
+        and acc_month = '12' 
+        and subj_code like '1214%' 
+    ) a 
+    left join ( 
+      /*期初*/
+      select subj_code, check6_id, bal_os 
+      from acc_leder_check 
+      where group_id = @group_id 
+        and hos_id = @hos_id 
+        and copy_code = @copy_code
+        and acc_year = @acc_year 
+        and acc_month = '00' 
+        and subj_code like '1214%' 
+    ) b 
+      on a.subj_code = b.subj_code 
+      and a.check6_id = b.check6_id 
+    left join hos_sup_dict c 
+      on c.group_id = @group_id 
+      and c.hos_id = @hos_id 
+      and a.check6_id = c.sup_id 
+      and c.is_stop = 0 
+    group by a.subj_code, c.sup_name 
+  ) 
+
+  select type, subj_code, subj_name, bal_os, end_os 
+  from tmp 
+  union all 
+  select type, subj_code, subj_name, bal_os, end_os 
+  from ctmp
+  union all 
+  select 3 type, '9999999' subj_code, '合计' subj_name, 
+    sum(bal_os) bal_os, sum(end_os) end_os 
+  from tmp 
+  order by subj_code, type 
+	]]></sql> 
+	
+	<sql id="ZREP_QTYSK" type="sql" desc="其他应收款"><![CDATA[
+  with tmp_subj as ( 
+    select distinct subj_code, subj_name 
+    from acc_subj 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code 
+      and acc_year = @acc_year 
+      and subj_code like '1218%' 
+  ), tmp as ( 
+    select 1 type, a.subj_code, a.subj_name, 
+      sum(d.bal_os) bal_os, sum(d.end_os) end_os 
+    from tmp_subj a 
+    left join ( 
+      select b.subj_code, c.bal_os, b.end_os 
+      from (
+        /*期末*/
+        select subj_code, end_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and acc_month = '12' 
+          and subj_code like '1218%' 
+      ) b 
+      left join ( 
+        /*期初*/
+        select subj_code, bal_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code
+          and acc_year = @acc_year 
+          and acc_month = '00' 
+          and subj_code like '1218%' 
+      ) c 
+        on b.subj_code = c.subj_code 
+    ) d 
+      on d.subj_code like a.subj_code || '%' 
+    group by a.subj_code, a.subj_name 
+  ), ctmp as ( 
+    select 2 type, a.subj_code, 
+      case 
+        when a.check2_id is null then e.sup_name 
+        else d.emp_name 
+      end subj_name, 
+      sum(b.bal_os) bal_os, sum(a.end_os) end_os 
+    from (
+      /*期末*/
+      select subj_code, check2_id, check6_id, end_os 
+      from acc_leder_check 
+      where group_id = @group_id 
+        and hos_id = @hos_id 
+        and copy_code = @copy_code 
+        and acc_year = @acc_year 
+        and acc_month = '12' 
+        and subj_code like '2307%' 
+    ) a 
+    left join ( 
+      /*期初*/
+      select subj_code, check2_id, check6_id, bal_os 
+      from acc_leder_check 
+      where group_id = @group_id 
+        and hos_id = @hos_id 
+        and copy_code = @copy_code 
+        and acc_year = @acc_year 
+        and acc_month = '00' 
+        and subj_code like '2307%' 
+    ) b 
+      on a.subj_code = b.subj_code 
+      and a.check2_id = b.check2_id 
+      and a.check6_id = b.check6_id 
+    left join hos_emp_dict d 
+      on d.group_id = @group_id 
+      and d.hos_id = @hos_id 
+      and a.check2_id = d.emp_id 
+      and d.is_stop = 0 
+    left join hos_sup_dict e 
+      on e.group_id = @group_id 
+      and e.hos_id = @hos_id 
+      and a.check6_id = e.sup_id 
+      and e.is_stop = 0 
+    group by a.subj_code, a.check2_id, a.check6_id, 
+      d.emp_name, e.sup_name 
+  ) 
+  select type, subj_code, subj_name, bal_os, end_os 
+  from tmp 
+  union all 
+  select type, subj_code, subj_name, bal_os, end_os 
+  from ctmp 
+  union all 
+  select 3 type, '9999999' subj_code, '合计' subj_name, 
+    sum(bal_os) bal_os, sum(end_os) end_os 
+  from tmp 
+  order by subj_code, type 
+	]]></sql> 
+	
+	<sql id="ZREP_CH" type="sql" desc="存货"><![CDATA[
+  with tmp_subj as ( 
+    select distinct subj_code, subj_name 
+    from (
+      select subj_code, subj_name 
+      from acc_subj 
+      where group_id = @group_id 
+        and hos_id = @hos_id 
+        and copy_code = @copy_code 
+        and acc_year = @acc_year 
+        and (subj_code like '1302%' or subj_code like '1302%') 
+        and subj_level <= 2
+      union all 
+      select subj_code, subj_name 
+      from acc_subj 
+      where group_id = @group_id 
+        and hos_id = @hos_id 
+        and copy_code = @copy_code 
+        and acc_year = @acc_year 
+        and (subj_code like '1302%' or subj_code like '1302%') 
+        and is_last = 1 
+    ) 
+  ), tmp as ( 
+    select a.subj_code, a.subj_name, sum(d.bal_os) bal_os, sum(d.end_os) end_os 
+    from tmp_subj a 
+    left join ( 
+      select b.subj_code, b.bal_os, c.end_os 
+      from ( 
+        /*年初*/
+        select subj_code, bal_os
+        from acc_leder
+        where group_id = @group_id
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and acc_month = '00'
+      ) b 
+      left join (
+        /*期末*/
+        select subj_code, end_os 
+        from acc_leder
+        where group_id = @group_id
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year
+          and acc_month = '12'
+      ) c
+        on b.subj_code = c.subj_code 
+    ) d 
+      on d.subj_code like a.subj_code || '%' 
+    group by a.subj_code, a.subj_name 
+  )  
+  select subj_code, subj_name, bal_os, end_os 
+  from tmp 
+  union all 
+  select '9999999' subj_code, '合计' subj_name, 
+    sum(bal_os) bal_os, sum(end_os) end_os 
+  from tmp 
+  order by subj_code;
+	]]></sql> 
+	
+	<sql id="ZREP_QTLDZCCQDTFY" type="sql" desc="其他流动资产长期待摊费用"><![CDATA[
+	SELECT 1 FROM DUAL
+	]]></sql> 
+	
+	<sql id="ZREP_QTFLDZC" type="sql" desc="其他非流动资产"><![CDATA[
+	SELECT 1 FROM DUAL
+	]]></sql> 
+	
+	<sql id="ZREP_CQZQTZ" type="sql" desc="长期债券投资"><![CDATA[
+  with tmp_subj as ( 
+    select distinct subj_code, subj_name 
+    from acc_subj 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code 
+      and acc_year = @acc_year 
+      and subj_code like '1502%' 
+  ), tmp as ( 
+    select 1 type, a.subj_code, a.subj_name, 
+      sum(d.bal_os) bal_os, sum(d.end_os) end_os 
+    from tmp_subj a 
+    left join ( 
+      select b.subj_code, c.bal_os, b.end_os 
+      from ( 
+        /*期末*/
+        select subj_code, end_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and acc_month = '12' 
+          and subj_code like '1502%' 
+      ) b 
+      left join ( 
+        /*期初*/
+        select subj_code, bal_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code
+          and acc_year = @acc_year 
+          and acc_month = '00' 
+          and subj_code like '1502%' 
+      ) c 
+        on b.subj_code = c.subj_code 
+    ) d 
+      on d.subj_code like a.subj_code || '%' 
+    group by a.subj_code, a.subj_name 
+  )
+  select subj_code, subj_name, bal_os, end_os 
+  from tmp 
+  union all 
+  select '9999999' subj_code, '合计' subj_name, 
+    sum(bal_os) bal_os, sum(end_os) end_os 
+  from tmp 
+  order by subj_code 
+	]]></sql> 
+	
+	<sql id="ZREP_CQGQTZ" type="sql" desc="长期股权投资"><![CDATA[
+  with tmp_subj as ( 
+    select distinct subj_code, subj_name 
+    from acc_subj 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code 
+      and acc_year = @acc_year 
+      and subj_code like '1501%' 
+  ), tmp as ( 
+    select 1 type, a.subj_code, a.subj_name, 
+      sum(d.bal_os) bal_os, sum(d.end_os) end_os 
+    from tmp_subj a 
+    left join ( 
+      select b.subj_code, c.bal_os, b.end_os 
+      from ( 
+        /*期末*/
+        select subj_code, end_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and acc_month = '12' 
+          and subj_code like '1501%' 
+      ) b 
+      left join ( 
+        /*期初*/
+        select subj_code, bal_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code
+          and acc_year = @acc_year 
+          and acc_month = '00' 
+          and subj_code like '1501%' 
+      ) c 
+        on b.subj_code = c.subj_code 
+    ) d 
+      on d.subj_code like a.subj_code || '%' 
+    group by a.subj_code, a.subj_name 
+  )
+  select subj_code, subj_name, bal_os, end_os 
+  from tmp 
+  union all 
+  select '9999999' subj_code, '合计' subj_name, 
+    sum(bal_os) bal_os, sum(end_os) end_os 
+  from tmp 
+  order by subj_code 
+	]]></sql> 
+	
+	<sql id="ZREP_DQTZ" type="sql" desc="短期投资"><![CDATA[
+	  with tmp_subj as ( 
+    select distinct subj_code, subj_name 
+    from acc_subj 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code 
+      and acc_year = @acc_year 
+      and subj_code like '1101%' 
+  ), tmp as ( 
+    select 1 type, a.subj_code, a.subj_name, 
+      sum(d.bal_os) bal_os, sum(d.end_os) end_os 
+    from tmp_subj a 
+    left join ( 
+      select b.subj_code, c.bal_os, b.end_os 
+      from ( 
+        /*期末*/
+        select subj_code, end_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and acc_month = '12' 
+          and subj_code like '1101%' 
+      ) b 
+      left join ( 
+        /*期初*/
+        select subj_code, bal_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code
+          and acc_year = @acc_year 
+          and acc_month = '00' 
+          and subj_code like '1101%' 
+      ) c 
+        on b.subj_code = c.subj_code 
+    ) d 
+      on d.subj_code like a.subj_code || '%' 
+    group by a.subj_code, a.subj_name 
+  )
+  select subj_code, subj_name, bal_os, end_os 
+  from tmp 
+  union all 
+  select '9999999' subj_code, '合计' subj_name, 
+    sum(bal_os) bal_os, sum(end_os) end_os 
+  from tmp 
+  order by subj_code 
+	]]></sql> 
+	
+	<sql id="ZREP_GDZCYZ" type="sql" desc="固定资产原值"><![CDATA[
+  with tmp_subj as( 
+    select distinct subj_code, subj_name 
+    from acc_subj 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code 
+      and acc_year = @acc_year 
+      and subj_code like '1601%' 
+      and is_last = 1 
+  ), tmp as ( 
+    select a.subj_code, a.subj_name, 
+      sum(e.bal_os) bal_os, sum(e.this_oc) this_oc, 
+      sum(e.this_od) this_od, sum(e.end_os) end_os 
+    from tmp_subj a 
+    left join ( 
+      select b.subj_code, b.bal_os, c.this_oc, c.this_od, d.end_os 
+      from ( 
+        /*年初余额*/
+        select subj_code, bal_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and acc_month = '00' 
+          and subj_code like '1601%'
+      ) b 
+      left join (
+        /*本期发生*/
+        select subj_code, sum(this_oc) this_oc, sum(this_od) this_od 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and acc_month between '01' and '12' 
+          and subj_code like '1601%' 
+        group by subj_code 
+      ) c 
+        on b.subj_code = c.subj_code 
+      left join ( 
+        /*期末余额*/
+        select subj_code, end_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and acc_month = '12' 
+          and subj_code like '1601%' 
+      ) d 
+        on b.subj_code = d.subj_code 
+    ) e 
+      on e.subj_code like a.subj_code || '%' 
+    group by a.subj_code, a.subj_name 
+  )
+  select subj_code, subj_name, 
+    bal_os, this_oc, this_od, end_os 
+  from tmp 
+  union all 
+  select '999999' subj_code, '合计' subj_name, 
+    sum(bal_os) bal_os, sum(this_oc) this_oc, 
+    sum(this_od) this_od, sum(end_os) end_os 
+  from tmp 
+  order by subj_code
+	]]></sql>
+	
+	<sql id="ZREP_GDZCZJ" type="sql" desc="固定资产折旧"><![CDATA[
+  with tmp_subj as( 
+    select distinct subj_code, subj_name 
+    from acc_subj 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code 
+      and acc_year = @acc_year 
+      and subj_code like '1602%' 
+      and is_last = 1 
+  ), tmp as ( 
+    select a.subj_code, a.subj_name, 
+      sum(e.bal_os) bal_os, sum(e.this_oc) this_oc, 
+      sum(e.this_od) this_od, sum(e.end_os) end_os 
+    from tmp_subj a 
+    left join ( 
+      select b.subj_code, b.bal_os, c.this_oc, c.this_od, d.end_os 
+      from ( 
+        /*年初余额*/
+        select subj_code, bal_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and acc_month = '00' 
+          and subj_code like '1601%'
+      ) b 
+      left join (
+        /*本期发生*/
+        select subj_code, sum(this_oc) this_oc, sum(this_od) this_od 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and acc_month between '01' and '12' 
+          and subj_code like '1602%' 
+        group by subj_code 
+      ) c 
+        on b.subj_code = c.subj_code 
+      left join ( 
+        /*期末余额*/
+        select subj_code, end_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and acc_month = '12' 
+          and subj_code like '1602%' 
+      ) d 
+        on b.subj_code = d.subj_code 
+    ) e 
+      on e.subj_code like a.subj_code || '%' 
+    group by a.subj_code, a.subj_name 
+  )
+  select subj_code, subj_name, 
+    bal_os, this_oc, this_od, end_os 
+  from tmp 
+  union all 
+  select '999999' subj_code, '合计' subj_name, 
+    sum(bal_os) bal_os, sum(this_oc) this_oc, 
+    sum(this_od) this_od, sum(end_os) end_os 
+  from tmp 
+  order by subj_code
+	]]></sql>
+	
+	<sql id="ZREP_GDZCLJ" type="sql" desc="固定资产累积"><![CDATA[
+  with tmp_subj as( 
+    select distinct substr(subj_code, 5, length(subj_code) - 4) subj_code, subj_name 
+    from acc_subj 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code 
+      and acc_year = @acc_year 
+      and (subj_code like '1601%' or subj_code like '1602%') 
+      and is_last = 1 
+  ), tmp as ( 
+    select a.subj_code, a.subj_name, 
+      sum(e.bal_os) bal_os, sum(e.this_oc) this_oc, 
+      sum(e.this_od) this_od, sum(e.end_os) end_os 
+    from tmp_subj a 
+    left join ( 
+      select b.subj_code, 
+        case when substr(b.subj_code, 0, 4) = '1601' then b.bal_os else -1*b.bal_os end bal_os, 
+        case when substr(b.subj_code, 0, 4) = '1601' then c.this_oc else -1*c.this_oc end this_oc, 
+        case when substr(b.subj_code, 0, 4) = '1601' then c.this_od else -1*c.this_od end this_od, 
+        case when substr(b.subj_code, 0, 4) = '1601' then d.end_os else -1*d.end_os end end_os 
+      from ( 
+        /*年初余额*/
+        select subj_code, bal_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and acc_month = '00' 
+          and (subj_code like '1601%' or subj_code like '1602%') 
+      ) b 
+      left join (
+        /*本期发生*/
+        select subj_code, sum(this_oc) this_oc, sum(this_od) this_od 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and acc_month between '01' and '12' 
+          and (subj_code like '1601%' or subj_code like '1602%') 
+        group by subj_code 
+      ) c 
+        on b.subj_code = c.subj_code 
+      left join ( 
+        /*期末余额*/
+        select subj_code, end_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and acc_month = '12' 
+          and (subj_code like '1601%' or subj_code like '1602%') 
+      ) d 
+        on b.subj_code = d.subj_code 
+    ) e 
+      on substr(e.subj_code, 5, length(e.subj_code) - 4) like a.subj_code || '%' 
+    group by a.subj_code, a.subj_name 
+  )
+  select subj_code, subj_name, 
+    bal_os, this_oc, this_od, end_os 
+  from tmp 
+  union all 
+  select '999999' subj_code, '合计' subj_name, 
+    sum(bal_os) bal_os, sum(this_oc) this_oc, 
+    sum(this_od) this_od, sum(end_os) end_os 
+  from tmp 
+  order by subj_code
+	]]></sql>
+	
+	<sql id="ZREP_ZJGC" type="sql" desc="在建工程"><![CDATA[
+  with tmp_subj as( 
+    select distinct subj_code, subj_name 
+    from acc_subj 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code 
+      and acc_year = @acc_year 
+      and (subj_code like '1611%') 
+  ), tmp as ( 
+    select a.subj_code, a.subj_name, 
+      sum(e.bal_os) bal_os, sum(e.this_oc) this_oc, 
+      sum(e.this_od) this_od, sum(e.end_os) end_os 
+    from tmp_subj a 
+    left join ( 
+      select b.subj_code, b.bal_os, c.this_oc, c.this_od, d.end_os 
+      from ( 
+        /*年初余额*/
+        select subj_code, bal_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and acc_month = '00' 
+          and (subj_code like '1611%')
+      ) b 
+      left join (
+        /*本期发生*/
+        select subj_code, sum(this_oc) this_oc, sum(this_od) this_od 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and acc_month between '01' and '12' 
+          and (subj_code like '1611%') 
+        group by subj_code 
+      ) c 
+        on b.subj_code = c.subj_code 
+      left join ( 
+        /*期末余额*/
+        select subj_code, end_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and acc_month = '12' 
+          and (subj_code like '1611%') 
+      ) d 
+        on b.subj_code = d.subj_code 
+    ) e 
+      on e.subj_code like a.subj_code || '%' 
+    group by a.subj_code, a.subj_name 
+  )
+  select subj_code, subj_name, 
+    bal_os, this_oc, this_od, end_os 
+  from tmp 
+  union all 
+  select '999999' subj_code, '合计' subj_name, 
+    sum(bal_os) bal_os, sum(this_oc) this_oc, 
+    sum(this_od) this_od, sum(end_os) end_os 
+  from tmp 
+  order by subj_code
+	]]></sql>
+	
+	<sql id="ZREP_WXZCYZ" type="sql" desc="无形资产原值"><![CDATA[
+  with tmp_subj as( 
+    select distinct subj_code, subj_name 
+    from acc_subj 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code 
+      and acc_year = @acc_year 
+      and (subj_code like '1701%') 
+  ), tmp as ( 
+    select a.subj_code, a.subj_name, 
+      sum(e.bal_os) bal_os, sum(e.this_oc) this_oc, 
+      sum(e.this_od) this_od, sum(e.end_os) end_os 
+    from tmp_subj a 
+    left join ( 
+      select b.subj_code, b.bal_os, c.this_oc, c.this_od, d.end_os 
+      from ( 
+        /*年初余额*/
+        select subj_code, bal_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and acc_month = '00' 
+          and (subj_code like '1701%')
+      ) b 
+      left join (
+        /*本期发生*/
+        select subj_code, sum(this_oc) this_oc, sum(this_od) this_od 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and acc_month between '01' and '12' 
+          and (subj_code like '1701%') 
+        group by subj_code 
+      ) c 
+        on b.subj_code = c.subj_code 
+      left join ( 
+        /*期末余额*/
+        select subj_code, end_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and acc_month = '12' 
+          and (subj_code like '1701%') 
+      ) d 
+        on b.subj_code = d.subj_code 
+    ) e 
+      on e.subj_code like a.subj_code || '%' 
+    group by a.subj_code, a.subj_name 
+  )
+  select subj_code, subj_name, 
+    bal_os, this_oc, this_od, end_os 
+  from tmp 
+  union all 
+  select '999999' subj_code, '合计' subj_name, 
+    sum(bal_os) bal_os, sum(this_oc) this_oc, 
+    sum(this_od) this_od, sum(end_os) end_os 
+  from tmp 
+  order by subj_code
+	]]></sql>
+	
+	<sql id="ZREP_WXZCZJ" type="sql" desc="无形资产折旧"><![CDATA[
+  with tmp_subj as( 
+    select distinct subj_code, subj_name 
+    from acc_subj 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code 
+      and acc_year = @acc_year 
+      and (subj_code like '1702%') 
+  ), tmp as ( 
+    select a.subj_code, a.subj_name, 
+      sum(e.bal_os) bal_os, sum(e.this_oc) this_oc, 
+      sum(e.this_od) this_od, sum(e.end_os) end_os 
+    from tmp_subj a 
+    left join ( 
+      select b.subj_code, b.bal_os, c.this_oc, c.this_od, d.end_os 
+      from ( 
+        /*年初余额*/
+        select subj_code, bal_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and acc_month = '00' 
+          and (subj_code like '1702%')
+      ) b 
+      left join (
+        /*本期发生*/
+        select subj_code, sum(this_oc) this_oc, sum(this_od) this_od 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and acc_month between '01' and '12' 
+          and (subj_code like '1702%') 
+        group by subj_code 
+      ) c 
+        on b.subj_code = c.subj_code 
+      left join ( 
+        /*期末余额*/
+        select subj_code, end_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and acc_month = '12' 
+          and (subj_code like '1702%') 
+      ) d 
+        on b.subj_code = d.subj_code 
+    ) e 
+      on e.subj_code like a.subj_code || '%' 
+    group by a.subj_code, a.subj_name 
+  )
+  select subj_code, subj_name, 
+    bal_os, this_oc, this_od, end_os 
+  from tmp 
+  union all 
+  select '999999' subj_code, '合计' subj_name, 
+    sum(bal_os) bal_os, sum(this_oc) this_oc, 
+    sum(this_od) this_od, sum(end_os) end_os 
+  from tmp 
+  order by subj_code
+	]]></sql>
+	
+	<sql id="ZREP_WXZCLJ" type="sql" desc="无形资产累计"><![CDATA[
+  with tmp_subj as( 
+    select distinct substr(subj_code, 5, length(subj_code) - 4) subj_code, subj_name 
+    from acc_subj 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code 
+      and acc_year = @acc_year 
+      and (subj_code like '1701%' or subj_code like '1702%') 
+      and is_last = 1 
+  ), tmp as ( 
+    select a.subj_code, a.subj_name, 
+      sum(e.bal_os) bal_os, sum(e.this_oc) this_oc, 
+      sum(e.this_od) this_od, sum(e.end_os) end_os 
+    from tmp_subj a 
+    left join ( 
+      select b.subj_code, 
+        case when substr(b.subj_code, 0, 4) = '1701' then b.bal_os else -1*b.bal_os end bal_os, 
+        case when substr(b.subj_code, 0, 4) = '1701' then c.this_oc else -1*c.this_oc end this_oc, 
+        case when substr(b.subj_code, 0, 4) = '1701' then c.this_od else -1*c.this_od end this_od, 
+        case when substr(b.subj_code, 0, 4) = '1701' then d.end_os else -1*d.end_os end end_os 
+      from ( 
+        /*年初余额*/
+        select subj_code, bal_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and acc_month = '00' 
+          and (subj_code like '1701%' or subj_code like '1702%') 
+      ) b 
+      left join (
+        /*本期发生*/
+        select subj_code, sum(this_oc) this_oc, sum(this_od) this_od 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and acc_month between '01' and '12' 
+          and (subj_code like '1701%' or subj_code like '1702%') 
+        group by subj_code 
+      ) c 
+        on b.subj_code = c.subj_code 
+      left join ( 
+        /*期末余额*/
+        select subj_code, end_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and acc_month = '12' 
+          and (subj_code like '1701%' or subj_code like '1702%') 
+      ) d 
+        on b.subj_code = d.subj_code 
+    ) e 
+      on substr(e.subj_code, 5, length(e.subj_code) - 4) like a.subj_code || '%' 
+    group by a.subj_code, a.subj_name 
+  )
+  select subj_code, subj_name, 
+    bal_os, this_oc, this_od, end_os 
+  from tmp 
+  union all 
+  select '999999' subj_code, '合计' subj_name, 
+    sum(bal_os) bal_os, sum(this_oc) this_oc, 
+    sum(this_od) this_od, sum(end_os) end_os 
+  from tmp 
+  order by subj_code
+	]]></sql>
+	
+	<sql id="ZREP_GGJCSS" type="sql" desc="公共基础设施"><![CDATA[
+		SELECT 1 FROM DUAL
+	]]></sql>
+	
+	<sql id="ZREP_ZFCBWZ" type="sql" desc="政府储备物资"><![CDATA[
+		SELECT 1 FROM DUAL
+	]]></sql>
+	
+	<sql id="ZREP_STDLZC" type="sql" desc="受托代理资产"><![CDATA[
+  with tmp_subj as ( 
+    select distinct subj_code, subj_name 
+    from acc_subj 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code 
+      and acc_year = @acc_year 
+      and subj_code like '1891%' 
+  ), tmp as ( 
+    select 1 type, a.subj_code, a.subj_name, 
+      sum(d.bal_os) bal_os, sum(d.end_os) end_os 
+    from tmp_subj a 
+    left join ( 
+      select b.subj_code, c.bal_os, b.end_os 
+      from ( 
+        /*期末*/
+        select subj_code, end_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and acc_month = '12' 
+          and subj_code like '1891%' 
+      ) b 
+      left join ( 
+        /*期初*/
+        select subj_code, bal_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code
+          and acc_year = @acc_year 
+          and acc_month = '00' 
+          and subj_code like '1891%' 
+      ) c 
+        on b.subj_code = c.subj_code 
+    ) d 
+      on d.subj_code like a.subj_code || '%' 
+    group by a.subj_code, a.subj_name 
+  )
+  select subj_code, subj_name, bal_os, end_os 
+  from tmp 
+  union all 
+  select '9999999' subj_code, '合计' subj_name, 
+    sum(bal_os) bal_os, sum(end_os) end_os 
+  from tmp 
+  order by subj_code 
+	]]></sql>
+	
+	<sql id="ZREP_YFZK" type="sql" desc="应付账款"><![CDATA[
+  with tmp_subj as ( 
+    select distinct subj_code, subj_name 
+    from acc_subj 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code 
+      and acc_year = @acc_year 
+      and subj_code like '2302%' 
+  ), tmp as ( 
+    select 1 type, a.subj_code, a.subj_name, 
+      sum(d.bal_os) bal_os, sum(d.end_os) end_os 
+    from tmp_subj a 
+    left join ( 
+      select b.subj_code, c.bal_os, b.end_os 
+      from (
+        /*期末*/
+        select subj_code, end_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and acc_month = '12' 
+          and subj_code like '2302%' 
+      ) b 
+      left join ( 
+        /*期初*/
+        select subj_code, bal_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code
+          and acc_year = @acc_year 
+          and acc_month = '00' 
+          and subj_code like '2302%' 
+      ) c 
+        on b.subj_code = c.subj_code 
+    ) d 
+      on d.subj_code like a.subj_code || '%' 
+    group by a.subj_code, a.subj_name 
+  ), ctmp as ( 
+    select 2 type, a.subj_code, c.sup_name subj_name, 
+      sum(b.bal_os) bal_os, sum(a.end_os) end_os 
+    from (
+      /*期末*/
+      select subj_code, check6_id, end_os 
+      from acc_leder_check 
+      where group_id = @group_id 
+        and hos_id = @hos_id 
+        and copy_code = @copy_code 
+        and acc_year = @acc_year 
+        and acc_month = '12' 
+        and subj_code like '2302%' 
+    ) a 
+    left join ( 
+      /*期初*/
+      select subj_code, check6_id, bal_os 
+      from acc_leder_check 
+      where group_id = @group_id 
+        and hos_id = @hos_id 
+        and copy_code = @copy_code
+        and acc_year = @acc_year 
+        and acc_month = '00' 
+        and subj_code like '2302%' 
+    ) b 
+      on a.subj_code = b.subj_code 
+      and a.check6_id = b.check6_id 
+    left join hos_sup_dict c 
+      on c.group_id = @group_id 
+      and c.hos_id = @hos_id 
+      and a.check6_id = c.sup_id 
+      and c.is_stop = 0 
+    group by a.subj_code, c.sup_name 
+  ) 
+
+  select type, subj_code, subj_name, bal_os, end_os 
+  from tmp 
+  union all 
+  select type, subj_code, subj_name, bal_os, end_os 
+  from ctmp 
+  union all 
+  select 3 type, '9999999' subj_code, '合计' subj_name, 
+    sum(bal_os) bal_os, sum(end_os) end_os 
+  from tmp 
+  order by subj_code, type 
+	]]></sql>
+	
+	<sql id="ZREP_YFPJ" type="sql" desc="应付票据"><![CDATA[
+  with tmp_subj as ( 
+    select distinct subj_code, subj_name 
+    from acc_subj 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code 
+      and acc_year = @acc_year 
+      and subj_code like '2301%' 
+  ), tmp as ( 
+    select 1 type, a.subj_code, a.subj_name, 
+      sum(d.bal_os) bal_os, sum(d.end_os) end_os 
+    from tmp_subj a 
+    left join ( 
+      select b.subj_code, c.bal_os, b.end_os 
+      from (
+        /*期末*/
+        select subj_code, end_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and acc_month = '12' 
+          and subj_code like '2301%' 
+      ) b 
+      left join ( 
+        /*期初*/
+        select subj_code, bal_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code
+          and acc_year = @acc_year 
+          and acc_month = '00' 
+          and subj_code like '2301%' 
+      ) c 
+        on b.subj_code = c.subj_code 
+    ) d 
+      on d.subj_code like a.subj_code || '%' 
+    group by a.subj_code, a.subj_name 
+  ), ctmp as ( 
+    select 2 type, a.subj_code, c.sup_name subj_name, 
+      sum(b.bal_os) bal_os, sum(a.end_os) end_os 
+    from (
+      /*期末*/
+      select subj_code, check6_id, end_os 
+      from acc_leder_check 
+      where group_id = @group_id 
+        and hos_id = @hos_id 
+        and copy_code = @copy_code 
+        and acc_year = @acc_year 
+        and acc_month = '12' 
+        and subj_code like '2301%' 
+    ) a 
+    left join ( 
+      /*期初*/
+      select subj_code, check6_id, bal_os 
+      from acc_leder_check 
+      where group_id = @group_id 
+        and hos_id = @hos_id 
+        and copy_code = @copy_code
+        and acc_year = @acc_year 
+        and acc_month = '00' 
+        and subj_code like '2301%' 
+    ) b 
+      on a.subj_code = b.subj_code 
+      and a.check6_id = b.check6_id 
+    left join hos_sup_dict c 
+      on c.group_id = @group_id 
+      and c.hos_id = @hos_id 
+      and a.check6_id = c.sup_id 
+      and c.is_stop = 0 
+    group by a.subj_code, c.sup_name 
+  ) 
+
+  select type, subj_code, subj_name, bal_os, end_os 
+  from tmp 
+  union all 
+  select type, subj_code, subj_name, bal_os, end_os 
+  from ctmp 
+  union all 
+  select 3 type, '9999999' subj_code, '合计' subj_name, 
+    sum(bal_os) bal_os, sum(end_os) end_os 
+  from tmp 
+  order by subj_code, type 
+	]]></sql>
+	
+	<sql id="ZREP_YUSZK" type="sql" desc="预收账款"><![CDATA[
+  with tmp_subj as ( 
+    select distinct subj_code, subj_name 
+    from acc_subj 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code 
+      and acc_year = @acc_year 
+      and subj_code like '2305%' 
+  ), tmp as ( 
+    select 1 type, a.subj_code, a.subj_name, 
+      sum(d.bal_os) bal_os, sum(d.end_os) end_os 
+    from tmp_subj a 
+    left join ( 
+      select b.subj_code, c.bal_os, b.end_os 
+      from (
+        /*期末*/
+        select subj_code, end_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and acc_month = '12' 
+          and subj_code like '2305%' 
+      ) b 
+      left join ( 
+        /*期初*/
+        select subj_code, bal_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code
+          and acc_year = @acc_year 
+          and acc_month = '00' 
+          and subj_code like '2305%' 
+      ) c 
+        on b.subj_code = c.subj_code 
+    ) d 
+      on d.subj_code like a.subj_code || '%' 
+    group by a.subj_code, a.subj_name 
+  )
+  select subj_code, subj_name, bal_os, end_os 
+  from tmp 
+  union all 
+  select '9999999' subj_code, '合计' subj_name, 
+    sum(bal_os) bal_os, sum(end_os) end_os 
+  from tmp 
+  order by subj_code 
+	]]></sql>
+	
+	<sql id="ZREP_QTYFK" type="sql" desc="其他应付款"><![CDATA[
+  with tmp_subj as ( 
+    select distinct subj_code, subj_name 
+    from acc_subj 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code 
+      and acc_year = @acc_year 
+      and subj_code like '2307%' 
+  ), tmp as ( 
+    select 1 type, a.subj_code, a.subj_name, 
+      sum(d.bal_os) bal_os, sum(d.end_os) end_os 
+    from tmp_subj a 
+    left join ( 
+      select b.subj_code, c.bal_os, b.end_os 
+      from (
+        /*期末*/
+        select subj_code, end_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and acc_month = '12' 
+          and subj_code like '2307%' 
+      ) b 
+      left join ( 
+        /*期初*/
+        select subj_code, bal_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code
+          and acc_year = @acc_year 
+          and acc_month = '00' 
+          and subj_code like '2307%' 
+      ) c 
+        on b.subj_code = c.subj_code 
+    ) d 
+      on d.subj_code like a.subj_code || '%' 
+    group by a.subj_code, a.subj_name 
+  ), ctmp as ( 
+    select 2 type, a.subj_code, 
+      case 
+        when a.check1_id is null then 
+          case 
+            when a.check2_id is null then e.sup_name 
+            else d.emp_name 
+          end 
+        else c.dept_name 
+      end subj_name, 
+      sum(b.bal_os) bal_os, sum(a.end_os) end_os 
+    from (
+      /*期末*/
+      select subj_code, check1_id, check2_id, check6_id, end_os 
+      from acc_leder_check 
+      where group_id = @group_id 
+        and hos_id = @hos_id 
+        and copy_code = @copy_code 
+        and acc_year = @acc_year 
+        and acc_month = '12' 
+        and subj_code like '2307%' 
+    ) a 
+    left join ( 
+      /*期初*/
+      select subj_code, check1_id, check2_id, check6_id, bal_os 
+      from acc_leder_check 
+      where group_id = @group_id 
+        and hos_id = @hos_id 
+        and copy_code = @copy_code 
+        and acc_year = @acc_year 
+        and acc_month = '00' 
+        and subj_code like '2307%' 
+    ) b 
+      on a.subj_code = b.subj_code 
+      and a.check1_id = b.check1_id 
+      and a.check2_id = b.check2_id 
+      and a.check6_id = b.check6_id 
+    left join hos_dept_dict c 
+      on c.group_id = @group_id 
+      and c.hos_id = @hos_id 
+      and a.check1_id = c.dept_id 
+      and c.is_stop = 0 
+    left join hos_emp_dict d 
+      on d.group_id = @group_id 
+      and d.hos_id = @hos_id 
+      and a.check2_id = d.emp_id 
+      and d.is_stop = 0 
+    left join hos_sup_dict e 
+      on e.group_id = @group_id 
+      and e.hos_id = @hos_id 
+      and a.check6_id = e.sup_id 
+      and e.is_stop = 0 
+    group by a.subj_code, a.check1_id, a.check2_id, a.check6_id, 
+      c.dept_name, d.emp_name, e.sup_name 
+  ) 
+  select type, subj_code, subj_name, bal_os, end_os 
+  from tmp 
+  union all 
+  select type, subj_code, subj_name, bal_os, end_os 
+  from ctmp
+  union all 
+  select 3 type, '9999999' subj_code, '合计' subj_name, 
+    sum(bal_os) bal_os, sum(end_os) end_os 
+  from tmp 
+  order by subj_code, type 
+	]]></sql>
+	
+	<sql id="ZREP_CQYFK" type="sql" desc="长期应付款"><![CDATA[
+  with tmp_subj as ( 
+    select distinct subj_code, subj_name 
+    from acc_subj 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code 
+      and acc_year = @acc_year 
+      and subj_code like '2502%' 
+  ), tmp as ( 
+    select 1 type, a.subj_code, a.subj_name, 
+      sum(d.bal_os) bal_os, sum(d.end_os) end_os 
+    from tmp_subj a 
+    left join ( 
+      select b.subj_code, c.bal_os, b.end_os 
+      from (
+        /*期末*/
+        select subj_code, end_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and acc_month = '12' 
+          and subj_code like '2502%' 
+      ) b 
+      left join ( 
+        /*期初*/
+        select subj_code, bal_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code
+          and acc_year = @acc_year 
+          and acc_month = '00' 
+          and subj_code like '2502%' 
+      ) c 
+        on b.subj_code = c.subj_code 
+    ) d 
+      on d.subj_code like a.subj_code || '%' 
+    group by a.subj_code, a.subj_name 
+  )
+  select subj_code, subj_name, bal_os, end_os 
+  from tmp 
+  union all 
+  select '9999999' subj_code, '合计' subj_name, 
+    sum(bal_os) bal_os, sum(end_os) end_os 
+  from tmp 
+  order by subj_code 
+	]]></sql>
+	
+	<sql id="ZREP_QTLDFZ" type="sql" desc="其他流动负债"><![CDATA[
+		SELECT 1 FROM DUAL
+	]]></sql>
+	
+	<sql id="ZREP_YJFZ" type="sql" desc="预计负债"><![CDATA[
+  with tmp_subj as ( 
+    select distinct subj_code, subj_name 
+    from acc_subj 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code 
+      and acc_year = @acc_year 
+      and subj_code like '2601%' 
+  ), tmp as ( 
+    select 1 type, a.subj_code, a.subj_name, 
+      sum(d.bal_os) bal_os, sum(d.end_os) end_os 
+    from tmp_subj a 
+    left join ( 
+      select b.subj_code, c.bal_os, b.end_os 
+      from (
+        /*期末*/
+        select subj_code, end_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and acc_month = '12' 
+          and subj_code like '2601%' 
+      ) b 
+      left join ( 
+        /*期初*/
+        select subj_code, bal_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code
+          and acc_year = @acc_year 
+          and acc_month = '00' 
+          and subj_code like '2601%' 
+      ) c 
+        on b.subj_code = c.subj_code 
+    ) d 
+      on d.subj_code like a.subj_code || '%' 
+    group by a.subj_code, a.subj_name 
+  )
+  select subj_code, subj_name, bal_os, end_os 
+  from tmp
+  union all 
+  select '9999999' subj_code, '合计' subj_name, 
+    sum(bal_os) bal_os, sum(end_os) end_os 
+  from tmp 
+  order by subj_code 
+	]]></sql>
+	
+	<sql id="ZREP_QTFLDFZ" type="sql" desc="其他非流动负债"><![CDATA[
+		SELECT 1 FROM DUAL
+	]]></sql>
+	
+	<sql id="ZREP_CQJK" type="sql" desc="长期借款"><![CDATA[
+  with tmp_subj as ( 
+    select distinct subj_code, subj_name 
+    from acc_subj 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code 
+      and acc_year = @acc_year 
+      and subj_code like '2501%' 
+  ), tmp as ( 
+    select 1 type, a.subj_code, a.subj_name, 
+      sum(d.bal_os) bal_os, sum(d.end_os) end_os 
+    from tmp_subj a 
+    left join ( 
+      select b.subj_code, c.bal_os, b.end_os 
+      from (
+        /*期末*/
+        select subj_code, end_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and acc_month = '12' 
+          and subj_code like '2501%' 
+      ) b 
+      left join ( 
+        /*期初*/
+        select subj_code, bal_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code
+          and acc_year = @acc_year 
+          and acc_month = '00' 
+          and subj_code like '2501%' 
+      ) c 
+        on b.subj_code = c.subj_code 
+    ) d 
+      on d.subj_code like a.subj_code || '%' 
+    group by a.subj_code, a.subj_name 
+  ), ctmp as ( 
+    select 2 type, a.subj_code, c.sup_name subj_name, 
+      sum(b.bal_os) bal_os, sum(a.end_os) end_os 
+    from (
+      /*期末*/
+      select subj_code, check6_id, end_os 
+      from acc_leder_check 
+      where group_id = @group_id 
+        and hos_id = @hos_id 
+        and copy_code = @copy_code 
+        and acc_year = @acc_year 
+        and acc_month = '12' 
+        and subj_code like '2501%' 
+    ) a 
+    left join ( 
+      /*期初*/
+      select subj_code, check6_id, bal_os 
+      from acc_leder_check 
+      where group_id = @group_id 
+        and hos_id = @hos_id 
+        and copy_code = @copy_code
+        and acc_year = @acc_year 
+        and acc_month = '00' 
+        and subj_code like '2501%' 
+    ) b 
+      on a.subj_code = b.subj_code 
+      and a.check6_id = b.check6_id 
+    left join hos_sup_dict c 
+      on c.group_id = @group_id 
+      and c.hos_id = @hos_id 
+      and a.check6_id = c.sup_id 
+      and c.is_stop = 0 
+    group by a.subj_code, c.sup_name 
+  ) 
+  select type, subj_code, subj_name, bal_os, end_os 
+  from tmp 
+  union all 
+  select type, subj_code, subj_name, bal_os, end_os 
+  from ctmp 
+  union all 
+  select 3 type, '9999999' subj_code, '合计' subj_name, 
+    sum(bal_os) bal_os, sum(end_os) end_os 
+  from tmp 
+  order by subj_code, type 
+	]]></sql>
+	
+	<sql id="ZREP_DQJK" type="sql" desc="短期借款"><![CDATA[
+  with tmp_subj as ( 
+    select distinct subj_code, subj_name 
+    from acc_subj 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code 
+      and acc_year = @acc_year 
+      and subj_code like '2001%' 
+  ), tmp as ( 
+    select 1 type, a.subj_code, a.subj_name, 
+      sum(d.bal_os) bal_os, sum(d.end_os) end_os 
+    from tmp_subj a 
+    left join ( 
+      select b.subj_code, c.bal_os, b.end_os 
+      from (
+        /*期末*/
+        select subj_code, end_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and acc_month = '12' 
+          and subj_code like '2001%' 
+      ) b 
+      left join ( 
+        /*期初*/
+        select subj_code, bal_os 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code
+          and acc_year = @acc_year 
+          and acc_month = '00' 
+          and subj_code like '2001%' 
+      ) c 
+        on b.subj_code = c.subj_code 
+    ) d 
+      on d.subj_code like a.subj_code || '%' 
+    group by a.subj_code, a.subj_name 
+  ), ctmp as ( 
+    select 2 type, a.subj_code, c.sup_name subj_name, 
+      sum(b.bal_os) bal_os, sum(a.end_os) end_os 
+    from (
+      /*期末*/
+      select subj_code, check6_id, end_os 
+      from acc_leder_check 
+      where group_id = @group_id 
+        and hos_id = @hos_id 
+        and copy_code = @copy_code 
+        and acc_year = @acc_year 
+        and acc_month = '12' 
+        and subj_code like '2001%' 
+    ) a 
+    left join ( 
+      /*期初*/
+      select subj_code, check6_id, bal_os 
+      from acc_leder_check 
+      where group_id = @group_id 
+        and hos_id = @hos_id 
+        and copy_code = @copy_code
+        and acc_year = @acc_year 
+        and acc_month = '00' 
+        and subj_code like '2001%' 
+    ) b 
+      on a.subj_code = b.subj_code 
+      and a.check6_id = b.check6_id 
+    left join hos_sup_dict c 
+      on c.group_id = @group_id 
+      and c.hos_id = @hos_id 
+      and a.check6_id = c.sup_id 
+      and c.is_stop = 0 
+    group by a.subj_code, c.sup_name 
+  ) 
+
+  select type, subj_code, subj_name, bal_os, end_os 
+  from tmp 
+  union all 
+  select type, subj_code, subj_name, bal_os, end_os 
+  from ctmp 
+  union all 
+  select 3 type, '9999999' subj_code, '合计' subj_name, 
+    sum(bal_os) bal_os, sum(end_os) end_os 
+  from tmp 
+  order by subj_code, type 
+	]]></sql>
+	
+	<sql id="ZREP_SYSR" type="sql" desc="事业收入"><![CDATA[
+  with tmp_subj as ( 
+    select distinct subj_code, subj_name 
+    from acc_subj 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code 
+      and acc_year = @acc_year 
+      and subj_code like '4101%' 
+  ), tmp as ( 
+    select 1 type, a.subj_code, a.subj_name, 
+      sum(d.this_money) this_money, sum(d.before_money) before_money 
+    from tmp_subj a 
+    left join ( 
+      select b.subj_code, b.this_money, c.before_money 
+      from ( 
+        /*本期发生额*/
+        select subj_code, sum(this_oc) this_money 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and subj_code like '4101%' 
+        group by subj_code 
+      ) b 
+      left join ( 
+        /*上期发生额*/
+        select subj_code, sum(this_oc) before_money 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code
+          and acc_year = @acc_year - 1 
+          and subj_code like '4101%' 
+        group by subj_code 
+      ) c 
+        on b.subj_code = c.subj_code 
+    ) d 
+      on d.subj_code like a.subj_code || '%' 
+    group by a.subj_code, a.subj_name 
+  ), ctmp as ( 
+    select 2 type, a.subj_code, c.dept_name subj_name, 
+      this_money, before_money 
+    from (
+      /*本期*/
+      select subj_code, check1_id, sum(this_oc) this_money 
+      from acc_leder_check 
+      where group_id = @group_id 
+        and hos_id = @hos_id 
+        and copy_code = @copy_code 
+        and acc_year = @acc_year 
+        and subj_code like '4101%' 
+      group by subj_code, check1_id 
+    ) a 
+    left join ( 
+      /*上期*/
+      select subj_code, check1_id, sum(this_oc) before_money 
+      from acc_leder_check 
+      where group_id = @group_id 
+        and hos_id = @hos_id 
+        and copy_code = @copy_code
+        and acc_year = @acc_year - 1 
+        and subj_code like '4101%' 
+      group by subj_code, check1_id 
+    ) b 
+      on a.subj_code = b.subj_code 
+      and a.check1_id = b.check1_id 
+    left join hos_dept_dict c 
+      on c.group_id = @group_id 
+      and c.hos_id = @hos_id 
+      and a.check1_id = c.dept_id 
+      and c.is_stop = 0 
+  ) 
+  select type, subj_code, subj_name, this_money, before_money 
+  from tmp 
+  union all 
+  select type, subj_code, subj_name, this_money, before_money 
+  from ctmp
+  union all 
+  select 3 type, '9999999' subj_code, '合计' subj_name, 
+    sum(this_money) this_money, sum(before_money) before_money 
+  from tmp 
+  order by subj_code, type  
+	]]></sql>
+	
+	<sql id="ZREP_FTJCZBKSR" type="sql" desc="非同级财政拨款收入"><![CDATA[
+  with tmp_subj as ( 
+    select distinct subj_code, subj_name 
+    from acc_subj 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code 
+      and acc_year = @acc_year 
+      and subj_code like '4601%' 
+  ), tmp as ( 
+    select 1 type, a.subj_code, a.subj_name, 
+      sum(d.this_money) this_money, sum(d.before_money) before_money 
+    from tmp_subj a 
+    left join ( 
+      select b.subj_code, b.this_money, c.before_money 
+      from ( 
+        /*本期发生额*/
+        select subj_code, sum(this_oc) this_money 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and subj_code like '4601%' 
+        group by subj_code 
+      ) b 
+      left join ( 
+        /*上期发生额*/
+        select subj_code, sum(this_oc) before_money 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code
+          and acc_year = @acc_year - 1 
+          and subj_code like '4601%' 
+        group by subj_code 
+      ) c 
+        on b.subj_code = c.subj_code 
+    ) d 
+      on d.subj_code like a.subj_code || '%' 
+    group by a.subj_code, a.subj_name 
+  )
+  select subj_code, subj_name, this_money, before_money 
+  from tmp 
+  union all 
+  select '9999999' subj_code, '合计' subj_name, 
+    sum(this_money) this_money, sum(before_money) before_money 
+  from tmp 
+  order by subj_code 
+	]]></sql>
+	
+	<sql id="ZREP_QTSR" type="sql" desc="其他收入"><![CDATA[
+  with tmp_subj as ( 
+    select distinct subj_code, subj_name 
+    from acc_subj 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code 
+      and acc_year = @acc_year 
+      and subj_code like '4609%' 
+  ), tmp as ( 
+    select 1 type, a.subj_code, a.subj_name, 
+      sum(d.this_money) this_money, sum(d.before_money) before_money 
+    from tmp_subj a 
+    left join ( 
+      select b.subj_code, b.this_money, c.before_money 
+      from ( 
+        /*本期发生额*/
+        select subj_code, sum(this_oc) this_money 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and subj_code like '4609%' 
+        group by subj_code 
+      ) b 
+      left join ( 
+        /*上期发生额*/
+        select subj_code, sum(this_oc) before_money 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code
+          and acc_year = @acc_year - 1 
+          and subj_code like '4609%' 
+        group by subj_code 
+      ) c 
+        on b.subj_code = c.subj_code 
+    ) d 
+      on d.subj_code like a.subj_code || '%' 
+    group by a.subj_code, a.subj_name 
+  ), ctmp as ( 
+    select 2 type, a.subj_code, c.dept_name subj_name, 
+      this_money, before_money 
+    from (
+      /*本期*/
+      select subj_code, check1_id, sum(this_oc) this_money 
+      from acc_leder_check 
+      where group_id = @group_id 
+        and hos_id = @hos_id 
+        and copy_code = @copy_code 
+        and acc_year = @acc_year 
+        and subj_code like '4609%' 
+      group by subj_code, check1_id 
+    ) a 
+    left join ( 
+      /*上期*/
+      select subj_code, check1_id, sum(this_oc) before_money 
+      from acc_leder_check 
+      where group_id = @group_id 
+        and hos_id = @hos_id 
+        and copy_code = @copy_code
+        and acc_year = @acc_year - 1 
+        and subj_code like '4609%' 
+      group by subj_code, check1_id 
+    ) b 
+      on a.subj_code = b.subj_code 
+      and a.check1_id = b.check1_id 
+    left join hos_dept_dict c 
+      on c.group_id = @group_id 
+      and c.hos_id = @hos_id 
+      and a.check1_id = c.dept_id 
+      and c.is_stop = 0 
+  ) 
+  select type, subj_code, subj_name, this_money, before_money 
+  from tmp 
+  union all 
+  select type, subj_code, subj_name, this_money, before_money 
+  from ctmp
+  union all 
+  select 3 type, '9999999' subj_code, '合计' subj_name, 
+    sum(this_money) this_money, sum(before_money) before_money 
+  from tmp 
+  order by subj_code, type  
+	]]></sql>
+	
+	<sql id="ZREP_YWHDFYJJFL" type="sql" desc="业务活动费用（按经济分类）"><![CDATA[
+  with tmp_subj as ( 
+    select distinct subj_code, subj_name 
+    from acc_subj 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code 
+      and acc_year = @acc_year 
+      and subj_code like '5001%' 
+  ), tmp as ( 
+    select 1 type, a.subj_code, a.subj_name, 
+      sum(d.this_money) this_money, sum(d.before_money) before_money 
+    from tmp_subj a 
+    left join ( 
+      select b.subj_code, b.this_money, c.before_money 
+      from ( 
+        /*本期发生额*/
+        select subj_code, sum(this_oc) this_money 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and subj_code like '5001%' 
+        group by subj_code 
+      ) b 
+      left join ( 
+        /*上期发生额*/
+        select subj_code, sum(this_oc) before_money 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code
+          and acc_year = @acc_year - 1 
+          and subj_code like '5001%' 
+        group by subj_code 
+      ) c 
+        on b.subj_code = c.subj_code 
+    ) d 
+      on d.subj_code like a.subj_code || '%' 
+    group by a.subj_code, a.subj_name 
+  )
+  select subj_code, subj_name, this_money, before_money 
+  from tmp 
+  union all 
+  select '9999999' subj_code, '合计' subj_name, 
+    sum(this_money) this_money, sum(before_money) before_money 
+  from tmp 
+  order by subj_code 
+	]]></sql>
+	
+	<sql id="ZREP_YWHDFYZFDX" type="sql" desc="业务活动费用（按支付对象）"><![CDATA[
+  with tmp_subj as ( 
+    select distinct subj_code, subj_name 
+    from acc_subj 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code 
+      and acc_year = @acc_year 
+      and subj_code like '5001%' 
+  ), tmp as ( 
+    select 1 type, a.subj_code, a.subj_name, 
+      sum(d.this_money) this_money, sum(d.before_money) before_money 
+    from tmp_subj a 
+    left join ( 
+      select b.subj_code, b.this_money, c.before_money 
+      from ( 
+        /*本期发生额*/
+        select subj_code, sum(this_oc) this_money 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and subj_code like '5001%' 
+        group by subj_code 
+      ) b 
+      left join ( 
+        /*上期发生额*/
+        select subj_code, sum(this_oc) before_money 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code
+          and acc_year = @acc_year - 1 
+          and subj_code like '5001%' 
+        group by subj_code 
+      ) c 
+        on b.subj_code = c.subj_code 
+    ) d 
+      on d.subj_code like a.subj_code || '%' 
+    group by a.subj_code, a.subj_name 
+  ), ctmp as ( 
+    select 2 type, a.subj_code, c.dept_name subj_name, 
+      this_money, before_money 
+    from (
+      /*本期*/
+      select subj_code, check1_id, sum(this_oc) this_money 
+      from acc_leder_check 
+      where group_id = @group_id 
+        and hos_id = @hos_id 
+        and copy_code = @copy_code 
+        and acc_year = @acc_year 
+        and subj_code like '5001%' 
+      group by subj_code, check1_id 
+    ) a 
+    left join ( 
+      /*上期*/
+      select subj_code, check1_id, sum(this_oc) before_money 
+      from acc_leder_check 
+      where group_id = @group_id 
+        and hos_id = @hos_id 
+        and copy_code = @copy_code
+        and acc_year = @acc_year - 1 
+        and subj_code like '5001%' 
+      group by subj_code, check1_id 
+    ) b 
+      on a.subj_code = b.subj_code 
+      and a.check1_id = b.check1_id 
+    left join hos_dept_dict c 
+      on c.group_id = @group_id 
+      and c.hos_id = @hos_id 
+      and a.check1_id = c.dept_id 
+      and c.is_stop = 0 
+  ) 
+  select type, subj_code, subj_name, this_money, before_money 
+  from tmp 
+  union all 
+  select type, subj_code, subj_name, this_money, before_money 
+  from ctmp
+  union all 
+  select 3 type, '9999999' subj_code, '合计' subj_name, 
+    sum(this_money) this_money, sum(before_money) before_money 
+  from tmp 
+  order by subj_code, type  
+	]]></sql>
+	
+	<sql id="ZREP_DWGLFYJJFL" type="sql" desc="单位管理费用（按经济分类）"><![CDATA[
+  with tmp_subj as ( 
+    select distinct subj_code, subj_name 
+    from acc_subj 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code 
+      and acc_year = @acc_year 
+      and subj_code like '5101%' 
+  ), tmp as ( 
+    select 1 type, a.subj_code, a.subj_name, 
+      sum(d.this_money) this_money, sum(d.before_money) before_money 
+    from tmp_subj a 
+    left join ( 
+      select b.subj_code, b.this_money, c.before_money 
+      from ( 
+        /*本期发生额*/
+        select subj_code, sum(this_oc) this_money 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and subj_code like '5101%' 
+        group by subj_code 
+      ) b 
+      left join ( 
+        /*上期发生额*/
+        select subj_code, sum(this_oc) before_money 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code
+          and acc_year = @acc_year - 1 
+          and subj_code like '5101%' 
+        group by subj_code 
+      ) c 
+        on b.subj_code = c.subj_code 
+    ) d 
+      on d.subj_code like a.subj_code || '%' 
+    group by a.subj_code, a.subj_name 
+  )
+  select subj_code, subj_name, this_money, before_money 
+  from tmp 
+  union all 
+  select '9999999' subj_code, '合计' subj_name, 
+    sum(this_money) this_money, sum(before_money) before_money 
+  from tmp 
+  order by subj_code 
+	]]></sql>
+	
+	<sql id="ZREP_DWGLFYZFDX" type="sql" desc="单位管理费用（按支付对象）"><![CDATA[
+with tmp_subj as ( 
+    select distinct subj_code, subj_name 
+    from acc_subj 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code 
+      and acc_year = @acc_year 
+      and subj_code like '5101%' 
+  ), tmp as ( 
+    select 1 type, a.subj_code, a.subj_name, 
+      sum(d.this_money) this_money, sum(d.before_money) before_money 
+    from tmp_subj a 
+    left join ( 
+      select b.subj_code, b.this_money, c.before_money 
+      from ( 
+        /*本期发生额*/
+        select subj_code, sum(this_oc) this_money 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and subj_code like '5101%' 
+        group by subj_code 
+      ) b 
+      left join ( 
+        /*上期发生额*/
+        select subj_code, sum(this_oc) before_money 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code
+          and acc_year = @acc_year - 1 
+          and subj_code like '5101%' 
+        group by subj_code 
+      ) c 
+        on b.subj_code = c.subj_code 
+    ) d 
+      on d.subj_code like a.subj_code || '%' 
+    group by a.subj_code, a.subj_name 
+  ), ctmp as ( 
+    select 2 type, a.subj_code, c.dept_name subj_name, 
+      this_money, before_money 
+    from (
+      /*本期*/
+      select subj_code, check1_id, sum(this_oc) this_money 
+      from acc_leder_check 
+      where group_id = @group_id 
+        and hos_id = @hos_id 
+        and copy_code = @copy_code 
+        and acc_year = @acc_year 
+        and subj_code like '5101%' 
+      group by subj_code, check1_id 
+    ) a 
+    left join ( 
+      /*上期*/
+      select subj_code, check1_id, sum(this_oc) before_money 
+      from acc_leder_check 
+      where group_id = @group_id 
+        and hos_id = @hos_id 
+        and copy_code = @copy_code
+        and acc_year = @acc_year - 1 
+        and subj_code like '5101%' 
+      group by subj_code, check1_id 
+    ) b 
+      on a.subj_code = b.subj_code 
+      and a.check1_id = b.check1_id 
+    left join hos_dept_dict c 
+      on c.group_id = @group_id 
+      and c.hos_id = @hos_id 
+      and a.check1_id = c.dept_id 
+      and c.is_stop = 0 
+  ) 
+  select type, subj_code, subj_name, this_money, before_money 
+  from tmp 
+  union all 
+  select type, subj_code, subj_name, this_money, before_money 
+  from ctmp
+  union all 
+  select 3 type, '9999999' subj_code, '合计' subj_name, 
+    sum(this_money) this_money, sum(before_money) before_money 
+  from tmp 
+  order by subj_code, type  
+	]]></sql>
+	
+	<sql id="ZREP_JYFYJJFL" type="sql" desc="经营费用（按经济分类）"><![CDATA[
+  with tmp_subj as ( 
+    select distinct subj_code, subj_name 
+    from acc_subj 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code 
+      and acc_year = @acc_year 
+      and subj_code like '5201%' 
+  ), tmp as ( 
+    select 1 type, a.subj_code, a.subj_name, 
+      sum(d.this_money) this_money, sum(d.before_money) before_money 
+    from tmp_subj a 
+    left join ( 
+      select b.subj_code, b.this_money, c.before_money 
+      from ( 
+        /*本期发生额*/
+        select subj_code, sum(this_oc) this_money 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and subj_code like '5201%' 
+        group by subj_code 
+      ) b 
+      left join ( 
+        /*上期发生额*/
+        select subj_code, sum(this_oc) before_money 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code
+          and acc_year = @acc_year - 1 
+          and subj_code like '5201%' 
+        group by subj_code 
+      ) c 
+        on b.subj_code = c.subj_code 
+    ) d 
+      on d.subj_code like a.subj_code || '%' 
+    group by a.subj_code, a.subj_name 
+  )
+  select subj_code, subj_name, this_money, before_money 
+  from tmp 
+  union all 
+  select '9999999' subj_code, '合计' subj_name, 
+    sum(this_money) this_money, sum(before_money) before_money 
+  from tmp 
+  order by subj_code 
+	]]></sql>
+	
+	<sql id="ZREP_JYFYZFDX" type="sql" desc="经营费用（按支付对象）"><![CDATA[
+  with tmp_subj as ( 
+    select distinct subj_code, subj_name 
+    from acc_subj 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code 
+      and acc_year = @acc_year 
+      and subj_code like '5201%' 
+  ), tmp as ( 
+    select 1 type, a.subj_code, a.subj_name, 
+      sum(d.this_money) this_money, sum(d.before_money) before_money 
+    from tmp_subj a 
+    left join ( 
+      select b.subj_code, b.this_money, c.before_money 
+      from ( 
+        /*本期发生额*/
+        select subj_code, sum(this_oc) this_money 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and subj_code like '5201%' 
+        group by subj_code 
+      ) b 
+      left join ( 
+        /*上期发生额*/
+        select subj_code, sum(this_oc) before_money 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code
+          and acc_year = @acc_year - 1 
+          and subj_code like '5201%' 
+        group by subj_code 
+      ) c 
+        on b.subj_code = c.subj_code 
+    ) d 
+      on d.subj_code like a.subj_code || '%' 
+    group by a.subj_code, a.subj_name 
+  ), ctmp as ( 
+    select 2 type, a.subj_code, c.dept_name subj_name, 
+      this_money, before_money 
+    from (
+      /*本期*/
+      select subj_code, check1_id, sum(this_oc) this_money 
+      from acc_leder_check 
+      where group_id = @group_id 
+        and hos_id = @hos_id 
+        and copy_code = @copy_code 
+        and acc_year = @acc_year 
+        and subj_code like '5201%' 
+      group by subj_code, check1_id 
+    ) a 
+    left join ( 
+      /*上期*/
+      select subj_code, check1_id, sum(this_oc) before_money 
+      from acc_leder_check 
+      where group_id = @group_id 
+        and hos_id = @hos_id 
+        and copy_code = @copy_code
+        and acc_year = @acc_year - 1 
+        and subj_code like '5201%' 
+      group by subj_code, check1_id 
+    ) b 
+      on a.subj_code = b.subj_code 
+      and a.check1_id = b.check1_id 
+    left join hos_dept_dict c 
+      on c.group_id = @group_id 
+      and c.hos_id = @hos_id 
+      and a.check1_id = c.dept_id 
+      and c.is_stop = 0 
+  ) 
+  select type, subj_code, subj_name, this_money, before_money 
+  from tmp 
+  union all 
+  select type, subj_code, subj_name, this_money, before_money 
+  from ctmp
+  union all 
+  select 3 type, '9999999' subj_code, '合计' subj_name, 
+    sum(this_money) this_money, sum(before_money) before_money 
+  from tmp 
+  order by subj_code, type  
+	]]></sql>
+	
+	<sql id="ZREP_QTFY" type="sql" desc="其他费用"><![CDATA[
+  with tmp_subj as ( 
+    select distinct subj_code, subj_name 
+    from acc_subj 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code 
+      and acc_year = @acc_year 
+      and subj_code like '5901%' 
+  ), tmp as ( 
+    select 1 type, a.subj_code, a.subj_name, 
+      sum(d.this_money) this_money, sum(d.before_money) before_money 
+    from tmp_subj a 
+    left join ( 
+      select b.subj_code, b.this_money, c.before_money 
+      from ( 
+        /*本期发生额*/
+        select subj_code, sum(this_oc) this_money 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and subj_code like '5901%' 
+        group by subj_code 
+      ) b 
+      left join ( 
+        /*上期发生额*/
+        select subj_code, sum(this_oc) before_money 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code
+          and acc_year = @acc_year - 1 
+          and subj_code like '5901%' 
+        group by subj_code 
+      ) c 
+        on b.subj_code = c.subj_code 
+    ) d 
+      on d.subj_code like a.subj_code || '%' 
+    group by a.subj_code, a.subj_name 
+  ), ctmp as ( 
+    select 2 type, a.subj_code, c.dept_name subj_name, 
+      this_money, before_money 
+    from (
+      /*本期*/
+      select subj_code, check1_id, sum(this_oc) this_money 
+      from acc_leder_check 
+      where group_id = @group_id 
+        and hos_id = @hos_id 
+        and copy_code = @copy_code 
+        and acc_year = @acc_year 
+        and subj_code like '5901%' 
+      group by subj_code, check1_id 
+    ) a 
+    left join ( 
+      /*上期*/
+      select subj_code, check1_id, sum(this_oc) before_money 
+      from acc_leder_check 
+      where group_id = @group_id 
+        and hos_id = @hos_id 
+        and copy_code = @copy_code
+        and acc_year = @acc_year - 1 
+        and subj_code like '5901%' 
+      group by subj_code, check1_id 
+    ) b 
+      on a.subj_code = b.subj_code 
+      and a.check1_id = b.check1_id 
+    left join hos_dept_dict c 
+      on c.group_id = @group_id 
+      and c.hos_id = @hos_id 
+      and a.check1_id = c.dept_id 
+      and c.is_stop = 0 
+  ) 
+  select type, subj_code, subj_name, this_money, before_money 
+  from tmp 
+  union all 
+  select type, subj_code, subj_name, this_money, before_money 
+  from ctmp
+  union all 
+  select 3 type, '9999999' subj_code, '合计' subj_name, 
+    sum(this_money) this_money, sum(before_money) before_money 
+  from tmp 
+  order by subj_code, type  
+	]]></sql>
+	
+	<sql id="ZREP_BQFY" type="sql" desc="本期费用"><![CDATA[
+  with tmp_subj as ( 
+    select distinct substr(subj_code, 5, length(subj_code) - 4) subj_code, subj_name 
+    from acc_subj 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code 
+      and acc_year = @acc_year 
+      and (subj_code like '5001%' or subj_code like '5301') 
+      and (subj_level = 3 or (subj_level < 3 and is_last = 1))
+  ), tmp as ( 
+    select a.subj_code, a.subj_name, 
+      sum(d.this_money) this_money, sum(d.before_money) before_money 
+    from tmp_subj a 
+    left join ( 
+      select b.subj_code, b.this_money, c.before_money 
+      from ( 
+        /*本期发生额*/
+        select subj_code, sum(this_oc) this_money 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code 
+          and acc_year = @acc_year 
+          and (subj_code like '5001%' or subj_code like '5301') 
+        group by subj_code 
+      ) b 
+      left join ( 
+        /*上期发生额*/
+        select subj_code, sum(this_oc) before_money 
+        from acc_leder 
+        where group_id = @group_id 
+          and hos_id = @hos_id 
+          and copy_code = @copy_code
+          and acc_year = @acc_year - 1 
+          and (subj_code like '5001%' or subj_code like '5301') 
+        group by subj_code 
+      ) c 
+        on b.subj_code = c.subj_code 
+    ) d 
+      on substr(d.subj_code, 5, length(d.subj_code) - 4) like a.subj_code || '%' 
+    group by a.subj_code, a.subj_name 
+  ) 
+  select subj_code, subj_name, this_money, before_money 
+  from tmp 
+  union all 
+  select '9999999' subj_code, '合计' subj_name, 
+    sum(this_money) this_money, sum(before_money) before_money 
+  from tmp 
+  order by subj_code  
+	]]></sql> 
+	
+	<sql id="ZREP_YBGGYSXMZC" type="sql" desc="一般公共预算项目支出"><![CDATA[
+  
+  
+  with tmp_check as (
+    select check_item_id 
+    from acc_check_item a 
+    inner join acc_check_type b 
+      on a.group_id = b.group_id 
+      and a.hos_id = b.hos_id 
+      and a.copy_code = b.copy_code 
+      and a.check_type_id = b.check_type_id 
+      and b.column_check = '@column_check' 
+    where a.group_id = @group_id 
+      and a.hos_id = @hos_id 
+      and a.copy_code = @copy_code 
+      and a.check_item_code = '@check_item_code' 
+  ),tmp_ncbkjz as ( 
+    /*年初财政拨款结转*/
+    select check3_id, check3_no, bal_os money 
+    from acc_leder_check 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code
+      and acc_year = @acc_year 
+      and acc_month = '00' 
+      and subj_code like '81010702%' 
+      and @column_check in (select check_item_id from tmp_check) 
+  ), tmp_ncbkjy as (   
+    /*年初财政拨款结余*/
+    select check3_id, check3_no, bal_os money 
+    from acc_leder_check 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code
+      and acc_year = @acc_year 
+      and acc_month = '00' 
+      and subj_code like '81020502%' 
+      and @column_check in (select check_item_id from tmp_check) 
+  ), tmp_ncjzjy as (   
+    /*调整年初结转结余*/
+    select check3_id, check3_no, sum(this_od) money 
+    from acc_leder_check 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code
+      and acc_year = @acc_year 
+      and acc_month = '00' 
+      and (subj_code like '810101%' or subj_code like '810201%') 
+      and @column_check in (select check_item_id from tmp_check) 
+  group by check3_id, check3_no 
+  ), tmp_gjdr as (  
+    /*本年归集调入*/
+    select check3_id, check3_no, sum(this_od) money 
+    from acc_leder_check 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code
+      and acc_year = @acc_year 
+      and subj_code like '810102%' 
+      and @column_check in (select check_item_id from tmp_check) 
+  group by check3_id, check3_no 
+  ), tmp_gjsjhdc as (   
+    /*本年归集上缴和调出*/
+    select check3_id, check3_no, sum(this_od) money 
+    from acc_leder_check 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code
+      and acc_year = @acc_year 
+      and (subj_code like '810103%' or subj_code like '810104%' or subj_code like '810202%') 
+      and @column_check in (select check_item_id from tmp_check) 
+  group by check3_id, check3_no 
+  ), tmp_nbtjjz as (   
+    /*单位内部调剂结转*/
+    select check3_id, check3_no, sum(this_od) money 
+    from acc_leder_check 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code
+      and acc_year = @acc_year 
+      and subj_code like '810105%' 
+      and @column_check in (select check_item_id from tmp_check) 
+  group by check3_id, check3_no 
+  ), tmp_nbtjjy as (   
+    /*单位内部调剂结余*/
+    select check3_id, check3_no, sum(this_od) money 
+    from acc_leder_check 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code
+      and acc_year = @acc_year 
+      and subj_code like '810203%' 
+      and @column_check in (select check_item_id from tmp_check) 
+  group by check3_id, check3_no 
+  ), tmp_kbsr as (   
+    /*本年财政拨款收入*/
+    select check3_id, check3_no, sum(this_od) money 
+    from acc_leder_check 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code
+      and acc_year = @acc_year 
+      and subj_code like '600102%' 
+      and @column_check in (select check_item_id from tmp_check) 
+  group by check3_id, check3_no 
+  ), tmp_bkzc as (   
+    /*本年财政拨款支出*/
+    select check3_id, check3_no, sum(this_oc) money 
+    from acc_leder_check 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code
+      and acc_year = @acc_year 
+      and subj_code like '72010102%' 
+      and @column_check in (select check_item_id from tmp_check) 
+  group by check3_id, check3_no 
+  ), tmp_nmbkjz as (   
+    /*年末财政拨款结转*/
+    select check3_id, check3_no, sum(this_od) money 
+    from acc_leder_check 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code
+      and acc_year = @acc_year 
+      and subj_code like '81010702%' 
+      and @column_check in (select check_item_id from tmp_check) 
+  group by check3_id, check3_no 
+  ), tmp_nmbkjy as (   
+    /*年末财政拨款结余*/
+    select check3_id, check3_no, sum(this_od) money 
+    from acc_leder_check 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code
+      and acc_year = @acc_year 
+      and subj_code like '81020502%' 
+      and @column_check in (select check_item_id from tmp_check) 
+  group by check3_id, check3_no 
+  ), tmp_proj as (
+    select a.check3_id, a.check3_no, b.proj_name 
+    from (
+      select distinct check3_id, check3_no 
+      from (
+        select check3_id, check3_no from tmp_ncbkjz 
+        union all 
+        select check3_id, check3_no from tmp_ncbkjy 
+        union all 
+        select check3_id, check3_no from tmp_ncjzjy 
+        union all 
+        select check3_id, check3_no from tmp_gjdr 
+        union all 
+        select check3_id, check3_no from tmp_gjsjhdc 
+        union all 
+        select check3_id, check3_no from tmp_nbtjjz 
+        union all 
+        select check3_id, check3_no from tmp_nbtjjy 
+        union all 
+        select check3_id, check3_no from tmp_kbsr 
+        union all 
+        select check3_id, check3_no from tmp_bkzc 
+        union all 
+        select check3_id, check3_no from tmp_nmbkjz 
+        union all 
+        select check3_id, check3_no from tmp_nmbkjy 
+      )tmp 
+    ) a 
+    left join hos_proj_dict b 
+      on b.group_id = @group_id
+      and b.hos_id = @hos_id
+      and a.check3_id = b.proj_id 
+      and a.check3_no = b.proj_no 
+  )
+  select proj.proj_name, ncbkjz.money ncjz, ncbkjy.money ncjy, 
+    ncjzjy.money nctz, gjdr.money gjdr, gjsjhdc.money gjsjhdc, 
+    nbtjjz.money nbtjjz, nbtjjy.money nbtjjy, kbsr.money kbsr, 
+    bkzc.money bkzc, nmbkjz.money nmjz, nmbkjy.money nmjy
+  from tmp_proj proj 
+  left join tmp_ncbkjz ncbkjz 
+    on proj.check3_id = ncbkjz.check3_id 
+    and proj.check3_no = ncbkjz.check3_no 
+  left join tmp_ncbkjy ncbkjy 
+    on proj.check3_id = ncbkjy.check3_id 
+    and proj.check3_no = ncbkjy.check3_no 
+  left join tmp_ncjzjy ncjzjy 
+    on proj.check3_id = ncjzjy.check3_id 
+    and proj.check3_no = ncjzjy.check3_no 
+  left join tmp_gjdr gjdr 
+    on proj.check3_id = gjdr.check3_id 
+    and proj.check3_no = gjdr.check3_no 
+  left join tmp_gjsjhdc gjsjhdc 
+    on proj.check3_id = gjsjhdc.check3_id 
+    and proj.check3_no = gjsjhdc.check3_no 
+  left join tmp_nbtjjz nbtjjz 
+    on proj.check3_id = nbtjjz.check3_id 
+    and proj.check3_no = nbtjjz.check3_no 
+  left join tmp_nbtjjy nbtjjy 
+    on proj.check3_id = nbtjjy.check3_id 
+    and proj.check3_no = nbtjjy.check3_no 
+  left join tmp_kbsr kbsr 
+    on proj.check3_id = kbsr.check3_id 
+    and proj.check3_no = kbsr.check3_no 
+  left join tmp_bkzc bkzc 
+    on proj.check3_id = bkzc.check3_id 
+    and proj.check3_no = bkzc.check3_no 
+  left join tmp_nmbkjz nmbkjz 
+    on proj.check3_id = nmbkjz.check3_id 
+    and proj.check3_no = nmbkjz.check3_no 
+  left join tmp_nmbkjy nmbkjy 
+    on proj.check3_id = nmbkjy.check3_id 
+    and proj.check3_no = nmbkjy.check3_no 
+	
+	
+	]]></sql>
+	
+	<sql id="ZREP_ZFXJJYSXMZC" type="sql" desc="政府性基金预算项目支出"><![CDATA[
+  
+  
+  with tmp_check as (
+    select check_item_id 
+    from acc_check_item a 
+    inner join acc_check_type b 
+      on a.group_id = b.group_id 
+      and a.hos_id = b.hos_id 
+      and a.copy_code = b.copy_code 
+      and a.check_type_id = b.check_type_id 
+      and b.column_check = '@column_check'
+    where a.group_id = @group_id 
+      and a.hos_id = @hos_id 
+      and a.copy_code = @copy_code 
+      and a.check_item_code = '@check_item_code' 
+  ),tmp_ncbkjz as ( 
+    /*年初财政拨款结转*/
+    select check3_id, check3_no, bal_os money 
+    from acc_leder_check 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code
+      and acc_year = @acc_year 
+      and acc_month = '00' 
+      and subj_code like '81010702%' 
+      and @column_check in (select check_item_id from tmp_check) 
+  ), tmp_ncbkjy as (   
+    /*年初财政拨款结余*/
+    select check3_id, check3_no, bal_os money 
+    from acc_leder_check 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code
+      and acc_year = @acc_year 
+      and acc_month = '00' 
+      and subj_code like '81020502%' 
+      and @column_check in (select check_item_id from tmp_check) 
+  ), tmp_ncjzjy as (   
+    /*调整年初结转结余*/
+    select check3_id, check3_no, sum(this_od) money 
+    from acc_leder_check 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code
+      and acc_year = @acc_year 
+      and acc_month = '00' 
+      and (subj_code like '810101%' or subj_code like '810201%') 
+      and @column_check in (select check_item_id from tmp_check) 
+  group by check3_id, check3_no 
+  ), tmp_gjdr as (  
+    /*本年归集调入*/
+    select check3_id, check3_no, sum(this_od) money 
+    from acc_leder_check 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code
+      and acc_year = @acc_year 
+      and subj_code like '810102%' 
+      and @column_check in (select check_item_id from tmp_check) 
+  group by check3_id, check3_no 
+  ), tmp_gjsjhdc as (   
+    /*本年归集上缴和调出*/
+    select check3_id, check3_no, sum(this_od) money 
+    from acc_leder_check 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code
+      and acc_year = @acc_year 
+      and (subj_code like '810103%' or subj_code like '810104%' or subj_code like '810202%') 
+      and @column_check in (select check_item_id from tmp_check) 
+  group by check3_id, check3_no 
+  ), tmp_nbtjjz as (   
+    /*单位内部调剂结转*/
+    select check3_id, check3_no, sum(this_od) money 
+    from acc_leder_check 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code
+      and acc_year = @acc_year 
+      and subj_code like '810105%' 
+      and @column_check in (select check_item_id from tmp_check) 
+  group by check3_id, check3_no 
+  ), tmp_nbtjjy as (   
+    /*单位内部调剂结余*/
+    select check3_id, check3_no, sum(this_od) money 
+    from acc_leder_check 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code
+      and acc_year = @acc_year 
+      and subj_code like '810203%' 
+      and @column_check in (select check_item_id from tmp_check) 
+  group by check3_id, check3_no 
+  ), tmp_kbsr as (   
+    /*本年财政拨款收入*/
+    select check3_id, check3_no, sum(this_od) money 
+    from acc_leder_check 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code
+      and acc_year = @acc_year 
+      and subj_code like '600102%' 
+      and @column_check in (select check_item_id from tmp_check) 
+  group by check3_id, check3_no 
+  ), tmp_bkzc as (   
+    /*本年财政拨款支出*/
+    select check3_id, check3_no, sum(this_oc) money 
+    from acc_leder_check 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code
+      and acc_year = @acc_year 
+      and subj_code like '72010102%' 
+      and @column_check in (select check_item_id from tmp_check) 
+  group by check3_id, check3_no 
+  ), tmp_nmbkjz as (   
+    /*年末财政拨款结转*/
+    select check3_id, check3_no, sum(this_od) money 
+    from acc_leder_check 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code
+      and acc_year = @acc_year 
+      and subj_code like '81010702%' 
+      and @column_check in (select check_item_id from tmp_check) 
+  group by check3_id, check3_no 
+  ), tmp_nmbkjy as (   
+    /*年末财政拨款结余*/
+    select check3_id, check3_no, sum(this_od) money 
+    from acc_leder_check 
+    where group_id = @group_id 
+      and hos_id = @hos_id 
+      and copy_code = @copy_code
+      and acc_year = @acc_year 
+      and subj_code like '81020502%' 
+      and @column_check in (select check_item_id from tmp_check) 
+  group by check3_id, check3_no 
+  ), tmp_proj as (
+    select a.check3_id, a.check3_no, b.proj_name 
+    from (
+      select distinct check3_id, check3_no 
+      from (
+        select check3_id, check3_no from tmp_ncbkjz 
+        union all 
+        select check3_id, check3_no from tmp_ncbkjy 
+        union all 
+        select check3_id, check3_no from tmp_ncjzjy 
+        union all 
+        select check3_id, check3_no from tmp_gjdr 
+        union all 
+        select check3_id, check3_no from tmp_gjsjhdc 
+        union all 
+        select check3_id, check3_no from tmp_nbtjjz 
+        union all 
+        select check3_id, check3_no from tmp_nbtjjy 
+        union all 
+        select check3_id, check3_no from tmp_kbsr 
+        union all 
+        select check3_id, check3_no from tmp_bkzc 
+        union all 
+        select check3_id, check3_no from tmp_nmbkjz 
+        union all 
+        select check3_id, check3_no from tmp_nmbkjy 
+      )tmp 
+    ) a 
+    left join hos_proj_dict b 
+      on b.group_id = @group_id
+      and b.hos_id = @hos_id
+      and a.check3_id = b.proj_id 
+      and a.check3_no = b.proj_no 
+  )
+  select proj.proj_name, ncbkjz.money ncjz, ncbkjy.money ncjy, 
+    ncjzjy.money nctz, gjdr.money gjdr, gjsjhdc.money gjsjhdc, 
+    nbtjjz.money nbtjjz, nbtjjy.money nbtjjy, kbsr.money kbsr, 
+    bkzc.money bkzc, nmbkjz.money nmjz, nmbkjy.money nmjy
+  from tmp_proj proj 
+  left join tmp_ncbkjz ncbkjz 
+    on proj.check3_id = ncbkjz.check3_id 
+    and proj.check3_no = ncbkjz.check3_no 
+  left join tmp_ncbkjy ncbkjy 
+    on proj.check3_id = ncbkjy.check3_id 
+    and proj.check3_no = ncbkjy.check3_no 
+  left join tmp_ncjzjy ncjzjy 
+    on proj.check3_id = ncjzjy.check3_id 
+    and proj.check3_no = ncjzjy.check3_no 
+  left join tmp_gjdr gjdr 
+    on proj.check3_id = gjdr.check3_id 
+    and proj.check3_no = gjdr.check3_no 
+  left join tmp_gjsjhdc gjsjhdc 
+    on proj.check3_id = gjsjhdc.check3_id 
+    and proj.check3_no = gjsjhdc.check3_no 
+  left join tmp_nbtjjz nbtjjz 
+    on proj.check3_id = nbtjjz.check3_id 
+    and proj.check3_no = nbtjjz.check3_no 
+  left join tmp_nbtjjy nbtjjy 
+    on proj.check3_id = nbtjjy.check3_id 
+    and proj.check3_no = nbtjjy.check3_no 
+  left join tmp_kbsr kbsr 
+    on proj.check3_id = kbsr.check3_id 
+    and proj.check3_no = kbsr.check3_no 
+  left join tmp_bkzc bkzc 
+    on proj.check3_id = bkzc.check3_id 
+    and proj.check3_no = bkzc.check3_no 
+  left join tmp_nmbkjz nmbkjz 
+    on proj.check3_id = nmbkjz.check3_id 
+    and proj.check3_no = nmbkjz.check3_no 
+  left join tmp_nmbkjy nmbkjy 
+    on proj.check3_id = nmbkjy.check3_id 
+    and proj.check3_no = nmbkjy.check3_no 
+	
+	
+	]]></sql>
+	
+</root>

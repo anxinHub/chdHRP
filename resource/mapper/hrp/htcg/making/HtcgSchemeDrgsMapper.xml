@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.htcg.dao.making.HtcgSchemeDrgsMapper">
+	<resultMap id="schemeDrgs" type="com.chd.hrp.htcg.entity.making.HtcgSchemeDrgs">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="scheme_code" column="scheme_code" />
+		<result property="drgs_code" column="drgs_code" />
+		<result property="drgs_note" column="drgs_note" />
+	</resultMap>
+ 
+	<insert id="addHtcgSchemeDrgs" useGeneratedKeys="true">
+
+		insert into htcg_scheme_drgs (
+			group_id,
+			hos_id,
+			copy_code ,
+			scheme_code ,
+			drgs_code
+		) values (
+			#{group_id},  
+        	#{hos_id}, 
+			#{copy_code} ,
+			#{scheme_code} ,
+			#{drgs_code}
+		)
+
+	</insert>
+	
+	<insert id="addBatchHtcgSchemeDrgs" parameterType="java.util.List">
+
+		insert into htcg_scheme_drgs (
+		 	group_id,
+			hos_id,
+			copy_code ,
+			scheme_code ,
+			drgs_code
+		)
+		<foreach collection="list" item="item" separator="union all">
+			select
+				#{item.group_id},  
+        		#{item.hos_id},  
+				#{item.copy_code} ,
+				#{item.scheme_code} ,
+				#{item.drgs_code}
+		   from dual
+		</foreach>
+	</insert>
+
+	<update id="updateHtcgSchemeDrgs" parameterType="java.util.Map">
+		update htcg_scheme_drgs set
+		    scheme_code = #{scheme_code},
+			drgs_code = #{drgs_code}
+		where  group_id = #{group_id}  
+        and hos_id = #{hos_id}
+        and copy_code = #{copy_code} 
+        and scheme_code = #{old_scheme_code}
+        and drgs_code = #{old_drgs_code}
+	</update>
+
+	<delete id="deleteHtcgSchemeDrgs" parameterType="java.util.Map">
+		delete from htcg_scheme_drgs 
+		where  group_id = #{group_id}  
+		       and hos_id = #{hos_id}
+	           and copy_code = #{copy_code} 
+	           and scheme_code = #{scheme_code}   
+	           and drgs_code = #{drgs_code}   
+	</delete>
+ 
+     <delete id="deleteBatchHtcgSchemeDrgs" parameterType="java.util.List">
+		delete from htcg_scheme_drgs where 
+		<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+			      group_id = #{item.group_id}
+			  and hos_id = #{item.hos_id}
+			  and copy_code= #{item.copy_code}
+			  and scheme_code = #{item.scheme_code}   
+			  and drgs_code = #{item.drgs_code} 
+		</foreach>
+	</delete>
+	
+
+	<select id="queryHtcgSchemeDrgsByCode" parameterType="java.util.Map" resultMap="schemeDrgs">
+		   select hsd.group_id,
+			      hsd.hos_id,
+				  hsd.copy_code,
+				  hsd.scheme_code,
+				  hs.scheme_name,
+				  hsd.drgs_code,
+				  hd.drgs_name,
+				  hd.drgs_note
+			from htcg_scheme_drgs hsd
+			left join htcg_scheme hs
+			on hsd.group_id = hs.group_id
+			and hsd.hos_id = hs.hos_id
+			and hsd.copy_code = hs.copy_code
+			and hsd.scheme_code = hs.scheme_code
+			left join htcg_drgs hd
+			on hd.group_id = hsd.group_id
+			and hd.hos_id = hsd.hos_id
+			and hd.copy_code = hsd.copy_code
+			and hd.drgs_code = hsd.drgs_code
+			where hsd.group_id = #{group_id}
+			and   hsd.hos_id =#{hos_id}
+			and	  hsd.copy_code = #{copy_code}
+			and	  hsd.scheme_code =#{scheme_code}
+			and	  hsd.drgs_code =#{drgs_code}
+			   
+	</select>
+	<select id="queryHtcgSchemeDrgs" parameterType="java.util.Map" resultMap="schemeDrgs">
+
+		 select   hsd.group_id,
+			      hsd.hos_id,
+				  hsd.copy_code,
+				  hsd.scheme_code,
+				  hs.scheme_name,
+				  hsd.drgs_code,
+				  hd.drgs_name,
+				  hd.drgs_note
+			from htcg_scheme_drgs hsd
+			left join htcg_scheme hs
+			on hsd.group_id = hs.group_id
+			and hsd.hos_id = hs.hos_id
+			and hsd.copy_code = hs.copy_code
+			and hsd.scheme_code = hs.scheme_code
+			left join htcg_drgs hd
+			on hd.group_id = hsd.group_id
+			and hd.hos_id = hsd.hos_id
+			and hd.copy_code = hsd.copy_code
+			and hd.drgs_code = hsd.drgs_code
+		<where>
+		  	       hsd.group_id = #{group_id}  
+	    	   and hsd.hos_id = #{hos_id} 
+		       and hsd.copy_code = #{copy_code}  
+			<if test="scheme_code != null and scheme_code != ''">
+				and hsd.scheme_code = #{scheme_code}
+			</if>
+			<if test="drgs_code != null and drgs_code != ''">
+				and (hd.drgs_code like  '%${drgs_code}%'
+					 or hd.drgs_name like  '%${drgs_code}%'
+					 or hd.spell_code like  '%${drgs_code}%'
+					 or hd.wbx_code like  '%${drgs_code}%'
+				)
+			</if>
+		</where>
+		order by hsd.group_id,hsd.hos_id,hsd.copy_code,hsd.scheme_code,hsd.drgs_code
+	</select>
+
+</mapper>
+

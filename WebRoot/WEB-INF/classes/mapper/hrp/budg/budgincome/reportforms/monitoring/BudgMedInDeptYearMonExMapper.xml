@@ -1,0 +1,280 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.budg.dao.budgincome.reportforms.monitoring.BudgMedInDeptYearMonExMapper">
+	
+	<resultMap id="budgMedIncomeExecute" type="java.util.Map">
+	<result property="group_id" column="group_id"/>
+	<result property="hos_id" column="hos_id"/>
+	<result property="copy_code" column="copy_code"/>
+	<result property="year" column="year"/>
+	<result property="dept_id" column="dept_id"/>
+	<result property="dept_name" column="dept_name"/>
+	<result property="month" column="month"/>
+	<result property="subj_code" column="subj_code"/>
+	<result property="subj_name" column="subj_name"/>
+	<result property="subj_level" column="subj_level"/>
+	<result property="amount" column="amount"/>
+	<result property="remark" column="remark"/>
+	</resultMap>
+		
+	<resultMap id="budgMedInDeptYearMonMap" type="java.util.Map">
+	<result property="group_id" column="group_id"/>
+	<result property="hos_id" column="hos_id"/>
+	<result property="copy_code" column="copy_code"/>
+	<result property="year" column="year"/>
+	<result property="dept_id" column="dept_id"/>
+	<result property="month" column="month"/>
+	<result property="subj_code" column="subj_code"/>
+	<result property="amount" column="amount"/>
+	<result property="remark" column="remark"/>
+	<result property="dept_code" column="dept_code"/>
+	<result property="dept_name" column="dept_name"/>
+	<result property="subj_name" column="subj_name"/>
+	<result property="subj_level" column="subj_level"/>
+	<result property="last_month_carried" column="last_month_carried"/>
+	<result property="budg_value" column="budg_value"/>
+	<result property="carried_next_month" column="carried_next_month"/>
+	<result property="year_sum" column="year_sum"/>
+	<result property="plan_num" column="plan_num"/>
+	<result property="item" column="item"/>
+	<result property="month_1" column="month_1"/>
+	<result property="month_2" column="month_2"/>
+	<result property="month_3" column="month_3"/>
+	<result property="month_4" column="month_4"/>
+	<result property="month_5" column="month_5"/>
+	<result property="month_6" column="month_6"/>
+	<result property="month_7" column="month_7"/>
+	<result property="month_8" column="month_8"/>
+	<result property="month_9" column="month_9"/>
+	<result property="month_10" column="month_10"/>
+	<result property="month_11" column="month_11"/>
+	<result property="month_12" column="month_12"/>
+	</resultMap>
+	
+	
+	<select id="query" parameterType="java.util.Map" resultMap="budgMedInDeptYearMonMap" >
+	
+	select  null as group_id, null as hos_id,  null copy_code, null as year,null as subj_code
+    , '合计' as subj_name, null as subj_level,null as dept_id
+          , null as dept_code, null as dept_name, nvl(sum(bie.amount), 0) as amount
+    , nvl(sum(bmid.BUDG_VALUE), 0) as budg_value,
+case  when nvl(sum(bie.amount),0)=0 then 0 
+              when nvl(sum(bmid.budg_value),0)=0 then 0 else nvl(sum(bie.amount),0)/nvl(sum(bmid.budg_value),0)  end as  amoun
+ from budg_med_income_execute bie
+        left join budg_income_subj asj on bie.group_id = asj.group_id
+        and bie.hos_id = asj.hos_id
+        and bie.copy_code = asj.copy_code
+        and bie.subj_code = asj.subj_code
+        and bie.year = asj.budg_year 
+        left join budg_med_income_dept_month bmid on bie.group_id = bmid.group_id
+        and bie.hos_id = bmid.hos_id
+        and bie.copy_code = bmid.copy_code
+        and bie.subj_code = bmid.subj_code
+        and bie.year = bmid.year 
+          left join hos_dept_dict hdd on bie.group_id = hdd.group_id
+        and bie.hos_id = hdd.hos_id
+        and bie.dept_id = hdd.dept_id
+        	where 
+  <if test="group_id != null and group_id != ''">
+		  bie.group_id = #{group_id,jdbcType=INTEGER}
+		</if>
+		<if test="hos_id != null and hos_id != ''">
+		AND bie.hos_id = #{hos_id,jdbcType=INTEGER}
+		</if>
+		<if test="copy_code != null and copy_code != ''">
+		AND  bie.copy_code = #{copy_code,jdbcType=VARCHAR}
+		</if>
+		<if test="year != null and year != ''">
+		AND  bie.year = #{year,jdbcType=VARCHAR}
+		</if>
+		<if test="subj_code != null and subj_code != ''">
+				  and bie.subj_code in (
+	          select bis2.subj_code from budg_income_subj bis2
+	          start with bis2.subj_code=#{subj_code,jdbcType=VARCHAR} connect by bis2.super_code=prior bis2.subj_code
+	        )  
+			</if>
+			<if test="subj_level != null and subj_level != ''">
+			AND bie.subj_level = #{subj_level,jdbcType=VARCHAR}
+			</if>
+			   union all
+ 	select bie.group_id, bie.hos_id, bie.copy_code
+          , bie.year, bie.subj_code, asj.subj_name, asj.subj_level, bie.dept_id
+          , hdd.dept_code, hdd.dept_name,nvl(sum(bie.amount),0) amount,nvl(sum(bmid.budg_value),0) budg_value
+          ,
+case  when nvl(sum(bie.amount),0)=0 then 0 
+              when nvl(sum(bmid.budg_value),0)=0 then 0 else nvl(sum(bie.amount),0)/nvl(sum(bmid.budg_value),0)  end as  amoun
+           from budg_med_income_execute bie
+        left join budg_income_subj asj on bie.group_id = asj.group_id
+        and bie.hos_id = asj.hos_id
+        and bie.copy_code = asj.copy_code
+        and bie.subj_code = asj.subj_code
+        and bie.year = asj.budg_year 
+        left join budg_med_income_dept_month bmid on bie.group_id = bmid.group_id
+        and bie.hos_id = bmid.hos_id
+        and bie.copy_code = bmid.copy_code
+        and bie.subj_code = bmid.subj_code
+        and bie.year = bmid.year 
+          left join hos_dept_dict hdd on bie.group_id = hdd.group_id
+        and bie.hos_id = hdd.hos_id
+        and bie.dept_id = hdd.dept_id
+        and hdd.is_stop = 0 
+	where 
+  <if test="group_id != null and group_id != ''">
+		  bie.group_id = #{group_id,jdbcType=INTEGER}
+		</if>
+		<if test="hos_id != null and hos_id != ''">
+		AND bie.hos_id = #{hos_id,jdbcType=INTEGER}
+		</if>
+		<if test="copy_code != null and copy_code != ''">
+		AND  bie.copy_code = #{copy_code,jdbcType=VARCHAR}
+		</if>
+		<if test="year != null and year != ''">
+		AND  bie.year = #{year,jdbcType=VARCHAR}
+		</if>
+		<if test="subj_code != null and subj_code != ''">
+				  and bie.subj_code in (
+	          select bis2.subj_code from budg_income_subj bis2
+	          start with bis2.subj_code=#{subj_code,jdbcType=VARCHAR} connect by bis2.super_code=prior bis2.subj_code
+	        )  
+			</if>
+			<if test="subj_level != null and subj_level != ''">
+			AND bie.subj_level = #{subj_level,jdbcType=VARCHAR}
+			</if>
+			        group by bie.group_id, bie.hos_id, bie.copy_code, bie.year, bie.subj_code, asj.subj_name, asj.subj_level, bie.dept_id, hdd.dept_code, hdd.dept_name
+			
+	</select>
+	<select id="queryByCode" resultMap="budgMedIncomeExecute"  parameterType="java.util.Map" >
+	
+		SELECT 
+		group_id,
+		hos_id,
+		copy_code,
+		year,
+		dept_id,
+		month,
+		subj_code,
+		amount,
+		remark
+		FROM budg_med_income_execute 
+		WHERE 
+		group_id = #{group_id,jdbcType=INTEGER}   and 
+		hos_id = #{hos_id,jdbcType=INTEGER}   and 
+		copy_code = #{copy_code,jdbcType=VARCHAR}   and 
+		year = #{year,jdbcType=VARCHAR}   and 
+		dept_id = #{dept_id,jdbcType=INTEGER}   and 
+		month = #{month,jdbcType=VARCHAR}   and 
+		subj_code = #{subj_code,jdbcType=VARCHAR} 
+	
+	</select>
+	<select id="queryByUniqueness" resultMap="budgMedIncomeExecute"  parameterType="java.util.Map" >
+	
+		SELECT 
+		group_id,
+		hos_id,
+		copy_code,
+		year,
+		dept_id,
+		month,
+		subj_code,
+		amount,
+		remark
+		FROM BUDG_MED_INCOME_EXECUTE 
+		<where>                     
+		<if test="group_id != null and group_id != ''">
+		AND group_id = #{group_id,jdbcType=INTEGER}
+		</if>
+		<if test="hos_id != null and hos_id != ''">
+		AND hos_id = #{hos_id,jdbcType=INTEGER}
+		</if>
+		<if test="copy_code != null and copy_code != ''">
+		AND copy_code = #{copy_code,jdbcType=VARCHAR}
+		</if>
+		<if test="year != null and year != ''">
+		AND year = #{year,jdbcType=VARCHAR}
+		</if>
+		<if test="dept_id != null and dept_id != ''">
+		AND dept_id = #{dept_id,jdbcType=INTEGER}
+		</if>
+		<if test="month != null and month != ''">
+		AND month = #{month,jdbcType=VARCHAR}
+		</if>
+		<if test="subj_code != null and subj_code != ''">
+		AND subj_code = #{subj_code,jdbcType=VARCHAR}
+		</if>
+		<if test="amount != null and amount != ''">
+		AND amount = #{amount,jdbcType=INTEGER}
+		</if>
+		<if test="remark != null and remark != ''">
+		AND remark = #{remark,jdbcType=VARCHAR}
+		</if>
+		</where>   
+		order by group_id asc
+	</select>
+	<select id="queryExists" resultMap="budgMedIncomeExecute"  parameterType="java.util.Map" >
+	
+		SELECT 
+		group_id,
+		hos_id,
+		copy_code,
+		year,
+		dept_id,
+		month,
+		subj_code,
+		amount,
+		remark
+		FROM BUDG_MED_INCOME_EXECUTE 
+		<where>                     
+		<if test="group_id != null and group_id != ''">
+		AND group_id = #{group_id,jdbcType=INTEGER}
+		</if>
+		<if test="hos_id != null and hos_id != ''">
+		AND hos_id = #{hos_id,jdbcType=INTEGER}
+		</if>
+		<if test="copy_code != null and copy_code != ''">
+		AND copy_code = #{copy_code,jdbcType=VARCHAR}
+		</if>
+		<if test="year != null and year != ''">
+		AND year = #{year,jdbcType=VARCHAR}
+		</if>
+		<if test="dept_id != null and dept_id != ''">
+		AND dept_id = #{dept_id,jdbcType=INTEGER}
+		</if>
+		<if test="month != null and month != ''">
+		AND month = #{month,jdbcType=VARCHAR}
+		</if>
+		<if test="subj_code != null and subj_code != ''">
+		AND subj_code = #{subj_code,jdbcType=VARCHAR}
+		</if>
+		<if test="amount != null and amount != ''">
+		AND amount = #{amount,jdbcType=INTEGER}
+		</if>
+		<if test="remark != null and remark != ''">
+		AND remark = #{remark,jdbcType=VARCHAR}
+		</if>
+		</where>   
+		order by group_id asc
+	</select>
+	
+	<!-- 查询 所查 预算年度 是否有 执行数据 ( flag 标识 (-1:表示 所查预算年度 没有执行数据) 解决  没有执行数据，前台合计行 展现数据 窜行问题) -->
+	<select id="queryExecuteDataExist" resultType="java.lang.Integer"  parameterType="java.util.Map" >
+	
+		SELECT count(1) FROM BUDG_MED_INCOME_EXECUTE 
+		where                    
+		group_id = #{group_id,jdbcType=INTEGER}
+		AND hos_id = #{hos_id,jdbcType=INTEGER}
+		AND copy_code = #{copy_code,jdbcType=VARCHAR}
+		AND year = #{year,jdbcType=VARCHAR}
+	</select>
+	
+	<!-- 查询 所查 预算年度 是否有 数据 ( budg_flag 标识 (-1:表示 所查预算年度 没有数据) 解决  没有数据，前台合计行 展现数据 窜行问题) -->
+	<select id="queryBudgDataExist" resultType="java.lang.Integer"  parameterType="java.util.Map" >
+	
+		SELECT count(1) FROM budg_med_income_dept_month 
+		where                    
+		group_id = #{group_id,jdbcType=INTEGER}
+		AND hos_id = #{hos_id,jdbcType=INTEGER}
+		AND copy_code = #{copy_code,jdbcType=VARCHAR}
+		AND year = #{year,jdbcType=VARCHAR}
+	</select>
+</mapper>
+

@@ -1,0 +1,717 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.acc.dao.tell.AccInventoryReportMapper">
+	<resultMap id="accInventoryReport" type="com.chd.hrp.acc.entity.AccInventoryReport" >
+		<result property="subj_code" column="subj_code"/>
+		<result property="subj_name" column="subj_name"/>
+		<result property="pre_bal" column="pre_bal"/>
+		<result property="credit" column="credit"/>
+		<result property="debit" column="debit"/>
+		<result property="cur_bal" column="cur_bal"/>
+		<result property="preMonth_bal" column="preMonth_bal"/>
+		<result property="curMonth_bal" column="curMonth_bal"/>
+	</resultMap>
+	<!-- 查询 库存日报 -->
+	<select id="queryAccInventoryReportByDay" parameterType="java.util.Map" resultMap="accInventoryReport">
+		WITH subj AS (
+			<!-- 查询现金、银行科目 -->
+    		SELECT 
+    			distinct s.super_code, s.subj_nature_code, s.is_last, s.subj_level, s.subj_code, s.subj_name 
+    		FROM ACC_SUBJ s 
+    		WHERE 
+    			s.group_id=#{group_id} 
+    			AND s.hos_id=#{hos_id}
+    			AND s.copy_code=#{copy_code}
+    			AND s.acc_year=#{acc_year} 
+    			AND s.subj_nature_code in('02','03')
+		), 
+		
+		cashData AS(
+			<!-- 4.昨日库存 -->
+    		SELECT
+	    		subj.super_code, subj.subj_nature_code, subj.is_last, subj.subj_level, subj.subj_code, subj.subj_name, 
+	    		nvl(c.end_os,0)+nvl(a.bal,0)+nvl(b.bal,0) as bal, nvl(d.debit,0) as debit, nvl(d.credit,0) as credit 
+    		FROM subj
+    		
+    		LEFT JOIN (
+      			<!-- 2.凭证结存：根据会计期间表中的开始日期作为条件查询凭证明细表 -->
+        		SELECT 
+            		s.subj_code, avd.group_id, avd.hos_id, avd.copy_code, avd.acc_year, sum(avd.debit-avd.credit) as bal
+         		FROM ACC_VOUCH_DETAIL avd
+         		INNER JOIN ACC_VOUCH av          
+               	ON 
+               		avd.vouch_id = av.vouch_id
+         		INNER JOIN ACC_SUBJ s 
+         	   	ON 
+         	   		avd.group_id = s.group_id  
+         	   		AND avd.hos_id= s.hos_id  
+         	   		AND avd.copy_code= s.copy_code  
+         	   		AND avd.acc_year= s.acc_year  
+         	   		AND avd.subj_code = s.subj_code
+         	   		AND s.subj_nature_code in('02','03')
+         		WHERE
+               		avd.group_id = #{group_id}
+               		AND avd.hos_id = #{hos_id}
+               		AND avd.copy_code = #{copy_code}   
+               		AND avd.acc_year = #{acc_year}
+               		
+               		AND EXISTS (
+	                	<!-- 1.根据出纳账系统启用年月作为条件查询会计期间表的开始日期 -->                                                                                        
+	               		SELECT 1 FROM ACC_YEAR_MONTH aym
+	                  	WHERE
+	                       aym.group_id = avd.group_id
+	                       AND aym.hos_id = avd.hos_id
+	                       AND aym.copy_code =avd.copy_code
+	                       AND aym.acc_year || aym.acc_month = #{modStartYearMonth}
+	                       AND av.vouch_date &lt; aym.begin_date
+                   	)
+               		AND av.state > 0
+           		GROUP BY avd.group_id,avd.hos_id,avd.copy_code,avd.acc_year,s.subj_code
+			) a 
+			ON a.subj_code = subj.subj_code
+		
+			LEFT JOIN (
+			<!-- 3.根据选择的日期,选择的日期年度，状态查询出纳账表借(收入)减贷(支出)的值 -->
+		        SELECT
+		             s.subj_code, sum(att.debit) - sum(att.credit) as bal
+		        FROM ACC_TELL att
+		        
+		        INNER JOIN ACC_SUBJ s 
+			    ON 
+			        att.group_id = s.group_id
+			        AND att.hos_id = s.hos_id
+			        AND att.copy_code = s.copy_code
+			        AND att.acc_year = s.acc_year
+			        AND att.cash_subj_code = s.subj_code 
+			        and s.subj_nature_code in('02','03')
+			        
+		        WHERE 
+		        	att.group_id = #{group_id}
+		            AND att.hos_id = #{hos_id}
+		            AND att.copy_code = #{copy_code}
+		            AND att.acc_year = #{acc_year}
+		            <!-- 选择的日期 -->
+		            AND att.occur_date &lt; to_date(#{end_time},'yyyy/MM/dd')
+		            AND att.state > 0
+		            and att.is_init = 0
+				GROUP BY s.subj_code
+			) b
+	    	ON 
+	    		b.subj_code = subj.subj_code
+	    		
+	    	LEFT JOIN (
+				SELECT 
+					s.subj_code,sum(al.end_os) end_os  from acc_leder al
+				INNER JOIN ACC_SUBJ s 
+				ON 
+					al.group_id = s.group_id
+			     	AND al.hos_id = s.hos_id
+			     	AND al.copy_code = s.copy_code
+			     	AND al.acc_year = s.acc_year
+			     	AND al.subj_code =s.subj_code 
+			     	AND s.subj_nature_code in('02','03')
+				WHERE 
+					al.group_id = #{group_id}
+			        AND al.hos_id =#{hos_id}
+			        AND al.copy_code = #{copy_code}
+			        AND al.acc_year = #{acc_year}
+			        AND s.subj_code=al.subj_code
+					AND al.acc_month=00
+				GROUP BY s.subj_code    
+			)  c
+			ON 
+				c.subj_code = subj.subj_code
+				
+			LEFT JOIN (
+	 			<!-- 查询本日收入和支出 -->
+				SELECT
+					s.subj_code, sum(att.debit) as debit, sum(att.credit) as credit
+				FROM ACC_TELL att
+				INNER JOIN ACC_SUBJ s 
+				ON 
+					att.group_id = s.group_id
+					AND att.hos_id = s.hos_id
+					AND att.copy_code = s.copy_code
+					AND att.acc_year = s.acc_year
+					AND att.cash_subj_code = s.subj_code
+			        AND s.subj_nature_code in('02','03')
+				WHERE 
+					att.group_id = #{group_id}
+					AND att.hos_id = #{hos_id}
+					AND att.copy_code = #{copy_code}
+			        AND att.acc_year = #{acc_year}
+			        AND att.occur_date=to_date(#{end_time},'yyyy/MM/dd')
+			        AND att.state > 0
+			        and att.is_init = 0
+				GROUP BY  s.subj_code
+			 ) d
+			 ON 
+			 	d.subj_code = subj.subj_code
+	 
+	     		ORDER BY subj.subj_code
+		),
+		
+ 		superData AS(
+	 		select cd1.super_code,
+				   sum(cd2.bal) as bal,
+				   sum(cd2.debit) as debit,
+				   sum(cd2.credit) as credit,
+				   sum(cd2.bal) + sum(cd2.debit) - sum(cd2.credit) as cur_bal
+			from cashData cd1
+			left join cashData cd2 
+				   on cd2.subj_code like cd1.subj_code || '%'
+			where cd1.super_code != 'top'
+			group by cd1.super_code
+ 		), 
+ 		
+ 		resultData AS(
+	 		SELECT 
+			 	subj_code ord, subj_nature_code, subj_level, subj_code, bal as pre_bal, debit, credit, bal+debit-credit as cur_bal  
+	 		FROM cashData 
+		 	WHERE 
+	 			is_last=1
+  			UNION ALL 
+  			
+  			SELECT 
+		  		super_code ord,'' subj_nature_code,0 subj_level, super_code, bal , debit, credit, cur_bal 
+	  		FROM superData
+ 			UNION ALL 
+ 			
+ 			SELECT 
+	 			'9999' ord, '' subj_nature_code, 0, '合计', sum(bal) as pre_bal, sum(debit) as debit, sum(credit) as credit, sum(bal)+sum(debit)-sum(credit) cur_bal  
+   			FROM cashData 
+   			WHERE 
+   				is_last=1 
+ 		)
+ 
+ 		SELECT 
+		 	r.subj_code, s.subj_name, r.pre_bal, r.debit, r.credit, r.cur_bal 
+ 		FROM resultData r
+ 		LEFT JOIN SUBJ s 
+ 		ON 
+ 			r.subj_code=s.subj_code
+ 		ORDER BY ord
+	</select>
+    
+    <!-- 查询 库存月报 -->
+    <select id="queryAccInventoryReportByMonth" parameterType="java.util.Map" resultMap="accInventoryReport">
+		WITH subj AS (
+			<!-- 查询现金、银行科目 -->
+    		SELECT DISTINCT 
+	    		s.super_code, s.subj_nature_code, s.is_last, s.subj_level, s.subj_code, s.subj_name 
+	    	FROM ACC_SUBJ s 
+	    	WHERE 
+		    	s.group_id=#{group_id} 
+		    	AND s.hos_id=#{hos_id}
+		    	AND s.copy_code=#{copy_code} 
+		    	AND s.subj_nature_code in('02','03')
+		), 
+		cashData AS(
+			<!-- 4.上月库存 -->
+    		SELECT
+	    		subj.super_code, subj.subj_nature_code, subj.is_last, subj.subj_level, subj.subj_code, subj.subj_name,
+	    		nvl(c.end_os,0)+nvl(a.bal,0)+nvl(b.bal,0) as bal, nvl(d.debit,0) as debit, nvl(d.credit,0) as credit 
+   			FROM SUBJ
+    		LEFT JOIN (
+      			<!-- 2.凭证结存：根据会计期间表中的开始日期作为条件查询凭证明细表 -->
+    			select s.subj_code, avd.group_id, avd.hos_id, avd.copy_code, avd.acc_year,
+	            	   sum(avd.debit-avd.credit) as bal
+				from acc_vouch_detail avd
+	            inner join acc_vouch av          
+	                    on avd.vouch_id = av.vouch_id
+	            inner join acc_subj s 
+	         	        on avd.group_id = s.group_id
+	         	   	   AND avd.hos_id = s.hos_id
+	         	   	   AND avd.copy_code = s.copy_code
+	         	   	   AND avd.acc_year = s.acc_year
+	         	   	   AND avd.subj_code = s.subj_code
+	         	       and s.subj_nature_code in('02','03')
+	            where avd.group_id = #{group_id}
+	              AND avd.hos_id = #{hos_id}
+	              AND avd.copy_code = #{copy_code}   
+	              AND avd.acc_year = #{acc_year}
+	              and exists (
+	                  <!-- 1.根据出纳账系统启用年月作为条件查询会计期间表的开始日期 -->                                                                                        
+	               	  select 1 from acc_year_month aym
+	                  where aym.group_id = avd.group_id
+	                    AND aym.hos_id = avd.hos_id
+	                    AND aym.copy_code =avd.copy_code
+	                    AND aym.acc_year || aym.acc_month = #{modStartYearMonth}
+	                    AND av.vouch_date &lt; aym.begin_date
+	               )
+	               AND av.state > 0
+	            group by avd.group_id,avd.hos_id,avd.copy_code,avd.acc_year,s.subj_code
+			) a 
+			       on subj.subj_code=a.subj_code
+            left join (
+                <!-- 3.根据选择的年月,选择的日期年度，状态查询出纳账表借(收入)减贷(支出)的值 -->
+                select s.subj_code, sum(att.debit) - sum(att.credit) as bal
+                from acc_tell att
+                inner join acc_subj s 
+	                    on att.group_id = s.group_id
+	        	       AND att.hos_id = s.hos_id
+	        	       AND att.copy_code = s.copy_code
+	        	       AND att.acc_year = s.acc_year
+	        	       AND att.cash_subj_code = s.subj_code
+	        	       and s.subj_nature_code in('02','03')
+                 where att.group_id = #{group_id}
+                   AND att.hos_id = #{hos_id}
+                   AND att.copy_code = #{copy_code}
+                   AND att.acc_year = #{acc_year}
+                   <!-- 选择的年月 -->
+                   AND to_char(att.occur_date,'yyyy/MM') &lt; #{end_yearMonth}
+                   AND att.state > 0
+		           and att.is_init = 0
+                 group by s.subj_code
+            ) b
+                   ON subj.subj_code=b.subj_code 
+            left join (
+		        select s.subj_code,sum(al.end_os) end_os
+		        from acc_leder al
+		        inner join acc_subj s 
+		                on al.group_id = s.group_id 
+		     	       AND al.hos_id = s.hos_id
+		     	       AND al.copy_code = s.copy_code
+		     	       AND al.acc_year = s.acc_year
+		     	       AND al.subj_code =s.subj_code
+		     	       AND s.subj_nature_code in('02','03')
+		        where al.group_id = #{group_id}
+		          AND al.hos_id =#{hos_id}
+		          AND al.copy_code = #{copy_code}
+		          AND al.acc_year = #{acc_year}
+		          AND s.subj_code = al.subj_code
+		          AND al.acc_month=00
+		        group by s.subj_code    
+		    ) c
+                   on c.subj_code=subj.subj_code
+		    left join (
+                <!-- 查询本月收入和支出 -->
+		        select s.subj_code, sum(att.debit) as debit, sum(att.credit) as credit
+		        from acc_tell att
+		        inner join acc_subj s 
+		                on att.group_id = s.group_id
+		         	   AND att.hos_id = s.hos_id
+		         	   AND att.copy_code = s.copy_code
+		         	   AND att.acc_year = s.acc_year
+		        	   AND att.cash_subj_code = s.subj_code
+		               and s.subj_nature_code in('02','03')
+		        where att.group_id = #{group_id}
+		          AND att.hos_id = #{hos_id}
+		          AND att.copy_code = #{copy_code}
+		          AND att.acc_year = #{acc_year}
+		          AND to_char(att.occur_date,'yyyy/MM')=#{end_yearMonth}
+		          AND att.state > 0
+		          and att.is_init = 0
+		        group by  s.subj_code
+		    ) d
+     	           on d.subj_code=subj.subj_code
+     	    order by subj.subj_code
+        ),
+        superData as(
+ 		    select cd1.super_code,
+				   sum(cd2.bal) as bal,
+				   sum(cd2.debit) as debit,
+				   sum(cd2.credit) as credit,
+				   sum(cd2.bal) + sum(cd2.debit) - sum(cd2.credit) as curMonth_bal
+			from cashData cd1
+			left join cashData cd2 
+				   on cd2.subj_code like cd1.subj_code || '%'
+			where cd1.super_code != 'top'
+			group by cd1.super_code
+        ), 
+        resultData as(
+	        select subj_code ord,
+			       subj_nature_code,
+			       subj_level,
+			       subj_code,  
+			       bal as preMonth_bal,
+			       debit,
+			       credit,
+			       bal + debit - credit as curMonth_bal  
+	        from cashData 
+	        where is_last=1
+            union all 
+  	        select super_code ord,
+	  	           '' subj_nature_code,
+	  	           0 subj_level,
+	  	           super_code, bal ,
+	  	           debit,
+	  	           credit,
+	  	           curMonth_bal
+  	        from superData
+            union all 
+ 	        select '9999' ord,
+	 	           '' subj_nature_code,
+	 	           0,
+	 	           '合计',
+	               sum(bal) as preMonth_bal,
+	               sum(debit) as debit,
+	               sum(credit) as credit,
+	               sum(bal) + sum(debit) - sum(credit) curMonth_bal  
+            from cashData 
+            where is_last=1 
+        )
+ 	    select r.subj_code,
+		       s.subj_name,
+		       r.preMonth_bal,
+		       r.debit,
+		       r.credit,
+		       r.curMonth_bal 
+ 	    from resultData r
+ 	    left join subj s 
+ 	           on r.subj_code = s.subj_code
+        order by ord
+    </select>
+    
+    <select id="queryAccInventoryReportByDayPrint" parameterType="java.util.Map" resultType="java.util.Map">
+		WITH subj AS (
+			<!-- 查询现金、银行科目 -->
+    		SELECT 
+    			distinct s.super_code, s.subj_nature_code, s.is_last, s.subj_level, s.subj_code, s.subj_name 
+    		FROM ACC_SUBJ s 
+    		WHERE 
+    			s.group_id=#{group_id} 
+    			AND s.hos_id=#{hos_id}
+    			AND s.copy_code=#{copy_code}
+    			AND s.acc_year=#{acc_year} 
+    			AND s.subj_nature_code in('02','03')
+		), 
+		
+		cashData AS(
+			<!-- 4.昨日库存 -->
+    		SELECT
+	    		subj.super_code, subj.subj_nature_code, subj.is_last, subj.subj_level, subj.subj_code, subj.subj_name, 
+	    		nvl(c.end_os,0)+nvl(a.bal,0)+nvl(b.bal,0) as bal, nvl(d.debit,0) as debit, nvl(d.credit,0) as credit 
+    		FROM subj
+    		
+    		LEFT JOIN (
+      			<!-- 2.凭证结存：根据会计期间表中的开始日期作为条件查询凭证明细表 -->
+        		SELECT 
+            		s.subj_code, avd.group_id, avd.hos_id, avd.copy_code, avd.acc_year, sum(avd.debit-avd.credit) as bal
+         		FROM ACC_VOUCH_DETAIL avd
+         		INNER JOIN ACC_VOUCH av          
+               	ON 
+               		avd.vouch_id = av.vouch_id
+         		INNER JOIN ACC_SUBJ s 
+         	   	ON 
+         	   		avd.group_id = s.group_id  
+         	   		AND avd.hos_id= s.hos_id  
+         	   		AND avd.copy_code= s.copy_code  
+         	   		AND avd.acc_year= s.acc_year  
+         	   		AND avd.subj_code = s.subj_code
+         	   		AND s.subj_nature_code in('02','03')
+         		WHERE
+               		avd.group_id = #{group_id}
+               		AND avd.hos_id = #{hos_id}
+               		AND avd.copy_code = #{copy_code}   
+               		AND avd.acc_year = #{acc_year}
+               		
+               		AND EXISTS (
+	                	<!-- 1.根据出纳账系统启用年月作为条件查询会计期间表的开始日期 -->                                                                                        
+	               		SELECT 1 FROM ACC_YEAR_MONTH aym
+	                  	WHERE
+	                       aym.group_id = avd.group_id
+	                       AND aym.hos_id = avd.hos_id
+	                       AND aym.copy_code =avd.copy_code
+	                       AND aym.acc_year || aym.acc_month = #{modStartYearMonth}
+	                       AND av.vouch_date &lt; aym.begin_date
+                   	)
+               		AND av.state > 0
+           		GROUP BY avd.group_id,avd.hos_id,avd.copy_code,avd.acc_year,s.subj_code
+			) a 
+			ON a.subj_code = subj.subj_code
+		
+			LEFT JOIN (
+			<!-- 3.根据选择的日期,选择的日期年度，状态查询出纳账表借(收入)减贷(支出)的值 -->
+		        SELECT
+		             s.subj_code, sum(att.debit) - sum(att.credit) as bal
+		        FROM ACC_TELL att
+		        
+		        INNER JOIN ACC_SUBJ s 
+			    ON 
+			        att.group_id = s.group_id
+			        AND att.hos_id = s.hos_id
+			        AND att.copy_code = s.copy_code
+			        AND att.acc_year = s.acc_year
+			        AND att.cash_subj_code = s.subj_code 
+			        and s.subj_nature_code in('02','03')
+			        
+		        WHERE 
+		        	att.group_id = #{group_id}
+		            AND att.hos_id = #{hos_id}
+		            AND att.copy_code = #{copy_code}
+		            AND att.acc_year = #{acc_year}
+		            <!-- 选择的日期 -->
+		            AND att.occur_date &lt; to_date(#{end_time},'yyyy/MM/dd')
+		            AND att.state > 0
+		            and att.is_init = 0
+				GROUP BY s.subj_code
+			) b
+	    	ON 
+	    		b.subj_code = subj.subj_code
+	    		
+	    	LEFT JOIN (
+				SELECT 
+					s.subj_code,sum(al.end_os) end_os  from acc_leder al
+				INNER JOIN ACC_SUBJ s 
+				ON 
+					al.group_id = s.group_id
+			     	AND al.hos_id = s.hos_id
+			     	AND al.copy_code = s.copy_code
+			     	AND al.acc_year = s.acc_year
+			     	AND al.subj_code =s.subj_code 
+			     	AND s.subj_nature_code in('02','03')
+				WHERE 
+					al.group_id = #{group_id}
+			        AND al.hos_id =#{hos_id}
+			        AND al.copy_code = #{copy_code}
+			        AND al.acc_year = #{acc_year}
+			        AND s.subj_code=al.subj_code
+					AND al.acc_month=00
+				GROUP BY s.subj_code    
+			)  c
+			ON 
+				c.subj_code = subj.subj_code
+				
+			LEFT JOIN (
+	 			<!-- 查询本日收入和支出 -->
+				SELECT
+					s.subj_code, sum(att.debit) as debit, sum(att.credit) as credit
+				FROM ACC_TELL att
+				INNER JOIN ACC_SUBJ s 
+				ON 
+					att.group_id = s.group_id
+					AND att.hos_id = s.hos_id
+					AND att.copy_code = s.copy_code
+					AND att.acc_year = s.acc_year
+					AND att.cash_subj_code = s.subj_code
+			        AND s.subj_nature_code in('02','03')
+				WHERE 
+					att.group_id = #{group_id}
+					AND att.hos_id = #{hos_id}
+					AND att.copy_code = #{copy_code}
+			        AND att.acc_year = #{acc_year}
+			        AND att.occur_date=to_date(#{end_time},'yyyy/MM/dd')
+			        AND att.state > 0
+			        and att.is_init = 0
+				GROUP BY  s.subj_code
+			 ) d
+			 ON 
+			 	d.subj_code = subj.subj_code
+	 
+	     		ORDER BY subj.subj_code
+		),
+		
+ 		superData AS(
+	 		select cd1.super_code,
+				   sum(cd2.bal) as bal,
+				   sum(cd2.debit) as debit,
+				   sum(cd2.credit) as credit,
+				   sum(cd2.bal) + sum(cd2.debit) - sum(cd2.credit) as cur_bal
+			from cashData cd1
+			left join cashData cd2 
+				   on cd2.subj_code like cd1.subj_code || '%'
+			where cd1.super_code != 'top'
+			group by cd1.super_code
+ 		), 
+ 		
+ 		resultData AS(
+	 		SELECT 
+			 	subj_code ord, subj_nature_code, subj_level, subj_code, bal as pre_bal, debit, credit, bal+debit-credit as cur_bal  
+	 		FROM cashData 
+		 	WHERE 
+	 			is_last=1
+  			UNION ALL 
+  			
+  			SELECT 
+		  		super_code ord,'' subj_nature_code,0 subj_level, super_code, bal , debit, credit, cur_bal 
+	  		FROM superData
+ 			UNION ALL 
+ 			
+ 			SELECT 
+	 			'9999' ord, '' subj_nature_code, 0, '合计', sum(bal) as pre_bal, sum(debit) as debit, sum(credit) as credit, sum(bal)+sum(debit)-sum(credit) cur_bal  
+   			FROM cashData 
+   			WHERE 
+   				is_last=1 
+ 		)
+ 
+ 		SELECT 
+		 	r.subj_code, s.subj_name, r.pre_bal, r.debit, r.credit, r.cur_bal 
+ 		FROM resultData r
+ 		LEFT JOIN SUBJ s 
+ 		ON 
+ 			r.subj_code=s.subj_code
+ 		ORDER BY ord
+    </select>
+    
+    <!-- 查询 库存月报 -->
+    <select id="queryAccInventoryReportByMonthPrint" parameterType="java.util.Map" resultType="java.util.Map">
+		WITH subj AS (
+			<!-- 查询现金、银行科目 -->
+    		SELECT DISTINCT 
+	    		s.super_code, s.subj_nature_code, s.is_last, s.subj_level, s.subj_code, s.subj_name 
+	    	FROM ACC_SUBJ s 
+	    	WHERE 
+		    	s.group_id=#{group_id} 
+		    	AND s.hos_id=#{hos_id}
+		    	AND s.copy_code=#{copy_code} 
+		    	AND s.subj_nature_code in('02','03')
+		), 
+		cashData AS(
+			<!-- 4.上月库存 -->
+    		SELECT
+	    		subj.super_code, subj.subj_nature_code, subj.is_last, subj.subj_level, subj.subj_code, subj.subj_name,
+	    		nvl(c.end_os,0)+nvl(a.bal,0)+nvl(b.bal,0) as bal, nvl(d.debit,0) as debit, nvl(d.credit,0) as credit 
+   			FROM SUBJ
+    		LEFT JOIN (
+      			<!-- 2.凭证结存：根据会计期间表中的开始日期作为条件查询凭证明细表 -->
+    			select s.subj_code, avd.group_id, avd.hos_id, avd.copy_code, avd.acc_year,
+	            	   sum(avd.debit-avd.credit) as bal
+				from acc_vouch_detail avd
+	            inner join acc_vouch av          
+	                    on avd.vouch_id = av.vouch_id
+	            inner join acc_subj s 
+	         	        on avd.group_id = s.group_id
+	         	   	   AND avd.hos_id = s.hos_id
+	         	   	   AND avd.copy_code = s.copy_code
+	         	   	   AND avd.acc_year = s.acc_year
+	         	   	   AND avd.subj_code = s.subj_code
+	         	       and s.subj_nature_code in('02','03')
+	            where avd.group_id = #{group_id}
+	              AND avd.hos_id = #{hos_id}
+	              AND avd.copy_code = #{copy_code}   
+	              AND avd.acc_year = #{acc_year}
+	              and exists (
+	                  <!-- 1.根据出纳账系统启用年月作为条件查询会计期间表的开始日期 -->                                                                                        
+	               	  select 1 from acc_year_month aym
+	                  where aym.group_id = avd.group_id
+	                    AND aym.hos_id = avd.hos_id
+	                    AND aym.copy_code =avd.copy_code
+	                    AND aym.acc_year || aym.acc_month = #{modStartYearMonth}
+	                    AND av.vouch_date &lt; aym.begin_date
+	               )
+	               AND av.state > 0
+	            group by avd.group_id,avd.hos_id,avd.copy_code,avd.acc_year,s.subj_code
+			) a 
+			       on subj.subj_code=a.subj_code
+            left join (
+                <!-- 3.根据选择的年月,选择的日期年度，状态查询出纳账表借(收入)减贷(支出)的值 -->
+                select s.subj_code, sum(att.debit) - sum(att.credit) as bal
+                from acc_tell att
+                inner join acc_subj s 
+	                    on att.group_id = s.group_id
+	        	       AND att.hos_id = s.hos_id
+	        	       AND att.copy_code = s.copy_code
+	        	       AND att.acc_year = s.acc_year
+	        	       AND att.cash_subj_code = s.subj_code
+	        	       and s.subj_nature_code in('02','03')
+                 where att.group_id = #{group_id}
+                   AND att.hos_id = #{hos_id}
+                   AND att.copy_code = #{copy_code}
+                   AND att.acc_year = #{acc_year}
+                   <!-- 选择的年月 -->
+                   AND to_char(att.occur_date,'yyyy/MM') &lt; #{end_yearMonth}
+                   AND att.state > 0
+		           and att.is_init = 0
+                 group by s.subj_code
+            ) b
+                   ON subj.subj_code=b.subj_code 
+            left join (
+		        select s.subj_code,sum(al.end_os) end_os
+		        from acc_leder al
+		        inner join acc_subj s 
+		                on al.group_id = s.group_id 
+		     	       AND al.hos_id = s.hos_id
+		     	       AND al.copy_code = s.copy_code
+		     	       AND al.acc_year = s.acc_year
+		     	       AND al.subj_code =s.subj_code
+		     	       AND s.subj_nature_code in('02','03')
+		        where al.group_id = #{group_id}
+		          AND al.hos_id =#{hos_id}
+		          AND al.copy_code = #{copy_code}
+		          AND al.acc_year = #{acc_year}
+		          AND s.subj_code = al.subj_code
+		          AND al.acc_month=00
+		        group by s.subj_code    
+		    ) c
+                   on c.subj_code=subj.subj_code
+		    left join (
+                <!-- 查询本月收入和支出 -->
+		        select s.subj_code, sum(att.debit) as debit, sum(att.credit) as credit
+		        from acc_tell att
+		        inner join acc_subj s 
+		                on att.group_id = s.group_id
+		         	   AND att.hos_id = s.hos_id
+		         	   AND att.copy_code = s.copy_code
+		         	   AND att.acc_year = s.acc_year
+		        	   AND att.cash_subj_code = s.subj_code
+		               and s.subj_nature_code in('02','03')
+		        where att.group_id = #{group_id}
+		          AND att.hos_id = #{hos_id}
+		          AND att.copy_code = #{copy_code}
+		          AND att.acc_year = #{acc_year}
+		          AND to_char(att.occur_date,'yyyy/MM')=#{end_yearMonth}
+		          AND att.state > 0
+		          and att.is_init = 0
+		        group by  s.subj_code
+		    ) d
+     	           on d.subj_code=subj.subj_code
+     	    order by subj.subj_code
+        ),
+        superData as(
+ 		    select cd1.super_code,
+				   sum(cd2.bal) as bal,
+				   sum(cd2.debit) as debit,
+				   sum(cd2.credit) as credit,
+				   sum(cd2.bal) + sum(cd2.debit) - sum(cd2.credit) as curMonth_bal
+			from cashData cd1
+			left join cashData cd2 
+				   on cd2.subj_code like cd1.subj_code || '%'
+			where cd1.super_code != 'top'
+			group by cd1.super_code
+        ), 
+        resultData as(
+	        select subj_code ord,
+			       subj_nature_code,
+			       subj_level,
+			       subj_code,  
+			       bal as preMonth_bal,
+			       debit,
+			       credit,
+			       bal + debit - credit as curMonth_bal  
+	        from cashData 
+	        where is_last=1
+            union all 
+  	        select super_code ord,
+	  	           '' subj_nature_code,
+	  	           0 subj_level,
+	  	           super_code, bal ,
+	  	           debit,
+	  	           credit,
+	  	           curMonth_bal
+  	        from superData
+            union all 
+ 	        select '9999' ord,
+	 	           '' subj_nature_code,
+	 	           0,
+	 	           '合计',
+	               sum(bal) as preMonth_bal,
+	               sum(debit) as debit,
+	               sum(credit) as credit,
+	               sum(bal) + sum(debit) - sum(credit) curMonth_bal  
+            from cashData 
+            where is_last=1 
+        )
+ 	    select r.subj_code,
+		       s.subj_name,
+		       r.preMonth_bal,
+		       r.debit,
+		       r.credit,
+		       r.curMonth_bal 
+ 	    from resultData r
+ 	    left join subj s 
+ 	           on r.subj_code = s.subj_code
+        order by ord
+    </select>
+</mapper>
+

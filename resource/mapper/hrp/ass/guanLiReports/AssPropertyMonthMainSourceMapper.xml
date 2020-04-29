@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper
+	namespace="com.chd.hrp.ass.dao.guanLiReports.AssPropertyMonthMainSourceMapper">
+
+	<resultMap id="assPropertyMonthMainSource"
+		type="java.util.Map">
+		<result property="ass_type_code" column="ass_type_code" />
+		<result property="ass_type_name" column="ass_type_name" />
+		<result property="source_name" column="source_name" />
+		<result property="begin_money" column="begin_money" />
+		<result property="add_money" column="add_money" />
+		<result property="dec_money" column="dec_money" />
+		<result property="end_money" column="end_money" />
+		<result property="depre_begin_money" column="depre_begin_money" />
+		<result property="depre_add_money" column="depre_add_money" />
+		<result property="depre_dec_money" column="depre_dec_money" />
+		<result property="depre_end_money" column="depre_end_money" />
+		<result property="remain_begin_money"
+			column="remain_begin_money" />
+		<result property="remain_end_money" column="remain_end_money" />
+		<result property="ass_naturs" column="ass_naturs" />
+		<result property="ass_naturs_name" column="ass_naturs_name" />
+	</resultMap>
+
+	<!-- 资产月报 <财务制度> 按部门 -->
+	<select id="queryAssPropertyMonthMainSource"
+		parameterType="java.util.Map" resultMap="assPropertyMonthMainSource">
+
+		WITH type_main_rep AS
+		(SELECT
+		a.GROUP_ID
+		,a.HOS_ID
+		,a.COPY_CODE
+		,ACC_YEAR
+		,ACC_MONTH
+		,YEAR_MONTH
+		,a.ASS_TYPE_ID
+		,ass_type_code
+		,super_code
+		,ass_naturs
+		,a.source_name
+		,R_BEGIN
+		,R_ADD
+		,R_DEC
+		,R_END
+		,L_BEGIN
+		,L_ADD
+		,L_DEC
+		,L_END
+		FROM
+		ASS_COLLECT_TYPE_SOURCE a
+		INNER JOIN ass_type_dict b
+		ON a.group_id =
+		b.group_id
+		AND a.hos_id = b.hos_id
+		AND a.copy_code = b.copy_code
+		AND
+		a.ass_type_id = b.ass_type_id
+		WHERE a.group_id = #{group_id, jdbcType =
+		INTEGER}
+		AND a.hos_id = #{hos_id, jdbcType = INTEGER}
+		AND a.copy_code =
+		#{copy_code, jdbcType = VARCHAR}
+		AND a.year_month between
+		#{year_month_begin,jdbcType=VARCHAR} and
+		#{year_month_end,jdbcType=VARCHAR}
+		
+		and exists (select 1 from v_user_data_perm bb where
+							a.group_id=bb.group_id and a.hos_id=bb.hos_id and
+							to_char(b.ass_naturs)=bb.perm_code
+							AND TABLE_CODE =
+							upper('ass_naturs')
+							and bb.user_id=#{user_id}
+							and (bb.is_read = 1
+							or bb.is_write = 1 ))
+							
+		and exists (select 1 from v_user_data_perm bb2 where
+							a.group_id=bb2.group_id and a.hos_id=bb2.hos_id and
+							to_char(b.ass_type_id)=bb2.perm_code
+							AND TABLE_CODE =
+							upper('ass_type_dict')
+							and bb2.user_id=#{user_id}
+							and (bb2.is_read = 1
+							or bb2.is_write = 1 ))
+							
+		),
+		type_temp AS
+		(SELECT
+		t1.group_id,t1.hos_id,t1.copy_code,t1.ass_type_id,t1.ass_type_code,t1.ass_type_name,t1.ass_naturs,t2.naturs_name
+		ass_naturs_name
+		FROM
+		ass_type_dict t1
+		left join ass_naturs t2 on t2.naturs_code=t1.ass_naturs
+		WHERE t1.type_level = 1
+		
+		and exists (select 1 from v_user_data_perm bb where
+							t1.group_id=bb.group_id and t1.hos_id=bb.hos_id and
+							to_char(t1.ass_naturs)=bb.perm_code
+							AND TABLE_CODE =
+							upper('ass_naturs')
+							and bb.user_id=#{user_id}
+							and (bb.is_read = 1
+							or bb.is_write = 1 ))
+		
+		
+		and exists (select 1 from v_user_data_perm bb2 where
+							t1.group_id=bb2.group_id and t1.hos_id=bb2.hos_id and
+							to_char(t1.ass_type_id)=bb2.perm_code
+							AND TABLE_CODE =
+							upper('ass_type_dict')
+							and bb2.user_id=#{user_id}
+							and (bb2.is_read = 1
+							or bb2.is_write = 1 ))
+		)
+
+		SELECT a.ass_naturs,ass_naturs_name,b.ass_type_code,
+		b.ass_type_name, source_name,
+		SUM(R_BEGIN) BEGIN_MONEY,
+		SUM(R_ADD)
+		ADD_MONEY, SUM(R_DEC) DEC_MONEY,
+		SUM(R_END) END_MONEY,
+		SUM(L_BEGIN)
+		depre_begin_money, SUM(L_ADD)
+		depre_ADD_MONEY, SUM(L_DEC)
+		depre_DEC_MONEY, SUM(L_END)
+		depre_END_MONEY, SUM(R_BEGIN - L_BEGIN)
+		remain_begin_money, SUM(R_END -
+		L_END) remain_end_money
+		FROM
+		type_main_rep a
+		LEFT JOIN type_temp b
+		ON
+		a.group_id = b.group_id AND
+		a.hos_id = b.hos_id AND a.copy_code =
+		b.copy_code AND a.ass_naturs =
+		b.ass_naturs
+		GROUP BY a.ass_naturs,ass_naturs_name,b.ass_type_code,
+		b.ass_type_name, source_name
+		union all
+		SELECT null, null,null,null, '合计', SUM(R_BEGIN) BEGIN_MONEY, SUM(R_ADD) ADD_MONEY, SUM(R_DEC) DEC_MONEY, SUM(R_END) END_MONEY, SUM(L_BEGIN) depre_begin_money, SUM(L_ADD) depre_ADD_MONEY, SUM(L_DEC) depre_DEC_MONEY, SUM(L_END) depre_END_MONEY, SUM(R_BEGIN - L_BEGIN) remain_begin_money, SUM(R_END - L_END) remain_end_money
+  FROM type_main_rep a
+		ORDER
+		BY ass_type_code
+
+	</select>
+	<select id="queryAssPropertyMonthMainSourcePrint"
+		parameterType="java.util.Map" resultMap="assPropertyMonthMainSource">
+
+		WITH type_main_rep AS
+		(SELECT
+		a.GROUP_ID
+		,a.HOS_ID
+		,a.COPY_CODE
+		,ACC_YEAR
+		,ACC_MONTH
+		,YEAR_MONTH
+		,a.ASS_TYPE_ID
+		,ass_type_code
+		,super_code
+		,ass_naturs
+		,a.source_name
+		,R_BEGIN
+		,R_ADD
+		,R_DEC
+		,R_END
+		,L_BEGIN
+		,L_ADD
+		,L_DEC
+		,L_END
+		FROM
+		ASS_COLLECT_TYPE_SOURCE a
+		INNER JOIN ass_type_dict b
+		ON a.group_id =
+		b.group_id
+		AND a.hos_id = b.hos_id
+		AND a.copy_code = b.copy_code
+		AND
+		a.ass_type_id = b.ass_type_id
+		WHERE a.group_id = #{group_id, jdbcType =
+		INTEGER}
+		AND a.hos_id = #{hos_id, jdbcType = INTEGER}
+		AND a.copy_code =
+		#{copy_code, jdbcType = VARCHAR}
+		AND a.year_month between
+		#{year_month_begin,jdbcType=VARCHAR} and
+		#{year_month_end,jdbcType=VARCHAR}
+		),
+		type_temp AS
+		(SELECT
+		t1.group_id,t1.hos_id,t1.copy_code,t1.ass_type_id,t1.ass_type_code,t1.ass_type_name,t1.ass_naturs,t2.naturs_name
+		ass_naturs_name
+		FROM
+		ass_type_dict t1
+		left join ass_naturs t2 on t2.naturs_code=t1.ass_naturs
+		WHERE t1.type_level= 1)
+		SELECT a.ass_naturs,ass_naturs_name,b.ass_type_code,
+		b.ass_type_name, source_name, SUM(R_BEGIN) BEGIN_MONEY,
+		SUM(R_ADD)
+		ADD_MONEY, SUM(R_DEC) DEC_MONEY, SUM(R_END) END_MONEY,
+		SUM(L_BEGIN)
+		depre_begin_money, SUM(L_ADD) depre_ADD_MONEY, SUM(L_DEC)
+		depre_DEC_MONEY, SUM(L_END) depre_END_MONEY, SUM(R_BEGIN - L_BEGIN)
+		remain_begin_money, SUM(R_END - L_END) remain_end_money
+		FROM
+		type_main_rep a
+		LEFT JOIN type_temp b
+		ON a.group_id = b.group_id AND
+		a.hos_id = b.hos_id AND a.copy_code =
+		b.copy_code AND a.ass_naturs =
+		b.ass_naturs
+		GROUP BY a.ass_naturs,ass_naturs_name,b.ass_type_code, b.ass_type_name, source_name
+		union all
+		SELECT null, null,null,null, '合计', SUM(R_BEGIN) BEGIN_MONEY, SUM(R_ADD) ADD_MONEY, SUM(R_DEC) DEC_MONEY, SUM(R_END) END_MONEY, SUM(L_BEGIN) depre_begin_money, SUM(L_ADD) depre_ADD_MONEY, SUM(L_DEC) depre_DEC_MONEY, SUM(L_END) depre_END_MONEY, SUM(R_BEGIN - L_BEGIN) remain_begin_money, SUM(R_END - L_END) remain_end_money
+  FROM type_main_rep a
+		ORDER
+		BY ass_type_code
+
+	</select>
+</mapper>
+

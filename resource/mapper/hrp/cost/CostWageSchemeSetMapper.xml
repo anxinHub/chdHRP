@@ -1,0 +1,429 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.cost.dao.CostWageSchemeSetMapper">
+
+	<resultMap id="costWageSchemeSet" type="com.chd.hrp.cost.entity.CostWageSchemeSet">
+        <result property="scheme_id" column="scheme_id"/>
+        <result property="scheme_name" column="scheme_name"/>
+        <result property="emp_kind_code" column="emp_kind_code"/>
+        <result property="emp_kind_name" column="emp_kind_name"/>
+        <result property="wage_item_name" column="wage_item_name"/>
+        <result property="wage_item_code" column="wage_item_code"/>
+        <result property="wage_code" column="wage_code"/>
+        <result property="wage_column" column="wage_column"/>
+        <result property="order_no" column="order_no"/>
+	</resultMap>
+	<resultMap type="com.chd.hrp.cost.entity.HrpCostSelect" id="hrpCostSelect">
+		<result property="id" column="id" />
+		<result property="text" column="text" />
+	</resultMap>
+	
+    <insert id="addCostWageSchemeSet" useGeneratedKeys="true" >
+    
+        INSERT INTO COST_WAGE_SCHEME_SET (
+                    scheme_id
+			 ,
+                    emp_kind_code
+			 ,
+                    wage_item_code
+			 ,
+                    order_no
+			 
+        ) VALUES (
+		#{scheme_id}			 ,
+		#{emp_kind_code}			 ,
+		#{wage_item_code}			 ,
+		#{order_no}			 
+        )
+    
+    </insert>
+	<insert id="addBatchCostWageSchemeSet" parameterType="java.util.List" >
+    
+        INSERT INTO COST_WAGE_SCHEME_SET 
+		(
+    		scheme_id,
+    		emp_kind_code,
+    		wage_item_code,
+    		order_no
+        ) 
+		<!-- 没有序列的变通调整 顺序要调整一下 -->
+		select A.* FROM (
+		 <foreach collection="list" item="item" index="index" separator=" union all " >
+        select 		
+		    #{item.scheme_id},
+		    #{item.emp_kind_code},
+		    #{item.wage_item_code},
+		    #{item.order_no}
+		 from dual 
+		</foreach>
+		) A
+    
+    </insert>
+	<update id="updateCostWageSchemeSet" parameterType="java.util.Map">
+    
+        UPDATE cost_wage_scheme_set SET
+			 order_no = #{order_no}
+        WHERE 
+		    scheme_id = #{scheme_id} and 
+		    emp_kind_code = #{emp_kind_code} and 
+		    wage_item_code = #{wage_item_code}
+   
+	</update>
+	
+	<update id="updateBatchCostWageSchemeSet" parameterType="java.util.List">
+     
+	<foreach collection="list" item="item" index="index" open="begin" close="end;" separator=";" >
+        UPDATE cost_wage_scheme_set SET
+			 order_no = #{order_no}
+        WHERE 
+		    scheme_id = #{item.scheme_id} and 
+		    emp_kind_code = #{item.emp_kind_code} and 
+		    wage_item_code = #{item.wage_item_code}
+    </foreach>
+	</update>
+
+    <delete id="deleteCostWageSchemeSet" parameterType="java.util.Map">
+   
+        DELETE FROM cost_wage_scheme_set 
+			WHERE
+				scheme_id = #{scheme_id}  and 
+				emp_kind_code = #{emp_kind_code}
+   
+    </delete>
+	
+    <delete id="deleteBatchCostWageSchemeSet" parameterType="java.util.List">
+        DELETE FROM cost_wage_scheme_set 
+			WHERE
+			<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+			    scheme_id = #{item.scheme_id} and 
+			    emp_kind_code = #{item.emp_kind_code} and 
+			    wage_item_code = #{item.wage_item_code}
+			</foreach>
+        
+    </delete>
+    
+    <select id="queryCostWageSchemeSetByCode" resultType="com.chd.hrp.cost.entity.CostWageSchemeSet" parameterType="string" >
+	  
+           SELECT 
+        	cws.group_id,
+        	cws.hos_id,
+        	cws.copy_code,
+            cwss.scheme_id,
+            cws.scheme_name,
+            cwss.emp_kind_code,
+            ceta.emp_kind_name,
+            cwss.wage_item_code,
+            cwia.wage_item_name,
+            cwss.order_no
+        FROM COST_WAGE_SCHEME_SET cwss
+        left join COST_WAGE_SCHEME cws
+        on cwss.scheme_id = cws.scheme_id
+        
+        left join COST_EMP_TYPE_ATTR ceta on
+        cwss.emp_kind_code = ceta.emp_kind_code
+        
+        left join COST_WAGE_ITEM_ARRT cwia  on 
+        cwss.wage_item_code = cwia.wage_item_code 
+	        <where>                  
+	        cwia.is_stop = '0'
+	        	<if test="group_id != null and group_id != ''">
+                    AND cws.group_id = #{group_id}
+             	  </if>
+			    <if test="hos_id != null and hos_id != ''">
+                    AND cws.hos_id = #{hos_id}
+               </if>
+			    <if test="copy_code != null and copy_code != ''">
+                    AND cws.copy_code = #{copy_code}
+               </if>   
+			    <if test="scheme_id != null and scheme_id != ''">
+                    AND cwss.scheme_id = #{scheme_id}
+               </if>
+			    <if test="emp_kind_code != null and emp_kind_code != ''">
+                    AND cwss.emp_kind_code = #{emp_kind_code}
+               </if>
+			    <if test="wage_item_code != null and wage_item_code != ''">
+                    AND cwss.wage_item_code = #{wage_item_code}
+               </if>
+
+        </where>   	  
+        
+	</select>
+	<select id="queryCostWageSchemeName" parameterType="java.util.Map" resultMap="costWageSchemeSet" >
+	
+   select scheme_id from COST_WAGE_SCHEME 
+   <where>
+     	<if test="group_id != null and group_id != ''">
+                    AND group_id = #{group_id}
+             	  </if>
+			    <if test="hos_id != null and hos_id != ''">
+                    AND hos_id = #{hos_id}
+               </if>
+			    <if test="copy_code != null and copy_code != ''">
+                    AND copy_code = #{copy_code}
+               </if>   
+			    <if test="scheme_name != null and scheme_name != ''">
+                    AND scheme_name = #{scheme_name}
+               </if>
+   </where>
+	
+	</select>
+	<select id="queryCostWageSchemeSet" parameterType="java.util.Map" resultMap="costWageSchemeSet" >
+      
+        SELECT 
+        	cws.group_id,
+        	cws.hos_id,
+        	cws.copy_code,
+            cwss.scheme_id,
+            cws.scheme_name,
+            cwss.emp_kind_code,
+            ceta.emp_kind_name,
+            cwss.wage_item_code,
+            cwia.wage_item_name,
+            cwss.order_no
+        FROM COST_WAGE_SCHEME_SET cwss
+        left join COST_WAGE_SCHEME cws
+        on cwss.scheme_id = cws.scheme_id
+        
+        left join COST_EMP_TYPE_ATTR ceta on
+        cwss.emp_kind_code = ceta.emp_kind_code
+        
+        left join COST_WAGE_ITEM_ARRT cwia  on 
+        cwss.wage_item_code = cwia.wage_item_code 
+        
+            <where> 
+              cwia.is_stop = '0'
+            	<if test="group_id != null and group_id != ''">
+                    AND cws.group_id = #{group_id}
+               </if>
+			    <if test="hos_id != null and hos_id != ''">
+                    AND cws.hos_id = #{hos_id}
+               </if>
+			    <if test="copy_code != null and copy_code != ''">
+                    AND cws.copy_code = #{copy_code}
+               </if>                  
+			    <if test="scheme_name != null and scheme_name != ''">
+                    AND cws.scheme_name like '%${scheme_name}%'
+                    <!-- or cwss.scheme_id = #{scheme_name} -->
+               </if>
+			    <if test="emp_kind_code != null and emp_kind_code != ''">
+                    AND cwss.emp_kind_code = #{emp_kind_code}
+               </if>
+			    <if test="wage_item_code != null and wage_item_code != ''">
+                    AND cwss.wage_item_code = #{wage_item_code}
+               </if>
+			    <if test="order_no != null and order_no != ''">
+                    AND cwss.order_no = #{order_no}
+               </if>
+        </where>   
+				order by cwss.scheme_id asc
+    </select>
+    
+    <select id="queryCostWageSchemeSetPrint" parameterType="java.util.Map" resultType="java.util.Map" >
+      
+        SELECT 
+        	cws.group_id,
+        	cws.hos_id,
+        	cws.copy_code,
+            cwss.scheme_id,
+            cws.scheme_name,
+            cwss.emp_kind_code,
+            ceta.emp_kind_name,
+            cwss.wage_item_code,
+            cwia.wage_item_name,
+            cwss.order_no
+        FROM COST_WAGE_SCHEME_SET cwss
+        left join COST_WAGE_SCHEME cws
+        on cwss.scheme_id = cws.scheme_id
+        
+        left join COST_EMP_TYPE_ATTR ceta on
+        cwss.emp_kind_code = ceta.emp_kind_code
+        
+        left join COST_WAGE_ITEM_ARRT cwia  on 
+        cwss.wage_item_code = cwia.wage_item_code 
+        
+            <where> 
+              cwia.is_stop = '0'
+            	<if test="group_id != null and group_id != ''">
+                    AND cws.group_id = #{group_id}
+               </if>
+			    <if test="hos_id != null and hos_id != ''">
+                    AND cws.hos_id = #{hos_id}
+               </if>
+			    <if test="copy_code != null and copy_code != ''">
+                    AND cws.copy_code = #{copy_code}
+               </if>                  
+			    <if test="scheme_name != null and scheme_name != ''">
+                    AND cws.scheme_name like '%${scheme_name}%'
+                    <!-- or cwss.scheme_id = #{scheme_name} -->
+               </if>
+			    <if test="emp_kind_code != null and emp_kind_code != ''">
+                    AND cwss.emp_kind_code = #{emp_kind_code}
+               </if>
+			    <if test="wage_item_code != null and wage_item_code != ''">
+                    AND cwss.wage_item_code = #{wage_item_code}
+               </if>
+			    <if test="order_no != null and order_no != ''">
+                    AND cwss.order_no = #{order_no}
+               </if>
+        </where>   
+				order by cwss.scheme_id asc
+    </select>
+    
+    <select id="queryCostWageSchemeSetByTitle" parameterType="java.util.Map" resultMap="costWageSchemeSet" >
+      
+        SELECT 
+            cwss.scheme_id,
+            cwss.emp_kind_code,
+            ceta.emp_kind_name,
+            cwss.wage_item_code,
+            cwia.wage_item_name,
+            cwss.order_no,
+            cwdm.wage_column
+        FROM COST_WAGE_SCHEME_SET cwss
+        left join COST_EMP_TYPE_ATTR ceta on
+        cwss.emp_kind_code = ceta.emp_kind_code
+        
+        left join COST_WAGE_ITEM_ARRT cwia  on 
+        cwss.wage_item_code = cwia.wage_item_code
+        
+        left join COST_WAGE_DETAIL_MAP cwdm on
+        cwss.wage_item_code = cwdm.wage_code
+            <where>                     
+			    <if test="scheme_id != null and scheme_id != ''">
+                    AND cwss.scheme_id = #{scheme_id}
+               </if>
+			    <if test="scheme_name != null and scheme_name != ''">
+                    AND cwss.scheme_name = #{scheme_name}
+               </if>
+			    <if test="emp_kind_code != null and emp_kind_code != ''">
+                    AND cwss.emp_kind_code = #{emp_kind_code}
+               </if>
+			    <if test="wage_item_code != null and wage_item_code != ''">
+                    AND cwss.wage_item_code = #{wage_item_code}
+               </if>
+			    <if test="wage_code != null and wage_code != ''">
+                    AND cwss.wage_code = #{wage_code}
+               </if>
+			    <if test="order_no != null and order_no != ''">
+                    AND cwss.order_no = #{order_no}
+               </if>
+        </where>   
+				order by cwss.order_no asc
+    </select>
+    
+    <select id="queryCostWageList"  resultMap="hrpCostSelect">
+      
+        select 
+		cekwis.wage_item_code id,
+		cwia.wage_item_name text
+		from COST_EMP_KIND_WAGE_ITEM_SET cekwis 
+		left join cost_wage_item_arrt cwia
+		on  cekwis.group_id = cwia.group_id and cekwis.hos_id = cwia.hos_id 
+		and cekwis.copy_code = cwia.copy_code
+		and cekwis.wage_item_code = cwia.wage_item_code 
+            <where>   
+            cwia.is_stop='0'
+            	<if test="group_id != null and group_id != ''">
+                    AND cekwis.group_id = #{group_id}
+               </if>
+			    <if test="hos_id != null and hos_id != ''">
+                    AND cekwis.hos_id = #{hos_id}
+               </if>
+			    <if test="copy_code != null and copy_code != ''">
+                    AND cekwis.copy_code = #{copy_code}
+               </if>              
+			    <if test="emp_kind_code != null and emp_kind_code != ''">
+                    AND cekwis.emp_kind_code = #{emp_kind_code}
+               </if> 
+        </where>   
+          group by cekwis.wage_item_code,cwia.wage_item_name
+				order by cekwis.wage_item_code asc
+    </select>
+    
+       
+    <select id="queryWageName"  parameterType="java.util.Map" resultMap="costWageSchemeSet">
+      
+        select 
+		cekwis.wage_item_code ,
+		cwia.wage_item_name 
+		from COST_EMP_KIND_WAGE_ITEM_SET cekwis 
+		left join cost_wage_item_arrt cwia
+		on  cekwis.group_id = cwia.group_id and cekwis.hos_id = cwia.hos_id 
+		and cekwis.copy_code = cwia.copy_code
+		and cekwis.wage_item_code = cwia.wage_item_code 
+		
+            <where>   
+            cwia.is_stop='0'
+            	<if test="group_id != null and group_id != ''">
+                    AND cekwis.group_id = #{group_id}
+               </if>
+			    <if test="hos_id != null and hos_id != ''">
+                    AND cekwis.hos_id = #{hos_id}
+               </if>
+			    <if test="copy_code != null and copy_code != ''">
+                    AND cekwis.copy_code = #{copy_code}
+               </if>              
+			    <if test="emp_kind_code != null and emp_kind_code != ''">
+                    AND cekwis.emp_kind_code = #{emp_kind_code}
+               </if> 
+        </where>   
+				order by cekwis.wage_item_code asc
+    </select>
+    
+    <select id="queryCostWageMap"  resultMap="hrpCostSelect">
+      
+        select 
+		cwia.wage_item_code id,
+		cwia.wage_item_name text
+		from  cost_wage_item_arrt cwia
+            <where>   
+             cwia.wage_item_code not in
+            (select cwss.wage_item_code from COST_WAGE_SCHEME_SET cwss
+            where cwss.emp_kind_code = #{emp_kind_code}
+            and cwss.scheme_id = #{scheme_id}
+            )
+            and cwia.is_stop='0' 
+            	<if test="group_id != null and group_id != ''">
+                    AND cwia.group_id = #{group_id}
+               </if>
+			    <if test="hos_id != null and hos_id != ''">
+                    AND cwia.hos_id = #{hos_id}
+               </if>
+			    <if test="copy_code != null and copy_code != ''">
+                    AND cwia.copy_code = #{copy_code}
+               </if>              
+        </where>   
+          group by cwia.wage_item_code,cwia.wage_item_name
+				order by cwia.wage_item_code asc
+    </select>
+    
+    <select id="queryCostWageItemList"  resultMap="hrpCostSelect">
+      
+      SELECT cwss.wage_item_code AS id, cwia.wage_item_name AS text
+	FROM COST_WAGE_SCHEME_SET cwss
+	LEFT JOIN cost_wage_item_arrt cwia ON 
+cwss.wage_item_code = cwia.wage_item_code 
+            <where>   
+            and cwia.is_stop='0' 
+            	<if test="group_id != null and group_id != ''">
+                    AND cwia.group_id = #{group_id}
+               </if>
+			    <if test="hos_id != null and hos_id != ''">
+                    AND cwia.hos_id = #{hos_id}
+               </if>
+			    <if test="copy_code != null and copy_code != ''">
+                    AND cwia.copy_code = #{copy_code}
+               </if>            
+                <if test="emp_kind_code != null and emp_kind_code != ''">
+                    AND cwss.emp_kind_code = #{emp_kind_code}
+               </if> 
+               <if test="scheme_id != null and scheme_id != ''">
+                    AND cwss.scheme_id = #{scheme_id}
+               </if> 
+        </where>   
+          group by cwss.wage_item_code,cwia.wage_item_name
+				order by cwss.wage_item_code asc
+    </select>
+	
+</mapper>
+

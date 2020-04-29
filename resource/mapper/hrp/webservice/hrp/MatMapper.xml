@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.webservice.dao.hrp.MatMapper">
+	
+	<!-- 查询供应商（停用） -->
+	<select id="queryHosSupDict"  parameterType="java.util.Map" resultType="java.util.Map">
+   	
+   		SELECT 
+            s.group_id "group_id",
+            s.hos_id "hos_id",
+            s.sup_id "sup_id",
+            s.sup_name "sup_name",
+            s.sup_name "short_name",
+            s.note "note",
+            s.spell_code "spell_code",
+            s.wbx_code "wbx_code",
+            s.is_disable "is_stop",
+            t.prov "province",
+            t.city "city",
+            t.mobile "phone",
+            t.address "address"
+        FROM HOS_SUP_DICT s
+        left join ass_sup_attr t on s.group_id=t.group_id and s.hos_id=t.hos_id and s.sup_id=t.sup_id
+		where s.group_id=#{group_id} and s.hos_id=#{hos_id} and s.is_stop=0 and is_sup=1
+		<if test="sup_id != null and sup_id != '' ">
+              and s.sup_id = #{sup_id}
+        </if> 
+	</select>
+	
+	
+	<!-- 查询审核的订单主表（hrp云平台）-->
+	<select id="queryMatOrderMainByOrderId"  parameterType="java.util.Map" resultType="java.util.Map">
+   	
+   		select a.order_id "order_id",a.order_code "order_no",a.order_type "bill_type",to_char(a.order_date,'yyyy-MM-dd') "order_date",to_char(sysdate,'yyyy-MM-dd HH24:MI:SS') "send_date",to_char(a.arrive_date,'yyyy-MM-dd') "req_date", 
+		a.arr_address "rece_address",d.dept_name "rece_dept",u.user_name "send_oper",a.note "note",state "state"
+		from mat_order_main a
+		left join hos_dept_dict d on a.dept_id=d.dept_id and a.dept_no=d.dept_no
+		left join sys_user u on a.maker=u.user_id
+		where a.group_id=#{group_id} and a.hos_id=#{hos_id} and a.copy_code=#{copy_code}
+		and a.state=2
+		and a.order_id in(${order_id})
+	</select>
+	
+	<!-- 查询审核的订单明细表（hrp云平台）-->
+	<select id="queryMatOrderDetailByOrderId"  parameterType="java.util.Map" resultType="java.util.Map">
+   	
+   		select a.order_id "order_id",a.order_detail_id "or_detail_id",inv.inv_code "inv_code",inv.inv_name "inv_name",i.chos_id "chos_id",i.csup_id "csup_id",i.prod_id "prod_id",i.spec_id "spec_id",a.amount "amount",
+	   a.price "price",a.amount*a.price "amount_money",a.memo "note",1 "state"
+	   from mat_order_detail a 
+	   inner join mat_inv_dict inv on a.group_id=inv.group_id and a.hos_id=inv.hos_id and a.copy_code=inv.copy_code and a.inv_id=inv.inv_id and a.inv_no=inv.inv_no
+	   left join mat_sup_prod_spec_inv i on a.group_id=i.group_id and a.hos_id=i.hos_id and a.copy_code=i.copy_code and a.inv_id=i.inv_id
+	   where a.group_id=#{group_id} and a.hos_id=#{hos_id} and a.copy_code=#{copy_code}
+		and a.order_id in(${order_id})
+		order by a.order_id,a.order_detail_id
+	</select>
+	
+	
+	<!-- 根据集团医院账套查询云医院ID（hrp云平台）-->
+	<select id="queryCHosId"  parameterType="java.util.Map" resultType="String">
+	
+		select a.chos_id from MAT_SUP_PROD_SPEC_INV a
+		where a.group_id=#{group_id} and a.hos_id=#{hos_id} and a.copy_code=#{copy_code} and rownum=1
+	</select>
+	
+</mapper>
+

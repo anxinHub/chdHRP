@@ -1,0 +1,507 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.mat.dao.account.balance.MatAccountBalanceInvDetailMapper">
+	
+	<resultMap id="matAccountBalanceInvDetailMap" type="java.util.Map">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="inv_id" column="inv_id"/>
+		<result property="confirm_date" column="confirm_date"/>
+		<result property="out_in_no" column="out_in_no"/>
+		<result property="bills_name" column="bills_name"/>
+		<result property="bus_type_name" column="bus_type_name"/>
+		<result property="brief" column="brief"/>
+		<result property="in_amount" column="in_amount"/>
+		<result property="in_price" column="in_price"/>
+		<result property="in_amount_money" column="in_amount_money"/>
+		<result property="out_amount" column="out_amount"/>
+		<result property="out_price" column="out_price"/>
+		<result property="out_amount_money" column="out_amount_money"/>
+		<result property="hold_amount" column="hold_amount"/>
+		<result property="hold_price" column="hold_price"/>
+		<result property="hold_amount_money" column="hold_amount_money"/>
+	</resultMap>
+	
+	<!-- 材料明细表查询 -->
+	<select id="queryMatAccountBalanceInvDetail" parameterType="java.util.Map" resultMap="matAccountBalanceInvDetailMap">
+		with balance_temp as(
+		     <!-- 1.期初结存 如果没选择材料则查询全部，选择材料后，只查询这个材料的结存  gaopei -->
+		     select
+		     <choose>
+		     	<when test="inv_id != null and inv_id != '' ">
+		     	 	   mib.group_id,
+			           mib.hos_id,
+			           mib.copy_code,
+			           mib.inv_id,
+		     	</when>
+		     	<otherwise>
+		     		  NULL as group_id,
+			          NULL as hos_id,
+			          NULL as copy_code,
+			          NULL as inv_id,
+		     	</otherwise>
+		     </choose> 
+		        to_char(mib.year) ||'-'|| to_char(mib.month) as confirm_date,
+		        NULL as para_date,
+		        NULL as out_in_no,
+		        NULL as bills_name,
+		        NULL bus_type_name,
+		        NULL as brief,
+		        NULL as in_amount,
+		        NULL as in_price,
+		        NULL as in_amount_money,
+		        NULL as out_amount,
+		        NULL as out_price,
+		        NULL as out_amount_money,
+		        sum(nvl(mib.begin_amount,0)) as hold_amount,
+		        NULL as hold_price,
+		        sum(nvl(mib.begin_money,0)) as hold_amount_money
+		      from mat_inv_balance mib
+		      left join mat_inv_dict midd
+		      on
+		      	 mib.group_id = midd.group_id
+	             and mib.hos_id = midd.hos_id
+	             and mib.copy_code = midd.copy_code
+	             and mib.inv_id = midd.inv_id
+	             and midd.is_stop = 0
+	             where
+		              mib.group_id=#{group_id}
+		              and mib.hos_id =#{hos_id}
+		              and mib.copy_code = #{copy_code}
+		              and mib.year||'-'||mib.month between #{begin_date} and #{end_date}
+		              and mib.store_id = #{store_id}
+		              <!--如果没选择材料则查询全部，选择材料后，只查询这个材料的结存  gaopei  -->
+		        <if test="inv_id != null and inv_id != '' ">
+			          and midd.inv_code = #{inv_id}
+		        </if>
+		        <if test="mat_type_id != null and mat_type_id != '' ">
+			          and midd.mat_type_id = #{mat_type_id}
+		        </if>
+		        <if test="mat_type_no != null and mat_type_no != '' ">
+			          and midd.mat_type_no = #{mat_type_no}
+		        </if>
+		        <if test="mat_type_id == null or mat_type_id == ''">
+			        and to_char(midd.mat_type_id) in (
+						select perm_code from v_user_data_perm  
+						where group_id = #{group_id,jdbcType=INTEGER}
+							and hos_id = #{hos_id,jdbcType=INTEGER}
+							and table_code = 'MAT_TYPE_DICT'
+							and user_id = #{user_id,jdbcType=INTEGER}
+							and is_read = 1 and is_write = 1 
+					)
+		        </if>
+		        
+		        <if test="inv_model != null and inv_model != ''">
+					and (midd.inv_model like '%${inv_model}%'
+					     or midd.inv_name like '%${inv_model}%'
+				         or midd.inv_code like '%${inv_model}%'
+					     or midd.spell_code like '%${inv_model}%'
+					     or midd.wbx_code like '%${inv_model}%'
+					   
+					     )
+			</if>  
+		  group by mib.year,mib.month
+		  <!-- 如果没选择材料则查询全部，选择材料后，只查询这个材料的结存  gaopei -->
+		    <if test="inv_id != null and inv_id != '' ">
+			         ,mib.group_id, mib.hos_id, mib.copy_code, mib.inv_id
+		    </if>
+		),
+		in_temp as(
+		     <!-- 2.期间每日发生 入库数据 -->
+		     select
+		        mid.group_id,
+		        mid.hos_id,
+		        mid.copy_code,
+		        mid.inv_id,
+		        to_char(mim.confirm_date,'yyyy-MM-dd') as confirm_date,
+		        to_char(mim.confirm_date,'yyyy-MM') as para_date,
+		        mim.in_no as out_in_no,
+		        '入库单' as bills_name,
+		        mbt.bus_type_name,
+		        mim.brief,
+		        nvl(mid.amount,0) as in_amount,
+		        nvl(mid.price,0) as in_price,
+		        nvl(mid.amount_money,0) as in_amount_money,
+		        0 as out_amount,
+		        NULL as out_price,
+		        0 as out_amount_money,
+		        0 as hold_amount,
+		        nvl(mid.price,0) as hold_price,
+		        0 as hold_amount_money
+		     from mat_in_detail mid
+		     left join mat_in_main mim
+		     on
+		          mid.group_id = mim.group_id
+		          and mid.hos_id = mim.hos_id
+		          and mid.copy_code = mim.copy_code
+		          and mid.in_id = mim.in_id
+		          and mid.in_no = mim.in_no
+		     left join mat_bus_type mbt
+		     on mim.bus_type_code = mbt.bus_type_code
+		     left join mat_inv_dict midd
+		     on
+		         mid.inv_id = midd.inv_id
+		         and mid.inv_no = midd.inv_no
+		     where
+		        mid.group_id = #{group_id}
+		        and mid.hos_id = #{hos_id}
+		        and mid.copy_code = #{copy_code}
+		        and to_char(mim.confirm_date,'yyyy-MM') between  #{begin_date} and  #{end_date}
+		        and mim.store_id = #{store_id}
+		        <if test="inv_id != null and inv_id !=''">
+		        	and (mid.inv_id like '%${inv_id}%'
+		                 or midd.inv_model like '%${inv_id}%'
+					     or midd.inv_name like '%${inv_id}%'
+				         or midd.inv_code like '%${inv_id}%'
+					     or midd.spell_code like '%${inv_id}%'
+					     or midd.wbx_code like '%${inv_id}%'
+		              )
+		        </if>
+		         
+		        <if test="mat_type_id != null and mat_type_id != '' ">
+			        and midd.mat_type_id = #{mat_type_id}
+		        </if>
+		        <if test="mat_type_no != null and mat_type_no != '' ">
+			        and midd.mat_type_no = #{mat_type_no}
+		        </if>
+		        order by mim.confirm_date,mim.in_no
+		),out_temp as(
+		     <!-- 3.期间每日发生 出库数据 -->
+		     select
+		          maod.group_id,
+		          maod.hos_id,
+		          maod.copy_code,
+		          maod.inv_id,
+		          to_char(mom.confirm_date,'yyyy-MM-dd') as confirm_date,
+		          to_char(mom.confirm_date,'yyyy-MM') as para_date,
+		          mom.out_no as out_in_no,
+		          '出库单' as bills_name,
+		          mbt.bus_type_name,
+		          mom.brief,
+		          0 as in_amount,
+		          NULL as in_price,
+		          0 as in_amount_money,
+		          nvl(maod.amount,0) as out_amount,
+		          nvl(maod.price,0) as out_price,
+		          nvl(maod.amount_money,0) as out_amount_money,
+		          0 as hold_amount,
+		          nvl(maod.price,0) as hold_price,
+		          0 as hold_amount_money
+		     from mat_out_detail maod
+		     left join mat_out_main mom
+		     on
+		          maod.group_id = mom.group_id
+		          and maod.hos_id = mom.hos_id
+		          and maod.copy_code = mom.copy_code
+		          and maod.out_id = mom.out_id
+		          and maod.out_no = mom.out_no
+		     left join mat_bus_type mbt
+		     on mom.bus_type_code = mbt.bus_type_code
+		     left join mat_inv_dict midd  on maod.inv_id = midd.inv_id
+		          and maod.inv_no = midd.inv_no 
+		          and maod.group_id=midd.group_id and maod.hos_id=midd.hos_id and maod.copy_code=midd.copy_code
+		     where
+		        maod.group_id = #{group_id}
+		        and maod.hos_id = #{hos_id}
+		        and maod.copy_code = #{copy_code}
+		        and to_char(mom.confirm_date,'yyyy-MM') between  #{begin_date} and  #{end_date}
+		        and mom.store_id = #{store_id}
+		        <if test="inv_id != null and inv_id !=''">
+		        	and (midd.inv_id like '%${inv_id}%'
+		                 or midd.inv_model like '%${inv_id}%'
+					     or midd.inv_name like '%${inv_id}%'
+				         or midd.inv_code like '%${inv_id}%'
+					     or midd.spell_code like '%${inv_id}%'
+					     or midd.wbx_code like '%${inv_id}%'
+		              )
+		        </if>
+		        <if test="mat_type_id != null and mat_type_id != '' ">
+		        	and midd.mat_type_id = #{mat_type_id}
+		        </if>
+		        <if test="mat_type_no != null and mat_type_no != '' ">
+			        and midd.mat_type_no = #{mat_type_no}
+		        </if>
+		       order by mom.confirm_date,mom.out_no
+		),month_count as (
+		     <!-- 本月合计   入库、出库数量、金额   查询入库、出库临时表  连接条件：材料、年月-->
+		     select
+		        NULL as group_id,
+		        NULL as hos_id,
+		        NULL as copy_code,
+		        NULL as inv_id,
+		        temp3.para_date as confirm_date,
+		        NULL as para_date,
+		        NULL as out_in_no,
+		        NULL as bills_name,
+		        NULL bus_type_name,
+		        NULL as brief,
+		        temp3.in_amount,
+		        NULL as in_price,
+		        temp3.in_amount_money,
+		        out_temp2.out_amount,
+		        NULL as out_price,
+		        out_temp2.out_amount_money,
+		        0 as hold_amount,
+		        NULL as hold_price,
+		        0 as hold_amount_money
+		     from(
+		         <!-- 期间每月入库数量、金额合计 按材料、年月分组-->
+		         select
+		             temp2.group_id,
+		             temp2.hos_id,
+		             temp2.copy_code,
+		             temp2.inv_id,
+		             temp2.para_date,
+		             sum(nvl(temp2.in_amount,0)) as in_amount,
+		             sum(nvl(temp2.in_amount_money,0)) as in_amount_money
+		         from (
+		           <!-- 期间每日发生:入库数量、金额  -->
+		           select
+		               temp1.group_id,
+		               temp1.hos_id,
+		               temp1.copy_code,
+		               temp1.inv_id,
+		               temp1.para_date,
+		               nvl(temp1.in_amount,0) as in_amount,
+		               nvl(temp1.in_amount_money,0) as in_amount_money
+		           from in_temp temp1
+		         ) temp2
+		         group by temp2.group_id,temp2.hos_id,temp2.copy_code,temp2.inv_id,temp2.para_date
+		     ) temp3 left join(
+		           <!-- 期间每日发生：出库数量、金额合计 -->
+		           select
+		               out_temp1.group_id,
+		               out_temp1.hos_id,
+		               out_temp1.copy_code,
+		               out_temp1.inv_id,
+		               out_temp1.para_date,
+		               sum(nvl(out_temp1.out_amount,0)) as out_amount,
+		               sum(nvl(out_temp1.out_amount_money,0)) as out_amount_money
+		           from out_temp out_temp1
+		           group by out_temp1.group_id,out_temp1.hos_id,out_temp1.copy_code,out_temp1.inv_id,out_temp1.para_date
+		     ) out_temp2 
+		     on
+		           temp3.group_id = out_temp2.group_id
+		           and temp3.hos_id = out_temp2.hos_id
+		           and temp3.copy_code = out_temp2.copy_code
+		           and temp3.inv_id = out_temp2.inv_id
+		           and temp3.para_date = out_temp2.para_date
+		),month_in_count as(
+		     <!-- 本年累计(入库)    按月连续累加-->
+		      select
+		        temp2.group_id,
+		        temp2.hos_id,
+		        temp2.copy_code,
+		        temp2.inv_id,
+		        temp2.para_date,
+		        sum(temp2.in_amount) over(order by para_date) as in_amount,
+		        sum(temp2.in_amount_money) over(order by para_date asc) as in_amount_money
+		      from(
+		        <!-- 小于结束期间的入库 合计数量、合计金额    按材料、年月分组 -->
+		        select
+		           temp.group_id,
+		           temp.hos_id,
+		           temp.copy_code,
+		           temp.inv_id,
+		           temp.para_date,
+		           sum(temp.in_amount) as in_amount,
+		           sum(temp.in_amount_money) as in_amount_money
+		        from (
+		             <!-- 本年入库数量、金额   小于结束期间且等于当前年度-->
+		             select
+		                mid.group_id,
+		                mid.hos_id,
+		                mid.copy_code,
+		                mid.inv_id,
+		                to_char(mim.confirm_date,'yyyy-MM') as para_date,
+		                nvl(mid.amount,0) as in_amount,
+		                nvl(mid.amount_money,0) as in_amount_money
+		             from mat_in_detail mid
+		             left join mat_in_main mim
+		             on
+		                  mid.group_id = mim.group_id
+		                  and mid.hos_id = mim.hos_id
+		                  and mid.copy_code = mim.copy_code
+		                  and mid.in_id = mim.in_id
+		                  and mid.in_no = mim.in_no
+		             left join mat_inv_dict midd
+		             on
+		                 mid.inv_id = midd.inv_id
+		               <!--   and mid.inv_no = midd.inv_no -->
+		                 and midd.is_stop = 0
+		             where
+		                mid.group_id = #{group_id}
+		                and mid.hos_id = #{hos_id}
+		                and mid.copy_code = #{copy_code}
+		                and to_char(mim.confirm_date,'yyyy') = #{cur_year}
+		                and to_char(mim.confirm_date,'yyyy-MM') &lt;= #{end_date}
+		                and mim.store_id = #{store_id}
+		                <!-- and mid.inv_id = #{inv_id} -->
+		                  <if test="inv_id != null and inv_id != '' " >
+		                and (mid.inv_id like '%${inv_id}%'
+		                 or midd.inv_model like '%${inv_id}%'
+					     or midd.inv_name like '%${inv_id}%'
+				         or midd.inv_code like '%${inv_id}%'
+					     or midd.spell_code like '%${inv_id}%'
+					     or midd.wbx_code like '%${inv_id}%'
+		              )
+		              </if>
+		                <if test="mat_type_id != null and mat_type_id != '' " >
+			                and midd.mat_type_id = #{mat_type_id}
+		                </if>
+		                <if test="mat_type_no != null and mat_type_no != '' ">
+			                and midd.mat_type_no = #{mat_type_no}
+		                </if>
+		        ) temp 
+		                group by temp.group_id,temp.hos_id,temp.copy_code,temp.inv_id,temp.para_date
+		      ) temp2 order by para_date asc
+		),month_out_count as (
+		      <!-- 本年累计(出库) 按年月累加 -->
+		      select
+		        temp2.group_id,
+		        temp2.hos_id,
+		        temp2.copy_code,
+		        temp2.inv_id,
+		        temp2.para_date,
+		        sum(temp2.out_amount) over(order by para_date asc) as out_amount,
+		        sum(temp2.out_amount_money) over(order by para_date asc) as out_amount_money
+		      from(
+		        <!-- 本年每月出库合计数量、合计金额   按材料、年月分组-->
+		        select
+		           temp.group_id,
+		           temp.hos_id,
+		           temp.copy_code,
+		           temp.inv_id,
+		           temp.para_date,
+		           sum(temp.out_amount) as out_amount,
+		           sum(temp.out_amount_money) as out_amount_money
+		        from (
+		            <!-- 本年每日出库数量、金额  小于等于结束期间且等于当前年度-->
+		            select
+		                maod.group_id,
+		                maod.hos_id,
+		                maod.copy_code,
+		                maod.inv_id,
+		                to_char(mom.confirm_date,'yyyy-MM') as para_date,
+		                nvl(maod.amount,0) as out_amount,
+		                nvl(maod.amount_money,0) as out_amount_money
+		           from mat_out_detail maod
+		           left join mat_out_main mom
+		           on
+		                maod.group_id = mom.group_id
+		                and maod.hos_id = mom.hos_id
+		                and maod.copy_code = mom.copy_code
+		                and maod.out_id = mom.out_id
+		                and maod.out_no = mom.out_no
+		           left join mat_inv_dict midd
+		           on
+		               maod.inv_id = midd.inv_id
+		               and maod.inv_no = midd.inv_no
+		               and midd.is_stop = 0
+		           where
+		              maod.group_id = #{group_id}
+		              and maod.hos_id = #{hos_id}
+		              and maod.copy_code = #{copy_code}
+		              and to_char(mom.confirm_date,'yyyy') = #{cur_year}
+		              and to_char(mom.confirm_date,'yyyy-MM') &lt;= #{end_date}
+		              and mom.store_id = #{store_id}
+		            <!--   and maod.inv_id = #{inv_id} -->
+		             <if test="inv_id != null and inv_id != '' " >
+		               and (maod.inv_id like '%${inv_id}%'
+		                 or midd.inv_model like '%${inv_id}%'
+					     or midd.inv_name like '%${inv_id}%'
+				         or midd.inv_code like '%${inv_id}%'
+					     or midd.spell_code like '%${inv_id}%'
+					     or midd.wbx_code like '%${inv_id}%'
+		              )
+		              </if>
+		              <if test="mat_type_id != null and mat_type_id != '' ">
+		              and midd.mat_type_id = #{mat_type_id}
+		              </if>
+		              <if test="mat_type_no != null and mat_type_no != '' ">
+			              and midd.mat_type_no = #{mat_type_no}
+		              </if>
+		        ) temp 
+		                group by temp.group_id,temp.hos_id,temp.copy_code,temp.inv_id,temp.para_date
+		      ) temp2 order by para_date asc
+		),cur_year_count as (
+		  <!-- 本年累计 (查(入库)本年累计临时表连接(出库)本年累计临时表  按年度月份连接  按开始期间至结束期间筛选)-->
+		  select
+		    NULL as group_id,NULL as hos_id,NULL as copy_code,NULL as inv_id,
+		    substr(mic.para_date,0,4) as confirm_date,mic.para_date,NULL as out_in_no,NULL as bills_name,
+		    NULL bus_type_name,NULL as brief,mic.in_amount,NULL as in_price,mic.in_amount_money,
+		    moc.out_amount,NULL as out_price,moc.out_amount_money,0 as hold_amount,
+		    NULL as hold_price,0 as hold_amount_money
+		  from month_in_count mic
+		  left join month_out_count moc
+		  on 
+		    mic.group_id = moc.group_id
+		    and mic.hos_id = moc.hos_id
+		    and mic.copy_code = moc.copy_code
+		    and mic.para_date = moc.para_date
+		  where
+		  mic.para_date between #{begin_date} and #{end_date}
+		)
+		<!-- 结果集 -->
+		select 
+		     t.ob_num,t.group_id,t.hos_id,t.copy_code,t.inv_id,
+		     t.confirm_date,t.para_date,t.out_in_no,t.bills_name,t.bus_type_name,t.brief,
+		     t.in_amount,t.in_price,t.in_amount_money,t.out_amount,t.out_price,
+		     t.out_amount_money,
+		     sum(t.hold_amount) over(partition by t.para_date order by t.ob_num,t.confirm_date,t.out_in_no) as hold_amount,
+		     t.hold_price,
+		     sum(t.hold_amount_money) over(partition by t.para_date order by t.ob_num,t.confirm_date,t.out_in_no) as hold_amount_money
+		from(
+		     <!-- 期初结存 -->
+		     select    
+		              a.confirm_date ||'-0' as ob_num,NULL as group_id,NULL as hos_id,NULL as copy_code,NULL as inv_id,
+		              a.confirm_date as confirm_date,a.confirm_date as para_date,NULL as out_in_no,NULL as bills_name,NULL bus_type_name,'期初结存' as brief,
+		              NULL as in_amount,NULL as in_price,NULL as in_amount_money,NULL as out_amount,NULL as out_price,
+		              NULL as out_amount_money,a.hold_amount,NULL as hold_price,a.hold_amount_money
+		      from balance_temp a
+		      union all
+		      <!-- 入库发生 -->
+		      select  
+		              b.confirm_date as ob_num,b.group_id,b.hos_id,b.copy_code,b.inv_id,
+		              b.confirm_date,substr(b.confirm_date,0,7) as para_date,b.out_in_no,b.bills_name,b.bus_type_name,b.brief,
+		              b.in_amount,b.in_price,b.in_amount_money,
+		              0 as out_amount,
+		              NULL as out_price,
+		              0 as out_amount_money,
+		              b.in_amount-b.out_amount as hold_amount,
+		              b.hold_price,
+		              b.in_amount_money-b.out_amount_money as hold_amount_money
+		      from in_temp b
+		      union all
+		      <!-- 出库发生 -->
+		      select
+		            c.confirm_date as ob_num,c.group_id,c.hos_id,c.copy_code,c.inv_id,
+		            c.confirm_date,substr(c.confirm_date,0,7) as para_date,c.out_in_no, c.bills_name,c.bus_type_name,
+		            c.brief,0 as in_amount,NULL as in_price,0 as in_amount_money,
+		            c.out_amount,c.out_price,c.out_amount_money,
+		            c.in_amount-c.out_amount as hold_amount,
+		            c.hold_price,
+		            c.in_amount_money-c.out_amount_money as hold_amount_money
+		      from out_temp c
+		      union all
+		      <!-- 本月合计 -->
+		      select 
+		              d.confirm_date||'1' as ob_num,NULL as group_id,NULL as hos_id,NULL as copy_code,NULL as inv_id,
+		              d.confirm_date,d.confirm_date as para_date,NULL as out_in_no,NULL as bills_name,NULL bus_type_name,
+		              '本月合计' as brief,d.in_amount,NULL as in_price,d.in_amount_money,d.out_amount,
+		              NULL as out_price,d.out_amount_money,0 as hold_amount,
+		              NULL as hold_price,0 as hold_amount_money
+		      from month_count d
+		      union all
+		      <!-- 本年累计 -->
+		      select
+		          e.para_date||'2' as ob_num,NULL as group_id,NULL as hos_id,NULL as copy_code,NULL as inv_id,
+		          e.confirm_date,e.para_date,NULL as out_in_no,NULL as bills_name,NULL bus_type_name,
+		          '本年累计' as brief,e.in_amount,NULL as in_price,e.in_amount_money,e.out_amount,
+		          NULL as out_price,e.out_amount_money,0 as hold_amount,NULL as hold_price,
+		          0 as hold_amount_money
+		      from cur_year_count e
+		) t order by t.ob_num,t.confirm_date,t.out_in_no
+	</select>
+</mapper>

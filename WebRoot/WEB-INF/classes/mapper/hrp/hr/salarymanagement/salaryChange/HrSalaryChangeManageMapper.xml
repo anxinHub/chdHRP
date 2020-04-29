@@ -1,0 +1,351 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.hr.dao.salarymanagement.salaryChange.HrSalaryChangeManageMapper">
+
+	<!-- 薪资变动类型管理薪资变动类型下拉框加载 -->
+	<select id="querySalaryChangeTypeOption" resultType="java.util.Map">
+		SELECT
+			TYPE_CODE "id",
+			TYPE_NAME "text"
+		FROM
+			HR_WAGE_CHANGE_TYPE
+		WHERE
+			GROUP_ID = #{group_id,jdbcType=VARCHAR}
+			AND HOS_ID = #{hos_id,jdbcType=VARCHAR}
+			AND IS_STOP = 0
+ 	</select>
+	
+	<!-- 新增查询类型编码 -->
+	<select id="querySalaryChangeManageChangecode" resultType="java.lang.String">
+		SELECT 
+			'BD'||TO_CHAR(SYSDATE,'YYYYMM')||HR_WAGE_CHANGE_SEQ.NEXTVAL 
+		FROM 
+			DUAL
+	</select>
+	
+	<!-- 薪资管理变动项目下拉加载 -->
+	<select id="querySalaryChangeTypeChangeProjectOption" resultType="java.util.Map">
+		SELECT 
+			P1.TAB_CODE||'@'||P1.COL_CODE "id",
+			P3.COL_NAME "label"
+		FROM 
+			HR_WAGE_C_TYPE_ITEM P1 
+			LEFT JOIN HR_TAB_STRUC P2 
+				ON P1.TAB_CODE = P2.TAB_CODE
+				AND P1.GROUP_ID = P2.GROUP_ID
+				AND P1.HOS_ID = P2.HOS_ID
+			LEFT JOIN HR_COL_STRUC P3
+				ON P1.GROUP_ID = P3.GROUP_ID
+				AND P1.HOS_ID = P3.HOS_ID
+				AND P1.TAB_CODE||'@'||P1.COL_CODE = P3.TAB_CODE||'@'||P3.COL_CODE
+		WHERE 
+			P1.GROUP_ID = #{group_id,jdbcType=INTEGER}
+			AND P1.HOS_ID = #{hos_id,jdbcType=INTEGER}
+			AND P1.TYPE_CODE = #{type_code,jdbcType=VARCHAR}
+	</select>
+	
+	<!-- 薪资变动管理级联变动后 -->
+	<select id="queryValueaftOption" resultType="java.util.Map">
+		SELECT 
+			T2.FIELD_COL_CODE "id",
+			T2.FIELD_COL_NAME "label"
+		FROM 
+			HR_COL_STRUC T1
+			LEFT JOIN HR_FIIED_DATA T2
+				ON T1.GROUP_ID = T2.GROUP_ID
+				AND T1.HOS_ID = T2.HOS_ID
+				AND T1.FIELD_TAB_CODE = T2.FIELD_TAB_CODE
+		WHERE 
+			T1.GROUP_ID = #{group_id,jdbcType=INTEGER}
+			AND T1.HOS_ID = #{hos_id,jdbcType=INTEGER}
+			AND T1.TAB_CODE || '@' || T1.COL_CODE = #{tab_code,jdbcType=VARCHAR}
+	</select>
+	
+	<!-- 薪资变动管理职工下拉加载 -->
+	<select id="querySalaryManageEmpOption" resultType="java.util.Map">
+		SELECT
+			EMP_ID "id",
+			EMP_NAME "text"
+		FROM
+			HOS_EMP_DICT T1
+		WHERE
+			GROUP_ID = #{group_id,jdbcType=INTEGER}
+			AND HOS_ID = #{hos_id,jdbcType=INTEGER}
+			<if test="key != null and key != '' ">
+			AND ( EMP_CODE LIKE '%${key}%' OR
+				  EMP_NAME LIKE '%${key}%' OR
+				  SPELL_CODE LIKE UPPER('${key}%') OR
+				  WBX_CODE LIKE UPPER('${key}%')
+				)
+			</if>
+			AND IS_STOP = 0
+			AND IS_DISABLE = 0
+	</select>
+	
+	<!-- 薪资变动管理添加 -->
+	<insert id="addSalaryManage">
+		INSERT INTO
+			HR_WAGE_CHANGE (GROUP_ID,HOS_ID,CHANGE_TYPE,CHANGE_CODE,REMARK,MAKE_DATE,MAKER,STATE,EFFECTIVE_DATE)
+			VALUES (#{group_id,jdbcType=INTEGER},#{hos_id,jdbcType=INTEGER},#{change_type,jdbcType=VARCHAR},
+					#{change_code,jdbcType=VARCHAR},#{remark,jdbcType=VARCHAR},TO_DATE(#{make_date,jdbcType=VARCHAR},'YYYY-MM-DD'),
+					#{user_id,jdbcType=VARCHAR},
+					0,TO_DATE(#{effective_date,jdbcType=VARCHAR},'YYYY-MM-DD')
+					)
+	</insert>
+	
+	<!-- 添加变动项目 -->
+	<insert id="addSalaryChange">
+		INSERT INTO
+			HR_WAGE_C_ITEM (GROUP_ID,HOS_ID,CHANGE_TYPE,CHANGE_CODE,TAB_CODE,COL_CODE,VALUE_AFT)
+			<foreach collection="list" open=" ( " close=" ) " item="item" separator=" UNION ALL ">
+				SELECT
+					#{vo.group_id,jdbcType=INTEGER},
+					#{vo.hos_id,jdbcType=INTEGER},
+					#{vo.change_type,jdbcType=VARCHAR},
+					#{vo.change_code,jdbcType=VARCHAR},
+					#{item.tab_code,jdbcType=VARCHAR},
+					#{item.col_code,jdbcType=VARCHAR},
+					#{item.value_aft,jdbcType=VARCHAR}
+				FROM
+					DUAL
+			</foreach>
+	</insert>
+	
+	<!-- 添加工资项目 -->
+	<insert id="addSalaryProject">
+		INSERT INTO
+			HR_WAGE_C_WAGE (GROUP_ID,HOS_ID,CHANGE_TYPE,CHANGE_CODE,PLAN_CODE,ITEM_CODE,VALUE_AFT)
+			<foreach collection="list" open=" ( " close=" ) " item="item" separator=" UNION ALL ">
+				SELECT
+					#{vo.group_id,jdbcType=INTEGER},
+					#{vo.hos_id,jdbcType=INTEGER},
+					#{vo.change_type,jdbcType=VARCHAR},
+					#{vo.change_code,jdbcType=VARCHAR},
+					#{item.plan_code,jdbcType=VARCHAR},
+					#{item.item_code,jdbcType=VARCHAR},
+					#{item.value_aft,jdbcType=VARCHAR}
+				FROM
+					DUAL
+			</foreach>
+	</insert>
+	
+	<!-- 薪资变动管理职工添加 -->
+	<insert id="addSalaryEmp">
+		INSERT INTO
+			HR_WAGE_C_EMP (GROUP_ID,HOS_ID,CHANGE_TYPE,CHANGE_CODE,EMP_ID)
+			<foreach collection="list" open=" ( " close=" ) " item="item" separator=" UNION ALL ">
+				SELECT
+					#{vo.group_id,jdbcType=INTEGER},
+					#{vo.hos_id,jdbcType=INTEGER},
+					#{vo.change_type,jdbcType=VARCHAR},
+					#{vo.change_code,jdbcType=VARCHAR},
+					#{item,jdbcType=INTEGER}
+				FROM
+					DUAL
+			</foreach>
+	</insert>
+	
+	<!-- 薪资变动管理查询 -->
+	<select id="querySalaryChangeManage" resultType="java.util.Map">
+		SELECT 
+			P2.TYPE_NAME,
+			P1.CHANGE_CODE,
+			P3.EMP_NAME,
+			P1.REMARK,
+			P1.EFFECTIVE_DATE,
+			P4.USER_NAME MAKER,
+			P1.MAKE_DATE,
+			P5.USER_NAME CHECKER,
+			P1.CHECK_DATE,
+			P1.STATE 
+		FROM 
+			HR_WAGE_CHANGE P1 
+			LEFT JOIN HR_WAGE_CHANGE_TYPE P2
+		        ON P1.GROUP_ID = P2.GROUP_ID
+		        AND P1.HOS_ID = P2.HOS_ID
+		        AND P1.CHANGE_TYPE = P2.TYPE_CODE
+      		LEFT JOIN HR_WAGE_C_EMP_VIEW P3
+	            ON P1.GROUP_ID = P3.GROUP_ID
+	            AND P1.HOS_ID = P3.HOS_ID
+	            AND P1.CHANGE_CODE = P3.CHANGE_CODE
+      		LEFT JOIN SYS_USER P4
+	            ON P1.GROUP_ID = P4.GROUP_ID
+	            AND P1.HOS_ID = P4.HOS_ID
+	            AND P1.MAKER = P4.USER_ID
+      		LEFT JOIN SYS_USER P5
+	            ON P1.GROUP_ID = P5.GROUP_ID
+	            AND P1.HOS_ID = P5.HOS_ID
+	            AND P1.CHECKER = P5.USER_ID
+      	WHERE 
+      		P1.GROUP_ID = #{group_id,jdbcType=INTEGER}
+      		AND P1.HOS_ID = #{hos_id,jdbcType=INTEGER}
+      		<if test="make_date_state != null and make_date_state != '' ">AND P1.MAKE_DATE &gt;= TO_DATE(#{make_date_state,jdbcType=VARCHAR},'YYYY-MM-DD')</if>
+      		<if test="make_date_end != null and make_date_end != '' ">AND P1.MAKE_DATE &lt;= TO_DATE(#{make_date_end,jdbcType=VARCHAR},'YYYY-MM-DD')</if>
+      		<if test="change_date_state != null and change_date_state != '' ">AND P1.EFFECTIVE_DATE &gt;= TO_DATE(#{change_date_state,jdbcType=VARCHAR},'YYYY-MM-DD')</if>
+      		<if test="change_date_end != null and change_date_end != '' ">AND P1.EFFECTIVE_DATE &lt;= TO_DATE(#{change_date_end,jdbcType=VARCHAR},'YYYY-MM-DD')</if>
+      		<if test="state != null and state != '' ">AND P1.STATE = #{state,jdbcType=INTEGER}</if>
+      		<if test="change_type != null and change_type != '' ">AND P1.CHANGE_TYPE = #{change_type,jdbcType=VARCHAR}</if>
+      		<if test="emp_id != null and emp_id != '' ">AND P3.EMP_NAME LIKE '%${emp_id}%'</if>
+	</select>
+	
+	<!-- 删除职工数据 -->
+	<delete id="deleteSalaryChangeManageCode">
+		DELETE FROM
+			${vo.table}
+		WHERE
+      		GROUP_ID = #{vo.group_id,jdbcType=INTEGER}
+      		AND HOS_ID = #{vo.hos_id,jdbcType=INTEGER}
+      		AND CHANGE_CODE IN
+				<foreach collection="list" open=" ( " close=" ) " item="item" separator=",">
+					#{item,jdbcType=INTEGER}
+				</foreach>
+	</delete>
+	
+	<!-- 删除职工数据 -->
+	<delete id="deleteSalaryChangeManage">
+		DELETE FROM
+			HR_WAGE_CHANGE
+		WHERE
+      		GROUP_ID = #{vo.group_id,jdbcType=INTEGER}
+      		AND HOS_ID = #{vo.hos_id,jdbcType=INTEGER}
+      		AND CHANGE_CODE IN
+				<foreach collection="list" open=" ( " close=" ) " item="item" separator=",">
+					#{item,jdbcType=INTEGER}
+				</foreach>
+	</delete>
+	
+	<!-- 薪资变动管理修改回显数据 -->
+	<select id="queryUpdateSalaryChangeManage" resultType="java.util.Map">
+      SELECT 
+		    K1.CHANGE_CODE,
+		    K1.CHANGE_TYPE,
+		    K3.TYPE_NAME,
+		    K1.REMARK,
+		    TO_CHAR(K1.MAKE_DATE,'YYYY-MM-DD') MAKE_DATE,
+		    TO_CHAR(K1.EFFECTIVE_DATE,'YYYY-MM-DD') EFFECTIVE_DATE,
+		    WM_CONCAT(K2.EMP_ID) EMP_ID 
+      FROM 
+	      	HR_WAGE_CHANGE K1 LEFT 
+	      	JOIN HR_WAGE_C_EMP  K2
+			ON K1.GROUP_ID = K2.GROUP_ID
+			AND K1.HOS_ID = K2.HOS_ID
+			AND K1.CHANGE_CODE = K2.CHANGE_CODE
+			LEFT JOIN HR_WAGE_CHANGE_TYPE K3
+			ON K1.GROUP_ID = K3.GROUP_ID
+			AND K1.HOS_ID = K3.HOS_ID
+			AND K1.CHANGE_TYPE = K3.TYPE_CODE
+	  WHERE 
+		  	K1.CHANGE_CODE = #{change_code,jdbcType=VARCHAR}
+			AND K1.GROUP_ID = #{group_id,jdbcType=INTEGER}
+			AND K1.HOS_ID = #{hos_id,jdbcType=INTEGER}
+	  GROUP BY 
+		      K1.GROUP_ID,
+		      K1.HOS_ID,
+		      K1.CHANGE_CODE,
+		      K1.CHANGE_TYPE,
+		      K1.REMARK,
+		      K1.MAKE_DATE,
+		      K1.EFFECTIVE_DATE,
+		      K3.TYPE_NAME
+	</select>
+	
+	<!-- 薪资变动管理审核数据 -->
+	<update id="updateSalaryChangeManageSubmit">
+		UPDATE 
+			HR_WAGE_CHANGE
+		SET
+			<if test="vo.state == 1">
+				STATE = #{vo.state,jdbcType=INTEGER},
+				CHECKER = #{vo.user_id,jdbcType=INTEGER},
+				CHECK_DATE = TO_DATE(TO_CHAR(SYSDATE,'YYYY-MM-DD'),'YYYY-MM-DD')
+			</if>
+			<if test="vo.state == 0">
+				STATE = #{vo.state,jdbcType=INTEGER},
+				CHECKER = null,
+				CHECK_DATE = null
+			</if>
+		WHERE
+			CHANGE_CODE IN
+				<foreach collection="list" close=" ) " open=" ( " item="item" separator=" , ">
+					#{item,jdbcType=VARCHAR}
+				</foreach>
+	</update>
+	
+	<!-- 薪资变动修改回显变动项目 -->
+	<select id="queryUpdateSalaryChangeTypeSalaryProject" resultType="java.util.Map">
+		SELECT 
+			M2.TAB_CODE||'@'||M2.COL_CODE "tab_code",
+			M2.COL_NAME "tab_codes",
+			M3.FIELD_COL_CODE "value_aft",
+			M3.FIELD_COL_NAME "value_afts"
+		FROM 
+			HR_WAGE_C_ITEM M1 LEFT JOIN HR_COL_STRUC M2
+				ON M1.GROUP_ID = M2.GROUP_ID
+				AND M1.HOS_ID = M2.HOS_ID
+				AND M1.TAB_CODE = M2.TAB_CODE
+				AND M1.COL_CODE = M2.COL_CODE
+			LEFT JOIN HR_FIIED_DATA M3
+				ON M1.GROUP_ID = M3.GROUP_ID
+				AND M1.HOS_ID = M3.HOS_ID
+				AND M2.FIELD_TAB_CODE = M3.FIELD_TAB_CODE
+				AND M1.VALUE_AFT = M3.FIELD_COL_CODE
+		WHERE 
+			M1.GROUP_ID = #{group_id,jdbcType=INTEGER}
+			AND M1.HOS_ID = #{hos_id,jdbcType=INTEGER}
+			AND M1.CHANGE_CODE = #{change_code,jdbcType=VARCHAR}
+	</select>
+	
+	<!-- 薪资变动管理修改 -->
+	<update id="updateSalaryManage">
+		UPDATE
+			HR_WAGE_CHANGE
+		SET
+			CHANGE_TYPE = #{change_type,jdbcType=VARCHAR},
+			REMARK = #{remark,jdbcType=VARCHAR},
+			MAKE_DATE = TO_DATE(#{make_date,jdbcType=VARCHAR},'YYYY-MM-DD'),
+			EFFECTIVE_DATE = TO_DATE(#{effective_date,jdbcType=VARCHAR},'YYYY-MM-DD')
+		WHERE
+			GROUP_ID = #{group_id,jdbcType=INTEGER}
+			AND HOS_ID = #{hos_id,jdbcType=INTEGER}
+			AND CHANGE_CODE = #{change_code,jdbcType=VARCHAR}
+	</update>
+
+	<!-- 薪资变动管理修改回显工资项目数据 -->
+	<select id="queryUpdateSalaryChangeTypeSalaryManageProject" resultType="java.util.Map">
+		SELECT 
+			P2.PLAN_CODE "plan_code",
+			P2.PLAN_NAME "plan_codes",
+			P3.ITEM_CODE "item_code",
+			P3.ITEM_NAME "item_codes",
+			P1.VALUE_AFT "value_aft"
+		FROM 
+			HR_WAGE_C_WAGE P1 
+			LEFT JOIN HR_WAGE_PLAN P2
+				ON P1.GROUP_ID = P2.GROUP_ID
+				AND P1.HOS_ID = P2.HOS_ID
+				AND P1.PLAN_CODE = P2.PLAN_CODE
+			LEFT JOIN HR_WAGE_ITEM P3
+				ON P1.GROUP_ID = P3.GROUP_ID
+				AND P1.HOS_ID = P3.HOS_ID
+				AND P1.PLAN_CODE = P3.PLAN_CODE
+				AND P1.ITEM_CODE = P3.ITEM_CODE
+		WHERE 
+			P1.GROUP_ID = #{group_id,jdbcType=INTEGER}
+			AND P1.HOS_ID = #{hos_id,jdbcType=INTEGER}
+			AND P1.CHANGE_CODE = #{change_code,jdbcType=VARCHAR}
+	</select>
+
+	<!-- 判断数据是否被审核 -->
+	<select id="updateSalaryManageCount" resultType="int">
+		SELECT
+			COUNT(1)
+		FROM
+			HR_WAGE_CHANGE
+		WHERE
+			GROUP_ID = #{group_id,jdbcType=INTEGER}
+			AND HOS_ID = #{hos_id,jdbcType=INTEGER}
+			AND CHANGE_CODE = #{change_code,jdbcType=VARCHAR}
+			AND STATE = 1
+	</select>
+
+</mapper>

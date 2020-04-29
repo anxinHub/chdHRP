@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+
+	<sql id="v_mat_affi_stock_imme" type="view" desc="物流代销库存占用量"><![CDATA[
+		CREATE OR REPLACE VIEW V_MAT_AFFI_STOCK_IMME AS
+			SELECT group_id, hos_id, copy_code, store_id, inv_id, price, batch_sn, batch_no, bar_code, location_id, SUM(amount) as amount
+			FROM (
+				--出库未确认单据
+				SELECT mam.group_id, mam.hos_id, mam.copy_code, mam.store_id,
+					maod.inv_id, maod.price, maod.batch_sn, maod.batch_no, maod.bar_code,
+					maod.location_id, SUM(NVL(maod.amount, 0)) as amount
+				FROM mat_affi_out mam
+				LEFT JOIN mat_affi_out_detail maod
+					ON mam.group_id = maod.group_id
+					AND mam.hos_id = maod.hos_id
+					AND mam.copy_code = maod.copy_code
+					AND mam.out_id = maod.out_id
+				WHERE mam.state < 3
+					AND mam.bus_type_code <> '30'
+				GROUP BY mam.group_id, mam.hos_id, mam.copy_code, mam.store_id, maod.inv_id, 
+					maod.price, maod.batch_sn, maod.batch_no, maod.bar_code, maod.location_id
+				--退货未确认单据
+				UNION ALL
+				SELECT mai.group_id, mai.hos_id, mai.copy_code, mai.store_id,
+					maid.inv_id, maid.price, maid.batch_sn, maid.batch_no, maid.bar_code,
+					maid.location_id, -1 * SUM(NVL(maid.amount, 0)) as amount
+				FROM mat_affi_in mai
+				LEFT JOIN mat_affi_in_detail maid
+					ON mai.group_id = maid.group_id
+					AND mai.hos_id = maid.hos_id
+					AND mai.copy_code = maid.copy_code
+					AND mai.in_id = maid.in_id
+				WHERE mai.state < 3
+					AND mai.bus_type_code = '29'
+				GROUP BY mai.group_id, mai.hos_id, mai.copy_code, mai.store_id, maid.inv_id, 
+					maid.price, maid.batch_sn, maid.batch_no, maid.bar_code, maid.location_id
+			)
+			GROUP BY group_id, hos_id, copy_code, store_id, inv_id, price, batch_sn, batch_no, bar_code, location_id
+	]]></sql>
+
+	<sql id="v_mat_affi_stock_inv_imme" type="view" desc="物流代销库存占用量"><![CDATA[
+		CREATE OR REPLACE VIEW V_MAT_AFFI_STOCK_INV_IMME AS
+			SELECT group_id, hos_id, copy_code, store_id, inv_id, SUM(amount) as amount
+			FROM (
+				--出库未确认单据
+				SELECT mam.group_id, mam.hos_id, mam.copy_code, mam.store_id,
+					maod.inv_id, SUM(NVL(maod.amount, 0)) as amount
+				FROM mat_affi_out mam
+				LEFT JOIN mat_affi_out_detail maod
+					ON mam.group_id = maod.group_id
+					AND mam.hos_id = maod.hos_id
+					AND mam.copy_code = maod.copy_code
+					AND mam.out_id = maod.out_id
+				WHERE mam.state < 3
+					AND mam.bus_type_code <> '30'
+				GROUP BY mam.group_id, mam.hos_id, mam.copy_code, mam.store_id, maod.inv_id
+				--退货未确认单据
+				UNION ALL
+				SELECT mai.group_id, mai.hos_id, mai.copy_code, mai.store_id,
+					maid.inv_id, -1 * SUM(NVL(maid.amount, 0)) as amount
+				FROM mat_affi_in mai
+				LEFT JOIN mat_affi_in_detail maid
+					ON mai.group_id = maid.group_id
+					AND mai.hos_id = maid.hos_id
+					AND mai.copy_code = maid.copy_code
+					AND mai.in_id = maid.in_id
+				WHERE mai.state < 3
+					AND mai.bus_type_code = '29'
+				GROUP BY mai.group_id, mai.hos_id, mai.copy_code, mai.store_id, maid.inv_id
+			)
+			GROUP BY group_id, hos_id, copy_code, store_id, inv_id
+	]]></sql>
+</root>
+

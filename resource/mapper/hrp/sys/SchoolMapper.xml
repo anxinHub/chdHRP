@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.sys.dao.SchoolMapper">
+
+	<resultMap id="school" type="com.chd.hrp.sys.entity.School">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="school_code" column="school_code" />
+		<result property="school_name" column="school_name" />
+		<result property="spell_code" column="spell_code" />
+		<result property="wbx_code" column="wbx_code" />
+		<result property="is_stop" column="is_stop" />
+		<result property="note" column="note" />
+	</resultMap>
+
+	<insert id="addSchool" useGeneratedKeys="true">
+		INSERT INTO HOS_SCHOOL (
+			group_id, hos_id, school_code, school_name, spell_code, wbx_code, is_stop
+			<if test="note != null and note != ''">
+				, note
+			</if>
+		) VALUES (
+			#{group_id, jdbcType=INTEGER},
+			#{hos_id, jdbcType=INTEGER},
+			#{school_code, jdbcType=VARCHAR},
+			#{school_name, jdbcType=VARCHAR},
+			#{spell_code, jdbcType=VARCHAR},
+			#{wbx_code, jdbcType=VARCHAR},
+			#{is_stop, jdbcType=INTEGER}
+			<if test="note != null and note != ''">
+				, #{note, jdbcType=VARCHAR}
+			</if>
+		)
+	</insert>
+	
+	<insert id="addBatchSchool" parameterType="java.util.List">
+
+		INSERT INTO HOS_SCHOOL (
+		group_id
+		,
+		hos_id
+		,
+		school_code
+		,
+		school_name
+		,
+		spell_code
+		,
+		wbx_code
+		,
+		is_stop
+		,
+		note
+
+		)
+		<foreach collection="list" item="item" index="index"
+			separator=" union all ">
+			select
+			#{item.group_id} ,
+			#{item.hos_id} ,
+			#{item.school_code} ,
+			#{item.school_name} ,
+			#{item.spell_code} ,
+			#{item.wbx_code} ,
+			#{item.is_stop} ,
+			#{item.note}
+			from dual
+		</foreach>
+
+	</insert>
+
+	<update id="updateSchool" parameterType="java.util.Map">
+
+		UPDATE HOS_SCHOOL SET
+		
+		school_name = #{school_name}
+		,
+		spell_code = #{spell_code}
+		,
+		wbx_code = #{wbx_code}
+		,
+		is_stop = #{is_stop}
+		,
+		note = #{note}
+
+		WHERE
+		group_id = #{group_id}
+		and
+		hos_id = #{hos_id}
+		and
+		school_code = #{school_code}
+
+	</update>
+	
+	<update id="updateBatchSchool" parameterType="java.util.List">
+
+		<foreach collection="list" item="item" index="index" open="begin"
+			close=";end;" separator=";">
+			UPDATE HOS_SCHOOL SET
+			school_name = #{item.school_name}
+			,
+			spell_code = #{item.spell_code}
+			,
+			wbx_code = #{item.wbx_code}
+			,
+			is_stop = #{item.is_stop}
+			,
+			note = #{item.note}
+
+			WHERE
+			group_id = #{item.group_id}
+			and
+			hos_id = #{item.hos_id}
+			and
+			school_code = #{item.school_code}
+
+		</foreach>
+	</update>
+
+	<delete id="deleteSchool" parameterType="java.util.Map">
+
+		DELETE FROM HOS_SCHOOL WHERE
+		group_id = #{group_id} and
+		hos_id = #{hos_id} and
+		school_code = #{school_code}
+
+	</delete>
+	<delete id="deleteBatchSchool" parameterType="java.util.List">
+		DELETE FROM HOS_SCHOOL WHERE
+		<foreach collection="list" index="index" item="item" open="("
+			separator="or" close=")">
+			group_id = #{item.group_id}
+			and
+			hos_id = #{item.hos_id}
+			and
+			school_code = #{item.school_code}
+
+		</foreach>
+
+
+	</delete>
+
+	<select id="querySchoolByCode" resultType="com.chd.hrp.sys.entity.School"
+		parameterType="string">
+
+		SELECT
+		group_id,
+		hos_id,
+		school_code,
+		school_name,
+		spell_code,
+		wbx_code,
+		is_stop,
+		note
+		FROM HOS_SCHOOL  
+		<where>
+			<if test="group_id != null and group_id != ''">
+				AND group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND hos_id = #{hos_id}
+			</if>
+			<if test="school_code != null and school_code != ''">
+				AND school_code = #{school_code}
+			</if>
+		</where>
+	</select>
+	<select id="querySchool" parameterType="java.util.Map" resultMap="school">
+
+		SELECT
+		group_id,
+		hos_id,
+		school_code,
+		school_name,
+		spell_code,
+		wbx_code,
+		is_stop,
+		note
+		FROM HOS_SCHOOL 
+		<where>
+			<if test="group_id != null and group_id != ''">
+				AND group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND hos_id = #{hos_id}
+			</if>
+			<if test="school_code != null and school_code != ''">
+				AND (school_code like '${school_code}%' or
+				spell_code like '${school_code}%' or
+				wbx_code like '${school_code}%' or
+				school_name like '%${school_code}%'
+				)
+			</if>
+			<if test="school_name != null and school_name != ''">
+				AND (school_name like '%${school_name}%' or
+				spell_code like '%${school_name}%' or
+				wbx_code like '%${school_name}%')
+			</if>
+			<if test="is_stop != null and is_stop != ''">
+				AND is_stop = #{is_stop}
+			</if>
+			<if test="note != null and note != ''">
+				AND note = #{note}
+			</if>
+		</where>
+		order by group_id asc
+	</select>
+	
+</mapper>
+

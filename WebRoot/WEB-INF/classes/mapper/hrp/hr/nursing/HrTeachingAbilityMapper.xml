@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.hr.dao.nursing.HrTeachingAbilityMapper">
+	<resultMap type="java.util.Map" id="hrSelectMap">
+		<result property="id" column="id" />
+		<result property="text" column="text" />
+		<result property="name" column="name" />
+		<result property="label" column="label" />
+		<result property="type" column="type" />
+		<result property="is_write" column="is_write" />
+	</resultMap>
+	
+	<resultMap id="hrTeach" type="com.chd.hrp.hr.entity.nursing.HrTeachingAbility">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="teach_date" column="teach_date"/>
+		<result property="emp_id" column="emp_id"/>
+		<result property="emp_code" column="emp_code"/>
+		<result property="emp_name" column="emp_name"/>
+		<result property="duty_code" column="duty_code"/>
+		<result property="title_code" column="title_code"/>
+		<result property="level_code" column="level_code"/>
+		<result property="teach_type" column="teach_type"/>
+		<result property="teach_type_name" column="teach_type_name"/>
+		<result property="state" column="state"/>
+		<result property="note" column="note"/>
+	</resultMap>
+		
+	<resultMap id="hrTeachMap" type="java.util.Map">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="teach_date" column="teach_date"/>
+		<result property="emp_id" column="emp_id"/>
+		<result property="emp_code" column="emp_code"/>
+		<result property="emp_name" column="emp_name"/>
+		<result property="duty_code" column="duty_code"/>
+		<result property="title_code" column="title_code"/>
+		<result property="level_code" column="level_code"/>
+		<result property="teach_type" column="teach_type"/>
+		<result property="teach_type_name" column="teach_type_name"/>
+		<result property="state" column="state"/>
+		<result property="note" column="note"/>
+	</resultMap>
+	
+	<insert id="addBatch" parameterType="java.util.List" >
+	
+		INSERT INTO HR_TEACH (
+			group_id,
+			hos_id,
+			teach_date,
+			emp_id,
+			duty_code,
+			title_code,
+			level_code,
+			teach_type,
+			state,
+			note
+		) (
+		<foreach collection="list" item="item" index="index" separator=" union all " >
+			select 		
+				#{item.group_id,jdbcType=INTEGER},
+				#{item.hos_id,jdbcType=INTEGER},
+				#{item.teach_date,jdbcType=VARCHAR},
+				<!-- 	#{item.teach_date,jdbcType=VARCHAR}, -->
+				#{item.emp_id,jdbcType=INTEGER},
+				#{item.duty_code,jdbcType=VARCHAR},
+				#{item.title_code,jdbcType=VARCHAR},
+				#{item.level_code,jdbcType=VARCHAR},
+				#{item.teach_type,jdbcType=VARCHAR},
+				#{item.state,jdbcType=INTEGER},
+				#{item.note,jdbcType=VARCHAR}
+		    from dual
+		</foreach>
+		)
+	</insert>
+	
+	<select id="query" parameterType="java.util.Map" resultMap="hrTeach" >
+	
+		SELECT 
+		   	ht.group_id,
+	   		ht.hos_id,
+	    	ht.teach_date,
+	    	ht.emp_id,
+	    	he.emp_code emp_code,
+	    	he.emp_name emp_name,
+	    	ht.duty_code,
+	    	ht.title_code,
+	    	ht.level_code,
+		    ht.teach_type,
+		    t.field_col_name as teach_type_name,
+		    ht.state,
+		    ht.note
+    	FROM HR_TEACH ht 
+    	left join hos_emp he on ht.emp_id=he.emp_id and ht.group_id=he.group_id and ht.hos_id=he.hos_id
+    	left join hr_fiied_data t on ht.teach_type=t.field_col_code and t.field_tab_code='DIC_TEACH_TYPE' and t.group_id=ht.group_id and   t.hos_id=ht.hos_id
+		<where>                     
+				ht.group_id = #{group_id,jdbcType=INTEGER}
+			AND ht.hos_id = #{hos_id,jdbcType=INTEGER}
+			<if test="teach_begin_date != null and teach_begin_date != ''">
+				AND ht.teach_date between to_char(#{teach_begin_date}) and to_char(#{teach_end_date})
+			</if>
+			<if test="emp_id != null and emp_id != ''">
+				AND ht.emp_id = #{emp_id,jdbcType=INTEGER}
+			</if>
+			<if test="duty_code != null and duty_code != ''">
+				AND ht.duty_code = #{duty_code,jdbcType=VARCHAR}
+			</if>
+			<if test="title_code != null and title_code != ''">
+				AND ht.title_code = #{title_code,jdbcType=VARCHAR}
+			</if>
+			<if test="level_code != null and level_code != ''">
+				AND ht.level_code = #{level_code,jdbcType=VARCHAR}
+			</if>
+			<if test="teach_type != null and teach_type != ''">
+				AND ht.teach_type = #{teach_type,jdbcType=VARCHAR}
+			</if>
+			<if test="state != null and state != ''">
+				AND ht.state = #{state,jdbcType=INTEGER}
+			</if>
+			<if test="note != null and note != ''">
+				AND ht.note = #{note,jdbcType=VARCHAR}
+			</if>
+			<if test="emp_code !=null and emp_code !=''">
+	 			AND he.emp_code like '%${emp_code}%'
+			</if>
+			<if test="emp_name !=null and emp_name !=''">
+				AND  he.emp_name like  '%${emp_name}%'
+			</if>
+			<if test="dept_no !=null and dept_no !=''">
+	 			AND he.dept_no=#{dept_no}
+			</if>
+		</where>   
+		order by ht.teach_date
+	</select>
+		<select id="queryByCode" resultMap="hrTeach"  parameterType="java.util.Map" >
+	
+		SELECT 
+		group_id,
+		hos_id,
+		teach_date,
+		emp_id,
+		duty_code,
+		title_code,
+		level_code,
+		teach_type,
+		state,
+		note
+		FROM hr_teach 
+		WHERE 
+		group_id = #{group_id,jdbcType=INTEGER}   and 
+		hos_id = #{hos_id,jdbcType=INTEGER}   and 
+		teach_date = #{teach_date,jdbcType=VARCHAR}   and 
+		emp_id = #{emp_id,jdbcType=INTEGER} 
+	
+	</select>
+	<select  id="queryTeach" resultMap="hrTeachMap" >
+		select 
+			field_col_code as teach_type, 
+			field_col_name as teach_type_name
+		from 
+			hr_fiied_data 
+		where field_tab_code='DIC_TEACH_TYPE' 
+		  AND group_id = #{group_id,jdbcType=INTEGER}
+		  AND hos_id = #{hos_id,jdbcType=INTEGER}
+		<if test="teach_type != null and teach_type != ''">
+	   		and (
+	   			field_col_code =#{teach_type,jdbcType=VARCHAR} or 
+				field_col_name =#{teach_type,jdbcType=VARCHAR}
+	   		)
+		</if>
+	</select>
+	<delete id="deleteTeaching" parameterType="java.util.Map">
+		DELETE FROM hr_teach 
+     	where group_id = #group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			<if test="teach_date != null and teach_date != ''">
+				AND teach_date = #{teach_date,jdbcType=VARCHAR}
+			</if>
+			<if test="emp_id != null and emp_id != ''">
+				AND emp_id = #{emp_id,jdbcType=INTEGER}
+			</if>
+	</delete>
+	
+	<delete id="deleteTeachingAbility" parameterType="java.util.List">
+		DELETE FROM hr_teach 
+		<where>
+			<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+				<if test="item.group_id != null and item.group_id != ''">
+			   		group_id = #{item.group_id,jdbcType=INTEGER}
+				</if>
+				<if test="item.hos_id != null and item.hos_id != ''">
+					AND hos_id = #{item.hos_id,jdbcType=INTEGER}
+				</if>
+				<if test="item.teach_date != null and item.teach_date != ''">
+					AND teach_date = #{item.teach_date,jdbcType=VARCHAR}
+				</if>
+				<if test="item.emp_id != null and item.emp_id != ''">
+					AND emp_id = #{item.emp_id,jdbcType=INTEGER}
+				</if>
+			</foreach>
+	    </where>  
+	</delete>
+	
+	<!--查询下拉框教学种类 -->
+	<select id="queryTeachType" parameterType="java.util.Map" resultMap="hrSelectMap">
+		select t.field_col_code as id ,t.field_col_name as text
+		from hr_fiied_data t 
+		where t.field_tab_code = 'DIC_TEACH_TYPE'
+			AND t.group_id = #{group_id,jdbcType=INTEGER}
+			AND t.hos_id = #{hos_id,jdbcType=INTEGER}
+	</select>
+	
+	<!-- 查询教学种类表格 -->
+	<select id="queryHrTeachType" parameterType="java.util.Map" resultMap="hrTeachMap">
+		select t.field_col_code as teach_type ,t.field_col_name as teach_type_name
+		from hr_fiied_data t 
+		where t.field_tab_code = 'DIC_TEACH_TYPE'
+			and t.group_id = #{group_id,jdbcType=INTEGER}
+			and t.hos_id = #{hos_id,jdbcType=INTEGER}
+	</select>
+	
+	<select id="queryHrTeachingAbilityByEmpId" parameterType="java.util.List" resultType="java.util.Map" >
+		 with list_temp as (
+			<foreach collection="list" item="item" index="index" separator=" union all " >
+				select    
+					#{item.group_id,jdbcType=INTEGER} as group_id, 
+					#{item.hos_id,jdbcType=INTEGER} as hos_id, 
+					#{item.teach_date,jdbcType=VARCHAR} as teach_date,
+					#{item.emp_id,jdbcType=INTEGER} as emp_id
+				from dual
+			</foreach>
+		)
+		select a.group_id,a.hos_id,a.teach_date,a.emp_id,c.emp_code,c.emp_name
+		from list_temp a
+		join hr_teach b on a.group_id=b.group_id and a.hos_id=b.hos_id and a.teach_date=b.teach_date and a.emp_id=b.emp_id
+		left join hos_emp c on b.group_id=c.group_id and b.hos_id=c.hos_id and b.emp_id=c.emp_id and c.is_stop = 0
+	</select> 
+	
+</mapper>

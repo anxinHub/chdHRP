@@ -1,0 +1,2554 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.cost.dao.director.CostComprehensiveAnalysisMapper">
+	 
+	<select id="queryCostDepartmentOperation" parameterType="java.util.Map" resultType="java.util.Map">
+                          with temp as ( <!-- 项目 -->
+				   select '01' item_code,'本期' item_name from dual
+				 ), income as (   <!-- 收入 -->
+				   select 
+					   '01' item_code,
+					   sum(ci.money) money
+					 from cost_income ci
+					 left join hos_dept_dict appl_hdd
+					 on appl_hdd.group_id = ci.group_id
+					 and appl_hdd.hos_id = ci.hos_id
+					 and appl_hdd.dept_id = ci.appl_dept_id
+					 and appl_hdd.is_stop=0
+					 left join acc_dept_attr ada
+					 on ada.group_id = appl_hdd.group_id
+					 and ada.hos_id = appl_hdd.hos_id
+					 and ada.dept_id = appl_hdd.dept_id
+					 where ci.group_id = #{group_id}
+					 and ci.hos_id = #{hos_id}
+					 and ci.copy_code =  #{copy_code}
+					 
+					 and to_char(appl_hdd.dept_id) in (
+				     select b.perm_code
+				     from v_user_data_perm b
+				     where b.group_id = '19'
+					 and b.hos_id = '23'
+					 and b.user_id = '4313'
+					 and b.table_code = 'HOS_DEPT_DICT'
+					 and (b.is_write = 1
+						or b.is_read = 1) )
+						
+					 and ada.natur_code in ('01','02')
+					 <if test="dept_code != null and dept_code != ''">
+                      and appl_hdd.dept_code like #{dept_code}||'%'
+                    </if>
+					 and ci.acc_year || ci.acc_month between #{year_month_begin} and #{year_month_end}
+				 ), cost as (   <!-- 成本 -->
+				    select 
+								 '01' item_code,
+								 sum(dir_amount + 
+								 dir_ass_amount + 
+								 dir_med_amount +
+								 indir_med_ass_amount + 
+								 dir_man_amount +
+								 indir_ass_man_amount + 
+								 indir_med_man_amount +
+								 indir_ass_med_man_amount) cost_money
+							 from cost_dept_cost cdc
+							 left join hos_dept_dict hdd
+							 on hdd.group_id = cdc.group_id
+							 and hdd.hos_id = cdc.hos_id
+							 and hdd.dept_id = cdc.dept_id
+							 and hdd.is_stop=0
+							 left join acc_dept_attr ada
+							 on ada.group_id = hdd.group_id
+							 and ada.hos_id = hdd.hos_id
+							 and ada.dept_id = hdd.dept_id
+							 where cdc.group_id = #{group_id}
+							 and cdc.hos_id = #{hos_id}
+							 and cdc.copy_code = #{copy_code}
+							 
+							 and to_char(cdc.dept_id) in (
+				                select b.perm_code
+				                from v_user_data_perm b
+				                where b.group_id = #{group_id}
+					            and b.hos_id = #{hos_id}
+					            and b.user_id = #{user_id}
+					            and b.table_code = 'HOS_DEPT_DICT'
+					            and (b.is_write = 1
+						        or b.is_read = 1)
+			                    ) 
+							 
+							 and cdc.source_id = '1'
+							 and cdc.ada.natur_code in ('01','02')
+							 <if test="dept_code != null and dept_code != ''">
+		                      and hdd.dept_code like #{dept_code}||'%'
+		                    </if>
+							 and cdc.acc_year || cdc.acc_month between #{year_month_begin} and #{year_month_end}
+				 ), clinic as (  <!-- 门诊工作量 -->
+							 select 
+								 '01' item_code,
+								 sum(ccw.clinic_num) clinic_num  <!-- clinic_num:门急诊人次 -->
+							 from cost_clinic_work ccw
+							 left join hos_dept_dict hdd
+							 on ccw.group_id = hdd.group_id
+							 and ccw.hos_id = hdd.hos_id
+							 and ccw.dept_id = hdd.dept_id
+							 and hdd.is_stop=0
+							 where ccw.group_id = #{group_id}
+							 and ccw.hos_id = #{hos_id}
+							 and ccw.copy_code = #{copy_code}
+							 
+							 and to_char(ccw.dept_id) in (
+				                select b.perm_code
+				                from v_user_data_perm b
+				                where b.group_id = #{group_id}
+					            and b.hos_id = #{hos_id}
+					            and b.user_id = #{user_id}
+					            and b.table_code = 'HOS_DEPT_DICT'
+					            and (b.is_write = 1
+						        or b.is_read = 1)
+			                    ) 
+							 
+							  <if test="dept_code != null and dept_code != ''">
+		                      and hdd.dept_code like #{dept_code}||'%'
+		                    </if>
+							 and ccw.acc_year || ccw.acc_month between #{year_month_begin} and #{year_month_end}
+				 ), use_day as(  <!-- 住院工作量 -->
+						select 
+						'01' item_code,
+						 sum(ciw.bed_use_day_num) bed_use_day_num  <!-- bed_use_day_num:实际占用床日数 -->
+						from cost_inhos_work ciw
+						left join hos_dept_dict hdd
+						on ciw.group_id = hdd.group_id
+						and ciw.hos_id = hdd.hos_id
+						and ciw.dept_id = hdd.dept_id
+						and hdd.is_stop=0
+						where ciw.group_id = #{group_id}
+						and ciw.hos_id = #{hos_id}
+						and ciw.copy_code = #{copy_code}
+						
+						and to_char(ciw.dept_id) in (
+				                select b.perm_code
+				                from v_user_data_perm b
+				                where b.group_id = #{group_id}
+					            and b.hos_id = #{hos_id}
+					            and b.user_id = #{user_id}
+					            and b.table_code = 'HOS_DEPT_DICT'
+					            and (b.is_write = 1
+						        or b.is_read = 1)
+			                    ) 
+						
+						  <if test="dept_code != null and dept_code != ''">
+		                      and hdd.dept_code like #{dept_code}||'%'
+		                    </if>
+						and ciw.acc_year || ciw.acc_month between #{year_month_begin} and #{year_month_end}
+				 )
+				 select 
+				     t1.item_code, <!-- 项目编码 -->
+					 t1.item_name, <!-- 项目名称 -->
+					 t2.money t_1, <!-- 收入 -->
+					 t3.cost_money t_2, <!-- 成本 -->
+					 nvl(t2.money,0) - nvl(cost_money,0) t_3, <!-- 收益 -->
+					 t4.clinic_num t_4, <!-- 门诊工作量 -->
+					 t5.bed_use_day_num t_5 <!-- 住院工作量 -->
+					from temp t1
+					left join income t2
+					on t1.item_code = t2.item_code
+					left join cost t3
+					on t1.item_code = t3.item_code
+					left join clinic t4
+					on t1.item_code = t4.item_code
+					left join use_day t5
+					on t1.item_code = t5.item_code
+    </select> 
+    
+    <select id="queryCostDepartmentOperationPrint" parameterType="java.util.Map" resultType="java.util.Map">
+                           with temp as ( <!-- 项目 -->
+				   select '01' item_code,'本期' item_name from dual
+				 ), income as (   <!-- 收入 -->
+				   select 
+					   '01' item_code,
+					   sum(ci.money) money
+					 from cost_income ci
+					 left join hos_dept_dict appl_hdd
+					 on appl_hdd.group_id = ci.group_id
+					 and appl_hdd.hos_id = ci.hos_id
+					 and appl_hdd.dept_id = ci.appl_dept_id
+					 and appl_hdd.dept_no = ci.appl_dept_no
+					 left join acc_dept_attr ada
+					 on ada.group_id = appl_hdd.group_id
+					 and ada.hos_id = appl_hdd.hos_id
+					 and ada.dept_id = appl_hdd.dept_id
+					 where ci.group_id = #{group_id}
+					 and ci.hos_id = #{hos_id}
+					 and ci.copy_code =  #{copy_code}
+					 
+					 and to_char(appl_hdd.dept_id) in (
+				     select b.perm_code
+				     from v_user_data_perm b
+				     where b.group_id = '19'
+					 and b.hos_id = '23'
+					 and b.user_id = '4313'
+					 and b.table_code = 'HOS_DEPT_DICT'
+					 and (b.is_write = 1
+						or b.is_read = 1) )
+						
+					 and ada.natur_code in ('01','02')
+					 <if test="dept_code != null and dept_code != ''">
+                      and appl_hdd.dept_code like #{dept_code}||'%'
+                    </if>
+					 and ci.acc_year || ci.acc_month between #{year_month_begin} and #{year_month_end}
+				 ), cost as (   <!-- 成本 -->
+				    select 
+								 '01' item_code,
+								 sum(dir_amount + 
+								 dir_ass_amount + 
+								 dir_med_amount +
+								 indir_med_ass_amount + 
+								 dir_man_amount +
+								 indir_ass_man_amount + 
+								 indir_med_man_amount +
+								 indir_ass_med_man_amount) cost_money
+							 from cost_dept_cost cdc
+							 left join hos_dept_dict hdd
+							 on hdd.group_id = cdc.group_id
+							 and hdd.hos_id = cdc.hos_id
+							 and hdd.dept_id = cdc.dept_id
+							 and hdd.dept_no = cdc.dept_no
+							 left join acc_dept_attr ada
+							 on ada.group_id = hdd.group_id
+							 and ada.hos_id = hdd.hos_id
+							 and ada.dept_id = hdd.dept_id
+							 where cdc.group_id = #{group_id}
+							 and cdc.hos_id = #{hos_id}
+							 and cdc.copy_code = #{copy_code}
+							 
+							 and to_char(cdc.dept_id) in (
+				                select b.perm_code
+				                from v_user_data_perm b
+				                where b.group_id = #{group_id}
+					            and b.hos_id = #{hos_id}
+					            and b.user_id = #{user_id}
+					            and b.table_code = 'HOS_DEPT_DICT'
+					            and (b.is_write = 1
+						        or b.is_read = 1)
+			                    ) 
+							 
+							 and cdc.source_id = '1'
+							 and cdc.ada.natur_code in ('01','02')
+							 <if test="dept_code != null and dept_code != ''">
+		                      and hdd.dept_code like #{dept_code}||'%'
+		                    </if>
+							 and cdc.acc_year || cdc.acc_month between #{year_month_begin} and #{year_month_end}
+				 ), clinic as (  <!-- 门诊工作量 -->
+							 select 
+								 '01' item_code,
+								 sum(ccw.clinic_num) clinic_num  <!-- clinic_num:门急诊人次 -->
+							 from cost_clinic_work ccw
+							 left join hos_dept_dict hdd
+							 on ccw.group_id = hdd.group_id
+							 and ccw.hos_id = hdd.hos_id
+							 and ccw.dept_id = hdd.dept_id
+							 and ccw.dept_no = hdd.dept_no
+							 where ccw.group_id = #{group_id}
+							 and ccw.hos_id = #{hos_id}
+							 and ccw.copy_code = #{copy_code}
+							 
+							 and to_char(ccw.dept_id) in (
+				                select b.perm_code
+				                from v_user_data_perm b
+				                where b.group_id = #{group_id}
+					            and b.hos_id = #{hos_id}
+					            and b.user_id = #{user_id}
+					            and b.table_code = 'HOS_DEPT_DICT'
+					            and (b.is_write = 1
+						        or b.is_read = 1)
+			                    ) 
+							 
+							  <if test="dept_code != null and dept_code != ''">
+		                      and hdd.dept_code like #{dept_code}||'%'
+		                    </if>
+							 and ccw.acc_year || ccw.acc_month between #{year_month_begin} and #{year_month_end}
+				 ), use_day as(  <!-- 住院工作量 -->
+						select 
+						'01' item_code,
+						 sum(ciw.bed_use_day_num) bed_use_day_num  <!-- bed_use_day_num:实际占用床日数 -->
+						from cost_inhos_work ciw
+						left join hos_dept_dict hdd
+						on ciw.group_id = hdd.group_id
+						and ciw.hos_id = hdd.hos_id
+						and ciw.dept_id = hdd.dept_id
+						and ciw.dept_no = hdd.dept_no
+						where ciw.group_id = #{group_id}
+						and ciw.hos_id = #{hos_id}
+						and ciw.copy_code = #{copy_code}
+						
+						and to_char(ciw.dept_id) in (
+				                select b.perm_code
+				                from v_user_data_perm b
+				                where b.group_id = #{group_id}
+					            and b.hos_id = #{hos_id}
+					            and b.user_id = #{user_id}
+					            and b.table_code = 'HOS_DEPT_DICT'
+					            and (b.is_write = 1
+						        or b.is_read = 1)
+			                    ) 
+						
+						  <if test="dept_code != null and dept_code != ''">
+		                      and hdd.dept_code like #{dept_code}||'%'
+		                    </if>
+						and ciw.acc_year || ciw.acc_month between #{year_month_begin} and #{year_month_end}
+				 )
+				 select 
+				     t1.item_code, <!-- 项目编码 -->
+					 t1.item_name, <!-- 项目名称 -->
+					 to_char(nvl(t2.money,0),'fm9999990.00') t_1, <!-- 收入 -->
+					 to_char(nvl(t3.cost_money,0),'fm9999990.00') t_2, <!-- 成本 -->
+					 to_char(nvl(t2.money,0) - nvl(cost_money,0),'fm9999990.00') t_3, <!-- 收益 -->
+					 to_char(nvl(t4.clinic_num,0),'fm9999990.00') t_4, <!-- 门诊工作量 -->
+					 to_char(nvl(t5.bed_use_day_num,0),'fm9999990.00') t_5 <!-- 住院工作量 -->
+					from temp t1
+					left join income t2
+					on t1.item_code = t2.item_code
+					left join cost t3
+					on t1.item_code = t3.item_code
+					left join clinic t4
+					on t1.item_code = t4.item_code
+					left join use_day t5
+					on t1.item_code = t5.item_code
+    </select> 
+    
+    <select id="queryCostGeneralMessage" parameterType="java.util.Map" resultType="java.util.Map">
+	     	with dept as (
+				      select hdd.dept_id,
+							 hdd.dept_code,
+							 hdd.dept_name,
+							 ada.natur_code as item_code,
+							 decode(ada.natur_code, '01', '门诊', '02', '住院') as item_name
+					from hos_dept_dict hdd
+					left join acc_dept_attr ada
+					  on hdd.group_id = ada.group_id
+					 and hdd.hos_id = ada.hos_id
+					 and hdd.dept_id = ada.dept_id
+				 where hdd.group_id = #{group_id}
+					 and hdd.hos_id = #{hos_id}
+					 and hdd.is_stop = '0'
+					 and hdd.is_last = '1'
+					 and ada.natur_code in ('01', '02')
+				 	<if test="dept_code != null and dept_code != ''">
+                      and hdd.dept_code like #{dept_code}||'%'
+                    </if>
+				 ), in_come as (
+				      select t1.appl_dept_id as dept_id,  sum(t1.money) as income_money
+							from cost_income t1
+							where t1.group_id = #{group_id}
+								and t1.hos_id = #{hos_id}
+								and t1.copy_code = #{copy_code}
+								
+								and to_char(t1.appl_dept_id) in (
+				                select b.perm_code
+				                from v_user_data_perm b
+				                where b.group_id = #{group_id}
+					            and b.hos_id = #{hos_id}
+					            and b.user_id = #{user_id}
+					            and b.table_code = 'HOS_DEPT_DICT'
+					            and (b.is_write = 1
+						        or b.is_read = 1)
+			                    )
+								
+								and t1.acc_year || t1.acc_month between #{year_month_begin} and #{year_month_end}
+							group by t1.appl_dept_id
+				    ),dept_cost as (
+						   select 
+								 dept_id,
+								 sum(dir_amount + 
+								 dir_ass_amount + 
+								 dir_med_amount +
+								 indir_med_ass_amount + 
+								 dir_man_amount +
+								 indir_ass_man_amount + 
+								 indir_med_man_amount +
+								 indir_ass_med_man_amount) cost_money
+							 from cost_dept_cost
+							 where group_id = #{group_id}
+							 and hos_id = #{hos_id}
+							 and copy_code = #{copy_code}
+							 
+							 and to_char(dept_id) in (
+				                select b.perm_code
+				                from v_user_data_perm b
+				                where b.group_id = #{group_id}
+					            and b.hos_id = #{hos_id}
+					            and b.user_id = #{user_id}
+					            and b.table_code = 'HOS_DEPT_DICT'
+					            and (b.is_write = 1
+						        or b.is_read = 1)
+			                    )
+							 
+							 and source_id = '1'
+							 and acc_year || acc_month between #{year_month_begin} and #{year_month_end}
+							 group by dept_id
+						 ), in_come_med as (
+						     select t1.appl_dept_id as dept_id
+				     	, sum(nvl(t1.money, 0)) as income_money_med
+								from cost_income t1
+								left join cost_charge_kind_arrt t2 on t1.group_id = t2.group_id
+								and t1.hos_id = t2.hos_id
+								and t1.copy_code = t2.copy_code
+								and t1.charge_kind_id = t2.charge_kind_id 
+									left join acc_dept_attr t3 on t3.group_id = t1.group_id
+								and t3.hos_id = t1.hos_id
+								and t3.dept_id = t1.appl_dept_id 
+								where t1.group_id = #{group_id}
+									and t1.hos_id = #{hos_id}
+									and t1.copy_code = #{copy_code}
+									
+									and to_char(t1.appl_dept_id) in (
+				                select b.perm_code
+				                from v_user_data_perm b
+				                where b.group_id = #{group_id}
+					            and b.hos_id = #{hos_id}
+					            and b.user_id = #{user_id}
+					            and b.table_code = 'HOS_DEPT_DICT'
+					            and (b.is_write = 1
+						        or b.is_read = 1)
+			                    )
+									
+									and t1.acc_year || t1.acc_month between #{year_month_begin} and #{year_month_end}
+									and t2.income_type_id = '2'
+								group by t1.appl_dept_id
+						  ),workload as(
+						    select dept_id,  sum(clinic_num) as workload
+								from cost_clinic_work
+								where group_id = #{group_id}
+									and hos_id = #{hos_id}
+									and copy_code = #{copy_code}
+									
+									and to_char(dept_id) in (
+				                select b.perm_code
+				                from v_user_data_perm b
+				                where b.group_id = #{group_id}
+					            and b.hos_id = #{hos_id}
+					            and b.user_id = #{user_id}
+					            and b.table_code = 'HOS_DEPT_DICT'
+					            and (b.is_write = 1
+						        or b.is_read = 1)
+			                    )
+									
+									and acc_year || acc_month between #{year_month_begin} and #{year_month_end}
+								group by dept_id
+								union all
+								select dept_id,  sum(bed_use_day_num) as workload
+								from cost_inhos_work
+								where group_id = #{group_id}
+									and hos_id = #{hos_id}
+									and copy_code = #{copy_code}
+									
+									and to_char(dept_id) in (
+				                select b.perm_code
+				                from v_user_data_perm b
+				                where b.group_id = #{group_id}
+					            and b.hos_id = #{hos_id}
+					            and b.user_id = #{user_id}
+					            and b.table_code = 'HOS_DEPT_DICT'
+					            and (b.is_write = 1
+						        or b.is_read = 1)
+			                    )
+									
+									and acc_year || acc_month between #{year_month_begin} and #{year_month_end}
+								group by dept_id
+						 ) select 
+						      t1.item_code
+						     ,t1.item_name
+						     ,sum(nvl(t2.income_money,0)) t_1
+							 ,sum(nvl(t3.cost_money,0)) t_2
+							 ,sum(nvl(t2.income_money,0)) - sum(nvl(t3.cost_money,0)) t_3
+							 ,decode(sum(nvl(t3.cost_money,0)),0,0,(sum(nvl(t2.income_money,0)) - sum(nvl(t3.cost_money,0)))/ sum(nvl(t3.cost_money,0)) * 100) t_4
+							 ,decode(sum(nvl(t2.income_money,0)),0,0,(sum(nvl(t2.income_money,0)) - sum(nvl(t3.cost_money,0)))/ sum(nvl(t2.income_money,0)) * 100) t_5
+							 ,decode(sum(nvl(t2.income_money,0)),0,0,sum(nvl(t4.income_money_med,0)) / sum(nvl(t2.income_money,0)) * 100) t_6
+							 ,decode(sum(nvl(t6.workload,0)),0,0,sum(nvl(t2.income_money,0)) / sum(nvl(t6.workload,0))) t_7
+							 ,decode(sum(nvl(t6.workload,0)),0,0,sum(nvl(t3.cost_money,0)) / sum(nvl(t6.workload,0))) t_8
+							 ,decode(sum(nvl(t6.workload,0)),0,0,(sum(nvl(t2.income_money,0)) - sum(nvl(t3.cost_money,0))) / sum(nvl(t6.workload,0))) t_9
+							 from dept t1
+							 left join in_come t2
+							 on t1.dept_id = t2.dept_id
+							 left join dept_cost t3
+							 on t1.dept_id = t3.dept_id
+							 left join in_come_med t4
+							 on t1.dept_id = t4.dept_id
+							 left join in_come_med t5
+							 on t1.dept_id = t5.dept_id
+							 left join workload t6
+							 on t1.dept_id = t6.dept_id
+							 group by t1.item_code,t1.item_name
+							 union all
+							 select
+							    '' item_code
+						     ,'合计' item_name
+						     ,sum(nvl(t2.income_money,0)) t_1
+							 ,sum(nvl(t3.cost_money,0)) t_2
+							 ,sum(nvl(t2.income_money,0)) - sum(nvl(t3.cost_money,0)) t_3
+							 ,decode(sum(nvl(t3.cost_money,0)),0,0,(sum(nvl(t2.income_money,0)) - sum(nvl(t3.cost_money,0)))/ sum(nvl(t3.cost_money,0)) * 100) t_4
+							 ,decode(sum(nvl(t2.income_money,0)),0,0,(sum(nvl(t2.income_money,0)) - sum(nvl(t3.cost_money,0)))/ sum(nvl(t2.income_money,0)) * 100) t_5
+							 ,decode(sum(nvl(t2.income_money,0)),0,0,sum(nvl(t4.income_money_med,0)) / sum(nvl(t2.income_money,0)) * 100) t_6
+							 ,decode(sum(nvl(t6.workload,0)),0,0,sum(nvl(t2.income_money,0)) / sum(nvl(t6.workload,0))) t_7
+							 ,decode(sum(nvl(t6.workload,0)),0,0,sum(nvl(t3.cost_money,0)) / sum(nvl(t6.workload,0))) t_8
+							 ,decode(sum(nvl(t6.workload,0)),0,0,(sum(nvl(t2.income_money,0)) - sum(nvl(t3.cost_money,0))) / sum(nvl(t6.workload,0))) t_9
+							 from dept t1
+							 left join in_come t2
+							 on t1.dept_id = t2.dept_id
+							 left join dept_cost t3
+							 on t1.dept_id = t3.dept_id
+							 left join in_come_med t4
+							 on t1.dept_id = t4.dept_id
+							 left join in_come_med t5
+							 on t1.dept_id = t5.dept_id
+							 left join workload t6
+							 on t1.dept_id = t6.dept_id
+							 order by item_code
+    </select>
+    
+    <select id="queryCostGeneralMessageDetail" parameterType="java.util.Map" resultType="java.util.Map">
+                 with dept as (
+					select hdd.dept_id, hdd.dept_code, hdd.dept_name, ada.natur_code as item_code
+						, decode(ada.natur_code, '01', '门诊', '02', '住院') as item_name
+					from hos_dept_dict hdd
+						left join acc_dept_attr ada on hdd.group_id = ada.group_id
+					and hdd.hos_id = ada.hos_id
+					and hdd.dept_id = ada.dept_id 
+					where hdd.group_id = #{group_id}
+						and hdd.hos_id = #{hos_id}
+						and hdd.is_stop = '0'
+						and hdd.is_last = '1'
+						and ada.natur_code in ('01', '02') 
+						<if test="natur_code != null and natur_code != ''">
+	                     and ada.natur_code = #{natur_code}
+	                    </if>
+	                    <if test="dept_code != null and dept_code != ''">
+	                      and hdd.dept_code like #{dept_code}||'%'
+	                    </if>
+                    	and to_char(hdd.dept_id) in (
+			                select b.perm_code
+			                from v_user_data_perm b
+			                where b.group_id = #{group_id}
+				            and b.hos_id = #{hos_id}
+				            and b.user_id = #{user_id}
+				            and b.table_code = 'HOS_DEPT_DICT'
+				            and (b.is_write = 1
+					        or b.is_read = 1)
+		                    )
+				), 
+				in_come as (
+					select t1.appl_dept_id as dept_id,  sum(t1.money) as income_money
+					from cost_income t1
+					where t1.group_id =  #{group_id}
+						and t1.hos_id = #{hos_id}
+						and t1.copy_code = #{copy_code}
+						and t1.acc_year || t1.acc_month between #{year_month_begin} and #{year_month_begin}
+					group by t1.appl_dept_id
+				), 
+				dept_cost as (
+					select dept_id
+						, sum(dir_amount + dir_ass_amount + dir_med_amount + indir_med_ass_amount + dir_man_amount + indir_ass_man_amount + indir_med_man_amount + indir_ass_med_man_amount) as cost_money
+					from cost_dept_cost
+					where group_id = #{group_id}
+						and hos_id = #{hos_id}
+						and copy_code = #{copy_code}
+						and source_id = '1'
+						and acc_year || acc_month between #{year_month_begin} and #{year_month_begin}
+					group by dept_id
+				), 
+				in_come_med as (
+					select t1.appl_dept_id as dept_id
+						, sum(nvl(t1.money, 0)) as income_money_med
+					from cost_income t1
+					left join cost_charge_kind_arrt t2 on t1.group_id = t2.group_id
+					and t1.hos_id = t2.hos_id
+					and t1.copy_code = t2.copy_code
+					and t1.charge_kind_id = t2.charge_kind_id 
+						left join acc_dept_attr t3 on t3.group_id = t1.group_id
+					and t3.hos_id = t1.hos_id
+					and t3.dept_id = t1.appl_dept_id 
+					where t1.group_id = #{group_id}
+						and t1.hos_id = #{hos_id}
+						and t1.copy_code = #{copy_code}
+						and t1.acc_year || t1.acc_month between #{year_month_begin} and #{year_month_begin}
+						and t2.income_type_id = '2'
+					group by t1.appl_dept_id
+				), 
+				workload as (
+					select dept_id, sum(clinic_num) as workload
+					from cost_clinic_work
+					where group_id = #{group_id}
+						and hos_id = #{hos_id}
+						and copy_code = #{copy_code}
+						and acc_year || acc_month between  #{year_month_begin} and #{year_month_begin}
+					group by dept_id
+					union all
+					select dept_id,  sum(bed_use_day_num) as workload
+					from cost_inhos_work
+					where group_id = #{group_id}
+						and hos_id = #{hos_id}
+						and copy_code = #{copy_code}
+						and acc_year || acc_month between  #{year_month_begin} and #{year_month_begin}
+					group by dept_id
+				)
+			select t1.dept_code, t1.dept_name
+				, sum(nvl(t2.income_money, 0)) as t_1
+				, sum(nvl(t3.cost_money, 0)) as t_2
+				, sum(nvl(t2.income_money, 0)) - sum(nvl(t3.cost_money, 0)) as t_3
+				, decode(sum(nvl(t3.cost_money, 0)), 0, 0, (sum(nvl(t2.income_money, 0)) - 
+				  sum(nvl(t3.cost_money, 0))) / sum(nvl(t3.cost_money, 0)) * 100) as t_4
+				, decode(sum(nvl(t2.income_money, 0)), 0, 0, (sum(nvl(t2.income_money, 0)) - 
+				sum(nvl(t3.cost_money, 0))) / sum(nvl(t2.income_money, 0)) * 100) as t_5
+				, decode(sum(nvl(t2.income_money, 0)), 0, 0, sum(nvl(t4.income_money_med, 0)) / sum(nvl(t2.income_money, 0)) * 100) as t_6
+				, decode(sum(nvl(t6.workload, 0)), 0, 0, sum(nvl(t2.income_money, 0)) / sum(nvl(t6.workload, 0))) as t_7
+				, decode(sum(nvl(t6.workload, 0)), 0, 0, sum(nvl(t3.cost_money, 0)) / sum(nvl(t6.workload, 0))) as t_8
+				, decode(sum(nvl(t6.workload, 0)), 0, 0, (sum(nvl(t2.income_money, 0)) - 
+				sum(nvl(t3.cost_money, 0))) / sum(nvl(t6.workload, 0))) as t_9
+			from dept t1
+			left join in_come t2 on t1.dept_id = t2.dept_id
+			left join dept_cost t3 on t1.dept_id = t3.dept_id
+			left join in_come_med t4 on t1.dept_id = t4.dept_id
+			left join in_come_med t5 on t1.dept_id = t5.dept_id
+				left join workload t6 on t1.dept_id = t6.dept_id
+			group by t1.dept_code, t1.dept_name
+			union all
+			select null as dept_code, '合计' as dept_name
+				, sum(nvl(t2.income_money, 0)) as t_1
+				, sum(nvl(t3.cost_money, 0)) as t_2
+				, sum(nvl(t2.income_money, 0)) - sum(nvl(t3.cost_money, 0)) as t_3
+				, decode(sum(nvl(t3.cost_money, 0)), 0, 0, (sum(nvl(t2.income_money, 0)) - 
+				  sum(nvl(t3.cost_money, 0))) / sum(nvl(t3.cost_money, 0)) * 100) as t_4
+				, decode(sum(nvl(t2.income_money, 0)), 0, 0, (sum(nvl(t2.income_money, 0)) - 
+				  sum(nvl(t3.cost_money, 0))) / sum(nvl(t2.income_money, 0)) * 100) as t_5
+				, decode(sum(nvl(t2.income_money, 0)), 0, 0, sum(nvl(t4.income_money_med, 0)) / sum(nvl(t2.income_money, 0)) * 100) as t_6
+				, decode(sum(nvl(t6.workload, 0)), 0, 0, sum(nvl(t2.income_money, 0)) / sum(nvl(t6.workload, 0))) as t_7
+				, decode(sum(nvl(t6.workload, 0)), 0, 0, sum(nvl(t3.cost_money, 0)) / sum(nvl(t6.workload, 0))) as t_8
+				, decode(sum(nvl(t6.workload, 0)), 0, 0, (sum(nvl(t2.income_money, 0)) - 
+				sum(nvl(t3.cost_money, 0))) / sum(nvl(t6.workload, 0))) as t_9
+				from dept t1
+				left join in_come t2 on t1.dept_id = t2.dept_id
+				left join dept_cost t3 on t1.dept_id = t3.dept_id
+				left join in_come_med t4 on t1.dept_id = t4.dept_id
+				left join in_come_med t5 on t1.dept_id = t5.dept_id
+					left join workload t6 on t1.dept_id = t6.dept_id
+				order by dept_code
+    </select>
+    <select id="queryCostGeneralMessageMed" parameterType="java.util.Map" resultType="java.util.Map">
+          with dept as (
+			select hdd.dept_id,
+						 hdd.dept_code,
+						 hdd.dept_name,
+						 ada.natur_code as item_code,
+						 decode(ada.natur_code, '01', '门诊', '02', '住院') as item_name
+				from hos_dept_dict hdd
+				left join acc_dept_attr ada
+					on hdd.group_id = ada.group_id
+				 and hdd.hos_id = ada.hos_id
+				 and hdd.dept_id = ada.dept_id
+			 where hdd.group_id = #{group_id}
+				 and hdd.hos_id = #{hos_id}
+				 and hdd.is_stop = '0'
+				 and hdd.is_last = '1'
+				 and ada.natur_code in ('01', '02')
+			 	 <if test="dept_code != null and dept_code != ''">
+                     and hdd.dept_code like #{dept_code}||'%'
+                 </if>
+			 ), in_come as (
+			      select t1.appl_dept_id as dept_id, sum(t1.money) as income_money
+						from cost_income t1
+						left join cost_charge_kind_arrt t2 on t1.group_id = t2.group_id
+						and t1.hos_id = t2.hos_id
+						and t1.copy_code = t2.copy_code
+						and t1.charge_kind_id = t2.charge_kind_id 
+							left join acc_dept_attr t3 on t3.group_id = t1.group_id
+						and t3.hos_id = t1.hos_id
+						and t3.dept_id = t1.appl_dept_id 
+						where t1.group_id = #{group_id}
+							and t1.hos_id = #{hos_id}
+							and t1.copy_code = #{copy_code}
+							
+							and to_char(t1.appl_dept_id) in (
+				                select b.perm_code
+				                from v_user_data_perm b
+				                where b.group_id = #{group_id}
+					            and b.hos_id = #{hos_id}
+					            and b.user_id = #{user_id}
+					            and b.table_code = 'HOS_DEPT_DICT'
+					            and (b.is_write = 1
+						        or b.is_read = 1)
+			                    )
+							
+							and t1.acc_year || t1.acc_month between #{year_month_begin} and #{year_month_end}
+							and t2.income_type_id != '2'
+						group by t1.appl_dept_id
+			    ),dept_cost as (
+					   select 
+							 dept_id,
+							 sum(dir_amount + 
+							 dir_ass_amount + 
+							 dir_med_amount +
+							 indir_med_ass_amount + 
+							 dir_man_amount +
+							 indir_ass_man_amount + 
+							 indir_med_man_amount +
+							 indir_ass_med_man_amount) cost_money
+						 from cost_dept_cost cdc
+						 left join cost_item_dict_no cidn
+						 on cdc.group_id = cidn.group_id
+						 and cdc.hos_id = cidn.hos_id
+						 and cdc.copy_code = cidn.copy_code
+						 and cdc.cost_item_id = cidn.cost_item_id
+						 and cidn.is_stop=0
+						 where cdc.group_id = #{group_id}
+						 and cdc.hos_id = #{hos_id}
+						 and cdc.copy_code = #{copy_code}
+						 
+						 and to_char(dept_id) in (
+				                select b.perm_code
+				                from v_user_data_perm b
+				                where b.group_id = #{group_id}
+					            and b.hos_id = #{hos_id}
+					            and b.user_id = #{user_id}
+					            and b.table_code = 'HOS_DEPT_DICT'
+					            and (b.is_write = 1
+						        or b.is_read = 1)
+			                    )
+						 
+						 and cdc.source_id = '1'
+						 and cidn.cost_type_id != '3'
+						 and cdc.acc_year || cdc.acc_month between #{year_month_begin} and #{year_month_end}
+						 group by dept_id
+					 ), in_come_med as (
+					     select t1.appl_dept_id as dept_id
+			     	, sum(nvl(t1.money, 0)) as income_money
+							from cost_income t1
+							left join cost_charge_kind_arrt t2 on t1.group_id = t2.group_id
+							and t1.hos_id = t2.hos_id
+							and t1.copy_code = t2.copy_code
+							and t1.charge_kind_id = t2.charge_kind_id 
+								left join acc_dept_attr t3 on t3.group_id = t1.group_id
+							and t3.hos_id = t1.hos_id
+							and t3.dept_id = t1.appl_dept_id 
+							where t1.group_id = #{group_id}
+								and t1.hos_id = #{hos_id}
+								and t1.copy_code = #{copy_code}
+								
+								and to_char(t1.appl_dept_id) in (
+				                select b.perm_code
+				                from v_user_data_perm b
+				                where b.group_id = #{group_id}
+					            and b.hos_id = #{hos_id}
+					            and b.user_id = #{user_id}
+					            and b.table_code = 'HOS_DEPT_DICT'
+					            and (b.is_write = 1
+						        or b.is_read = 1)
+			                    )
+								
+								and t1.acc_year || t1.acc_month between #{year_month_begin} and #{year_month_end}
+								and t2.income_type_id = '2'
+							group by t1.appl_dept_id
+					  ),dept_cost_med as(
+					        select 
+									 dept_id,
+									 sum(dir_amount + 
+									 dir_ass_amount + 
+									 dir_med_amount +
+									 indir_med_ass_amount + 
+									 dir_man_amount +
+									 indir_ass_man_amount + 
+									 indir_med_man_amount +
+									 indir_ass_med_man_amount) cost_money
+								 from cost_dept_cost cdc
+								 left join cost_item_dict_no cidn
+								 on cdc.group_id = cidn.group_id
+								 and cdc.hos_id = cidn.hos_id
+								 and cdc.copy_code = cidn.copy_code
+								 and cdc.cost_item_id = cidn.cost_item_id
+								 and cidn.is_stop=0
+								 where cdc.group_id = #{group_id}
+								 and cdc.hos_id = #{hos_id}
+								 and cdc.copy_code = #{copy_code}
+								 
+								 and to_char(dept_id) in (
+				                select b.perm_code
+				                from v_user_data_perm b
+				                where b.group_id = #{group_id}
+					            and b.hos_id = #{hos_id}
+					            and b.user_id = #{user_id}
+					            and b.table_code = 'HOS_DEPT_DICT'
+					            and (b.is_write = 1
+						        or b.is_read = 1)
+			                    )
+								 
+								 and cdc.source_id = '1'
+								 and cidn.cost_type_id = '3'
+								 and cdc.acc_year || cdc.acc_month between #{year_month_begin} and #{year_month_end}
+								 group by dept_id
+					 ) select 
+					      t1.item_code
+					     ,t1.item_name
+					     ,sum(nvl(t2.income_money,0)) t_1
+						 ,sum(nvl(t3.cost_money,0)) t_2
+						 ,sum(nvl(t2.income_money,0)) - sum(nvl(t3.cost_money,0)) t_3
+						 ,decode(sum(nvl(t3.cost_money,0)),0,0,(sum(nvl(t2.income_money,0)) - sum(nvl(t3.cost_money,0)))/ sum(nvl(t3.cost_money,0)) * 100) t_4
+						 ,decode(sum(nvl(t2.income_money,0)),0,0,(sum(nvl(t2.income_money,0)) - sum(nvl(t3.cost_money,0)))/ sum(nvl(t2.income_money,0)) * 100) t_5
+						 ,sum(nvl(t4.income_money,0)) t_6
+						 ,sum(nvl(t5.cost_money,0)) t_7
+						 ,sum(nvl(t4.income_money,0)) - sum(nvl(t5.cost_money,0)) t_8
+						 ,decode(sum(nvl(t5.cost_money,0)),0,0,(sum(nvl(t4.income_money,0)) - sum(nvl(t5.cost_money,0))) / sum(nvl(t5.cost_money,0)) * 100) t_9
+						 ,decode(sum(nvl(t4.income_money,0)),0,0,(sum(nvl(t4.income_money,0)) - sum(nvl(t5.cost_money,0)))/ sum(nvl(t4.income_money,0)) * 100) t_10
+						 from dept t1
+						 left join in_come t2
+						 on t1.dept_id = t2.dept_id
+						 left join dept_cost t3
+						 on t1.dept_id = t3.dept_id
+						 left join in_come_med t4
+						 on t1.dept_id = t4.dept_id
+						 left join dept_cost_med t5
+						 on t1.dept_id = t5.dept_id
+						 group by t1.item_code,t1.item_name
+						 union all
+						  select 
+						    '' item_code
+					     ,'合计' item_name
+					     ,sum(nvl(t2.income_money,0)) t_1
+						 ,sum(nvl(t3.cost_money,0)) t_2
+						 ,sum(nvl(t2.income_money,0)) - sum(nvl(t3.cost_money,0)) t_3
+						 ,decode(sum(nvl(t3.cost_money,0)),0,0,(sum(nvl(t2.income_money,0)) - sum(nvl(t3.cost_money,0)))/ sum(nvl(t3.cost_money,0)) * 100) t_4
+						 ,decode(sum(nvl(t2.income_money,0)),0,0,(sum(nvl(t2.income_money,0)) - sum(nvl(t3.cost_money,0)))/ sum(nvl(t2.income_money,0)) * 100) t_5
+						 ,sum(nvl(t4.income_money,0)) t_6
+						 ,sum(nvl(t5.cost_money,0)) t_7
+						 ,sum(nvl(t4.income_money,0)) - sum(nvl(t5.cost_money,0)) t_8
+						 ,decode(sum(nvl(t5.cost_money,0)),0,0,(sum(nvl(t4.income_money,0)) - sum(nvl(t5.cost_money,0))) / sum(nvl(t5.cost_money,0)) * 100) t_9
+						 ,decode(sum(nvl(t4.income_money,0)),0,0,(sum(nvl(t4.income_money,0)) - sum(nvl(t5.cost_money,0)))/ sum(nvl(t4.income_money,0)) * 100) t_10
+						 from dept t1
+						 left join in_come t2
+						 on t1.dept_id = t2.dept_id
+						 left join dept_cost t3
+						 on t1.dept_id = t3.dept_id
+						 left join in_come_med t4
+						 on t1.dept_id = t4.dept_id
+						 left join dept_cost_med t5
+						 on t1.dept_id = t5.dept_id
+						 order by item_code
+    </select>
+    
+    
+    <select id="queryCostGeneralMessageMedDetail" parameterType="java.util.Map" resultType="java.util.Map">
+           with dept as (
+				select hdd.dept_id,  hdd.dept_code, hdd.dept_name, ada.natur_code as item_code
+					, decode(ada.natur_code, '01', '门诊', '02', '住院') as item_name
+				from hos_dept_dict hdd
+					left join acc_dept_attr ada on hdd.group_id = ada.group_id
+				and hdd.hos_id = ada.hos_id
+				and hdd.dept_id = ada.dept_id 
+				where hdd.group_id = #{group_id}
+					and hdd.hos_id = #{hos_id}
+					and hdd.is_stop = '0'
+					and hdd.is_last = '1'
+					and ada.natur_code in ('01', '02')
+				    <if test="natur_code != null and natur_code != ''">
+                    and ada.natur_code = #{natur_code}
+                    </if>
+                    <if test="dept_code != null and dept_code != '' ">
+                     and hdd.dept_code like #{dept_code}||'%'
+                    </if>
+                   	 and to_char(hdd.dept_id) in (
+				                select b.perm_code
+				                from v_user_data_perm b
+				                where b.group_id = #{group_id}
+					            and b.hos_id = #{hos_id}
+					            and b.user_id = #{user_id}
+					            and b.table_code = 'HOS_DEPT_DICT'
+					            and (b.is_write = 1
+						        or b.is_read = 1)
+			                    )
+			), 
+			in_come as (
+				select t1.appl_dept_id as dept_id, sum(t1.money) as income_money
+				from cost_income t1
+				left join cost_charge_kind_arrt t2 on t1.group_id = t2.group_id
+				and t1.hos_id = t2.hos_id
+				and t1.copy_code = t2.copy_code
+				and t1.charge_kind_id = t2.charge_kind_id 
+					left join acc_dept_attr t3 on t3.group_id = t1.group_id
+				and t3.hos_id = t1.hos_id
+				and t3.dept_id = t1.appl_dept_id 
+				where t1.group_id = #{group_id}
+					and t1.hos_id = #{hos_id}
+					and t1.copy_code = #{copy_code}
+					and t1.acc_year || t1.acc_month between #{year_month_begin} and #{year_month_end}
+					and t2.income_type_id != '2'
+				group by t1.appl_dept_id
+			), 
+			dept_cost as (
+				select dept_id
+					, sum(dir_amount + dir_ass_amount + dir_med_amount + indir_med_ass_amount + dir_man_amount + indir_ass_man_amount + indir_med_man_amount + indir_ass_med_man_amount) as cost_money
+				from cost_dept_cost cdc
+					left join cost_item_dict_no cidn on cdc.group_id = cidn.group_id
+				and cdc.hos_id = cidn.hos_id
+				and cdc.copy_code = cidn.copy_code
+				and cdc.cost_item_id = cidn.cost_item_id
+				and cidn.is_stop=0
+				where cdc.group_id = #{group_id}
+					and cdc.hos_id = #{hos_id}
+					and cdc.copy_code = #{copy_code}
+					and cdc.source_id = '1'
+					and cidn.cost_type_id != '3'
+					and cdc.acc_year || cdc.acc_month between #{year_month_begin} and #{year_month_end}
+				group by dept_id
+			), 
+			in_come_med as (
+				select t1.appl_dept_id as dept_id
+					, sum(nvl(t1.money, 0)) as income_money
+				from cost_income t1
+				left join cost_charge_kind_arrt t2 on t1.group_id = t2.group_id
+				and t1.hos_id = t2.hos_id
+				and t1.copy_code = t2.copy_code
+				and t1.charge_kind_id = t2.charge_kind_id 
+					left join acc_dept_attr t3 on t3.group_id = t1.group_id
+				and t3.hos_id = t1.hos_id
+				and t3.dept_id = t1.appl_dept_id 
+				where t1.group_id = #{group_id}
+					and t1.hos_id = #{hos_id}
+					and t1.copy_code = #{copy_code}
+					and t1.acc_year || t1.acc_month between #{year_month_begin} and #{year_month_end}
+					and t2.income_type_id = '2'
+				group by t1.appl_dept_id
+			), 
+			dept_cost_med as (
+				select dept_id
+					, sum(dir_amount + dir_ass_amount + dir_med_amount + indir_med_ass_amount + dir_man_amount + indir_ass_man_amount + indir_med_man_amount + indir_ass_med_man_amount) as cost_money
+				from cost_dept_cost cdc
+					left join cost_item_dict_no cidn on cdc.group_id = cidn.group_id
+				and cdc.hos_id = cidn.hos_id
+				and cdc.copy_code = cidn.copy_code
+				and cdc.cost_item_id = cidn.cost_item_id
+				and cidn.is_stop=0
+				where cdc.group_id = #{group_id}
+					and cdc.hos_id = #{hos_id}
+					and cdc.copy_code = #{copy_code}
+					and cdc.source_id = '1'
+					and cidn.cost_type_id = '3'
+					and cdc.acc_year || cdc.acc_month between #{year_month_begin} and #{year_month_end}
+				group by dept_id
+			)
+		select t1.dept_code, t1.dept_name
+			, sum(nvl(t2.income_money, 0)) as t_1
+			, sum(nvl(t3.cost_money, 0)) as t_2
+			, sum(nvl(t2.income_money, 0)) - sum(nvl(t3.cost_money, 0)) as t_3
+			, decode(sum(nvl(t3.cost_money, 0)), 0, 0, (sum(nvl(t2.income_money, 0)) - sum(nvl(t3.cost_money, 0))) / sum(nvl(t3.cost_money, 0)) * 100) as t_4
+			, decode(sum(nvl(t2.income_money, 0)), 0, 0, (sum(nvl(t2.income_money, 0)) - sum(nvl(t3.cost_money, 0))) / sum(nvl(t2.income_money, 0)) * 100) as t_5
+			, sum(nvl(t4.income_money, 0)) as t_6
+			, sum(nvl(t5.cost_money, 0)) as t_7
+			, sum(nvl(t4.income_money, 0)) - sum(nvl(t5.cost_money, 0)) as t_8
+			, decode(sum(nvl(t5.cost_money, 0)), 0, 0, (sum(nvl(t4.income_money, 0)) - sum(nvl(t5.cost_money, 0))) / sum(nvl(t5.cost_money, 0)) * 100) as t_9
+			, decode(sum(nvl(t4.income_money, 0)), 0, 0, (sum(nvl(t4.income_money, 0)) - sum(nvl(t5.cost_money, 0))) / sum(nvl(t4.income_money, 0)) * 100) as t_10
+		from dept t1
+		left join in_come t2 on t1.dept_id = t2.dept_id
+		left join dept_cost t3 on t1.dept_id = t3.dept_id
+		left join in_come_med t4 on t1.dept_id = t4.dept_id
+		left join dept_cost_med t5 on t1.dept_id = t5.dept_id
+		group by t1.dept_code, t1.dept_name
+		union all
+		select null as dept_code, '合计' as dept_name
+			, sum(nvl(t2.income_money, 0)) as t_1
+			, sum(nvl(t3.cost_money, 0)) as t_2
+			, sum(nvl(t2.income_money, 0)) - sum(nvl(t3.cost_money, 0)) as t_3
+			, decode(sum(nvl(t3.cost_money, 0)), 0, 0, (sum(nvl(t2.income_money, 0)) - sum(nvl(t3.cost_money, 0))) / sum(nvl(t3.cost_money, 0)) * 100) as t_4
+			, decode(sum(nvl(t2.income_money, 0)), 0, 0, (sum(nvl(t2.income_money, 0)) - sum(nvl(t3.cost_money, 0))) / sum(nvl(t2.income_money, 0)) * 100) as t_5
+			, sum(nvl(t4.income_money, 0)) as t_6
+			, sum(nvl(t5.cost_money, 0)) as t_7
+			, sum(nvl(t4.income_money, 0)) - sum(nvl(t5.cost_money, 0)) as t_8
+			, decode(sum(nvl(t5.cost_money, 0)), 0, 0, (sum(nvl(t4.income_money, 0)) - sum(nvl(t5.cost_money, 0))) / sum(nvl(t5.cost_money, 0)) * 100) as t_9
+			, decode(sum(nvl(t4.income_money, 0)), 0, 0, (sum(nvl(t4.income_money, 0)) - sum(nvl(t5.cost_money, 0))) / sum(nvl(t4.income_money, 0)) * 100) as t_10
+		from dept t1
+		left join in_come t2 on t1.dept_id = t2.dept_id
+		left join dept_cost t3 on t1.dept_id = t3.dept_id
+		left join in_come_med t4 on t1.dept_id = t4.dept_id
+		left join dept_cost_med t5 on t1.dept_id = t5.dept_id
+		order by dept_code
+    </select>
+    
+    
+     <select id="queryCostGeneralMessage_t1" parameterType="java.util.Map" resultType="java.util.Map">
+			 with temp as (
+               select 
+                 '直接成本' item_name,
+                 sum(dir_amount) amount
+               from cost_dept_cost cdc
+			   left join hos_dept_dict hdd
+			   on hdd.group_id = cdc.group_id
+			   and hdd.hos_id = cdc.hos_id
+			   and hdd.dept_id = cdc.dept_id
+			   and hdd.is_stop=0
+			   left join acc_dept_attr ada
+			   on ada.group_id = hdd.group_id
+			   and ada.hos_id = hdd.hos_id
+			   and ada.dept_id = hdd.dept_id
+               <where>
+                   cdc.group_id = #{group_id}
+               and cdc.hos_id = #{hos_id}
+               and cdc.copy_code = #{copy_code}
+               
+               and to_char(cdc.dept_id) in (
+				                select b.perm_code
+				                from v_user_data_perm b
+				                where b.group_id = #{group_id}
+					            and b.hos_id = #{hos_id}
+					            and b.user_id = #{user_id}
+					            and b.table_code = 'HOS_DEPT_DICT'
+					            and (b.is_write = 1
+						        or b.is_read = 1)
+			                    ) 
+               
+               and cdc.acc_year || cdc.acc_month between #{year_month_begin} and #{year_month_end}
+			   and ada.type_code = 01
+			   <if test="dept_code != null and dept_code != '' ">
+                    and hdd.dept_code like #{dept_code}||'%'
+               </if>
+               </where>
+               union all
+               select 
+                 '分摊管理成本' item_name,
+                 sum(dir_man_amount + indir_ass_man_amount + indir_med_man_amount + indir_ass_med_man_amount)
+               from cost_dept_cost cdc
+			   left join hos_dept_dict hdd
+			   on hdd.group_id = cdc.group_id
+			   and hdd.hos_id = cdc.hos_id
+			   and hdd.dept_id = cdc.dept_id
+			   and hdd.is_stop=0
+			   left join acc_dept_attr ada
+			   on ada.group_id = hdd.group_id
+			   and ada.hos_id = hdd.hos_id
+			   and ada.dept_id = hdd.dept_id
+               <where>
+                   cdc.group_id = #{group_id}
+               and cdc.hos_id = #{hos_id}
+               and cdc.copy_code = #{copy_code}
+               
+               and to_char(cdc.dept_id) in (
+				                select b.perm_code
+				                from v_user_data_perm b
+				                where b.group_id = #{group_id}
+					            and b.hos_id = #{hos_id}
+					            and b.user_id = #{user_id}
+					            and b.table_code = 'HOS_DEPT_DICT'
+					            and (b.is_write = 1
+						        or b.is_read = 1)
+			                    )
+               
+               and cdc.acc_year || cdc.acc_month between #{year_month_begin} and #{year_month_end}
+			   and ada.type_code = 01
+			   <if test="dept_code != null and dept_code != '' ">
+                    and hdd.dept_code like #{dept_code}||'%'
+               </if>
+               </where>
+                union all
+               select 
+                 '分摊医辅成本' item_name,
+                 sum(dir_ass_amount + indir_med_ass_amount)
+               from cost_dept_cost cdc
+			   left join hos_dept_dict hdd
+			   on hdd.group_id = cdc.group_id
+			   and hdd.hos_id = cdc.hos_id
+			   and hdd.dept_id = cdc.dept_id
+			   and hdd.is_stop=0
+			   left join acc_dept_attr ada
+			   on ada.group_id = hdd.group_id
+			   and ada.hos_id = hdd.hos_id
+			   and ada.dept_id = hdd.dept_id
+              <where>
+                   cdc.group_id = #{group_id}
+               and cdc.hos_id = #{hos_id}
+               and cdc.copy_code = #{copy_code}
+               
+               and to_char(cdc.dept_id) in (
+				                select b.perm_code
+				                from v_user_data_perm b
+				                where b.group_id = #{group_id}
+					            and b.hos_id = #{hos_id}
+					            and b.user_id = #{user_id}
+					            and b.table_code = 'HOS_DEPT_DICT'
+					            and (b.is_write = 1
+						        or b.is_read = 1)
+			                    )
+               
+               and cdc.acc_year || cdc.acc_month between #{year_month_begin} and #{year_month_end}
+			   and ada.type_code = 01
+			   <if test="dept_code != null and dept_code != '' ">
+                    and hdd.dept_code like #{dept_code}||'%'
+               </if>
+               </where>
+                union all
+               select 
+                 '分摊医技成本' item_name,
+                 sum(dir_med_amount)
+               from cost_dept_cost cdc
+			   left join hos_dept_dict hdd
+			   on hdd.group_id = cdc.group_id
+			   and hdd.hos_id = cdc.hos_id
+			   and hdd.dept_id = cdc.dept_id
+			   and hdd.is_stop=0
+			   left join acc_dept_attr ada
+			   on ada.group_id = hdd.group_id
+			   and ada.hos_id = hdd.hos_id
+			   and ada.dept_id = hdd.dept_id
+               <where>
+                   cdc.group_id = #{group_id}
+               and cdc.hos_id = #{hos_id}
+               and cdc.copy_code = #{copy_code}
+               
+               and to_char(cdc.dept_id) in (
+				                select b.perm_code
+				                from v_user_data_perm b
+				                where b.group_id = #{group_id}
+					            and b.hos_id = #{hos_id}
+					            and b.user_id = #{user_id}
+					            and b.table_code = 'HOS_DEPT_DICT'
+					            and (b.is_write = 1
+						        or b.is_read = 1)
+			                    )
+               
+               and cdc.acc_year || cdc.acc_month between #{year_month_begin} and #{year_month_end}
+			   and ada.type_code = 01
+			   <if test="dept_code != null and dept_code != '' ">
+                    and hdd.dept_code like #{dept_code}||'%'
+               </if>
+               </where>
+              ), temp_sum as(
+                 select sum(amount) sum_amount from temp
+              )select 
+                 item_name,amount,amount / sum_amount * 100 percentage
+               from temp 
+               left join temp_sum 
+               on 1 =1
+               union all
+               select 
+                 '合计',sum(amount),sum(amount / sum_amount * 100)
+               from temp 
+               left join temp_sum
+               on 1 =1
+    </select>
+    
+    <select id="queryCostGeneralMessage_t2" parameterType="java.util.Map" resultType="java.util.Map">
+						  with temp as (
+			               select 
+			                 '固定成本' item_name,
+			                 sum(dir_amount + 
+								 dir_man_amount +
+								 dir_ass_amount +
+								 dir_med_amount +
+								 indir_ass_man_amount +
+								 indir_med_man_amount +
+								 indir_ass_med_man_amount +
+								 indir_med_ass_amount) amount
+                             from cost_dept_cost cdc
+							 left join hos_dept_dict hdd
+							 on hdd.group_id = cdc.group_id
+							 and hdd.hos_id = cdc.hos_id
+							 and hdd.dept_id = cdc.dept_id
+							 and hdd.is_stop=0
+							 left join acc_dept_attr ada
+							 on ada.group_id = hdd.group_id
+							 and ada.hos_id = hdd.hos_id
+							 and ada.dept_id = hdd.dept_id
+							 left join cost_item_dict_no cidn
+							 on cidn.group_id = cdc.group_id
+							 and cidn.hos_id = cdc.hos_id
+							 and cidn.copy_code = cdc.copy_code
+							 and cidn.cost_item_id = cdc.cost_item_id
+							 and cidn.is_stop=0
+				             <where>
+				                   cdc.group_id = #{group_id}
+				               and cdc.hos_id = #{hos_id}
+				               and cdc.copy_code = #{copy_code}
+				               
+				               and to_char(cdc.dept_id) in (
+				                select b.perm_code
+				                from v_user_data_perm b
+				                where b.group_id = #{group_id}
+					            and b.hos_id = #{hos_id}
+					            and b.user_id = #{user_id}
+					            and b.table_code = 'HOS_DEPT_DICT'
+					            and (b.is_write = 1
+						        or b.is_read = 1)
+			                    )
+				               
+				               and cdc.acc_year || cdc.acc_month between #{year_month_begin} and #{year_month_end}
+							   and ada.type_code = 01
+							   and cidn.nature_id = 1
+							   <if test="dept_code != null and dept_code != '' ">
+				                    and hdd.dept_code like #{dept_code}||'%'
+				               </if>
+				             </where>
+				               union all
+				               select 
+				                 '变动成本' item_name,
+				                 sum(dir_amount + 
+										 dir_man_amount +
+										 dir_ass_amount +
+										 dir_med_amount +
+										 indir_ass_man_amount +
+										 indir_med_man_amount +
+										 indir_ass_med_man_amount +
+										 indir_med_ass_amount) amount
+                             from cost_dept_cost cdc
+							 left join hos_dept_dict hdd
+							 on hdd.group_id = cdc.group_id
+							 and hdd.hos_id = cdc.hos_id
+							 and hdd.dept_id = cdc.dept_id
+							 and hdd.is_stop=0
+							 left join acc_dept_attr ada
+							 on ada.group_id = hdd.group_id
+							 and ada.hos_id = hdd.hos_id
+							 and ada.dept_id = hdd.dept_id
+							 left join cost_item_dict_no cidn
+							 on cidn.group_id = cdc.group_id
+							 and cidn.hos_id = cdc.hos_id
+							 and cidn.copy_code = cdc.copy_code
+							 and cidn.cost_item_id = cdc.cost_item_id
+							 and cidn.is_stop=0
+				             <where>
+				                   cdc.group_id = #{group_id}
+				               and cdc.hos_id = #{hos_id}
+				               and cdc.copy_code = #{copy_code}
+				               
+				               and to_char(cdc.dept_id) in (
+				                select b.perm_code
+				                from v_user_data_perm b
+				                where b.group_id = #{group_id}
+					            and b.hos_id = #{hos_id}
+					            and b.user_id = #{user_id}
+					            and b.table_code = 'HOS_DEPT_DICT'
+					            and (b.is_write = 1
+						        or b.is_read = 1)
+			                    )
+				               
+				               and cdc.acc_year || cdc.acc_month between #{year_month_begin} and #{year_month_end}
+							   and ada.type_code = 01
+							   and cidn.nature_id = 2
+							   <if test="dept_code != null and dept_code != '' ">
+				                    and hdd.dept_code like #{dept_code}||'%'
+				               </if>
+				             </where>
+				            ), temp_sum as(
+				                 select sum(amount) sum_amount from temp
+				              )select 
+				                 item_name,amount,amount / sum_amount * 100 percentage
+				               from temp 
+				               left join temp_sum 
+				               on 1 =1
+				               union all
+				               select 
+				                 '合计',sum(amount),sum(amount / sum_amount * 100)
+				               from temp 
+				               left join temp_sum
+				               on 1 =1
+    </select>
+    
+    <select id="queryCostGeneralMessage_t3" parameterType="java.util.Map" resultType="java.util.Map">
+			                with temp as (
+							 select 
+							     ctd.cost_type_code item_code,
+				                 ctd.cost_type_name item_name,
+				                 sum(dir_amount + 
+				                     dir_man_amount +
+				                     dir_ass_amount +
+				                     dir_med_amount +
+				                     indir_ass_man_amount +
+				                     indir_med_man_amount +
+				                     indir_ass_med_man_amount +
+				                     indir_med_ass_amount) amount
+				               from cost_dept_cost cdc
+				               left join hos_dept_dict hdd
+				               on hdd.group_id = cdc.group_id
+				               and hdd.hos_id = cdc.hos_id
+				               and hdd.dept_id = cdc.dept_id
+				               and hdd.is_stop=0
+				               left join acc_dept_attr ada
+				               on ada.group_id = hdd.group_id
+				               and ada.hos_id = hdd.hos_id
+				               and ada.dept_id = hdd.dept_id
+				               left join cost_item_dict_no cidn
+				               on cidn.group_id = cdc.group_id
+				               and cidn.hos_id = cdc.hos_id
+				               and cidn.copy_code = cdc.copy_code
+				               and cidn.cost_item_id = cdc.cost_item_id
+				               and cidn.is_stop=0
+							   left join cost_type_dict ctd
+							   on ctd.cost_type_id = cidn.cost_type_id
+				               <where>
+				                   cdc.group_id = #{group_id}
+				               and cdc.hos_id = #{hos_id}
+				               and cdc.copy_code = #{copy_code}
+				               
+				               and to_char(cdc.dept_id) in (
+				                select b.perm_code
+				                from v_user_data_perm b
+				                where b.group_id = #{group_id}
+					            and b.hos_id = #{hos_id}
+					            and b.user_id = #{user_id}
+					            and b.table_code = 'HOS_DEPT_DICT'
+					            and (b.is_write = 1
+						        or b.is_read = 1)
+			                    )
+				               
+				               and cdc.acc_year || cdc.acc_month between #{year_month_begin} and #{year_month_end}
+				               and ada.type_code = 01
+				               <if test="dept_code != null and dept_code != '' ">
+				                   and hdd.dept_code like #{dept_code}||'%'
+				               </if>
+				               </where>
+							   group by ctd.cost_type_code,ctd.cost_type_name
+							  ), temp_sum as (
+							    select sum(amount) sum_amount from temp
+							  ) select item_code,item_name,amount,amount/sum_amount * 100 percentage
+							   from temp
+							   left join temp_sum
+								 on 1 = 1
+								 union all
+								 select '','合计',sum(amount),sum(amount/sum_amount * 100) 
+							   from temp
+							   left join temp_sum
+								 on 1 = 1
+								 order by item_code
+    </select>
+    
+    <select id="queryCostGeneralMessageProfit" parameterType="java.util.Map" resultType="java.util.Map">
+			     with dept as (
+					select a.dept_id,  a.dept_code, a.dept_name
+						, decode(b.natur_code, '01', '01', '02', '02', '03') as item_code
+						, decode(b.natur_code, '01', '门诊', '02', '住院', '医技') as item_name
+					from hos_dept_dict a
+						left join acc_dept_attr b on a.group_id = b.group_id
+					and a.hos_id = b.hos_id
+					and a.dept_id = b.dept_id 
+					where a.group_id = #{group_id}
+						and a.hos_id = #{hos_id}
+						and b.natur_code in ('01', '02')
+						and a.is_stop = '0'
+						and a.is_last = '1'
+						
+					union all
+					select a.dept_id,  a.dept_code, a.dept_name
+						, decode(b.natur_code, '01', '01', '02', '02', '03') as item_code
+						, decode(b.natur_code, '01', '门诊', '02', '住院', '医技') as item_name
+					from hos_dept_dict a
+						left join acc_dept_attr b on a.group_id = b.group_id
+					and a.hos_id = b.hos_id
+					and a.dept_id = b.dept_id 
+					where a.group_id = #{group_id}
+						and a.hos_id = #{hos_id}
+						and b.type_code = '02'
+						and a.is_stop = '0'
+						and a.is_last = '1'
+					),income as(
+					   select appl_dept_id dept_id ,sum(money) money from cost_income
+						 where group_id = #{group_id}
+						 and hos_id = #{hos_id}
+						 and copy_code = #{copy_code}
+						 
+						 and to_char(appl_dept_id) in (
+				                select b.perm_code
+				                from v_user_data_perm b
+				                where b.group_id = #{group_id}
+					            and b.hos_id = #{hos_id}
+					            and b.user_id = #{user_id}
+					            and b.table_code = 'HOS_DEPT_DICT'
+					            and (b.is_write = 1
+						        or b.is_read = 1)
+			                    )
+						 
+						 and acc_year || acc_month between #{year_month_begin} and #{year_month_end}
+						 group by appl_dept_id
+					 ),dept_cost as(
+					    select 
+							 dept_id,
+							 sum(decode(cidn.nature_id,1,dir_amount + 
+							 dir_ass_amount + 
+							 dir_med_amount +
+							 indir_med_ass_amount + 
+							 dir_man_amount +
+							 indir_ass_man_amount + 
+							 indir_med_man_amount +
+							 indir_ass_med_man_amount,0)) fixed_cost,
+							 sum(decode(cidn.nature_id,2,dir_amount + 
+							 dir_ass_amount + 
+							 dir_med_amount +
+							 indir_med_ass_amount + 
+							 dir_man_amount +
+							 indir_ass_man_amount + 
+							 indir_med_man_amount +
+							 indir_ass_med_man_amount,0)) change_cost
+						 from cost_dept_cost cdc
+						 left join cost_item_dict_no cidn
+						 on cdc.group_id = cidn.group_id
+						 and cdc.hos_id = cidn.hos_id
+						 and cdc.copy_code = cidn.copy_code
+						 and cdc.cost_item_id = cidn.cost_item_id
+						 and cidn.is_stop=0
+						 where cdc.group_id = #{group_id}
+						 and cdc.hos_id = #{hos_id}
+						 and cdc.copy_code = #{copy_code}
+						 
+						 and to_char(dept_id) in (
+				                select b.perm_code
+				                from v_user_data_perm b
+				                where b.group_id = #{group_id}
+					            and b.hos_id = #{hos_id}
+					            and b.user_id = #{user_id}
+					            and b.table_code = 'HOS_DEPT_DICT'
+					            and (b.is_write = 1
+						        or b.is_read = 1)
+			                    )
+						 
+						 and cdc.source_id = '1'
+						 and cdc.acc_year || cdc.acc_month between #{year_month_begin} and #{year_month_end}
+						 group by dept_id
+					  ),work as(
+						    select dept_id,  sum(clinic_num) as workload
+								from cost_clinic_work
+								where group_id = #{group_id}
+									and hos_id = #{hos_id}
+									and copy_code = #{copy_code}
+									
+									and to_char(dept_id) in (
+				                select b.perm_code
+				                from v_user_data_perm b
+				                where b.group_id = #{group_id}
+					            and b.hos_id = #{hos_id}
+					            and b.user_id = #{user_id}
+					            and b.table_code = 'HOS_DEPT_DICT'
+					            and (b.is_write = 1
+						        or b.is_read = 1)
+			                    )
+									
+									and acc_year || acc_month between #{year_month_begin} and #{year_month_end}
+								group by dept_id
+								union all
+								select dept_id,  sum(bed_use_day_num) as workload
+								from cost_inhos_work
+								where group_id = #{group_id}
+									and hos_id = #{hos_id}
+									and copy_code = #{copy_code}
+									
+									and to_char(dept_id) in (
+				                select b.perm_code
+				                from v_user_data_perm b
+				                where b.group_id = #{group_id}
+					            and b.hos_id = #{hos_id}
+					            and b.user_id = #{user_id}
+					            and b.table_code = 'HOS_DEPT_DICT'
+					            and (b.is_write = 1
+						        or b.is_read = 1)
+			                    )
+									
+									and acc_year || acc_month between #{year_month_begin} and #{year_month_end}
+								group by dept_id
+								union all
+								select server_dept_id as dept_id,  sum(server_num) as workload
+								from cost_inner_server
+								where group_id = #{group_id}
+								and hos_id = #{hos_id}
+								and copy_code = #{copy_code}
+								and to_char(server_dept_id) in (
+				                select b.perm_code
+				                from v_user_data_perm b
+				                where b.group_id = #{group_id}
+					            and b.hos_id = #{hos_id}
+					            and b.user_id = #{user_id}
+					            and b.table_code = 'HOS_DEPT_DICT'
+					            and (b.is_write = 1
+						        or b.is_read = 1)
+			                    )
+									
+									and acc_year || acc_month between #{year_month_begin} and #{year_month_end}
+								group by server_dept_id		 
+						 )select 
+						      t1.item_code
+							 ,t1.item_name
+							 ,sum(nvl(t2.fixed_cost,0)) as t_1
+							,sum(nvl(t2.change_cost,0)) as t_2
+							,sum(nvl(t3.workload,0)) as t_3
+							,decode(sum(nvl(t3.workload,0)),0,0,sum(nvl(t4.money,0)) / sum(nvl(t3.workload,0))) as t_4
+							,decode(sum(nvl(t3.workload,0)),0,0,sum(nvl(t2.change_cost,0)) / sum(nvl(t3.workload,0))) as t_5
+							,decode(sum(nvl(workload,0)),0,0,(sum(nvl(money,0)) - (sum(nvl(fixed_cost,0)) + sum(nvl(change_cost,0)))) / sum(nvl(workload,0))) as t_6
+							,decode(sum(nvl(workload,0)),0,0,sum(nvl(fixed_cost,0)) / ((sum(nvl(money,0)) - sum(nvl(change_cost,0))) / sum(nvl(workload,0)))) as t_7
+							,decode(sum(nvl(workload,0)),0,0,sum(nvl(fixed_cost,0)) / ((sum(nvl(money,0)) - sum(nvl(change_cost,0))) / sum(nvl(workload,0))) * (sum(nvl(money,0)) / sum(nvl(workload,0)))) as t_8,
+							sum(t4.money) money
+						  from  dept t1
+							left join dept_cost t2
+							on t1.dept_id = t2.dept_id
+							left join work t3
+							on t1.dept_id = t3.dept_id
+							left join income t4
+							on t1.dept_id = t4.dept_id
+							<where>
+					           <if test="dept_code != null and dept_code != '' ">
+					               and t1.dept_code like #{dept_code}||'%'
+					           </if>
+					               <if test="item_code != null and dept_code != '' ">
+					               and t1.item_code = #{item_code}
+					           </if>
+							</where>
+							group by t1.item_code,t1.item_name
+							order by t1.item_code			
+    </select>
+    
+     <select id="queryCostGeneralMessageProfitClinic" parameterType="java.util.Map" resultType="java.util.Map">
+             		     with dept as(
+						    select hdd.dept_id,
+								   hdd.dept_code,
+								   hdd.dept_name
+							from hos_dept_dict hdd
+							left join acc_dept_attr ada
+								on hdd.group_id = ada.group_id
+							 and hdd.hos_id = ada.hos_id
+							 and hdd.dept_id = ada.dept_id
+						 where hdd.group_id = #{group_id}
+							 and hdd.hos_id = #{hos_id}
+							 and ada.natur_code in ('01')
+							 and hdd.is_stop = '0'
+							 and hdd.is_last = '1'
+							 <if test="dept_code != null and dept_code != '' ">
+					             and hdd.dept_code like #{dept_code}||'%'
+					          </if>
+					          	and to_char(hdd.dept_id) in (
+				                    select b.perm_code
+			                        from v_user_data_perm b
+			                        where b.group_id = #{group_id}
+			                        and b.hos_id = #{hos_id}
+			                        and b.user_id = #{user_id}
+			                        and b.table_code = 'HOS_DEPT_DICT'
+			                        and (  b.is_write = 1
+			                            or b.is_read = 1)
+		                            )
+							), income as (
+							 select 
+							     appl_dept_id dept_id, 
+								 sum(money) money
+						   from cost_income
+					     where group_id = #{group_id}
+						   and hos_id = #{hos_id}
+						   and copy_code = #{copy_code}
+						   and acc_year || acc_month between #{year_month_begin} and #{year_month_end}
+					    group by appl_dept_id
+							), dept_cost as
+							 (select dept_id,
+											
+											 sum(decode(cidn.nature_id,
+																	1,
+																	dir_amount + dir_ass_amount + dir_med_amount +
+																	indir_med_ass_amount + dir_man_amount +
+																	indir_ass_man_amount + indir_med_man_amount +
+																	indir_ass_med_man_amount,
+																	0)) fixed_cost,
+											 sum(decode(cidn.nature_id,
+																	2,
+																	dir_amount + dir_ass_amount + dir_med_amount +
+																	indir_med_ass_amount + dir_man_amount +
+																	indir_ass_man_amount + indir_med_man_amount +
+																	indir_ass_med_man_amount,
+																	0)) change_cost
+									from cost_dept_cost cdc
+									left join cost_item_dict_no cidn
+										on cdc.group_id = cidn.group_id
+									 and cdc.hos_id = cidn.hos_id
+									 and cdc.copy_code = cidn.copy_code
+									 and cdc.cost_item_id = cidn.cost_item_id
+									 and cidn.is_stop=0
+								 where cdc.group_id = #{group_id}
+									 and cdc.hos_id = #{hos_id}
+									 and cdc.copy_code = #{copy_code}
+									 and cdc.source_id = '1'
+									 and cdc.acc_year || cdc.acc_month between #{year_month_begin} and #{year_month_end}
+								 group by dept_id),
+								work as
+						(select dept_id,  sum(clinic_num) as workload
+							from cost_clinic_work
+						 where group_id = #{group_id}
+							 and hos_id = #{hos_id}
+							 and copy_code = #{copy_code}
+							 and acc_year || acc_month  between #{year_month_begin} and #{year_month_end}
+						 group by dept_id)
+			          select 
+								  t1.dept_code,
+									t1.dept_name,
+									t4.workload t_1,
+									divide(t2.money,t4.workload) t_2,
+									divide(t3.change_cost,t4.workload) t_3,
+									divide((t2.money - t3.fixed_cost + t3.fixed_cost),t4.workload) t_4,
+									t3.fixed_cost t_5,
+									t3.change_cost t_6,
+									divide(t3.fixed_cost,divide((t2.money - t3.change_cost),t4.workload)) t_7,
+									divide(t3.fixed_cost,(1- divide(divide(t3.change_cost,t4.workload),divide(t2.money,t4.workload)))) t_8,
+	                                t2.money
+								from dept t1
+								left join income t2
+								on t1.dept_id = t2.dept_id
+								left join dept_cost t3
+								on t1.dept_id = t3.dept_id
+								left join work t4
+								on t1.dept_id = t4.dept_id
+								order by dept_code
+    </select>
+    
+    <select id="queryCostGeneralMessageProfitClinicCost" parameterType="java.util.Map" resultType="java.util.Map">
+                        with temp as (
+				             select 
+							   cidn.cost_item_code,
+								cidn.cost_item_name,
+				               sum(dir_amount + 
+				               dir_ass_amount + 
+				               dir_med_amount +
+				               indir_med_ass_amount + 
+				               dir_man_amount +
+				               indir_ass_man_amount + 
+				               indir_med_man_amount +
+				               indir_ass_med_man_amount) amount
+				             from cost_dept_cost cdc
+				             left join cost_item_dict_no cidn
+				             on cdc.group_id = cidn.group_id
+				             and cdc.hos_id = cidn.hos_id
+				             and cdc.copy_code = cidn.copy_code
+				             and cdc.cost_item_id = cidn.cost_item_id
+				             and cidn.is_stop=0
+				             left join hos_dept_dict hdd
+							 on hdd.group_id = cdc.group_id
+							 and hdd.hos_id = cdc.hos_id
+							 and hdd.dept_id = cdc.dept_id
+							 and hdd.is_stop=0
+				             where cdc.group_id = #{group_id}
+				             and cdc.hos_id = #{hos_id}
+				             and cdc.copy_code = #{copy_code}
+				             and cdc.source_id = '1'
+							 and cidn.nature_id = #{nature_id}
+							 and hdd.dept_code = #{dept_code}
+				             and cdc.acc_year || cdc.acc_month between #{year_month_begin} and #{year_month_end}
+										 group by  cidn.cost_item_code,cidn.cost_item_name
+									), temp_sum as (
+									    select 
+											 sum(amount) sum_amount
+											from temp
+									)select 
+									  cost_item_code,
+									  cost_item_name,
+										amount t_1,
+										divide(amount,sum_amount) * 100 t_2
+									 from temp
+									 left join temp_sum
+									 on 1=1
+				              
+    </select>
+    
+    
+    <select id="queryCostGeneralMessageProfitInhos" parameterType="java.util.Map" resultType="java.util.Map">
+              with dept as(
+						select hdd.dept_id,
+								 hdd.dept_code,
+								 hdd.dept_name
+							from hos_dept_dict hdd
+							left join acc_dept_attr ada 
+								on hdd.group_id = ada.group_id 
+							 and hdd.hos_id = ada.hos_id
+							 and hdd.dept_id = ada.dept_id
+						 where hdd.group_id = #{group_id}
+							 and hdd.hos_id = #{hos_id}
+							 and ada.natur_code in ('02')
+							 and hdd.is_stop = '0'
+							 and hdd.is_last = '1'
+							 <if test="dept_code != null and dept_code != '' ">
+					             and hdd.dept_code like #{dept_code}||'%'
+					          </if>
+					          and to_char(hdd.dept_id) in (
+				                    select b.perm_code
+			                        from v_user_data_perm b
+			                        where b.group_id = #{group_id}
+			                        and b.hos_id = #{hos_id}
+			                        and b.user_id = #{user_id}
+			                        and b.table_code = 'HOS_DEPT_DICT'
+			                        and (  b.is_write = 1
+			                            or b.is_read = 1)
+		                            )
+							), income as (
+							 select 
+							     appl_dept_id dept_id, 
+								 sum(money) money
+						   from cost_income
+					     where group_id = #{group_id}
+						   and hos_id = #{hos_id}
+						   and copy_code = #{copy_code}
+						   and acc_year || acc_month between #{year_month_begin} and #{year_month_end}
+					    group by appl_dept_id
+							), dept_cost as
+							 (select dept_id,
+											 sum(decode(cidn.nature_id,
+																	1,
+																	dir_amount + dir_ass_amount + dir_med_amount +
+																	indir_med_ass_amount + dir_man_amount +
+																	indir_ass_man_amount + indir_med_man_amount +
+																	indir_ass_med_man_amount,
+																	0)) fixed_cost,
+											 sum(decode(cidn.nature_id,
+																	2,
+																	dir_amount + dir_ass_amount + dir_med_amount +
+																	indir_med_ass_amount + dir_man_amount +
+																	indir_ass_man_amount + indir_med_man_amount +
+																	indir_ass_med_man_amount,
+																	0)) change_cost
+									from cost_dept_cost cdc
+									left join cost_item_dict_no cidn
+										on cdc.group_id = cidn.group_id
+									 and cdc.hos_id = cidn.hos_id
+									 and cdc.copy_code = cidn.copy_code
+									 and cdc.cost_item_id = cidn.cost_item_id
+									 and cidn.is_stop=0
+								 where cdc.group_id = #{group_id}
+									 and cdc.hos_id = #{hos_id}
+									 and cdc.copy_code = #{copy_code}
+									 and cdc.source_id = '1'
+									 and cdc.acc_year || cdc.acc_month between #{year_month_begin} and #{year_month_end}
+								 group by dept_id),
+								work as
+						(select dept_id,  sum(bed_use_day_num) as workload
+							from cost_inhos_work
+							where group_id = #{group_id}
+								and hos_id = #{hos_id}
+								and copy_code = #{copy_code}
+								and acc_year || acc_month between  #{year_month_begin} and #{year_month_begin}
+							group by dept_id)
+			          select 
+								  t1.dept_code,
+									t1.dept_name,
+									t4.workload t_1,
+									divide(t2.money,t4.workload) t_2,
+									divide(t3.change_cost,t4.workload) t_3,
+									divide((t2.money - t3.fixed_cost + t3.fixed_cost),t4.workload) t_4,
+									t3.fixed_cost t_5,
+									t3.change_cost t_6,
+									divide(t3.fixed_cost,divide((t2.money - t3.change_cost),t4.workload)) t_7,
+									divide(t3.fixed_cost,(1- divide(divide(t3.change_cost,t4.workload),divide(t2.money,t4.workload)))) t_8,
+	                                t2.money
+								from dept t1
+								left join income t2
+								on t1.dept_id = t2.dept_id
+								left join dept_cost t3
+								on t1.dept_id = t3.dept_id
+								left join work t4
+								on t1.dept_id = t4.dept_id
+								order by dept_code
+    </select>
+    
+       <select id="queryCostGeneralMessageProfitInhosCost" parameterType="java.util.Map" resultType="java.util.Map">
+                        with temp as (
+				             select 
+							   cidn.cost_item_code,
+								cidn.cost_item_name,
+				               sum(dir_amount + 
+				               dir_ass_amount + 
+				               dir_med_amount +
+				               indir_med_ass_amount + 
+				               dir_man_amount +
+				               indir_ass_man_amount + 
+				               indir_med_man_amount +
+				               indir_ass_med_man_amount) amount
+				             from cost_dept_cost cdc
+				             left join cost_item_dict_no cidn
+				             on cdc.group_id = cidn.group_id
+				             and cdc.hos_id = cidn.hos_id
+				             and cdc.copy_code = cidn.copy_code
+				             and cdc.cost_item_id = cidn.cost_item_id
+				             and cidn.is_stop=0
+				             left join hos_dept_dict hdd
+							 on hdd.group_id = cdc.group_id
+							 and hdd.hos_id = cdc.hos_id
+							 and hdd.dept_id = cdc.dept_id
+							 and hdd.is_stop=0
+				             where cdc.group_id = #{group_id}
+				             and cdc.hos_id = #{hos_id}
+				             and cdc.copy_code = #{copy_code}
+				             and cdc.source_id = '1'
+							 and cidn.nature_id = #{nature_id}
+							 and hdd.dept_code = #{dept_code}
+				             and cdc.acc_year || cdc.acc_month between #{year_month_begin} and #{year_month_end}
+										 group by  cidn.cost_item_code,cidn.cost_item_name
+									), temp_sum as (
+									    select 
+											 sum(amount) sum_amount
+											from temp
+									)select 
+									  cost_item_code,
+									  cost_item_name,
+										amount t_1,
+										divide(amount,sum_amount) * 100 t_2
+									 from temp
+									 left join temp_sum
+									 on 1=1
+				              
+    </select>
+    
+    
+      <select id="queryCostGeneralMessageProfitMedical" parameterType="java.util.Map" resultType="java.util.Map">
+              with dept as(
+						select hdd.dept_id,
+								 hdd.dept_code,
+								 hdd.dept_name
+							from hos_dept_dict hdd
+							left join acc_dept_attr ada
+								on hdd.group_id = ada.group_id 
+							 and hdd.hos_id = ada.hos_id
+							 and hdd.dept_id = ada.dept_id
+						 where hdd.group_id = #{group_id}
+							 and hdd.hos_id = #{hos_id}
+							 and ada.type_code = '02'
+							 and hdd.is_stop = '0'
+							 and hdd.is_last = '1'
+							 <if test="dept_code != null and dept_code != '' ">
+					             and hdd.dept_code like #{dept_code}||'%'
+					          </if>
+					           and to_char(hdd.dept_id) in (
+				                    select b.perm_code
+			                        from v_user_data_perm b
+			                        where b.group_id = #{group_id}
+			                        and b.hos_id = #{hos_id}
+			                        and b.user_id = #{user_id}
+			                        and b.table_code = 'HOS_DEPT_DICT'
+			                        and (  b.is_write = 1
+			                            or b.is_read = 1)
+		                            )
+							), income as (
+							 select 
+							     appl_dept_id dept_id, 
+								 sum(money) money
+						   from cost_income
+					     where group_id = #{group_id}
+						   and hos_id = #{hos_id}
+						   and copy_code = #{copy_code}
+						   and acc_year || acc_month between #{year_month_begin} and #{year_month_end}
+					    group by appl_dept_id
+							), dept_cost as
+							 (select dept_id,
+											 sum(decode(cidn.nature_id,
+																	1,
+																	dir_amount + dir_ass_amount + dir_med_amount +
+																	indir_med_ass_amount + dir_man_amount +
+																	indir_ass_man_amount + indir_med_man_amount +
+																	indir_ass_med_man_amount,
+																	0)) fixed_cost,
+											 sum(decode(cidn.nature_id,
+																	2,
+																	dir_amount + dir_ass_amount + dir_med_amount +
+																	indir_med_ass_amount + dir_man_amount +
+																	indir_ass_man_amount + indir_med_man_amount +
+																	indir_ass_med_man_amount,
+																	0)) change_cost
+									from cost_dept_cost cdc
+									left join cost_item_dict_no cidn
+										on cdc.group_id = cidn.group_id
+									 and cdc.hos_id = cidn.hos_id
+									 and cdc.copy_code = cidn.copy_code
+									 and cdc.cost_item_id = cidn.cost_item_id
+									 and cidn.is_stop=0
+								 where cdc.group_id = #{group_id}
+									 and cdc.hos_id = #{hos_id}
+									 and cdc.copy_code = #{copy_code}
+									 and cdc.source_id = '1'
+									 and cdc.acc_year || cdc.acc_month between #{year_month_begin} and #{year_month_end}
+								 group by dept_id),
+								work as
+						(select dept_id,  sum(bed_use_day_num) as workload
+							from cost_inhos_work
+							where group_id = #{group_id}
+								and hos_id = #{hos_id}
+								and copy_code = #{copy_code}
+								and acc_year || acc_month between  #{year_month_begin} and #{year_month_begin}
+							group by dept_id)
+			          select 
+								  t1.dept_code,
+									t1.dept_name,
+									t4.workload t_1,
+									divide(t2.money,t4.workload) t_2,
+									divide(t3.change_cost,t4.workload) t_3,
+									divide((t2.money - t3.fixed_cost + t3.fixed_cost),t4.workload) t_4,
+									t3.fixed_cost t_5,
+									t3.change_cost t_6,
+									divide(t3.fixed_cost,divide((t2.money - t3.change_cost),t4.workload)) t_7,
+									divide(t3.fixed_cost,(1- divide(divide(t3.change_cost,t4.workload),divide(t2.money,t4.workload)))) t_8,
+	                                t2.money
+								from dept t1
+								left join income t2
+								on t1.dept_id = t2.dept_id
+								left join dept_cost t3
+								on t1.dept_id = t3.dept_id
+								left join work t4
+								on t1.dept_id = t4.dept_id
+								order by dept_code
+    </select>
+    
+      <select id="queryCostDirect" parameterType="java.util.Map" resultType="java.util.Map">
+            						with dept as (
+										      select hdd.dept_id,
+													 hdd.dept_code,
+													 hdd.dept_name
+											from hos_dept_dict hdd
+											left join acc_dept_attr ada
+												on hdd.group_id = ada.group_id
+											 and hdd.hos_id = ada.hos_id
+											 and hdd.dept_id = ada.dept_id
+										  where hdd.group_id = #{group_id}
+											 and hdd.hos_id = #{hos_id}
+											 and hdd.is_stop = '0'
+											 and hdd.is_last = '1'
+											 and ada.natur_code in ('01', '02')
+										<if test="dept_code != null and dept_code != '' ">
+								             and hdd.dept_code like #{dept_code}||'%'
+								          </if>
+								          		and to_char(hdd.dept_id) in (
+											     select b.perm_code
+											     from v_user_data_perm b
+											     where b.group_id = '19'
+												 and b.hos_id = '23'
+												 and b.user_id = '4313'
+												 and b.table_code = 'HOS_DEPT_DICT'
+												 and (b.is_write = 1
+													or b.is_read = 1) )
+										),in_come as (
+										select 
+											t1.appl_dept_id as dept_id,
+											sum(t1.money) as income_money
+										from cost_income t1
+										where t1.group_id = #{group_id}
+											and t1.hos_id = #{hos_id}
+											and t1.copy_code = #{copy_code}
+											and t1.acc_year || t1.acc_month between #{year_month_begin} and #{year_month_end}
+										group by t1.appl_dept_id
+										),in_come_t as (
+										select 
+											t1.appl_dept_id as dept_id, 
+											sum(t1.money) as income_money
+										from cost_income t1
+										where t1.group_id = #{group_id}
+											and t1.hos_id = #{hos_id}
+											and t1.copy_code = #{copy_code}
+											and (t1.acc_year || t1.acc_month between #{year_month_begin} and #{year_month_end}
+											or  t1.acc_year || t1.acc_month <![CDATA[<]]> #{year_month_begin} )
+										group by t1.appl_dept_id
+										),dept_cost as (
+											 select 
+												 dept_id,
+												 sum(dir_amount) cost_money
+											 from cost_dept_cost
+											 where group_id = #{group_id}
+											 and hos_id = #{hos_id}
+											 and copy_code = #{copy_code}
+											 and source_id = '1'
+											 and acc_year || acc_month  between #{year_month_begin} and #{year_month_end}
+											 group by dept_id
+									 ),dept_cost_t as (
+											 select 
+												 dept_id,
+												 sum(dir_amount) cost_money
+											 from cost_dept_cost
+											 where group_id = #{group_id}
+											 and hos_id = #{hos_id}
+											 and copy_code = #{copy_code}
+											 and source_id = '1'
+											 and (acc_year || acc_month between #{year_month_begin} and #{year_month_end}
+											 or  acc_year || acc_month <![CDATA[<]]> #{year_month_begin})
+											 group by dept_id
+										)select  
+											 t.dept_id,
+											 t.dept_code,
+											 t.dept_name,
+											 t1.income_money t_1,
+											 t2.income_money t_2,
+											 t3.cost_money t_3,
+											 t4.cost_money t_4,
+											 nvl(t1.income_money,0) - nvl(t3.cost_money,0) t_5,
+											 nvl(t2.income_money,0) - nvl(t4.cost_money,0) t_6
+										 from dept t
+										 left join in_come t1
+										 on t.dept_id = t1.dept_id
+										 left join in_come_t t2
+										 on t.dept_id = t2.dept_id
+										 left join dept_cost t3
+										 on t.dept_id = t3.dept_id
+										 left join dept_cost_t t4
+										 on t.dept_id = t4.dept_id
+     </select>
+     
+     
+     <select id="queryCostDirectPrint" parameterType="java.util.Map" resultType="java.util.Map">
+            						with dept as (
+										      select hdd.dept_id,
+													 hdd.dept_no,
+													 hdd.dept_code,
+													 hdd.dept_name
+											from hos_dept_dict hdd
+											left join acc_dept_attr ada
+												on hdd.group_id = ada.group_id
+											 and hdd.hos_id = ada.hos_id
+											 and hdd.dept_id = ada.dept_id
+										  where hdd.group_id = #{group_id}
+											 and hdd.hos_id = #{hos_id}
+											 and hdd.is_stop = '0'
+											 and hdd.is_last = '1'
+											 and ada.natur_code in ('01', '02')
+										<if test="dept_code != null and dept_code != '' ">
+								             and hdd.dept_code like #{dept_code}||'%'
+								          </if>
+								          and to_char(hdd.dept_id) in (
+											     select b.perm_code
+											     from v_user_data_perm b
+											     where b.group_id = '19'
+												 and b.hos_id = '23'
+												 and b.user_id = '4313'
+												 and b.table_code = 'HOS_DEPT_DICT'
+												 and (b.is_write = 1
+													or b.is_read = 1) )
+										),in_come as (
+										select 
+											t1.appl_dept_id as dept_id,
+											t1.appl_dept_no as dept_no, 
+											sum(t1.money) as income_money
+										from cost_income t1
+										where t1.group_id = #{group_id}
+											and t1.hos_id = #{hos_id}
+											and t1.copy_code = #{copy_code}
+											and t1.acc_year || t1.acc_month between #{year_month_begin} and #{year_month_end}
+										group by t1.appl_dept_id, t1.appl_dept_no
+										),in_come_t as (
+										select 
+											t1.appl_dept_id as dept_id,
+											t1.appl_dept_no as dept_no, 
+											sum(t1.money) as income_money
+										from cost_income t1
+										where t1.group_id = #{group_id}
+											and t1.hos_id = #{hos_id}
+											and t1.copy_code = #{copy_code}
+											and (t1.acc_year || t1.acc_month between #{year_month_begin} and #{year_month_end}
+											or  t1.acc_year || t1.acc_month <![CDATA[<]]> #{year_month_begin} )
+										group by t1.appl_dept_id, t1.appl_dept_no
+										),dept_cost as (
+											 select 
+												 dept_id,
+												 dept_no,
+												 sum(dir_amount) cost_money
+											 from cost_dept_cost
+											 where group_id = #{group_id}
+											 and hos_id = #{hos_id}
+											 and copy_code = #{copy_code}
+											 and source_id = '1'
+											 and acc_year || acc_month  between #{year_month_begin} and #{year_month_end}
+											 group by dept_id,dept_no
+									 ),dept_cost_t as (
+											 select 
+												 dept_id,
+												 dept_no,
+												 sum(dir_amount) cost_money
+											 from cost_dept_cost
+											 where group_id = #{group_id}
+											 and hos_id = #{hos_id}
+											 and copy_code = #{copy_code}
+											 and source_id = '1'
+											 and (acc_year || acc_month between #{year_month_begin} and #{year_month_end}
+											 or  acc_year || acc_month <![CDATA[<]]> #{year_month_begin})
+											 group by dept_id,dept_no
+										)select  
+											 t.dept_id,
+											 t.dept_no,
+											 t.dept_code,
+											 t.dept_name,
+											 to_char(nvl(t1.income_money,0),'fm999999999990.00') t_1,
+											 to_char(nvl(t2.income_money,0),'fm999999999990.00') t_2,
+											 to_char(nvl(t3.cost_money,0),'fm999999999990.00') t_3,
+											 to_char(nvl(t4.cost_money,0),'fm9999999999990.00') t_4,
+											 to_char((nvl(t1.income_money,0) - nvl(t3.cost_money,0)),'fm999999999990.00') t_5,
+											 to_char((nvl(t2.income_money,0) - nvl(t4.cost_money,0)),'fm999999999990.00') t_6
+										 from dept t
+										 left join in_come t1
+										 on t.dept_id = t1.dept_id
+										 and t.dept_no = t1.dept_no
+										 left join in_come_t t2
+										 on t.dept_id = t2.dept_id
+										 and t.dept_no = t2.dept_no
+										 left join dept_cost t3
+										 on t.dept_id = t3.dept_id
+										 and t.dept_no = t3.dept_no
+										 left join dept_cost_t t4
+										 on t.dept_id = t4.dept_id
+										 and t.dept_no = t4.dept_no
+     </select>
+     
+    
+       <select id="queryCostDirectIncomeKind" parameterType="java.util.Map" resultType="java.util.Map">
+              
+          with temp as (
+					 select  
+						 ccka.charge_kind_code,
+						 ccka.charge_kind_name,
+						 sum(ci.money) as income_money
+						from cost_income ci
+						left join cost_charge_kind_arrt ccka
+						on ci.group_id = ccka.group_id
+						and ci.hos_id = ccka.hos_id
+						and ci.copy_code = ccka.copy_code
+						and ci.charge_kind_id = ccka.charge_kind_id
+						left join hos_dept_dict hdd
+						on hdd.group_id = ci.group_id
+						and hdd.hos_id = ci.hos_id
+						and hdd.dept_id = ci.appl_dept_id
+						and hdd.is_stop=0
+						where ci.group_id = #{group_id}
+						  and ci.hos_id = #{hos_id}
+						  and ci.copy_code = #{copy_code}
+						  and hdd.dept_code = #{dept_code}
+						 <if test="state == 1 or state == '1' ">
+							 and ci.acc_year || ci.acc_month between #{year_month_begin} and #{year_month_end}
+						 </if>
+						 <if test="state == 2 or state == '2' ">
+							 and (ci.acc_year || ci.acc_month between #{year_month_begin} and #{year_month_end}
+							   or  ci.acc_year || ci.acc_month <![CDATA[<]]> #{year_month_begin})
+							 
+						 </if>
+						group by ccka.charge_kind_code,ccka.charge_kind_name
+				)select 
+				  charge_kind_code,
+					charge_kind_name,
+				  income_money
+				from temp
+				union all
+				select 
+				  '',
+					'合计',
+				  sum(income_money)
+				from temp
+       </select>
+       <select id="queryMultiIncome" parameterType="java.util.Map" resultType="java.util.Map">
+           with dept as(
+			  select hdd.dept_id,  hdd.dept_code, hdd.dept_name,ada.natur_code
+			    from hos_dept_dict hdd
+			    left join acc_dept_attr ada
+			      on hdd.group_id = ada.group_id
+			     and hdd.hos_id = ada.hos_id
+			     and hdd.dept_id = ada.dept_id
+			   where hdd.group_id = #{group_id}
+			     and hdd.hos_id = #{hos_id}
+			     and hdd.is_stop = '0'
+			     and hdd.is_last = '1'
+			     and ada.natur_code in ('01', '02') 
+			     <if test = "dept_code != null and dept_code != '' " >
+			     and hdd.dept_code like #{dept_code} || '%' 
+			     </if>
+     	),
+     
+     totalndirectnomanage as(
+	     select cdc.dept_id, 
+	            sum(nvl(cdc.DIR_AMOUNT, 0) + nvl(cdc.DIR_MAN_AMOUNT, 0) + nvl(cdc.DIR_ASS_AMOUNT, 0) + nvl(cdc.DIR_MED_AMOUNT, 0) 
+	            + nvl(cdc.INDIR_ASS_MAN_AMOUNT, 0) + nvl(cdc.INDIR_MED_MAN_AMOUNT, 0) 
+	            + nvl(cdc.INDIR_ASS_MED_MAN_AMOUNT, 0) + nvl(cdc.INDIR_MED_ASS_AMOUNT, 0))
+	                 as totalcost,
+	            sum(nvl(cdc.dir_amount, 0)) as directcost,
+	            sum(nvl(cdc.DIR_AMOUNT, 0) + nvl(cdc.DIR_ASS_AMOUNT, 0) + nvl(cdc.DIR_MED_AMOUNT, 0) + nvl(cdc.INDIR_MED_ASS_AMOUNT, 0))
+	                 as nomanage
+	     from cost_dept_cost cdc
+	     where cdc.group_id = #{group_id}
+	           and cdc.hos_id = #{hos_id}
+	           and cdc.copy_code = #{copy_code}
+	           and cdc.source_id = '1'
+	           and cdc.acc_year || cdc.acc_month between #{year_month_begin} and #{year_month_end}
+	           group by cdc.dept_id
+     ),
+     
+     changecost as(
+     	select 
+             dept_id,
+             sum(decode(cidn.nature_id,2,dir_amount + 
+             dir_ass_amount + 
+             dir_med_amount +
+             indir_med_ass_amount + 
+             dir_man_amount +
+             indir_ass_man_amount + 
+             indir_med_man_amount +
+             indir_ass_med_man_amount,0)) change_cost
+             from cost_dept_cost cdc
+             left join cost_item_dict_no cidn
+             on cdc.group_id = cidn.group_id
+             and cdc.hos_id = cidn.hos_id
+             and cdc.copy_code = cidn.copy_code
+             and cdc.cost_item_id = cidn.cost_item_id
+             and cidn.is_stop=0
+             where cdc.group_id = #{group_id}
+             and cdc.hos_id = #{hos_id}
+             and cdc.copy_code = #{copy_code}
+             and cdc.source_id = '1'
+             and cdc.acc_year || cdc.acc_month between #{year_month_begin} and #{year_month_end}
+             group by dept_id
+     ),
+     
+     income as (
+        select t1.appl_dept_id as dept_id, sum(t1.money) as income_money
+          from cost_income t1
+         where t1.group_id = #{group_id}
+           and t1.hos_id = #{hos_id}
+           and t1.copy_code = #{copy_code}
+           and t1.acc_year || t1.acc_month between #{year_month_begin} and #{year_month_end}
+         group by t1.appl_dept_id
+     )
+      select 
+     	 '01' natur_code,
+         '' dept_code, 
+         '门诊' dept_name,
+         null dept_id,
+         sum(income.income_money) income_money,
+         sum(tdn.totalcost) totalcost,
+         sum(income.income_money) - sum(tdn.totalcost) as total_profit,
+         sum(tdn.directcost) directcost,
+         sum(income.income_money) - sum(tdn.directcost) as direct_profit,
+         sum(tdn.nomanage) nomanage,
+         sum(income.income_money) - sum(tdn.nomanage) as nomanage_profit,
+         sum(cc.change_cost) change_cost,
+         sum(income.income_money) - sum(cc.change_cost) as change_profit
+     from dept dept
+     left join income income on dept.dept_id = income.dept_id
+     left join totalndirectnomanage tdn on dept.dept_id = tdn.dept_id
+     left join changecost cc on dept.dept_id = cc.dept_id
+     where natur_code = '01' 
+                
+                     
+     union all
+      
+      select 
+         '' natur_code,
+         dept.dept_code, 
+         dept.dept_name,
+         dept.dept_id,
+         income.income_money,
+         tdn.totalcost,
+         income.income_money - tdn.totalcost as total_profit,
+         tdn.directcost,
+         income.income_money - tdn.directcost as direct_profit,
+         tdn.nomanage,
+         income.income_money - tdn.nomanage as nomanage_profit,
+         cc.change_cost,
+         income.income_money - cc.change_cost as change_profit
+     from dept dept
+     left join income income on dept.dept_id = income.dept_id
+     left join totalndirectnomanage tdn on dept.dept_id = tdn.dept_id
+     left join changecost cc on dept.dept_id = cc.dept_id
+     where natur_code = '01'   
+   
+     union all
+      select 
+     	 '02' natur_code,
+         '' dept_code, 
+         '住院' dept_name,
+         null dept_id,
+         sum(income.income_money) income_money,
+         sum(tdn.totalcost) totalcost,
+         sum(income.income_money) - sum(tdn.totalcost) as total_profit,
+         sum(tdn.directcost) directcost,
+         sum(income.income_money) - sum(tdn.directcost) as direct_profit,
+         sum(tdn.nomanage) nomanage,
+         sum(income.income_money) - sum(tdn.nomanage) as nomanage_profit,
+         sum(cc.change_cost) change_cost,
+         sum(income.income_money) - sum(cc.change_cost) as change_profit
+     from dept dept
+     left join income income on dept.dept_id = income.dept_id
+     left join totalndirectnomanage tdn on dept.dept_id = tdn.dept_id
+     left join changecost cc on dept.dept_id = cc.dept_id
+     where natur_code = '02'  
+                               
+     union all
+     select 
+         '' natur_code,
+         dept.dept_code, 
+         dept.dept_name,
+         dept.dept_id,
+         income.income_money,
+         tdn.totalcost,
+         income.income_money - tdn.totalcost as total_profit,
+         tdn.directcost,
+         income.income_money - tdn.directcost as direct_profit,
+         tdn.nomanage ,
+         income.income_money - tdn.nomanage as nomanage_profit,
+         cc.change_cost,
+         income.income_money - cc.change_cost as change_profit
+     from dept dept
+     left join income income on dept.dept_id = income.dept_id
+     left join totalndirectnomanage tdn on dept.dept_id = tdn.dept_id
+     left join changecost cc on dept.dept_id = cc.dept_id
+     where natur_code = '02'  
+     
+     union all
+     
+     select 
+         '' natur_code,
+         '' dept_code, 
+         '合计' dept_name,
+         null dept_id,
+         sum(income.income_money) income_money,
+         sum(tdn.totalcost) totalcost,
+         sum(income.income_money) - sum(tdn.totalcost) as total_profit,
+         sum(tdn.directcost) directcost,
+         sum(income.income_money) - sum(tdn.directcost) as direct_profit,
+         sum(tdn.nomanage) nomanage,
+         sum(income.income_money) - sum(tdn.nomanage) as nomanage_profit,
+         sum(cc.change_cost) change_cost,
+         sum(income.income_money) - sum(cc.change_cost) as change_profit
+     from dept dept
+     left join income income on dept.dept_id = income.dept_id
+     left join totalndirectnomanage tdn on dept.dept_id = tdn.dept_id
+     left join changecost cc on dept.dept_id = cc.dept_id
+     
+                            
+       </select>
+       
+       
+       <select id="queryMultiIncomeByDeptDir" parameterType="java.util.Map" resultType="java.util.Map">
+		   with income as (
+		        select t1.appl_dept_id as dept_id, t1.charge_kind_id, sum(t1.money) as income_money
+		          from cost_income t1
+		         where t1.group_id = #{group_id}
+		           and t1.hos_id = #{hos_id}
+		           and t1.copy_code =#{copy_code}
+		           and t1.acc_year || t1.acc_month between #{year_month_begin} and #{year_month_end} and t1.appl_dept_id=#{dept_id} 
+		         group by t1.appl_dept_id, t1.charge_kind_id
+		     ),
+			incomeByself as (
+			        select t1.appl_dept_id as dept_id, t1.charge_kind_id,sum(t1.money) as income_money
+			          from cost_income t1
+			         where t1.group_id = #{group_id}
+			           and t1.hos_id = #{hos_id}
+			           and t1.copy_code = #{copy_code}
+			           and t1.acc_year || t1.acc_month between #{year_month_begin} and #{year_month_end} and t1.appl_dept_id=#{dept_id} 
+			           and t1.appl_dept_id = t1.exec_dept_id 
+			         group by t1.appl_dept_id, t1.charge_kind_id
+			     ) ,    
+
+			dept_income as(
+			  select ci.appl_dept_id,ccka.charge_kind_id,ccka.charge_kind_name
+			  from cost_income ci
+			  left join COST_CHARGE_KIND_ARRT ccka
+			  on ci.group_id = ccka.group_id and ci.hos_id = ccka.hos_id and ci.copy_code=ccka.copy_code and ci.charge_kind_id = ccka.charge_kind_id
+			  where ci.group_id = #{group_id}
+			           and ci.hos_id = #{hos_id}
+			           and ci.copy_code = #{copy_code}
+			           and ci.acc_year || ci.acc_month between #{year_month_begin} and #{year_month_end} and ci.appl_dept_id=#{dept_id} 
+			    group by ci.appl_dept_id,ccka.charge_kind_id,ccka.charge_kind_name
+			),deptIncome as(
+					select di.appl_dept_id,di.charge_kind_id,di.charge_kind_name,income.income_money money,
+					ratio_to_report(income.income_money) over (partition by appl_dept_id)*100  as proportion,
+					incomeByself.income_money selfMoney,divide(incomeByself.income_money,income.income_money)*100 selfProportion
+					from dept_income di
+					left join income on di.appl_dept_id = income.dept_id  and di.charge_kind_id = income.charge_kind_id
+					left join incomeByself on di.appl_dept_id = incomeByself.dept_id  and di.charge_kind_id = incomeByself.charge_kind_id
+			)
+
+			select d.appl_dept_id deptId,d.charge_kind_id as chargeId,d.charge_kind_name as chargeName, d.money as money,d.proportion as proportion,
+			d.selfMoney as selfMoney,d.selfProportion as selfProportion
+			from deptIncome d
+			union all
+			select null deptId,null deptNo,null as chargeId,'合计' as chargeName,sum(d.money) as money,divide(sum(d.money),sum(d.money))*100 as proportion,sum(d.selfMoney) as selfMoney,divide(sum(d.selfMoney),sum(d.money))*100 as selfProportion
+			from deptIncome d 
+		</select> 
+		
+		<select id="queryMultiIncomeByChargeType" parameterType="java.util.Map" resultType="java.util.Map">
+			
+		</select> 
+		
+		<select id="queryMultiIncomeTotalCost" parameterType="java.util.Map" resultType="java.util.Map">
+			 with dept_cost as(    
+			     select cidn.cost_item_code, 
+			     	  cidn.cost_item_name
+			          ,sum(dir_amount + dir_ass_amount + dir_med_amount + indir_med_ass_amount + 
+								  dir_man_amount + indir_ass_man_amount + indir_med_man_amount + indir_ass_med_man_amount) as cost_amount
+			          , sum(dir_amount) as dir_amount
+			          , sum(dir_man_amount + indir_ass_man_amount + indir_med_man_amount + indir_ass_med_man_amount) as dir_man_amount
+			          , sum(dir_ass_amount + indir_med_ass_amount) as dir_ass_amount
+			          , sum(dir_med_amount) as dir_med_amount
+		        from cost_dept_cost cdc
+		        left join cost_item_dict_no cidn on cdc.group_id = cidn.group_id
+		        and cdc.hos_id = cidn.hos_id
+		        and cdc.copy_code = cidn.copy_code
+		        and cdc.cost_item_id = cidn.cost_item_id
+		        and cidn.is_stop=0
+				left join hos_dept_dict hdd
+				on hdd.group_id = cdc.group_id
+				and hdd.hos_id = cdc.hos_id
+				and hdd.dept_id = cdc.dept_id
+				and hdd.is_stop=0
+				left join cost_item_dict cid on cdc.group_id = cid.group_id
+		        and cdc.hos_id = cid.hos_id
+		        and cdc.copy_code = cid.copy_code
+		        and cdc.cost_item_id = cid.cost_item_id
+		        where cdc.group_id = #{group_id}
+		          and cdc.hos_id = #{hos_id}
+		          and cdc.copy_code = #{copy_code}
+		          and cdc.source_id = '1'
+		          and cdc.acc_year || cdc.acc_month between  #{year_month_begin} and  #{year_month_end}
+				  and hdd.dept_code = #{dept_code}
+		        group by cidn.cost_item_code, cidn.cost_item_name,cid.item_grade
+		        order by cidn.cost_item_code
+			)
+			select 
+			  	cost_item_code,
+				cost_item_name,
+				cost_amount t_1,
+				dir_amount t_2,
+				divide(dir_amount,cost_amount) * 100 t_3,
+				dir_man_amount t_4,
+				divide(dir_man_amount,cost_amount) * 100 t_5,
+				dir_ass_amount t_6,
+				divide(dir_ass_amount,cost_amount) * 100 t_7,
+				dir_med_amount t_8,
+				divide(dir_med_amount,cost_amount) * 100 t_9
+			 from dept_cost
+			 union all
+			 select 
+			  '',
+				'合计',
+				sum(cost_amount),
+				sum(dir_amount),
+				divide(sum(dir_amount),sum(cost_amount)) * 100,
+				sum(dir_man_amount),
+				divide(sum(dir_man_amount),sum(cost_amount)) * 100,
+				sum(dir_ass_amount),
+				divide(sum(dir_ass_amount),sum(cost_amount)) * 100,
+				sum(dir_med_amount),
+				divide(sum(dir_med_amount),sum(cost_amount)) * 100
+			 from dept_cost
+			 order by cost_item_code
+		</select>
+ 		
+		<select id="queryMultiIncomeChangeCostDir" parameterType="java.util.Map" resultType="java.util.Map">
+			with changetotal as(
+				select cidn.cost_item_code, 
+					cidn.cost_item_name
+        			,sum(dir_amount + dir_ass_amount + dir_med_amount + indir_med_ass_amount + dir_man_amount + indir_ass_man_amount + indir_med_man_amount + indir_ass_med_man_amount) as change_cost
+			     from cost_dept_cost cdc
+			     left join cost_item_dict_no cidn on cdc.group_id = cidn.group_id
+			        and cdc.hos_id = cidn.hos_id
+			        and cdc.copy_code = cidn.copy_code
+			        and cdc.cost_item_id = cidn.cost_item_id
+			        and cidn.is_stop=0
+			    left join cost_item_dict cid on cdc.group_id = cid.group_id
+			        and cdc.hos_id = cid.hos_id
+			        and cdc.copy_code = cid.copy_code
+			        and cdc.cost_item_id = cid.cost_item_id
+		        where cdc.group_id = #{group_id}
+		          and cdc.hos_id = #{hos_id}
+		          and cdc.copy_code = #{copy_code}
+		          and cdc.source_id = '1'
+				  and cid.is_stop = '0'
+		          and cdc.acc_year || cdc.acc_month between #{year_month_begin} and #{year_month_end}
+		          and cdc.dept_id=#{dept_id} 
+			          and cidn.nature_id=2
+			 group by cidn.cost_item_code, cidn.cost_item_name
+			 order by cidn.cost_item_code
+			 ) , 
+			 temp as (
+		      select  cid.cost_item_code,
+	       		case cid.item_grade
+	            when 1 then  cid.cost_item_name
+	            when 2 then '　　' ||  cid.cost_item_name
+	            when 3 then '　　　　' ||  cid.cost_item_name
+	            when 4 then '　　　　　　' || cid.cost_item_name
+	            when 5 then '　　　　　　　　' ||  cid.cost_item_name
+	            end as cost_item_name
+	      		,cid.item_grade,cid.is_last,sum(ct.change_cost) change_cost
+		         from cost_item_dict cid 
+		         left join changetotal ct 
+		         on ct.cost_item_code like cid.cost_item_code ||'%'  
+		         where cid.group_id = #{group_id}
+			          and cid.hos_id = #{hos_id}
+			          and cid.copy_code =  #{copy_code}
+		         group by  cid.cost_item_code,cid.cost_item_name,cid.item_grade,cid.is_last
+		         having sum(ct.change_cost)  is not null
+		         order by cid.cost_item_code
+         )
+         select  
+           t.cost_item_code
+          ,t.cost_item_name
+          ,t.change_cost
+          ,divide(t.change_cost,t1.change_cost)*100  ratio
+         from temp  t
+         left join (
+          select sum(change_cost) change_cost from temp where is_last = 1
+         )t1 on 1=1
+        union all
+        select '','合计',sum(change_cost) change_cost ,divide(sum(change_cost),sum(change_cost))*100 ratio from temp where is_last = 1
+		</select>
+		
+		
+		<select id="queryMultiIncomeDirectCostDir" parameterType="java.util.Map" resultType="java.util.Map">
+			with dept_cost as (
+				select 
+				      cidn.cost_item_code,cidn.cost_item_name,
+					  sum(dir_amount) as dir_amount
+				from cost_dept_cost cdc
+				left join cost_item_dict_no cidn on cdc.group_id = cidn.group_id
+				and cdc.hos_id = cidn.hos_id
+				and cdc.copy_code = cidn.copy_code
+				and cdc.cost_item_id = cidn.cost_item_id
+				and cidn.is_stop=0
+					left join hos_dept_dict hdd on hdd.group_id = cdc.group_id
+				and hdd.hos_id = cdc.hos_id
+				and hdd.dept_id = cdc.dept_id 
+				and hdd.is_stop=0
+					left join acc_dept_attr ada
+				on ada.group_id = hdd.group_id
+				and ada.hos_id = hdd.hos_id
+				and ada.dept_id = hdd.dept_id
+				left join cost_item_dict cid on cdc.group_id = cid.group_id
+		        and cdc.hos_id = cid.hos_id
+		        and cdc.copy_code = cid.copy_code
+		        and cdc.cost_item_id = cid.cost_item_id
+				    where cdc.group_id = #{group_id}
+					and cdc.hos_id = #{hos_id}
+					and cdc.copy_code = #{copy_code}
+					and cdc.source_id = '1'
+					and cdc.acc_year || cdc.acc_month  between  #{year_month_begin} and  #{year_month_end}
+					and ada.natur_code in ('01','02')
+					<if test="dept_code != null and dept_code != ''">
+		              and hdd.dept_code = #{dept_code}
+		            </if>
+		            <if test="natur_code != null and natur_code != ''">
+		              and ada.natur_code = #{natur_code}
+		            </if>
+					and dir_amount !=0
+				    group by cidn.cost_item_code, cidn.cost_item_name,cid.item_grade
+				    order by cidn.cost_item_code
+				),temp as(
+		            select  cid.cost_item_code,
+		              case cid.item_grade
+		              when 1 then  cid.cost_item_name
+		              when 2 then '　　' ||  cid.cost_item_name
+		              when 3 then '　　　　' ||  cid.cost_item_name
+		              when 4 then '　　　　　　' || cid.cost_item_name
+		              when 5 then '　　　　　　　　' ||  cid.cost_item_name
+		              end as cost_item_name
+		            ,cid.item_grade,cid.is_last,sum(dir_amount) dir_amount
+		             from cost_item_dict cid 
+		             left join dept_cost dc 
+		             on dc.cost_item_code like cid.cost_item_code ||'%'  
+		             where cid.group_id = #{group_id}
+		                and cid.hos_id = #{hos_id}
+		                and cid.copy_code =  #{copy_code}
+		             group by  cid.cost_item_code,cid.cost_item_name,cid.item_grade,cid.is_last
+		             having sum(dc.dir_amount)  is not null
+		             order by cid.cost_item_code
+      
+      		)
+		      
+		    select dc1.cost_item_code, dc1.cost_item_name,dc1.item_grade, dc1.dir_amount,
+		      divide(dc1.dir_amount, dc2.total)*100 ratio
+		    from temp dc1
+		    left join (select sum(dir_amount) total from temp where is_last=1)dc2 on 1=1
+		    union all
+		    select null, '合计' as cost_item_name, null,sum(dir_amount) as dir_amount
+		      , divide(sum(dir_amount), sum(dir_amount)) * 100 as ratio
+		    from temp
+		    where is_last=1
+		</select>
+</mapper>
+

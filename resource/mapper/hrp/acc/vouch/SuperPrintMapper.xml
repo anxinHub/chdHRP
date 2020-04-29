@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.acc.dao.vouch.SuperPrintMapper">
+	
+	<!-- 查询系统参数，打印是否按用户权限控制 -->
+	<select id="querySuperPrintAccPara" resultType="String">
+		select para_value from acc_para where para_code=#{para_code} and 
+		group_id = #{group_id} and hos_id = #{hos_id} and copy_code = #{copy_code} 
+	</select>
+	
+	<!-- 下拉框-取科目全称 -->
+	<resultMap id="subjNameAll" type="com.chd.hrp.acc.entity.HrpAccSelect">
+		<result property="id" column="id" />
+		<result property="text" column="text" />
+	</resultMap>
+	<select id="querySubjNameAllDict" resultMap="subjNameAll">
+		select * from (
+			select s.subj_code id,s.subj_code||' '||s.subj_name_all text from acc_subj s
+			where s.group_id = #{group_id} and s.hos_id = #{hos_id} and s.copy_code = #{copy_code} and s.acc_year=#{acc_year} and s.is_stop = 0
+			
+			<if test="key != null and key != ''">
+				and (
+					s.subj_code like '${key}%' or s.subj_name like '%${key}%' or s.spell_code like '%${key}%' or s.wbx_code like '%${key}%'
+				)
+			</if>
+			order by s.subj_code
+		) t1 where rownum &lt; 50
+		
+	</select>
+	
+	<!-- 添加打印模板 -->
+	<insert id="insertSuperPrintTemplate" parameterType="java.util.Map">
+
+		INSERT INTO SYS_PRINT_TEMPLATE (
+			TEMPLATE_CODE,GROUP_ID,HOS_ID,COPY_CODE,mod_code,CONTENT,USE_ID,CREATE_DATE,PRINT_COUNT
+		) VALUES (
+			#{template_code},#{group_id},#{hos_id},#{copy_code},#{mod_code},#{content},
+			#{use_id},#{create_date},#{print_count}
+		)
+
+	</insert>
+	
+	<!-- 修改打印模板 -->
+	<update id="updateSuperPrintTemplate" parameterType="java.util.Map">
+		update SYS_PRINT_TEMPLATE set 
+		content = #{content},
+	    CREATE_DATE = #{create_date}
+		WHERE group_id = #{group_id} and hos_id = #{hos_id} and copy_code = #{copy_code} 
+		and template_code=#{template_code} 
+		AND use_id = #{use_id}
+	</update>
+	
+	<!--查询打印次数 -->
+	<select id="querySuperPrintCount" parameterType="java.util.Map" resultType="java.lang.Integer">
+		select nvl(max(print_count),0) print_count from SYS_PRINT_COUNT 
+		WHERE group_id = #{group_id} and hos_id = #{hos_id} and copy_code = #{copy_code} 
+		and template_code=#{template_code} AND BUSINESS_NO = #{print_business_no}
+	</select>
+	
+	<!-- 删除打印次数 -->
+	<delete id="deleteSuperPrintCount" parameterType="java.util.Map">
+		delete SYS_PRINT_COUNT 
+		WHERE group_id = #{group_id} and hos_id = #{hos_id} and copy_code = #{copy_code} 
+		and template_code=#{template_code} AND BUSINESS_NO = #{print_business_no}
+	</delete>
+	
+	<!-- 添加打印次数 -->
+	<insert id="insertSuperPrintCount" parameterType="java.util.Map">
+		insert into SYS_PRINT_COUNT (GROUP_ID,HOS_ID,COPY_CODE,TEMPLATE_CODE,BUSINESS_NO,PRINT_COUNT)
+		values(#{group_id},#{hos_id},#{copy_code},#{template_code},#{print_business_no},#{print_count}) 
+	</insert>
+	
+	<!--查询打印次数 -->
+	<select id="querySuperPrintCountBatch" parameterType="java.util.Map" resultType="java.util.Map">
+		select BUSINESS_NO "business_no",nvl(max(print_count),0) "print_count" from SYS_PRINT_COUNT 
+		WHERE group_id = #{group_id} and hos_id = #{hos_id} and copy_code = #{copy_code} 
+		and template_code=#{template_code}
+		and BUSINESS_NO in (${print_business_no})
+		group by BUSINESS_NO
+	</select>
+	
+	<!-- 保存打印次数 -->
+	<update id="savePrintCount" parameterType="java.util.List">
+
+		<foreach collection="list" item="item" separator="" open="begin" close="end;">
+			delete SYS_PRINT_COUNT 
+			WHERE group_id = #{item.group_id} and hos_id = #{item.hos_id} and copy_code = #{item.copy_code} 
+			and template_code=#{item.template_code} AND BUSINESS_NO = #{item.business_no};
+			
+			insert into SYS_PRINT_COUNT (GROUP_ID,HOS_ID,COPY_CODE,TEMPLATE_CODE,BUSINESS_NO,PRINT_COUNT)
+			values(#{item.group_id},#{item.hos_id},#{item.copy_code},#{item.template_code},#{item.business_no},#{item.print_count});
+		</foreach>
+
+	</update>
+	
+	<!-- PageOffice保存打印次数 -->
+	<update id="savePrintCountPage" parameterType="java.util.Map">
+
+		<foreach collection="business_no" index="index" item="item" separator="" open="begin" close="end;">
+			update SYS_PRINT_COUNT set PRINT_COUNT=PRINT_COUNT+1
+			WHERE group_id = #{group_id} and hos_id = #{hos_id} and copy_code = #{copy_code} 
+			and template_code=#{template_code}
+			and BUSINESS_NO=#{item};
+			
+		   
+            insert into SYS_PRINT_COUNT (GROUP_ID,HOS_ID,COPY_CODE,TEMPLATE_CODE,BUSINESS_NO,PRINT_COUNT)
+			select #{group_id},#{hos_id},#{copy_code},#{template_code},#{item},1 from dual
+			where not exists (
+				select 1 from SYS_PRINT_COUNT b
+                where b.GROUP_ID = #{group_id} AND b.HOS_ID = #{hos_id} AND b.COPY_CODE = #{copy_code}
+                AND b.template_code = #{template_code} and b.BUSINESS_NO=#{item}
+             );
+        </foreach> 
+		
+	</update>
+	
+	<!-- 保存打印参数 -->
+	<update id="updateSuperPrintPara" parameterType="java.util.List">
+
+		<foreach collection="list" item="item" separator="" open="begin" close="end;">
+			update sys_print_para set para_value=#{item.para_value} 
+			where group_id = #{item.group_id} and hos_id = #{item.hos_id} and copy_code = #{item.copy_code} 
+			and template_code=#{item.template_code}
+			and use_id = #{item.use_id} and para_code=#{item.para_code};
+		</foreach>
+
+	</update>
+	
+	<!-- 删除打印模板 -->
+	<delete id="deleteSuperPrintTemplate" parameterType="java.util.Map">
+
+		DELETE FROM SYS_PRINT_TEMPLATE WHERE group_id = #{group_id} and hos_id = #{hos_id} and copy_code = #{copy_code} 
+		and template_code=#{template_code} 
+		AND use_id = #{use_id}
+
+	</delete>
+	
+	<!-- 查询用户打印模板 -->
+	<select id="querySuperPrintTemplateByCode" parameterType="java.util.Map" resultType="com.chd.hrp.acc.entity.superVouch.SysPrintTemplate">
+		select t.use_id,t.create_date,t.print_count,t.CONTENT
+		from sys_print_template t
+		where t.group_id = #{group_id} and t.hos_id = #{hos_id} and t.copy_code = #{copy_code} 
+		and t.template_code=#{template_code}
+		and t.use_id = #{use_id}
+		
+	</select>
+	
+	<!--初始化参数表 -->
+	<insert id="copySuperPrintParaByCode" parameterType="java.util.Map">
+		insert into sys_print_para(group_id,hos_id,copy_code,use_id,mod_code,template_code,template_name,para_code,para_name,para_value,flag,sort_code,para_json)
+		select #{group_id},#{hos_id},#{copy_code},#{use_id},p.mod_code,p.template_code,p.template_name,p.para_code,p.para_name,p.para_value,p.flag,p.sort_code,p.para_json		
+		from init_sys_print_para p
+		where not exists
+		(
+			select 1 from sys_print_para t where t.group_id = #{group_id} and t.hos_id = #{hos_id} and t.copy_code = #{copy_code} 
+			and t.use_id=#{use_id} and t.mod_code=p.mod_code and t.template_code=p.template_code and t.para_code=p.para_code
+		)
+		and p.template_code=#{template_code}
+	</insert>
+	
+	<!-- 查询打印模板参数 -->
+	<select id="querySuperPrintParaByCode" parameterType="java.util.Map" resultType="com.chd.hrp.acc.entity.superVouch.SysPrintPara">
+		select mod_code,para_code,para_name,para_value,flag,case flag when 1 then '主表' when 2 then '从表' else '系统参数' end flag_value,use_id,para_json 
+		from sys_print_para
+		where group_id = #{group_id} and hos_id = #{hos_id} and copy_code = #{copy_code} 
+		and template_code=#{template_code}	and use_id=#{use_id}	
+		<if test="flag != null and flag != ''">
+			and flag &gt; #{flag}	
+		</if>
+		order by sort_code
+	</select>
+	
+	<!-- 查询用户打印模板内容 -->
+	<select id="querySuperPrintContentByCode" parameterType="java.util.Map" resultType="String">
+		select t.content
+		from sys_print_template t
+		where t.group_id = #{group_id} and t.hos_id = #{hos_id} and t.copy_code = #{copy_code} 
+		and t.template_code=#{template_code} and t.use_id = #{use_id}
+		
+	</select>
+
+</mapper>
+

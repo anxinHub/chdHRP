@@ -1,0 +1,1693 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.hr.dao.base.HrSelectMapper">
+	<resultMap type="java.util.Map" id="hrSelectMap">
+		<result property="id" column="id" />
+		<result property="text" column="text" />
+		<result property="name" column="name" />
+		<result property="label" column="label" />
+		<result property="type" column="type" />
+		<result property="is_write" column="is_write" />
+		<result property="spell_code" column="spell_code" /> 
+		<result property="wbx_code" column="wbx_code" />
+	</resultMap>
+
+	<resultMap type="java.util.Map" id="hrTreeMap">
+		<result property="id" column="id" />
+		<result property="pId" column="pId" />
+		<result property="name" column="name" />
+	</resultMap>
+	<resultMap type="java.util.Map" id="hrEmptMap">
+	<result property="emp_id" column="emp_id" />
+	</resultMap>
+	<resultMap type="java.util.Map" id="hrdeptMap">
+	<result property="dept_id" column="dept_id" />
+	</resultMap>
+	<resultMap type="java.util.Map" id="hrEmpMap">
+		<result property="user_code" column="user_code" />
+		<result property="emp_name" column="emp_name" />
+		<result property="duty_code" column="duty_code" />
+		<result property="duty_name" column="duty_name" />
+		<result property="mobile" column="mobile" />
+		<result property="photo" column="photo" />
+	</resultMap>
+
+	<resultMap type="java.util.Map" id="hrEmpDutyMap">
+		<result property="emp_code" column="emp_code" />
+		<result property="emp_id" column="emp_id" />
+		<result property="emp_name" column="emp_name" />
+		<result property="dept_id" column="dept_id" />
+		<result property="dept_name" column="dept_name" />
+		<result property="title_code" column="title_code" />
+		<result property="title_name" column="title_name" />
+		<result property="kind_code" column="kind_code" />
+		<result property="kind_name" column="kind_name" />
+		<result property="level_code" column="level_code" />
+		<result property="level_name" column="level_name" />
+		<result property="duty_code" column="duty_code" />
+		<result property="duty_name" column="duty_name" />
+		<result property="mobile" column="mobile" />
+		<result property="photo" column="photo" />
+		<result property="birthplace" column="birthplace" />
+		<result property="birthday" column="birthday" />
+		<result property="workage" column="workage" />
+		<result property="worktime" column="worktime" />
+		<result property="sex_code" column="sex_code" />
+		<result property="sex_name" column="sex_name" />
+	</resultMap>
+
+	<resultMap type="java.util.Map" id="hrpDeptSelectMap">
+		<result property="id" column="id" />
+		<result property="name" column="text" />
+		<result property="pId" column="pId" />
+		<result property="label" column="label" />
+	</resultMap>
+
+
+
+	<select id="queryTypeFiledTypeSelect" parameterType="java.util.Map"
+		resultMap="hrSelectMap">
+		select t.type_filed_code as id, t.type_filed_name as text
+		from hr_fiied_tab_type t
+		where t.group_id = #{group_id}
+		and t.hos_id = #{hos_id}
+		order by t.type_filed_code
+	</select>
+
+	<select id="queryHosDeptDictTree" parameterType="java.util.Map"
+		resultMap="hrTreeMap">
+		select t.dept_code as id, t.dept_name as name, t.super_code
+		as pId
+		from 
+			<if test="dept_source == 1">
+			hr_dept_dict  t
+			</if>
+			<if test="dept_source == 2">
+			hos_dept_dict  t
+			</if> 
+		where t.group_id = #{group_id}
+		and t.hos_id = #{hos_id}
+		and t.is_stop = 0
+		and t.is_disable = 0
+		<if test="is_perm != null and is_perm == 1">
+		and exists (select 1 from sys_user_perm_data b
+		where t.group_id = b.group_id
+		and t.hos_id = b.hos_id
+		and to_char(t.dept_id) = b.perm_code
+		and user_id =#{user_id,jdbcType=VARCHAR}
+		
+		
+		<if test="dept_source == 1">
+		 	and TABLE_CODE = upper('HR_DEPT_DICT')
+		</if>
+		<if test="dept_source == 2">
+			and TABLE_CODE = upper('HOS_DEPT_DICT')
+		</if> 
+		and (b.is_read = 1 or b.is_write = 1))
+		</if>
+		<!-- 角色权限 -->
+		and exists (
+      select 1
+      from v_user_data_perm b
+      where t.group_id = b.group_id
+      and t.hos_id = b.hos_id
+      and to_char(t.dept_id) = b.perm_code
+      and user_id =#{user_id,jdbcType=VARCHAR}
+      <if test="dept_source == 1">
+		 	and TABLE_CODE = 'HR_DEPT_DICT'
+		</if>
+		<if test="dept_source == 2">
+			and TABLE_CODE = 'HOS_DEPT_DICT'
+		</if>
+		
+      and (b.is_read = 1 or b.is_write = 1))
+		order by t.dept_code
+	</select>
+
+	<select id="queryHrStoreTypeSelect" parameterType="java.util.Map"
+		resultMap="hrSelectMap">
+		select t.store_type_code as id,t.store_type_code ||''||
+		t.store_type_name as text
+		from hr_store_type t
+		where t.group_id = #{group_id}
+		and t.hos_id = #{hos_id}
+		order by t.store_type_code
+	</select>
+
+	<select id="queryHrStoreTabStrucSelect" parameterType="java.util.Map"
+		resultMap="hrSelectMap">
+		select t.tab_code as id, hts.tab_name as name	
+		<!-- <if test="is_read  != null and is_read != ''  "> -->
+		, up.is_write
+		<!-- </if> -->
+			<!-- <if test="is_read  == null and is_read == ''  "> -->
+		, up.is_write
+	<!-- 	</if> -->
+		from hr_store_tab_struc t
+		left join hr_table_struc hts
+		on t.tab_code = hts.tab_code
+		and t.group_id = hts.group_id
+		and t.hos_id = hts.hos_id
+		and hts.is_stop=0
+and hts.type_tab_code='pf'
+		left join SYS_USER_PERM_DATA up
+		on t.group_id = up.group_id
+		and t.hos_id = up.hos_id
+		and t.tab_code = up.PERM_CODE
+		and up.mod_code = '06'
+		and up.user_id = #{user_id}
+left join hr_table_struc ht on
+hts.group_id=ht.group_id
+and hts.hos_id=ht.hos_id
+and hts.tab_code=ht.tab_code
+		where t.group_id = #{group_id}
+		and t.hos_id = #{hos_id}
+		  and ht.is_stop=0
+		<if test="store_type_code != null and store_type_code != '' and store_type_code != 'undefined'">
+			and t.store_type_code = #{store_type_code}
+		</if>
+		<if test="ignore != null and ignore != ''">
+			and t.tab_code &lt;&gt; '${ignore}'
+		</if>
+		<!-- <if test="is_read  != null and is_read != ''  ">
+		and up.is_read = 1
+		</if> -->
+		and exists (select 1 from sys_user_perm_data b
+    where t.group_id = b.group_id
+    and t.hos_id = b.hos_id
+    and to_char(t.TAB_CODE) = b.perm_code
+    and user_id = #{user_id}
+    and TABLE_CODE = upper('HR_TAB_STRUC')
+    and (b.is_read = 1 or b.is_write = 1))
+    
+    
+		order by hts.sort nulls last
+	</select>
+<select id="queryHrStoreTabStruc" parameterType="java.util.Map"
+		resultMap="hrSelectMap">
+		select t.tab_code as id, hts.tab_name as text 
+	<if test="is_read  != null and is_read != ''  ">
+		, up.is_write
+		</if>
+			<if test="is_read  == null and is_read == ''  ">
+		, 1 is_write
+		</if>
+		from hr_store_tab_struc t
+		left join hr_tab_struc hts
+		on t.tab_code = hts.tab_code
+		and t.group_id = hts.group_id
+		and t.hos_id = hts.hos_id
+		left join SYS_USER_PERM_DATA up
+		on t.group_id = up.group_id
+		and t.hos_id = up.hos_id
+		and t.tab_code = up.PERM_CODE
+		and up.mod_code = '06'
+		and up.user_id = #{user_id}
+
+		where t.group_id = #{group_id}
+		and t.hos_id = #{hos_id}
+		and t.store_type_code = #{store_type_code}
+		<if test="ignore != null and ignore != ''">
+			and t.tab_code &lt;&gt; '${ignore}'
+		</if>
+			<if test=" key != null and key != ''">
+				and ( t.tab_code like '%'||UPPER('${key}')||'%' or
+				hts.tab_name like '%${key}%' )
+			</if>
+	<if test="is_read  != null and is_read != ''  ">
+		and up.is_read = 1
+		</if>
+		order by hts.sort nulls last
+	</select>
+
+	<select id="queryHrTabTypeSelect" parameterType="java.util.Map"
+		resultMap="hrSelectMap">
+		select t.type_tab_code as id,t.type_tab_code
+		||''||t.type_tab_name as text
+		from HR_TAB_TYPE t
+		where t.group_id = #{group_id}
+		and t.hos_id = #{hos_id}
+		order by t.type_tab_code
+	</select>
+	
+	<select id="queryHrTableTypeSelect" parameterType="java.util.Map"
+		resultMap="hrSelectMap">
+		select t.type_tab_code as id,t.type_tab_code
+		||''||t.type_tab_name as text
+		from HR_TABLE_TYPE t
+		order by t.table_sort
+	</select>
+
+	<select id="queryHrTabStrucSelect" parameterType="java.util.Map"
+		resultMap="hrSelectMap">
+		select t.tab_code as id,t.tab_code ||' '||t.tab_name as
+		text,t.tab_name as name
+		from HR_TAB_STRUC t
+		left join SYS_USER_PERM_DATA up
+		on t.group_id = up.group_id
+		and t.hos_id = up.hos_id
+		and t.tab_code = up.PERM_CODE
+		and up.mod_code = '06'
+		and up.user_id = #{user_id}
+		
+		where t.group_id = #{group_id}
+		and t.hos_id = #{hos_id}
+		<if test="type_tab_code != null and type_tab_code != ''">
+			and t.type_tab_code = #{type_tab_code}
+		</if>
+		<if test="key != null and key != ''">
+			and (
+			t.tab_code like upper('%${key}%')
+			or t.tab_name like '%${key}%'
+			)
+
+		</if>
+		<if test="is_read  != null and is_read != ''  ">
+		and up.is_read = 1
+		</if>
+		order by t.sort asc nulls last
+	</select>
+	<select id="queryMod" parameterType="java.util.Map"
+		resultMap="hrSelectMap">
+		select s.mod_code as id,s.mod_name as
+		text,s.mod_name as name
+		from SYS_MOD s
+		
+	</select>
+	<select id="queryHrColStrucSelect" parameterType="java.util.Map"
+		resultMap="hrSelectMap">
+		select t.col_code as id,
+		t.col_code || ' ' || t.col_name as text
+		<if test="store_type_code != null and store_type_code != ''">
+			,ct.com_type_nature type
+		</if>
+		from HR_COL_STRUC t
+		<if test="store_type_code != null and store_type_code != ''">
+			left join hr_store_col_set scs
+			on t.tab_code = scs.tab_code
+			and t.col_code = scs.col_code
+			and t.group_id = scs.group_id
+			and t.hos_id = scs.hos_id
+			and scs.store_type_code = #{store_type_code}
+			left join hr_com_type ct
+			on scs.com_type_code = ct.com_type_code
+		</if>
+		where t.group_id = #{group_id}
+		and t.hos_id = #{hos_id}
+		<if test="tab_code != null and tab_code != ''">
+			and t.tab_code = '${tab_code}'
+		</if>
+		order by t.sort
+	</select>
+
+	<resultMap type="java.util.Map" id="hrColStrucMap">
+		<result property="col_code" column="col_code" />
+		<result property="col_name" column="col_name" />
+		<result property="note" column="note" />
+	</resultMap>
+	<select id="queryHrColStrucGrid" parameterType="java.util.Map"
+		resultMap="hrColStrucMap">
+		select t.col_code, t.col_name, t.note
+		from HR_COL_STRUC t
+		where t.group_id = #{group_id}
+		and t.hos_id = #{hos_id}
+		<if test="tab_code != null and tab_code != ''">
+			and t.tab_code = '${tab_code}'
+		</if>
+		order by t.sort
+	</select>
+
+	<select id="queryHrColDataTypeSelect" parameterType="java.util.Map"
+		resultMap="hrSelectMap">
+		select t.data_type_code as id,t.data_type_name as text
+		from HR_COL_DATA_TYPE t
+		<where>
+			<if test="data_type_code != null and data_type_code != ''">
+				t.data_type_code = '${data_type_code}'
+			</if>
+		</where>
+	</select>
+
+	<select id="queryHrComTypeSelect" parameterType="java.util.Map"
+		resultMap="hrSelectMap">
+		select t.com_type_code as id,t.com_type_name as text
+		from HR_COM_TYPE t
+		<where>
+			<if test="com_type_code != null and com_type_code != ''">
+				t.com_type_code = '${com_type_code}'
+			</if>
+		</where>
+	</select>
+
+	<select id="queryHrConSignSelect" parameterType="java.util.Map"
+		resultMap="hrSelectMap">
+		select t.con_sign_code as id,t.con_sign_note as text
+		from HR_CON_SIGN t
+		<where>
+			<if test="con_sign_code != null and con_sign_code != ''">
+				t.con_sign_code = '${con_sign_code}'
+			</if>
+		</where>
+	</select>
+
+	<select id="queryHrJoinSignSelect" parameterType="java.util.Map"
+		resultMap="hrSelectMap">
+		select t.join_sign_code as id,t.join_sign_note as text
+		from HR_JOIN_SIGN t
+		<where>
+			<if test="join_sign_code != null and join_sign_code != ''">
+				t.join_sign_code = '${join_sign_code}'
+			</if>
+		</where>
+	</select>
+
+	<resultMap type="java.util.Map" id="hrFiiedTabStrucMap">
+		<result property="field_tab_code" column="field_tab_code" />
+		<result property="field_tab_name" column="field_tab_name" />
+		<result property="type_filed_name" column="type_filed_name" />
+	</resultMap>
+	<select id="queryHrFiiedTabStrucDic" parameterType="java.util.Map"
+		resultMap="hrFiiedTabStrucMap">
+		select t.field_tab_code, t.field_tab_name, ftt.type_filed_name
+		from HR_FIIED_TAB_STRUC t
+		left join hr_fiied_tab_type ftt
+		on t.group_id = ftt.group_id
+		and t.hos_id = ftt.hos_id
+		and t.type_filed_code = ftt.type_filed_code
+		<where>
+			t.group_id = #{group_id}
+			and t.hos_id = #{hos_id}
+			<if test="field_tab_code != null and field_tab_code != ''">
+				t.field_tab_code = '${field_tab_code}'
+			</if>
+			<if test=" key != null and key != ''">
+				and ( t.field_tab_code like '%'||UPPER('${key}')||'%' or
+				t.field_tab_name like '%${key}%' )
+			</if>
+		</where>
+	</select>
+
+	<resultMap type="java.util.Map" id="hrFiiedDataMap">
+		<result property="field_col_code" column="field_col_code" />
+		<result property="field_col_name" column="field_col_name" />
+	</resultMap>
+	<!-- <select id="queryHrFiiedDataDicByTabCol" parameterType="java.util.Map" 
+		resultMap="hrFiiedDataMap"> select t2.field_col_code, t2.field_col_name from 
+		hr_col_struc t right join hr_fiied_data t2 on t.field_tab_code = t2.field_tab_code 
+		and t.group_id = t2.group_id and t.hos_id = t2.hos_id and t.copy_code = t2.copy_code 
+		where t.group_id = #{group_id} and t.hos_id = #{hos_id} and t.copy_code = 
+		#{copy_code} <if test="tab_code != null and tab_code != ''"> and t.tab_code 
+		= #{tab_code} </if> <if test="col_code != null and col_code != ''"> and t.col_code 
+		= #{col_code} </if> <if test="key != null and key != ''"> and ( t2.field_col_code 
+		like '${key}%' or t2.field_col_name like '%${key}%' or t2.spell_code like 
+		upper('%${key}%') or t2.wbx_code like upper('%${key}%') ) </if> </select> -->
+	<select id="queryHrFiiedDataDicByTabCol" statementType="CALLABLE">
+		<![CDATA[ 
+			 {call PKG_HR_APP.PROC_FIIED_DATA_QUERY(#{group_id, mode=IN, jdbcType=INTEGER},#{hos_id, mode=IN, jdbcType=INTEGER},#{copy_code, mode=IN, jdbcType=VARCHAR},#{user_id, mode=IN, jdbcType=INTEGER},#{tab_code, mode=IN, jdbcType=VARCHAR},#{col_code, mode=IN, jdbcType=VARCHAR},#{key, mode=IN, jdbcType=VARCHAR},#{resultlist, mode=OUT, jdbcType=CURSOR, javaType=java.sql.ResultSet, resultMap=com.chd.hrp.hr.dao.base.HrSelectMapper.hrFiiedDataMap},#{appCode, mode=OUT, jdbcType=INTEGER},#{ErrTxt, mode=IN, jdbcType=VARCHAR})}
+		]]>
+	</select>
+
+	<select id="queryHrFiiedDataSelect" parameterType="java.util.Map"
+		resultMap="hrSelectMap">
+		select t.field_col_code id, t.field_col_name text, t.field_col_name
+		label
+		from hr_fiied_data t
+		where t.group_id = #{group_id}
+		and t.hos_id = #{hos_id}
+		<if test="store_type_code != null and store_type_code != ''">
+			and t.field_tab_code = #{store_type_code}
+		</if>
+		<if test="key != null and key != ''">
+			and (
+			t.field_col_code like '%'||#{key}||'%' or
+			t.field_col_name like '%'||#{key}||'%' or
+			t.SPELL_CODE like
+			'%'||upper(#{key})||'%' or
+			t.WBX_CODE like '%'||upper(#{key})||'%'
+			)
+		</if>
+	</select>
+
+	<select id="queryEmp" parameterType="java.util.Map" resultMap="hrEmpMap">
+	  select he.emp_id user_code, he.emp_name emp_name,hd.duty_name
+    duty_name,he.mobile mobile,he.photo photo
+    from hos_emp he
+    left join HR_HOS_DUTY hhd
+    on he.emp_id =hhd.emp_id
+     and he.group_id=hhd.group_id and he.hos_id=hhd.hos_id
+    left join hos_duty hd
+    on hhd.DUTY_CODE =hd.duty_code
+    and hhd.group_id=hd.group_id
+    and hhd.hos_id=hd.hos_id
+    left join hos_dept_dict hdd
+    on he.dept_no=hdd.dept_no
+    and he.dept_id=hdd.dept_id
+    and he.group_id=hdd.group_id
+    and he.hos_id=hdd.hos_id
+		<where>
+			<if test="group_id != null and group_id != ''">
+				 he.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and he.hos_id = #{hos_id}
+			</if>
+			<if test="dept_id != null and dept_id != ''">
+				and he.dept_id = #{dept_id}
+			</if>
+			<if test="dept_code != null and dept_code != ''">
+			and hdd.dept_code=#{dept_code}
+			</if>
+			<if test="user_code != null and user_code != ''">
+				and he.emp_code = #{user_code}
+			</if>
+			<if test="super_id != null and super_id != ''">
+				and hdd.super_code = #{super_id}
+			</if>
+			<if test="is_attend != null and is_attend != ''">
+				and he.is_attend = #{is_attend}
+			</if>
+		</where>
+	order by he.emp_id
+	</select>
+
+
+
+	<select id="queryHosDeptSelect" parameterType="java.util.Map"
+		resultMap="hrSelectMap">
+		select * from (
+			select t.dept_no||'@'|| t.dept_id id,<!-- t.dept_code ||' '|| --> t.dept_name
+			text,t.dept_name label
+			from 
+			<if test="dept_source == 1">
+			hr_dept_dict t
+			</if>
+			<if test="dept_source == 2">
+			hos_dept_dict t
+			</if>  
+			<where>
+				 exists (select 1 from sys_user_perm_data b
+						where t.group_id = b.group_id
+							and t.hos_id = b.hos_id
+							and to_char(t.dept_id) = b.perm_code
+							and user_id =#{user_id,jdbcType=VARCHAR}
+							
+							<if test="dept_source == 1">
+							 and TABLE_CODE =upper('HR_DEPT_DICT')
+							</if>
+							<if test="dept_source == 2">
+							 and TABLE_CODE =upper('HOS_DEPT_DICT')
+							</if>  
+							and (b.is_read = 1 or b.is_write = 1)
+				) 
+				<if test="group_id != null and group_id != ''">
+					and group_id = #{group_id}
+				</if>
+				<if test="hos_id != null and hos_id != ''">
+					and hos_id = #{hos_id}
+				</if>
+				
+					AND is_last = 1
+				
+				and is_stop = 0
+				and is_disable = 0
+				<if test="key != null and key != ''">
+					and (
+						t.DEPT_CODE like '%'||#{key}||'%' or
+						t.DEPT_NAME like '%'||#{key}||'%' or
+						t.SPELL_CODE like '%'||upper(#{key})||'%' or
+						t.WBX_CODE like '%'||upper(#{key})||'%'
+					)
+				</if>
+			</where>
+			order by t.dept_code
+		)
+		where rownum &lt; 100
+	</select>
+
+	<select id="queryHosAftDeptSelect" parameterType="java.util.Map"
+		resultMap="hrSelectMap">
+		select * from (
+			select t.dept_no||'@'|| t.dept_id id,<!-- t.dept_code ||' '|| --> t.dept_name
+			text,t.dept_name label
+			from hos_dept_dict t
+			<where>
+				<!--  exists (select 1 from sys_user_perm_data b
+						where t.group_id = b.group_id
+							and t.hos_id = b.hos_id
+							and to_char(t.dept_id) = b.perm_code
+							and user_id =#{user_id,jdbcType=VARCHAR}
+							and TABLE_CODE =upper('HOS_DEPT_DICT')
+							and (b.is_read = 1 or b.is_write = 1)
+				)  -->
+				<if test="group_id != null and group_id != ''">
+					and group_id = #{group_id}
+				</if>
+				<if test="hos_id != null and hos_id != ''">
+					and hos_id = #{hos_id}
+				</if>
+				
+					AND is_last = 1
+				
+				and is_stop = 0
+				and is_disable = 0
+				<if test="key != null and key != ''">
+					and (
+						t.DEPT_CODE like '%'||#{key}||'%' or
+						t.DEPT_NAME like '%'||#{key}||'%' or
+						t.SPELL_CODE like '%'||upper(#{key})||'%' or
+						t.WBX_CODE like '%'||upper(#{key})||'%'
+					)
+				</if>
+			</where>
+			order by t.dept_code
+		)
+		where rownum &lt; 100
+	</select>
+	<select id="queryEmpSelect" parameterType="java.util.Map"
+		resultMap="hrSelectMap">
+		select * from (
+		select he.emp_id id, he.emp_code||' '|| he.emp_name text,he.emp_name label
+		from hos_emp he
+		<where>
+		    he.is_stop=0
+			<if test="group_id != null and group_id != ''">
+			and	he.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and he.hos_id = #{hos_id}
+			</if>
+			<if test="dept_id != null and dept_id != ''">
+				and he.dept_id = #{dept_id}
+			</if>
+			<if test="dept_no != null and dept_no != ''">
+				and he.dept_no = #{dept_no}
+			</if> 
+			<if test="key != null and key != ''">
+				and (
+				he.emp_name like '%'||#{key}||'%' or
+					he.emp_code like '%'||#{key}||'%' or
+				he.SPELL_CODE like '%'||upper(#{key})||'%' or
+				he.WBX_CODE like '%'||upper(#{key})||'%'
+				)
+			</if>
+		</where>
+		order by he.emp_code
+		)  
+		where rownum &lt; 100
+		<!-- 
+		union  -->
+	</select>
+	
+	<select id="queryEmpSelectAttend" parameterType="java.util.Map"
+		resultMap="hrSelectMap">
+		select * from (
+		select he.emp_id id, he.emp_code||' '|| he.emp_name text,he.emp_name label
+		from hos_emp he
+		<where>
+		    he.is_stop=0
+			<if test="group_id != null and group_id != ''">
+			and	he.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and he.hos_id = #{hos_id}
+			</if>
+			<if test="dept_id != null and dept_id != ''">
+				and he.dept_id = #{dept_id}
+			</if>
+			<if test="dept_no != null and dept_no != ''">
+				and he.dept_no = #{dept_no}
+			</if> 
+			and he.is_attend = 1
+			<if test="key != null and key != ''">
+				and (
+				he.emp_name like '%'||#{key}||'%' or
+					he.emp_code like '%'||#{key}||'%' or
+				he.SPELL_CODE like '%'||upper(#{key})||'%' or
+				he.WBX_CODE like '%'||upper(#{key})||'%'
+				)
+			</if>
+		</where>
+		order by he.emp_code
+		)  <!-- where rownum &lt; 100  -->
+		<!-- union  -->
+	</select>
+	<select id="queryAppEmpSelect" parameterType="java.util.Map" resultMap="hrSelectMap">
+		select he.emp_id id, he.emp_name text
+		from hos_emp he
+		<where>
+			<if test="group_id != null and group_id != ''">
+				he.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and he.hos_id = #{hos_id}
+			</if>
+			<if test="dept_id != null and dept_id != ''">
+				and he.dept_id = #{dept_id}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+					he.emp_name like '%'||#{key}||'%' or
+					he.emp_code like '%'||#{key}||'%' or
+					he.SPELL_CODE like '%'||upper(#{key})||'%' or
+					he.WBX_CODE like '%'||upper(#{key})||'%'
+				)
+			</if>
+			and  he.is_attend = 1 
+		</where>
+		order by he.emp_code
+	</select>
+	<!-- 部门分类快速查询(cjc) -->
+	<select id="queryDeptTree" resultMap="hrpDeptSelectMap">
+		select * from (
+		select t1.dept_id dept_id, t1.dept_code id, t1.is_last,
+		t1.dept_code || ' ' || t1.dept_name as text,
+		nvl(t1.super_code, '0') as pId
+		from 
+			<if test="dept_source == 1">
+			hr_dept_dict t1
+			</if>
+			<if test="dept_source == 2">
+			hos_dept_dict t1
+			</if>
+		where group_id = #{group_id} and hos_id = #{hos_id} <!-- and  t1.is_disable=0  -->   and t1.is_stop=0
+		and exists (
+			select 1
+			from sys_user_perm_data b
+			where t1.group_id = b.group_id
+			and t1.hos_id = b.hos_id
+			and to_char(t1.dept_id) = b.perm_code
+			and user_id =#{user_id,jdbcType=VARCHAR}
+			<if test="dept_source == 1">
+			and TABLE_CODE = 'HR_DEPT_DICT'
+			</if>
+			<if test="dept_source == 2">
+			and TABLE_CODE = 'HOS_DEPT_DICT'
+			</if>
+			
+			and (b.is_read = 1 or b.is_write = 1)
+		)
+		<if test="key != null and key != ''">
+			and (
+			t1.DEPT_code like '%'||#{key}||'%' or
+			t1.DEPT_NAME like '%'||#{key}||'%' or
+			t1.spell_code like '%'||upper(#{key})||'%' or
+			t1.wbx_code like '%'||upper(#{key})||'%'
+			)
+		</if>
+		) t
+		<where>
+			<if test="dept_id != null and dept_id != ''">
+				and t.dept_id=#{dept_id}
+			</if>
+			<if test="super_id != null and super_id != ''">
+				and t.pId=#{super_id}
+			</if>
+		</where>
+		order by t.id
+	</select>
+	
+
+	<!--查询职务 -->
+	<select id="queryDuty" parameterType="java.util.Map" resultMap="hrSelectMap">
+		select t.duty_code id,t.duty_code ||' '|| t.duty_name text
+		from hos_duty t
+		where group_id = #{group_id} and hos_id = #{hos_id}
+		<if test="key != null and key != ''">
+			and (
+			duty_code like '%${key}%' or duty_name like '%${key}%'
+			or spell_code like upper('%${key}%') or wbx_code like
+			upper('%${key}%')
+			)
+		</if>
+		order by t.duty_code
+	</select>
+
+	<!-- 查询职称信息 -->
+	<select id="queryHrTitle" parameterType="java.util.Map" resultMap="hrSelectMap">
+		select fd.TITLE_CODE  as id, fd.TITLE_NAME  as text
+		from HR_TITLE  fd
+		where fd.group_id = #{group_id} 
+		  and fd.hos_id = #{hos_id}
+		<!--   and fd.field_tab_code = 'DIC_TITLE' -->
+		order by fd.TITLE_CODE
+	</select>
+
+	<!-- 查询护理等级 -->
+	<select id="queryDicLevel" parameterType="java.util.Map"
+		resultMap="hrSelectMap">
+		select t.field_col_code id,t.field_col_code ||' '|| t.field_col_name text
+		from hr_fiied_data t
+		where group_id = #{group_id} and hos_id = #{hos_id} and	field_tab_code = 'DIC_LEVEL'
+		<if test="key != null and key != ''">
+			and (
+			field_col_code like '%${key}%' or field_col_name like '%${key}%'
+			or spell_code like upper('%${key}%') or wbx_code like
+			upper('%${key}%')
+			)
+		</if>
+		order by t.field_col_code
+	</select>
+
+	<select id="queryEmpDuty" parameterType="java.util.Map" resultMap="hrEmpDutyMap">
+		select hde.dept_id as dept_id, hde.dept_name as dept_name, he.emp_id,he.emp_code
+		as emp_code, he.emp_name as emp_name, t.field_col_code as level_code,
+		t.field_col_name as level_name, ht.title_code as title_code,
+		ht.title_name as title_name, hd.duty_code as duty_code, hd.duty_name
+		as duty_name
+		from hos_emp he
+		left join hos_dept_dict hde on  he.group_id=hde.group_id and he.hos_id=hde.hos_id and he.dept_id = hde.dept_id and hde.is_stop=0 
+		left join HR_HOS_DUTY hhd on he.emp_id=hhd.emp_id and
+		he.group_id=hhd.group_id and he.hos_id=hhd.hos_id
+		left join hos_duty hd on hhd.duty_code=hd.duty_code and
+		hd.group_id=hhd.group_id and hd.hos_id=hhd.hos_id
+		left join HR_EMP_TECHNOLOGY_TITLE het on he.emp_id =het.emp_id and
+		he.group_id=het.group_id and he.hos_id=het.hos_id
+		left join HR_TITLE ht on het.title_code=ht.title_code and
+		ht.group_id=het.group_id and ht.hos_id=het.hos_id
+		left join HR_EMP_PROMOTION hep on he.emp_id = hep.emp_id and
+		he.group_id=hep.group_id and he.hos_id=hep.hos_id
+		left join hr_fiied_data t on hep.level_code =t.field_col_code and
+		t.field_tab_code = 'DIC_LEVEL'
+		and t.group_id=hep.group_id and t.hos_id=hep.hos_id
+		where he.group_id=#{group_id} and he.hos_id=#{hos_id}
+			<if test="dept_code !=null and dept_code !=''">
+				and hde.dept_code like '${dept_code}%'
+			</if>
+			<if test="emp_code !=null and emp_code !=''">
+				and he.emp_code like '${emp_code}%'
+			</if>
+			<if test="emp_name !=null and emp_name !=''">
+				and he.emp_name like '%${emp_name}%'
+			</if>
+			<if test="duty_code !=null and duty_code !=''">
+				and hhd.duty_code =#{duty_code}
+			</if>
+			<if test="title_code !=null and title_code !=''">
+				and het.title_code =#{title_code}
+			</if>
+			<if test="level_code !=null and level_code !=''">
+				and t.field_col_code =#{level_code}
+			</if>
+		order by he.emp_code
+	</select>
+
+	<select id="queryHrEmpData" parameterType="java.util.Map"
+		resultMap="hrEmpDutyMap">
+		select hrt.TITLE_LEVEL_NAME as title_name,hrt.title_level_code as
+		title_code,
+		hep.level_code as level_code, hf2.field_col_name as level_name,
+		hd.duty_code,hd.duty_name,he.emp_id, he.emp_name,he.emp_code
+		from hos_emp he
+		left join HR_HOS_DUTY hhd on he.emp_id =hhd.emp_id and
+		he.group_id=hhd.group_id and he.hos_id=hhd.hos_id
+		left join hos_duty hd on hhd.duty_code=hd.duty_code and
+		hhd.group_id=hd.group_id and hhd.hos_id=hd.hos_id
+		left join HR_EMP_PROMOTION hep on hep.emp_id = he.emp_id
+		left join HR_FIIED_DATA hf2 on hf2.field_tab_code = 'DIC_LEVEL'
+		and hf2.field_col_code = hep.level_code and hf2.group_id = hep.group_id
+		and hf2.hos_id = hep.hos_id
+		left join HR_EMP_TECHNOLOGY_TITLE hett on hett.emp_id = he.emp_id
+		and hett.group_id = he.group_id and hett.hos_id = he.hos_id
+		left join HR_TITLE_LEVEL hrt on hrt.TITLE_LEVEL_CODE = hett.TITLE_CODE
+		and hrt.group_id = hett.group_id and hrt.hos_id = hett.hos_id
+		<where>
+			<if test="group_id != null and group_id != ''">
+				he.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and he.hos_id = #{hos_id}
+			</if>
+			<if test="dept_id !=null and dept_id !=''">
+				and he.dept_id = #{dept_id}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+				he.emp_name like '%'||#{key}||'%' or
+				<!-- he.emp_id like '%'||#{key}||'%' or -->
+				he.emp_code like '%'||#{key}||'%' or
+				he.spell_code like '%'||upper(#{key})||'%' or
+				he.wbx_code like '%'||upper(#{key})||'%'
+				)
+			</if>
+			and he.is_stop = 0
+			
+  )
+		</where>
+		group by hrt.TITLE_LEVEL_NAME , hrt.title_level_code , hep.level_code
+		, hf2.field_col_name ,hd.duty_code,hd.duty_name, he.emp_id,
+		he.emp_name,he.emp_code
+	</select>
+
+	<resultMap type="java.util.Map" id="hosEmpGridMap">
+		<result property="emp_id" column="emp_id" />
+		<result property="emp_code" column="emp_code" />
+		<result property="emp_name" column="emp_name" />
+		<result property="duty_code" column="duty_code" />
+		<result property="duty_name" column="duty_name" />
+		<result property="title_code" column="title_code" />
+		<result property="title_name" column="title_name" />
+		<result property="level_code" column="level_code" />
+		<result property="level_name" column="level_name" />
+	</resultMap>
+	<select id="queryHosEmpGrid" parameterType="java.util.Map"
+		resultMap="hosEmpGridMap">
+		select he.emp_id, he.emp_code, he.emp_name,
+		hd.duty_code,
+		du.duty_name,
+		ett.title_code,
+		ti.title_name,
+		ep.level_code,
+		fd.field_col_name level_name
+		from hos_emp he
+
+		left join (select hd.group_id, hd.hos_id, hd.emp_id, hd.duty_code
+		from HR_HOS_DUTY hd
+		where hd.engage_date =
+		(select max(hd2.engage_date)
+		from HR_HOS_DUTY hd2
+		where hd2.group_id = hd.group_id
+		and hd2.hos_id = hd.hos_id
+		and hd2.emp_id = hd.emp_id
+		group by hd2.group_id, hd2.hos_id, hd2.emp_id)) hd
+		on he.group_id = hd.group_id
+		and he.hos_id = hd.hos_id
+		and he.emp_id = hd.emp_id
+
+		left join hos_duty du
+		on hd.group_id = du.group_id
+		and hd.hos_id = du.hos_id
+		and hd.duty_code = du.duty_code
+
+		left join (select ett.group_id, ett.hos_id, ett.emp_id, ett.title_code
+		from HR_EMP_TECHNOLOGY_TITLE ett
+		where ett.get_date =
+		(select max(ett2.get_date)
+		from HR_EMP_TECHNOLOGY_TITLE ett2
+		where ett2.group_id = ett.group_id
+		and ett2.hos_id = ett.hos_id
+		and ett2.emp_id = ett.emp_id
+		group by ett2.group_id, ett2.hos_id, ett2.emp_id)) ett
+		on he.group_id = ett.group_id
+		and he.hos_id = ett.hos_id
+		and he.emp_id = ett.emp_id
+
+		left join hr_title ti
+		on ett.group_id = ti.group_id
+		and ett.hos_id = ti.hos_id
+		and ett.title_code = ti.title_code
+
+		left join (select ep.group_id, ep.hos_id, ep.emp_id, ep.level_code
+		from HR_EMP_PROMOTION ep
+		where ep.get_date =
+		(select max(ep2.get_date)
+		from HR_EMP_PROMOTION ep2
+		where ep2.group_id = ep.group_id
+		and ep2.hos_id = ep.hos_id
+		and ep2.emp_id = ep.emp_id
+		group by ep2.group_id, ep2.hos_id, ep2.emp_id)
+
+		) ep
+		on he.group_id = ep.group_id
+		and he.hos_id = ep.hos_id
+		and he.emp_id = ep.emp_id
+
+		left join hr_fiied_data fd
+		on ep.group_id = fd.group_id
+		and ep.hos_id = fd.hos_id
+		and ep.level_code = fd.field_col_code
+		and fd.field_tab_code = 'DIC_LEVEL'
+
+		where he.group_id = #{group_id}
+		and he.hos_id = #{hos_id}
+		<if test="key != null and key != ''">
+			and (he.emp_code like '%' || #{key} || '%' or
+			he.emp_name like '%' || #{key} || '%' or
+			he.spell_code like '%' || upper(#{key}) || '%' or
+			he.wbx_code like '%' || upper(#{key}) || '%')
+		</if>
+		order by he.emp_code
+	</select>
+
+	<select id="queryHpmOraclePkg" resultMap="hrSelectMap">
+		SELECT object_name id, object_name text
+		FROM user_procedures
+		<where>
+			object_type = 'PACKAGE'
+			and subprogram_id = 0
+			and object_name like 'PKG_HR_FUN%'
+			<if test="key != null and key != ''">
+				and (
+				object_name like '%${key}%'
+				)
+			</if>
+		</where>
+		order by object_name
+	</select>
+
+	<select id="queryHpmFunType" resultMap="hrSelectMap">
+		select
+		TYPE_CODE as id,
+		TYPE_NAME as text
+		from hr_FUN_TYPE
+		<where>
+			<if test="group_id != null and group_id != ''">
+				AND group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				AND copy_code = #{copy_code}
+			</if>
+			<if test="key != null and key != ''">
+				AND (TYPE_CODE like '%'||#{key}||'%'
+				or TYPE_NAME like
+				'%'||#{key}||'%'
+				or SPELL_CODE like '%'||upper(#{key})||'%'
+				or
+				wbx_code like '%'||upper(#{key})||'%'
+			</if>
+			and is_stop=0
+		</where>
+		order by TYPE_CODE
+	</select>
+
+	<select id="queryHpmFunParaMethod" resultMap="hrSelectMap">
+		select
+		para_code as id,
+		para_code ||' '|| para_name text
+		from hr_FUN_PARA_METHOD
+		<where>
+			<if test="group_id != null and group_id != ''">
+				AND group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			AND para_sql is not null
+			<if test="copy_code != null and copy_code != ''">
+				AND copy_code = #{copy_code}
+			</if>
+			<if test="key != null and key != ''">
+				AND (para_code like '%'||#{key}||'%'
+				or para_name like
+				'%'||#{key}||'%'
+				or SPELL_CODE like '%'||upper(#{key})||'%'
+				or
+				wbx_code like '%'||upper(#{key})||'%')
+			</if>
+		</where>
+		order by para_code
+	</select>
+
+	<!-- 绩效函数参数取值表 -->
+	<select id="queryHrFunParaMethod" resultMap="hrSelectMap">
+		SELECT
+		para_code id ,
+		para_name text
+		FROM HR_FUN_PARA_METHOD
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null  and copy_code != ''">
+				and copy_code = #{copy_code}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+				para_code like '%'||#{key}||'%' or
+				para_name like '%'||#{key}||'%' or
+				spell_code like '%'||upper(#{key})||'%' or
+				wbx_code like '%'||upper(#{key})||'%'
+				)
+			</if>
+		</where>
+		order by para_code
+	</select>
+	<!--查询岗位 -->
+	<select id="queryStation" parameterType="java.util.Map"
+		resultMap="hrSelectMap">
+		select t.STATION_CODE id,t.STATION_CODE ||' '|| t.STATION_NAME text
+		from HR_STATION t
+		<where>
+			<if test="group_id != null and group_id != ''">
+				group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+		</where>
+	</select>
+	<!--查询职工类别 -->
+	<select id="queryEmpType" resultMap="hrSelectMap" parameterType="java.util.Map">
+		select hd.TYPE_code id, hd.TYPE_name text from HR_EMP_TYPE hd
+		<where>
+
+			<if test="group_id != null  and group_id != '' ">
+				and hd.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != '' ">
+				and hd.hos_id = #{hos_id}
+			</if>
+		</where>
+	</select>
+	<select id="queryPersonnel" resultMap="hrEmpDutyMap"
+		parameterType="java.util.Map">
+		select hde.dept_id as dept_id, hde.dept_name as dept_name, he.emp_id
+		as emp_id, he.emp_code,he.emp_name as emp_name,hek.kind_code as kin_code
+		,hek.kind_name as kind_name ,t.field_col_code as level_code
+		, t.field_col_name as level_name, t1.field_col_code as sex_code
+		, t1.field_col_name as sex_name, ht.title_code as title_code,
+		ht.title_name as title_name, hd.duty_code as duty_code, hd.duty_name
+		as duty_name , he.photo,he.birthplace,to_char(he.birthday,
+		'yyyy-mm-dd') as birthday ,he.workage,to_char(he.worktime,
+		'yyyy-mm-dd') as worktime
+		from hos_emp he
+		left join hos_dept_dict hde on he.dept_id = hde.dept_id
+		and he.dept_no = hde.dept_no
+		and he.group_id = hde.group_id
+		and he.hos_id = hde.hos_id
+		left join HR_HOS_DUTY hhd on he.emp_id = hhd.emp_id
+		and he.group_id = hhd.group_id
+		and he.hos_id = hhd.hos_id
+		left join hos_duty hd on hhd.duty_code = hd.duty_code
+		and hd.group_id = hhd.group_id
+		and hd.hos_id = hhd.hos_id
+		left join HR_EMP_TECHNOLOGY_TITLE het on he.emp_id = het.emp_id
+		and he.group_id = het.group_id
+		and he.hos_id = het.hos_id
+		left join HR_TITLE ht on het.title_code = ht.title_code
+		and ht.group_id = het.group_id
+		and ht.hos_id = het.hos_id
+		left join HR_EMP_PROMOTION hep on he.emp_id = hep.emp_id
+		and he.group_id = hep.group_id
+		and he.hos_id = hep.hos_id
+		left join hr_fiied_data t on hep.level_code = t.field_col_code
+		and t.field_tab_code = 'DIC_LEVEL'
+		and t.group_id = hep.group_id
+		and t.hos_id = hep.hos_id
+		left join HOS_EMP_KIND hek on he.kind_code=hek.kind_code
+		and he.group_id = hek.group_id
+		and he.hos_id = hek.hos_id
+		left join hr_fiied_data t1 on he.sex_code= t1.field_col_code
+		and t1.field_tab_code = 'DIC_SEX'
+		and t1.group_id = he.group_id
+		and t1.hos_id = he.hos_id
+		<where>
+		<if test="group_id != null and group_id != ''">
+				he.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and he.hos_id = #{hos_id}
+			</if>
+			<if test="dept_id !=null and dept_id !=''">
+				he.dept_id=#{dept_id}
+			</if>
+			<if test="dept_no !=null and dept_no !=''">
+				and he.dept_no=#{dept_no}
+			</if>
+			<if test="emp_id !=null and emp_id !=''">
+				and he.emp_id = #{emp_id}
+			</if>
+			<if test="emp_name !=null and emp_name !=''">
+				and he.emp_name = #{emp_id}
+			</if>
+			<if test="emp_code !=null and emp_code !=''">
+				and he.emp_code = #{emp_code}
+			</if>
+			<if test="duty_code !=null and duty_code !=''">
+				and hhd.duty_code =#{duty_code}
+			</if>
+			<if test="title_code !=null and title_code !=''">
+				and het.title_code =#{title_code}
+			</if>
+			<if test="level_code !=null and level_code !=''">
+				and t.field_col_code =#{level_code}
+			</if>
+			<if test="key != null and key != ''">
+				and (<!-- emp_id like '%'||#{key}||'%' or -->
+				emp_code like '%'||#{key}||'%' or
+				emp_name like '%'||#{key}||'%' or
+				spell_code like '%'||upper(#{key})||'%' or
+				wbx_code like '%'||upper(#{key})||'%'
+				)
+			</if>
+		</where>
+	order by he.emp_code
+	</select>
+	<!--查询职工 -->
+	<select id="queryPerson" resultMap="hrSelectMap" parameterType="java.util.Map">
+		select he.emp_id id, he.emp_code||' '|| he.emp_name text
+		from hos_emp he
+		<where>
+			<if test="group_id != null and group_id != ''">
+				he.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and he.hos_id = #{hos_id}
+			</if>
+			<if test="dept_id != null and dept_id != ''">
+				and he.dept_id = #{dept_id}
+			</if>
+			<if test="dept_no != null and dept_no != ''">
+				and he.dept_no = #{dept_no}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+				<!-- he.emp_id like '%'||#{key}||'%'  or -->
+				emp_code like '%'||#{key}||'%' or
+				he.emp_name like '%'||#{key}||'%' or
+				he.SPELL_CODE like '%'||upper(#{key})||'%' or
+				he.WBX_CODE like '%'||upper(#{key})||'%'
+				)
+			</if>
+		</where>
+		order by he.emp_code
+
+	</select>
+	<select id="queryPermTypeSelect" resultMap="hrSelectMap"
+		parameterType="java.util.Map">
+		select fd.field_col_code id,fd.FIELD_COL_NAME text from hr_fiied_data
+		fd
+		where fd.field_tab_code = 'DIC_PERM_TYPE'
+		<if test="group_id != null and group_id != ''">
+			and fd.group_id = #{group_id}
+		</if>
+		<if test="hos_id != null and hos_id != ''">
+			and fd.hos_id = #{hos_id}
+		</if>
+	</select>
+	<select id="queryMedTypeSelect" resultMap="hrSelectMap"
+		parameterType="java.util.Map">
+		select * from (
+		select med.inv_id id,med.inv_name text from med_inv_dict med
+		<where>
+			<if test="group_id != null and group_id != ''">
+				med.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and med.hos_id = #{hos_id}
+			</if>
+					<if test="key != null and key != ''">
+				and (
+				med.inv_id like '%'||#{key}||'%' or
+				med.inv_name like '%'||#{key}||'%' <!-- or
+				med.SPELL_CODE like '%'||upper(#{key})||'%' or
+				med.WBX_CODE like '%'||upper(#{key})||'%' -->
+				)
+			</if>
+		<!-- 	<if test="copy_code != null and copy_code != ''">
+				and med.copy_code = #{copy_code}
+			</if> -->
+		</where>
+		) where rownum &lt; 100
+	</select>
+	<select id="queryDicSexSelect" resultMap="hrSelectMap"
+		parameterType="java.util.Map">
+		select hf.field_col_code as id ,hf.field_col_name as
+		text from hr_fiied_data hf
+		where hf.field_tab_code = 'DIC_SEX'
+		and hf.group_id = #{group_id}
+		and hf.hos_id = #{hos_id}
+	</select>
+
+	<select id="queryProbNature" resultMap="hrSelectMap"
+		parameterType="java.util.Map">
+		select hf.field_col_code as id ,hf.field_col_name as
+		text from hr_fiied_data hf
+		where hf.field_tab_code = 'DIC_PROB_NATURE'
+		and hf.group_id = #{group_id}
+		and hf.hos_id = #{hos_id}
+	</select>
+
+	<select id="queryProbType" resultMap="hrSelectMap"
+		parameterType="java.util.Map">
+		select hf.field_col_code as id ,hf.field_col_name as
+		text from hr_fiied_data hf
+		where hf.field_tab_code = 'DIC_PROB_TYPE'
+		and hf.group_id = #{group_id}
+		and hf.hos_id = #{hos_id}
+	</select>
+
+
+	<select id="queryIsOrNot" resultMap="hrSelectMap" parameterType="java.util.Map">
+		SELECT 0 id, '否' text FROM DUAL
+		UNION ALL
+		SELECT 1 id, '是' text FROM DUAL
+	</select>
+	<select id="queryEmpById" resultMap="hrEmptMap" parameterType="java.util.Map">
+		select he.emp_id from hos_emp he
+		<where>
+			<if test="group_id != null and group_id != ''">
+				he.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and he.hos_id = #{hos_id}
+			</if>
+			<if test="emp_code != null and emp_code != ''">
+				and he.emp_code = #{emp_code}
+				<!-- or he.emp_name=#{emp_id} -->
+			</if>
+		</where>
+	</select>
+	<select id="queryEmpByCode" resultMap="hrEmptMap" parameterType="java.util.Map">
+		select emp_id from hos_emp
+		where is_stop=0
+			and group_id=#{group_id}
+			and hos_id=#{hos_id}
+			and (emp_code=#{emp_code} or emp_name=#{emp_code})
+	</select>
+	<select id="queryDeptById" resultMap="hrdeptMap" parameterType="java.util.Map">
+		select he.dept_id from hos_dept he
+		<where>
+			<if test="group_id != null and group_id != ''">
+				he.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and he.hos_id = #{hos_id}
+			</if>
+			<if test="dept_id != null and dept_id != ''">
+				and he.dept_id = #{dept_id}
+			</if>
+			<if test="dept_code != null and dept_code != ''">
+				and he.dept_code = #{dept_code}
+			</if>
+			<if test="dept_name != null and dept_name != ''">
+				and he.dept_name=#{dept_name}
+			</if>
+		</where>
+	</select>
+	<select id="queryDeptByCode" resultMap="hrdeptMap" parameterType="java.util.Map">
+		select dept_id from hos_dept
+		where is_stop=0 
+			and group_id=#{group_id,jdbcType=INTEGER} 
+			and hos_id=#{hos_id,jdbcType=INTEGER} 
+			and (dept_name=#{dept_code,jdbcType=VARCHAR} or dept_code=#{dept_code,jdbcType=VARCHAR})
+	</select>
+	<select id="queryColorSelect" resultMap="hrSelectMap"
+		parameterType="java.util.Map">
+		select hf.field_col_code as id ,hf.field_col_name as
+		text from hr_fiied_data hf
+		where hf.field_tab_code = 'DIC_COLOUR'
+		and hf.group_id = #{group_id}
+		and hf.hos_id = #{hos_id}
+	</select>
+	<select id="queryAttendTypesSelect" resultMap="hrSelectMap"
+		parameterType="java.util.Map">
+		select hf.field_col_code as id ,hf.field_col_name as
+		text from hr_fiied_data hf
+		where hf.field_tab_code = 'DIC_ATTEND_TYPES'
+		and hf.group_id = #{group_id}
+		and hf.hos_id = #{hos_id}
+	</select>
+	<select id="queryHosInfoSelect" resultMap="hrSelectMap"
+		parameterType="java.util.Map">
+	select hi.hos_id as id, hi.hos_simple as text
+from HOS_INFO hi
+	left join sys_user he on hi.hos_id = he.hos_id
+and hi.group_id = he.group_id 
+and exists (select 1 from sys_user_perm_data b
+    where hi.group_id = b.group_id
+    and hi.hos_id = b.hos_id
+    and user_id =#{user_id}
+    and TABLE_CODE = upper('HOS_INFO')
+    and (b.is_read = 1 or b.is_write = 1))
+	where
+	hi.group_id = #{group_id}
+		and he.user_id= #{user_id}
+	</select>
+	<select id="queryOvertimeKind" resultMap="hrSelectMap"
+		parameterType="java.util.Map">
+		select ha.attend_code as id ,ha.attend_name as text from HR_ATTEND_ITEM ha
+		where ha.attend_types=02
+		and ha.group_id = #{group_id}
+		and ha.hos_id = #{hos_id}
+				<if test="key != null and key != ''">
+			and (
+			ha.attend_code like upper('%${key}%')
+			or  ha.attend_name like '%${key}%'
+			)
+
+		</if>
+		order by ha.attend_code
+	</select>
+	<select id="queryCalssCode" resultMap="hrSelectMap" parameterType="java.util.Map">
+		select ha.attend_classcode as id ,ha.attend_classsname as text from HR_ATTEND_CLASS ha
+		where  ha.group_id = #{group_id} and ha.hos_id = #{hos_id}
+		and ha.attend_class_typecode in(
+			select hac.attend_class_typecode from HR_ATTEND_AREA hac 
+			where ha.group_id=hac.group_id and ha.hos_id=hac.hos_id and hac.attend_areacode=#{attend_areacode}
+		)
+		
+		<if test="key != null and key != ''">
+		and (
+			ha.attend_classcode like upper('%${key}%') or ha.attend_classsname like '%${key}%'
+		)
+		</if>
+		order by  ha.attend_classcode 
+	</select>
+		
+	<select id="queryCalssDept" resultMap="hrSelectMap" parameterType="java.util.Map">
+	
+		select hd.dept_id as id,hd.dept_code||' '||hd.dept_name as text,hd.spell_code,hd.wbx_code   
+		from 
+		<if test="dept_source == 1">
+		hr_dept_dict hd 
+		</if>
+		<if test="dept_source == 2">
+		hos_dept_dict hd 
+		</if>
+		where hd.group_id = #{group_id}	and hd.hos_id = #{hos_id} and hd.is_stop=0 and hd.is_disable=0 and hd.is_last=1
+		<if test="key != null and key != ''">
+			and (
+				hd.dept_code like upper('%${key}%') or hd.dept_name like '%${key}%' 
+				or hd.spell_code like upper('%${key}%') or hd.wbx_code like upper('%${key}%')
+			)
+		</if>
+		
+		and exists (
+			select 1
+			from sys_user_perm_data b
+			where hd.group_id = b.group_id
+			and hd.hos_id = b.hos_id
+			and to_char(hd.dept_id) = b.perm_code
+			and user_id =#{user_id,jdbcType=VARCHAR}
+			<if test="dept_source == 1">
+			and TABLE_CODE = 'HR_DEPT_DICT'
+			</if>
+			<if test="dept_source == 2">
+			and TABLE_CODE = 'HOS_DEPT_DICT'
+			</if>
+			and (b.is_read = 1 or b.is_write = 1)
+		)
+		
+		order by  hd.dept_code 
+	
+	</select>
+		
+		<!-- 职务等级 -->
+		<select id="queryDutyLevel" resultMap="hrSelectMap" parameterType="java.util.Map">
+			select duty_level_code as id, duty_level_name as text
+			from hos_duty_level
+			where group_id = #{group_id,jdbcType=INTEGER}
+				and hos_id = #{hos_id,jdbcType=INTEGER}
+				and is_stop = 0
+			order by duty_level_code
+		</select>
+		
+		<!-- 职务类别 -->
+		<select id="queryDutyKind" resultMap="hrSelectMap" parameterType="java.util.Map">
+			select kind_code as id, kind_name as text
+			from hos_duty_kind
+			where group_id = #{group_id}
+				and hos_id = #{hos_id}
+				and is_stop = 0
+			order by kind_code
+		</select>
+		
+		<!-- 职务名称-->
+		<select id="queryDutyCode" resultMap="hrSelectMap" parameterType="java.util.Map">
+			select duty_code as id, duty_name as text
+			from hos_duty
+			where group_id = #{group_id}
+				and hos_id = #{hos_id}
+				and is_stop = 0
+			order by duty_code
+		</select>
+		
+		<!-- 岗位等级-->
+		<select id="queryStationLevel" resultMap="hrSelectMap" parameterType="java.util.Map">
+			select station_level_code as id, station_level_name as text
+			from hos_station_level
+			where group_id = #{group_id}
+				and hos_id = #{hos_id}
+				and is_stop = 0
+			order by station_level_code
+		</select>
+		
+		<!-- 岗位信息-->
+		<select id="queryStationInfo" resultMap="hrSelectMap" parameterType="java.util.Map">
+			select station_code as id, station_name as text
+			from hos_station
+			where group_id = #{group_id}
+				and hos_id = #{hos_id}
+				and is_stop = 0
+			order by station_code
+		</select>
+		
+		<!-- 部门分类-->
+		<select id="queryDeptKind" resultMap="hrSelectMap" parameterType="java.util.Map">
+			select kind_code as id, kind_name as text
+			from hos_dept_kind
+			where group_id = #{group_id}
+				and hos_id = #{hos_id}
+				and is_stop = 0
+			order by kind_code
+		</select>
+		
+		<select id="queryAttendCalssType" resultMap="hrSelectMap" parameterType="java.util.Map">
+			select attend_class_typecode as id, attend_class_typename as text
+			from HR_ATTEND_CLASS_TYPE
+			where group_id = #{group_id}
+				and hos_id = #{hos_id}
+				<if test=" key != null and key != ''">
+					and ( attend_class_typecode like '%'||UPPER('${key}')||'%' or
+					attend_class_typename like '%${key}%' )
+				</if>
+			order by attend_class_typecode
+		</select>
+		
+		<!--查询休假类型  -->
+		<select id="queryAttendCodeCla" resultMap="hrSelectMap" parameterType="java.util.Map">
+			select  ha.attend_code as id ,ha.attend_shortname   as text  
+			from  hr_attend_item  ha 
+			where ha.group_id = #{group_id}
+				and ha.hos_id = #{hos_id}
+				<if test="attend_types != null and attend_types != ''">
+					and ha.attend_types=#{attend_types}
+				</if>
+		</select>
+		<select id="queryAttendFZ" resultMap="hrSelectMap" parameterType="java.util.Map">
+		select  ha.attend_code_fz as id ,ha.attend_name_fz   as text  
+			from  HR_ATTEND_ITEM_FZ  ha 
+			where ha.group_id = #{group_id}
+				and ha.hos_id = #{hos_id}
+		
+		</select>
+		<!--根据员工查科室信息 -->
+		<select id="queryHosDeptByEmpSelect" resultMap="hrSelectMap" parameterType="java.util.Map">
+			select  b.dept_no||'@'||b.dept_id as id ,b.dept_code||' '||b.dept_name   as text  
+			from  hos_emp_dict  a
+			left join hos_dept_dict b on a.group_id=b.group_id and a.hos_id=b.hos_id 
+				and a.dept_id=b.dept_id and a.dept_no=b.dept_no   
+			where a.group_id = #{group_id,jdbcType=INTEGER}
+				and a.hos_id = #{hos_id,jdbcType=INTEGER}
+				<if test="empId != null and empId !='' ">
+					and a.emp_id= #{empId,jdbcType=INTEGER}
+				</if>
+				and a.is_stop = 0
+				and rownum &lt; 100
+			order by b.dept_code
+		</select>
+	
+	<!-- 查获奖情况 -->
+	<select id="queryPrize" resultMap="hrSelectMap" parameterType="java.util.Map">
+		select field_col_code id, field_col_code ||' '|| field_col_name text
+		from hr_fiied_data 
+		where field_tab_code = 'DIC_PRIZE'
+		      and group_id = #{group_id, jdbcType=INTEGER}
+		      and hos_id = #{hos_id, jdbcType=INTEGER}
+	</select>
+	
+	<!-- 医护属性下拉查询 -->
+	<select id="queryAttendFieldOption" resultType="java.util.Map" parameterType="java.util.Map">
+		 select hfd.field_col_code "id", hfd.field_col_name "text"
+		   from hr_fiied_data hfd
+		  where hfd.group_id = #{group_id}
+		    and hfd.hos_id = #{hos_id}
+		    and hfd.field_tab_code = 'HOS_EMP_YH'
+		    and hfd.is_stop = 0
+	</select>
+	
+	<!-- 查询区域排班、倒班规则、医护属性 -->
+	<select id="queryDicAreaAttr" parameterType="java.util.Map" resultMap="hrSelectMap">
+		select t.attend_areacode||','||t.pb_gz||','||t.db_gz||','||t.yh_code as id, t.attend_area_name as text
+		 from hr_attend_area t
+		 where t.group_id = #{group_id} and t.hos_id = #{hos_id}
+	 	<if test=" key != null and key != ''">
+			and ( t.attend_areacode like '%'||UPPER('${key}')||'%' or
+			t. attend_area_name like '%${key}%' )
+		</if>
+		 order by t.attend_areacode
+	</select>
+	
+	<!-- 考勤项目树-->
+	<select id="queryAttendItemTree" resultMap="hrTreeMap" parameterType="java.util.Map">
+		select id,name,pId
+		from (
+		  select  type_code as id, type_name as name, '0' as pId
+		  from dic_attend_type 
+		  union all
+		  select  a.attend_code as id, a.attend_name as name, a.attend_types as pId
+		  from hr_attend_item  a
+		  where  a.group_id=#{group_id} 
+		  	and a.hos_id = #{hos_id}
+		)
+		order by id,pId
+	</select>
+	
+	<!-- 考勤项目 -->
+	<select id="queryAttendTypes" resultMap="hrSelectMap" parameterType="java.util.Map">
+		select  type_code as id, type_code||' '||type_name as text
+		from dic_attend_type 
+		where is_stop = 0
+			<if test="attend_types != null ">
+				and type_code = #{attend_types}
+			</if>
+		order by type_code
+	</select>
+	<select id="queryAllAttendCode" resultMap="hrSelectMap" parameterType="java.util.Map">
+	select ha.attend_code as id, ha.attend_name as text, attend_ed_is as "attend_ed_is"
+	from hr_attend_item ha
+	where ha.group_id = #{group_id} 
+		and ha.hos_id = #{hos_id} 
+		and ha.attend_types = '03'
+		<!-- and ha.attend_ed_is = 1 -->
+	</select>
+	<!-- 职工分类 -->
+	<select id="queryHrEmpKindSelect" resultMap="hrSelectMap" parameterType="java.util.Map">
+		select kind_code id, kind_name text 
+		from hos_emp_kind
+		where group_id = #{group_id, jdbcType=INTEGER}
+		  and hos_id = #{hos_id, jdbcType=INTEGER}
+		  <if test="key != null and key != ''">
+		      and (
+		             kind_code like '%' || #{key} || '%'
+		          or kind_name like '%' || #{key} || '%'
+		          or spell_code like '%' || upper(#{key}) || '%'
+		          or wbx_code like '%' || upper(#{key}) || '%'
+		      )
+		  </if>
+		  and is_stop = 0
+	</select>
+	<select id="queryUserSelect" resultMap="hrSelectMap" parameterType="java.util.Map">
+select user_id id, user_name text from sys_user
+	where group_id = #{group_id, jdbcType=INTEGER}
+		  and hos_id = #{hos_id, jdbcType=INTEGER}
+	      and type_code = 0
+	</select>
+	<select id="queryHosTrainTypeSelect" resultMap="hrSelectMap" parameterType="java.util.Map">
+	select type_code id, type_name text from HR_TRAIN_TYPE
+	where group_id = #{group_id, jdbcType=INTEGER}
+		  and hos_id = #{hos_id, jdbcType=INTEGER}
+	       and is_stop=0
+	</select>
+	<select id="queryHosTrainWaySelect" resultMap="hrSelectMap" parameterType="java.util.Map">
+	select way_code id, way_name text from hr_train_way
+	where group_id = #{group_id, jdbcType=INTEGER}
+		  and hos_id = #{hos_id, jdbcType=INTEGER}
+	      and is_stop=0
+	</select>
+	
+	<select id="queryHrExamWaySelect" resultMap="hrSelectMap" parameterType="java.util.Map">
+		select way_code id, 
+			   way_name text 
+		from hr_exam_way
+		where group_id = #{group_id, jdbcType=INTEGER}
+		  and hos_id = #{hos_id, jdbcType=INTEGER}
+	      and is_stop=0
+	    order by way_code
+	</select>
+	
+	<select id="queryHrTrainSiteSelect" resultMap="hrSelectMap" parameterType="java.util.Map">
+	select site_code id, site_name text from HR_TRAIN_SITE
+	where group_id = #{group_id, jdbcType=INTEGER}
+		  and hos_id = #{hos_id, jdbcType=INTEGER}
+	      and is_stop=0
+	      <if test="key != null and key != ''">
+			and (
+			site_code like '%'||#{key}||'%' or
+			site_name like '%'||#{key}||'%' or
+			SPELL_CODE like
+			'%'||upper(#{key})||'%' or
+			WBX_CODE like '%'||upper(#{key})||'%'
+			)
+		</if>
+	      order by site_code
+	      </select>
+	      
+	       <select id="queryEmpSelectInfo" resultType="java.util.Map">
+		   select
+		       a.emp_code,
+		       a.emp_name,
+		       a.emp_id
+		  from hos_emp a
+		 
+		 where  a.group_id = #{group_id}
+		   and  a.hos_id = #{hos_id}
+		   and a.emp_id=#{emp_id}
+		   
+		   
+		   </select>
+		   <select id="baseSelect" resultMap="hrSelectMap" parameterType="java.util.Map">
+		 select *
+from (
+	select tmp_page.*, rownum as row_id
+	from ( 
+	${sql} 
+	) tmp_page
+	where rownum &lt;= 20
+)
+where row_id > 0
+		   </select>
+		   <select id="queryStManTree"  resultMap="hrpDeptSelectMap">
+		   
+		   select t1.dept_id dept_id, t1.station_code id, 
+		t1.STATION_CODE || ' ' || t1.STATION_NAME as text
+	
+		from 
+		HR_STATION_MANAGE t1
+		where t1.group_id = #{group_id} and t1.hos_id = #{hos_id} 
+		    and t1.is_stop=0
+		   
+		   </select>
+		   <select id="queryManNumData" parameterType="java.util.Map"
+		resultMap="hrEmpDutyMap">
+		select  he.emp_id, he.emp_name, he.emp_code
+from hos_emp he
+
+		<where>
+			<if test="group_id != null and group_id != ''">
+				he.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and he.hos_id = #{hos_id}
+			</if>
+			<if test="dept_id !=null and dept_id !=''">
+				and he.dept_id = #{dept_id}
+			</if>
+			<if test="ignore != null and ignore != 'undefined'">
+			and he.emp_id not in(${ignore})
+		</if>
+			<if test="key != null and key != ''">
+				and (
+				he.emp_name like '%'||#{key}||'%' or
+			    he.emp_id like '%'||#{key}||'%' or 
+				he.emp_code like '%'||#{key}||'%' or
+				he.spell_code like '%'||upper(#{key})||'%' or
+				he.wbx_code like '%'||upper(#{key})||'%'
+				)
+			</if>
+			and he.is_stop = 0
+			 and  he.emp_id not in (
+  select EMP_ID from HR_STATION_MANNUM where group_id = #{group_id}
+	and hos_id = #{hos_id}
+  )
+		</where>
+	order by he.emp_code
+		
+		</select>
+</mapper>

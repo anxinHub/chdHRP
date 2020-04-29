@@ -1,0 +1,401 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.ass.dao.tongJiReports.AssSupplierMapper">   
+	<resultMap type="java.util.Map" id="assSupplier">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="sup_code" column="sup_code" />
+		<result property="sup_name" column="sup_name" />
+		<result property="store_name" column="store_name" />
+		<result property="ass_type_name" column="ass_type_name" />
+		<result property="ass_code" column="ass_code" />
+		<result property="ass_name" column="ass_name" />
+		<result property="ass_spec" column="ass_spec" />
+		<result property="unit_name" column="unit_name" />
+		<result property="fac_code" column="fac_code" />
+		<result property="fac_name" column="fac_name" />
+		<result property="in_amount" column="in_amount" />
+		<result property="price" column="price" />
+		<result property="sum_price" column="sum_price" />
+		<result property="ass_amount" column="ass_amount" />
+		<result property="in_date" column="in_date" />
+	</resultMap>
+
+	<select id="queryAssSupplier" resultMap="assSupplier" parameterType="java.util.Map">  
+		with ass_data as
+		 ( -- 入库单
+		 select t6.sup_code,
+		         t6.sup_name,
+		         t4.store_name,
+		         atd.ass_type_name,
+		         t2.ass_code,
+		         t2.ass_name,
+		         t1.ASS_SPEC || t1.ASS_MODEL as ass_spec,
+		         unit.unit_name,
+		         t5.fac_code,
+		         t5.fac_name,
+		         vim.in_date,
+		         t1.in_amount ass_amount,
+		         t1.price,
+		         t1.in_amount * t1.price sum_price
+		    from v_ass_in_detail t1
+		    left join v_ass_in_main vim
+		      on vim.group_id = t1.group_id
+		     and vim.hos_id = t1.hos_id
+		     and vim.copy_code = t1.copy_code
+		     and vim.ass_in_no = t1.ass_in_no
+		    left join ass_no_dict t2
+		      on t1.group_id = t2.group_id
+		     and t1.hos_id = t2.hos_id
+		     and t1.copy_code = t2.copy_code
+		     and t1.ass_id = t2.ass_id
+		     and t2.is_stop = 0
+		    left join hos_unit unit
+		      on t1.GROUP_ID = unit.group_id
+		     and t1.HOS_ID = unit.hos_id
+		     and t1.UNIT_CODE = unit.unit_code
+		    left join ass_type_dict atd
+		      on t2.group_id = atd.group_id
+		     and t2.hos_id = atd.hos_id
+		     and t2.copy_code = atd.copy_code
+		     and t2.ass_type_id = atd.ass_type_id
+		     and atd.is_stop = 0
+		    left join v_ass_in_main t3
+		      on t1.group_id = t3.group_id
+		     and t1.hos_id = t3.hos_id
+		     and t1.copy_code = t3.copy_code
+		     and t1.ass_in_no = t3.ass_in_no
+		    left join hos_store_dict t4
+		      on t3.group_id = t4.group_id
+		     and t3.hos_id = t4.hos_id
+		     and t3.store_id = t4.store_id
+		     and t4.is_stop = 0
+		    left join hos_fac_dict t5
+		      on t1.group_id = t5.group_id
+		     and t1.hos_id = t5.hos_id
+		     and t1.FAC_ID = t5.fac_id
+		     and t5.is_stop = 0
+		    left join hos_sup_dict t6
+		      on t3.group_id = t6.group_id
+		     and t3.hos_id = t6.hos_id
+		     and t3.ven_id = t6.sup_id
+		     and t6.is_stop = 0
+		   <where>
+				<if test="group_id != null and group_id != ''">
+					t1.group_id = #{group_id}
+				</if>
+				<if test="hos_id != null and hos_id != ''">
+					and t1.hos_id = #{hos_id}
+				</if>
+				<if test="copy_code != null and copy_code != ''">
+					and t1.copy_code = #{copy_code}
+				</if>
+				<if test="ass_type_id != null and ass_type_id !=''">
+					and t2.ass_type_id = #{ass_type_id}
+				</if> 
+				<if test="ass_name != null and ass_name !=''">
+					and t2.ass_name like '%${ass_name}%'
+				</if> 
+				<if test="ass_in_no != null and ass_in_no !=''">
+					and t1.ass_in_no like '%${ass_in_no}%'
+				</if>   
+				<if test="store_id != null and store_id !=''">
+					and t3.store_id = #{store_id}
+				</if> 
+				<if test="use_dept_id != null and use_dept_id !=''">
+					and t3.dept_id = #{use_dept_id}
+				</if>
+				<if test="ven_id != null and ven_id !=''">
+					and t3.ven_id = #{ven_id}
+				</if>  
+				<if test="ass_naturs != null and ass_naturs !=''">
+					and t1.ass_naturs = #{ass_naturs}
+				</if>
+				<if test="price_beg != null and price_beg != ''">
+					AND t1.price &gt;= #{price_beg}
+				</if>
+				<if test="price_end != null and price_end != ''">
+					AND t1.price  &lt;= #{price_end}
+				</if>
+				<if test="is_measure != null and is_measure !=''">
+					and t2.is_measure = #{is_measure}
+				</if>
+				<if test="in_date_beg != null and in_date_beg != ''">
+					AND vim.in_date &gt;= to_date(#{in_date_beg},'YYYY-MM-DD')
+				</if>
+				<if test="in_date_end != null and in_date_end != ''">
+					AND vim.in_date &lt;= to_date(#{in_date_end},'YYYY-MM-DD')
+				</if>
+				<if test="run_date_beg != null and run_date_beg != '' ">
+					AND vim.create_date &gt;= to_date(#{run_date_beg},'YYYY-MM-DD')
+				</if>
+				<if test="run_date_end != null and run_date_end != ''">
+					AND vim.create_date &lt;= to_date(#{run_date_end},'YYYY-MM-DD')
+				</if>
+			</where> 
+		  union all
+		  -- 退货单
+		  select hspd.sup_code,
+		         hspd.sup_name,
+		         hsd.store_name,
+		         atd.ass_type_name,
+		         assnd.ass_code,
+		         assnd.ass_name,
+		         ac.ASS_SPEC || ac.ASS_MONDL ass_spec,
+		         unit.unit_name,
+		         hfd.fac_code,
+		         hfd.fac_name,
+		         abm.back_date in_date,
+		         -1 ass_amount,
+		         abd.price,
+		         -1 * abd.price sum_price
+		    from v_ass_back_detail abd
+		    left join v_ass_back_main abm
+		      on abd.ass_naturs = abm.ass_naturs
+		     and abd.group_id = abm.group_id
+		     and abd.hos_id = abm.hos_id
+		     and abd.copy_code = abm.copy_code
+		     and abd.ass_back_no = abm.ass_back_no
+		    left join v_ass_card ac
+		      on abd.group_id = ac.group_id
+		     and abd.hos_id = ac.hos_id
+		     and abd.copy_code = ac.copy_code
+		     and abd.ass_card_no = ac.ASS_CARD_NO
+		     and abd.ass_naturs = ac.ass_naturs
+		    left join ass_no_dict assnd
+		      on ac.group_id = assnd.group_id
+		     and ac.hos_id = assnd.hos_id
+		     and ac.copy_code = assnd.copy_code
+		     and ac.ass_id = assnd.ass_id
+		     and assnd.is_stop = 0
+		    left join ass_type_dict atd
+		      on assnd.group_id = atd.group_id
+		     and assnd.hos_id = atd.hos_id
+		     and assnd.copy_code = atd.copy_code
+		     and assnd.ass_type_id = atd.ass_type_id
+		     and atd.is_stop = 0
+		    left join hos_unit unit
+		      on ac.GROUP_ID = unit.group_id
+		     and ac.HOS_ID = unit.hos_id
+		     and ac.UNIT_CODE = unit.unit_code
+		    left join hos_store_dict hsd
+		      on abm.group_id = hsd.group_id
+		     and abm.hos_id = hsd.hos_id
+		     and abm.store_id = hsd.store_id
+		     and hsd.is_stop = 0
+		    left join hos_fac_dict hfd
+		      on ac.group_id = hfd.group_id
+		     and ac.hos_id = hfd.hos_id
+		     and ac.FAC_ID = hfd.fac_id
+		     and hfd.is_stop = 0
+		    left join hos_sup_dict hspd
+		      on abm.group_id = hspd.group_id
+		     and abm.hos_id = hspd.hos_id
+		     and abm.ven_id = hspd.sup_id
+		     and hspd.is_stop = 0
+		   <where>
+				<if test="group_id != null and group_id != ''">
+					abd.group_id = #{group_id}
+				</if>
+				<if test="hos_id != null and hos_id != ''">
+					and abd.hos_id = #{hos_id}
+				</if>
+				<if test="copy_code != null and copy_code != ''">
+					and abd.copy_code = #{copy_code}
+				</if>
+				<if test="ass_type_id != null and ass_type_id !=''">
+					and assnd.ass_type_id = #{ass_type_id}
+				</if> 
+				<if test="ass_name != null and ass_name !=''">
+					and assnd.ass_name like '%${ass_name}%'
+				</if> 
+				<if test="ass_in_no != null and ass_in_no !=''">
+					and ac.ass_in_no like '%${ass_in_no}%'
+				</if>   
+				<if test="store_id != null and store_id !=''">
+					and abm.store_id = #{store_id}
+				</if> 
+				<if test="use_dept_id != null and use_dept_id !=''">
+					and 1 = 2 --因为退货并没有科室记录 ,因此根据科室查排除退货单记录
+				</if>
+				<if test="ven_id != null and ven_id !=''">
+					and abm.ven_id = #{ven_id}
+				</if>  
+				<if test="ass_naturs != null and ass_naturs !=''">
+					and abd.ass_naturs = #{ass_naturs}
+				</if>
+				<if test="price_beg != null and price_beg != ''">
+					AND abd.price &gt;= #{price_beg}
+				</if>
+				<if test="price_end != null and price_end != ''">
+					AND abd.price  &lt;= #{price_end}
+				</if>
+				<if test="is_measure != null and is_measure !=''">
+					and ac.is_measure = #{is_measure}
+				</if>
+				<if test="in_date_beg != null and in_date_beg != ''">
+					AND abm.back_date &gt;= to_date(#{in_date_beg},'YYYY-MM-DD')
+				</if>
+				<if test="in_date_end != null and in_date_end != ''">
+					AND abm.back_date &lt;= to_date(#{in_date_end},'YYYY-MM-DD')
+				</if>
+				<if test="run_date_beg != null and run_date_beg != '' ">
+					AND abm.create_date &gt;= to_date(#{run_date_beg},'YYYY-MM-DD')
+				</if>
+				<if test="run_date_end != null and run_date_end != ''">
+					AND abm.create_date &lt;= to_date(#{run_date_end},'YYYY-MM-DD')
+				</if>
+			</where>
+		)
+		select decode(GROUPING_ID(sup_code, sup_name),
+		              0,
+		              sup_code,
+		              1,
+		              to_char('供应商小计'),
+		              to_char('总合计')) as sup_code,
+		       sup_name,
+		       store_name,
+		       ass_type_name,
+		       ass_code,
+		       ass_name,
+		       ass_spec,
+		       unit_name,
+		       fac_code,
+		       fac_name,
+		       in_date,
+		       sum(ass_amount) ass_amount,
+		       price,
+		       sum(sum_price) sum_price
+		  from ass_data
+		 group by grouping sets((sup_code, sup_name, store_name, ass_type_name, ass_code, ass_name, ass_spec, unit_name, fac_code, fac_name, in_date, price), sup_code, null)
+	</select>	
+	
+	<!-- 打印 -->
+	<select id="queryAssSupplierPrint" resultMap="assSupplier" parameterType="java.util.Map">
+		select decode(GROUPING_ID(t6.sup_code, t6.sup_name),
+				              0,
+				              t6.sup_code,
+				              1,
+				              to_char('供应商小计'),
+				              to_char('总合计')) as sup_code,
+				       t6.sup_name,
+				       t4.store_name,
+				       atd.ass_type_name,
+				       t2.ass_code,
+				       t2.ass_name,
+				       t1.ASS_SPEC || t1.ASS_MODEL as ass_spec,
+				       unit.unit_name,
+				       t5.fac_code,
+				       t5.fac_name,
+				       vim.in_date,
+				       sum(t1.in_amount) ass_amount,
+				       t1.price,
+				       sum(t1.in_amount * t1.price) sum_price
+				  from v_ass_in_detail t1
+				  left join v_ass_in_main vim
+				  on vim.group_id = t1.group_id
+				  and vim.hos_id = t1.hos_id
+				  and vim.copy_code = t1.copy_code
+				  and vim.ass_in_no = t1.ass_in_no
+				  left join ass_no_dict t2
+				    on t1.group_id = t2.group_id
+				   and t1.hos_id = t2.hos_id
+				   and t1.copy_code = t2.copy_code
+				   and t1.ass_id = t2.ass_id
+				   and t2.is_stop = 0
+				
+				  left join hos_unit unit
+				    on t1.GROUP_ID = unit.group_id
+				   and t1.HOS_ID = unit.hos_id
+				   and t1.UNIT_CODE = unit.unit_code
+				
+				  left join ass_type_dict atd
+				    on t2.group_id = atd.group_id
+				   and t2.hos_id = atd.hos_id
+				   and t2.copy_code = atd.copy_code
+				   and t2.ass_type_id = atd.ass_type_id
+				   and atd.is_stop = 0
+				
+				  left join v_ass_in_main t3
+				    on t1.group_id = t3.group_id
+				   and t1.hos_id = t3.hos_id
+				   and t1.copy_code = t3.copy_code
+				   and t1.ass_in_no = t3.ass_in_no
+				
+				  left join hos_store_dict t4
+				    on t3.group_id = t4.group_id
+				   and t3.hos_id = t4.hos_id
+				   and t3.store_id = t4.store_id
+				   and t4.is_stop = 0
+				
+				  left join hos_fac_dict t5
+				    on t1.group_id = t5.group_id
+				   and t1.hos_id = t5.hos_id
+				   and t1.FAC_ID = t5.fac_id
+				   and t5.is_stop = 0
+				
+				  left join hos_sup_dict t6
+				    on t3.group_id = t6.group_id
+				   and t3.hos_id = t6.hos_id
+				   and t3.ven_id = t6.sup_id
+				   and t6.is_stop = 0
+				  <where>
+					   <if test="group_id != null and group_id != ''">
+							 t1.group_id = #{group_id}
+						</if>
+						<if test="hos_id != null and hos_id != ''">
+							and t1.hos_id = #{hos_id}
+						</if>
+						<if test="copy_code != null and copy_code != ''">
+							and t1.copy_code = #{copy_code}
+						</if>
+				  		<if test="ass_type_id != null and ass_type_id !=''">
+					       and t2.ass_type_id = #{ass_type_id}
+					     </if> 
+					     <if test="ass_name != null and ass_name !=''">
+					       and t2.ass_name like '%${ass_name}%'
+					     </if> 
+						 <if test="ass_in_no != null and ass_in_no !=''">
+					       and t1.ass_in_no like '%${ass_in_no}%'
+					     </if>   
+						 <if test="store_id != null and store_id !=''">
+					       and t3.store_id = #{store_id}
+					     </if> 
+					     <if test="use_dept_id != null and use_dept_id !=''">
+					       and t3.dept_id = #{use_dept_id}
+					     </if>
+					     <if test="ven_id != null and ven_id !=''">
+					       and t3.ven_id = #{ven_id}
+					     </if>  
+					     <if test="ass_naturs != null and ass_naturs !=''">
+					       and t1.ass_naturs = #{ass_naturs}
+					     </if>
+					     <if test="price_beg != null and price_beg != ''">
+						 AND t1.price &gt;= #{price_beg}
+						 </if>
+						 <if test="price_end != null and price_end != ''">
+						 AND t1.price  &lt;= #{price_end}
+						 </if>
+						 <if test="is_measure != null and is_measure !=''">
+					       and t2.is_measure = #{is_measure}
+					     </if>
+					     <if test="in_date_beg != null and in_date_beg != ''">
+							AND vim.in_date &gt;= to_date(#{in_date_beg},'YYYY-MM-DD')
+						 </if>
+						 <if test="in_date_end != null and in_date_end != ''">
+							AND vim.in_date &lt;= to_date(#{in_date_end},'YYYY-MM-DD')
+						 </if>
+						 <if test="run_date_beg != null and run_date_beg != '' ">
+							AND vim.create_date &gt;= to_date(#{run_date_beg},'YYYY-MM-DD')
+						 </if>
+						 <if test="run_date_end != null and run_date_end != ''">
+							AND vim.create_date &lt;= to_date(#{run_date_end},'YYYY-MM-DD')
+						 </if>
+				  
+				  
+				  </where> 
+				 group by grouping sets((t6.sup_code, t6.sup_name,t4.store_name, atd.ass_type_name, t2.ass_code, t2.ass_name, t1.ASS_SPEC || t1.ASS_MODEL, unit.unit_name, t5.fac_code,t5.fac_name,vim.in_date, t1.price), t6.sup_code, null)
+	
+	</select>
+</mapper>	

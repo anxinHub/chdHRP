@@ -1,0 +1,295 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+
+	<sql id="med_final_inverse_month_store" type="proc"><![CDATA[
+		
+	  CREATE OR REPLACE PROCEDURE MED_FINAL_INVERSE_MONTH_STORE
+
+	    /*期末分库房反结账*/
+	    (
+	      p_group_id numeric,  --集团ID
+	      p_hos_id numeric,  --医院ID
+	      p_copy_code varchar2,  --帐套编码
+	      p_set_id numeric,  --虚仓ID
+	      p_year varchar2,  --当前年份
+	      p_month varchar2,  --当前月份
+	      p_last_year varchar2,  --反结账年份
+	      p_last_month varchar2,  --反结账月份
+	      p_before_year varchar2,  --上一期间年份
+	      p_before_month varchar2,  --上一期间月份
+	      p_user_id numeric,  --当前操作用户
+	      msg OUT nvarchar2  --返回值格式："msg":"···","state":"true/false","year":"···"
+	    )
+	    IS
+	      med_flag numeric;  --判断状态依据
+	      sys_date date;  --当前系统时间(用于更新结账时间)
+	      num NUMBER;
+	      before_year varchar2(10);  --上一期间年份
+	      before_month varchar2(10);  --上一期间月份
+	    BEGIN
+	
+	      sys_date := sysdate;
+	
+	      --校验虚仓对应的仓库是否可以反结
+	      select count(*) into med_flag
+	      from med_store_set a
+	      left join med_store_detail b
+	        on a.group_id = b.group_id
+	        and a.hos_id = b.hos_id
+	        and a.set_id = b.set_id
+	      where a.group_id = p_group_id
+	        and a.hos_id = p_hos_id
+	        and a.set_id = p_set_id
+	        and b.is_account = 1
+	        and exists(
+	          --当前期间大于库房启用年月的库房才可以反结
+	          select 1 from med_store_start
+	          where group_id = p_group_id
+	            and hos_id = p_hos_id
+	            and copy_code = p_copy_code
+	            and store_id = b.store_id
+	            and start_year || start_month < p_year || p_month
+	        )
+	        and not exists(
+	          --当前期间未结账的库房才可以反结
+	          select 1 from med_termend_store
+	          where group_id = p_group_id
+	            and hos_id = p_hos_id
+	            and copy_code = p_copy_code
+	            and year = p_year
+	            and month = p_month
+	            and store_id = b.store_id
+	            and is_account = 1
+	        );
+	      if med_flag = 0 then
+	        msg :=  '{"error":"虚仓包含的所有仓库当前期间为启用年月不能反结账！","state":"false"}';
+	        return;
+	      end if;
+	
+	      declare
+	        v_store_id numeric(16,0);
+	        CURSOR cur_store IS
+	          select b.store_id
+	          from med_store_set a
+	          left join med_store_detail b
+	            on a.group_id = b.group_id
+	            and a.hos_id = b.hos_id
+	            and a.set_id = b.set_id
+	          where a.group_id = p_group_id
+	            and a.hos_id = p_hos_id
+	            and a.set_id = p_set_id
+	            and b.is_account = 1
+	            and exists(
+	              --当前期间大于库房启用年月才可以反结
+	              select 1 from med_store_start
+	              where group_id = p_group_id
+	                and hos_id = p_hos_id
+	                and copy_code = p_copy_code
+	                and start_year || start_month < p_year || p_month
+	            )
+	            and not exists(
+	              --当前期间未结账的库房才可以反结
+	              select 1 from med_termend_store
+	              where group_id = p_group_id
+	                and hos_id = p_hos_id
+	                and copy_code = p_copy_code
+	                and year = p_year
+	                and month = p_month
+	                and store_id = b.store_id
+	                and is_account = 1
+	            );
+	      begin
+	        open cur_store; loop
+	          FETCH cur_store INTO v_store_id;
+	
+	          --如果循环不存在则跳出循环
+	          IF cur_store%NOTFOUND THEN
+	            if cur_store%isopen then
+	              CLOSE cur_store;
+	            end if;
+	            EXIT;
+	          END IF;
+	
+	          /*常备材料批结余表*/
+	          update med_batch_balance
+	          set
+	            med_batch_balance.end_amount = 0,
+	            med_batch_balance.end_money = 0,
+	            med_batch_balance.end_sale_money = 0,
+	            med_batch_balance.begin_amount = 0,
+	            med_batch_balance.begin_money = 0,
+	            med_batch_balance.begin_sale_money = 0,
+	            med_batch_balance.y_in_amount = nvl(med_batch_balance.in_amount,0),
+	            med_batch_balance.y_in_money  = nvl(med_batch_balance.in_money,0),
+	            med_batch_balance.y_in_sale_money  = nvl(med_batch_balance.in_sale_money,0),
+	            med_batch_balance.y_out_amount = nvl(med_batch_balance.out_amount,0),
+	            med_batch_balance.y_out_money = nvl(med_batch_balance.out_money,0),
+	            med_batch_balance.y_out_sale_money = nvl(med_batch_balance.out_sale_money,0)
+	          where med_batch_balance.group_id = p_group_id
+	            and med_batch_balance.hos_id = p_hos_id
+	            and med_batch_balance.copy_code = p_copy_code
+	            and med_batch_balance.year = p_year
+	            and med_batch_balance.month = p_month
+	            and med_batch_balance.store_id = v_store_id;
+	
+	          /*常备材料结余表*/
+	          update med_inv_balance
+	          set
+	            med_inv_balance.end_amount = 0,
+	            med_inv_balance.end_money = 0,
+	            med_inv_balance.end_sale_money = 0,
+	            med_inv_balance.begin_amount = 0,
+	            med_inv_balance.begin_money = 0,
+	            med_inv_balance.begin_sale_money = 0,
+	            med_inv_balance.y_in_amount = nvl(med_inv_balance.in_amount,0),
+	            med_inv_balance.y_in_money  = nvl(med_inv_balance.in_money,0),
+	            med_inv_balance.y_in_sale_money  = nvl(med_inv_balance.in_sale_money,0),
+	            med_inv_balance.y_out_amount = nvl(med_inv_balance.out_amount,0),
+	            med_inv_balance.y_out_money = nvl(med_inv_balance.out_money,0),
+	            med_inv_balance.y_out_sale_money = nvl(med_inv_balance.out_sale_money,0)
+	          where med_inv_balance.group_id = p_group_id
+	            and med_inv_balance.hos_id = p_hos_id
+	            and med_inv_balance.copy_code = p_copy_code
+	            and med_inv_balance.year = p_year
+	            and med_inv_balance.month = p_month
+	            and med_inv_balance.store_id = v_store_id;
+	
+	          /*代销材料批结余表*/
+	         /* update med_affi_batch
+	          set
+	            med_affi_batch.end_amount = 0,
+	            med_affi_batch.end_money = 0,
+	            med_affi_batch.end_sale_money = 0,
+	            med_affi_batch.begin_amount = 0,
+	            med_affi_batch.begin_money = 0,
+	            med_affi_batch.begin_sale_money = 0,
+	            med_affi_batch.y_in_amount = nvl(med_affi_batch.in_amount,0),
+	            med_affi_batch.y_in_money  = nvl(med_affi_batch.in_money,0),
+	            med_affi_batch.y_in_sale_money  = nvl(med_affi_batch.in_sale_money,0),
+	            med_affi_batch.y_out_amount = nvl(med_affi_batch.out_amount,0),
+	            med_affi_batch.y_out_money = nvl(med_affi_batch.out_money,0),
+	            med_affi_batch.y_out_sale_money = nvl(med_affi_batch.out_sale_money,0)
+	          where med_affi_batch.group_id = p_group_id
+	            and med_affi_batch.hos_id = p_hos_id
+	            and med_affi_batch.copy_code = p_copy_code
+	            and med_affi_batch.year = p_year
+	            and med_affi_batch.month = p_month
+	            and med_affi_batch.store_id = v_store_id;
+	
+	          \*代销材料结余表*\
+	          update med_affi_balance
+	          set
+	            med_affi_balance.end_amount = 0,
+	            med_affi_balance.end_money = 0,
+	            med_affi_balance.end_sale_money = 0,
+	            med_affi_balance.begin_amount = 0,
+	            med_affi_balance.begin_money = 0,
+	            med_affi_balance.begin_sale_money = 0,
+	            med_affi_balance.y_in_amount = nvl(med_affi_balance.in_amount,0),
+	            med_affi_balance.y_in_money  = nvl(med_affi_balance.in_money,0),
+	            med_affi_balance.y_in_sale_money  = nvl(med_affi_balance.in_sale_money,0),
+	            med_affi_balance.y_out_amount = nvl(med_affi_balance.out_amount,0),
+	            med_affi_balance.y_out_money = nvl(med_affi_balance.out_money,0),
+	            med_affi_balance.y_out_sale_money = nvl(med_affi_balance.out_sale_money,0)
+	          where med_affi_balance.group_id = p_group_id
+	            and med_affi_balance.hos_id = p_hos_id
+	            and med_affi_balance.copy_code = p_copy_code
+	            and med_affi_balance.year = p_year
+	            and med_affi_balance.month = p_month
+	            and med_affi_balance.store_id = v_store_id;*/
+	
+	          /*修改上一期间库房结账信息*/
+	          update med_termend_store
+	            set
+	              is_account = 0,
+	              oper = p_user_id,
+	              oper_date = sys_date
+	            where group_id = p_group_id
+	              and hos_id = p_hos_id
+	              and copy_code = p_copy_code
+	              and year = p_last_year
+	              and month = p_last_month
+	              and store_id = v_store_id;
+	          <<next_i>>
+	            null;
+	        end loop;
+	      end;
+	
+	      /*所有库房都已反结则需更新结账状态*/
+	      select count(*) into med_flag
+	      from hos_store a
+	      where a.group_id = p_group_id
+	        and a.hos_id = p_hos_id
+	        and a.is_mat = 1
+	        and a.is_stop = 0
+	        and exists(
+	          --当前期间大于库房启用年月的库房才可以参与结账状态判断
+	          select 1 from med_store_start
+	          where group_id = p_group_id
+	            and hos_id = p_hos_id
+	            and copy_code = p_copy_code
+	            and start_year || start_month <= p_last_year || p_last_month
+	        )
+	        and exists(
+	          --当前期间存在已结账库房则不能更新结账状态
+	          select 1 from med_termend_store
+	          where group_id = p_group_id
+	            and hos_id = p_hos_id
+	            and copy_code = p_copy_code
+	            and year = p_last_year
+	            and month = p_last_month
+	            and store_id = a.store_id
+	            and is_account = 1
+	        );
+	      if med_flag > 0 then
+	        update acc_year_month
+	        set med_flag = 0,med_date = sys_date,med_user = p_user_id
+	        where group_id = p_group_id
+	          and hos_id = p_hos_id
+	          and copy_code = p_copy_code
+	          and acc_year = p_last_year
+	          and acc_month = p_last_month;
+	      end if;
+	
+	      /*返回上个期间*/
+	      before_year := p_before_year;
+	      before_month := p_before_month;
+	
+	      select count(1) into num
+	      from med_termend_store
+	      where group_id = p_group_id
+	        and hos_id = p_hos_id
+	        and copy_code = p_copy_code
+	        and year = p_before_year
+	        and month = p_before_month;
+	      /*select count(1) into num
+	      from acc_year_month
+	      where group_id = p_group_id
+	        and hos_id = p_hos_id
+	        and copy_code = p_copy_code
+	        and acc_year = p_before_year
+	        and acc_month = p_before_month
+	        and acc_year||acc_month > = (
+	          select
+	            start_year||start_month
+	          from sys_mod_start
+	           where group_id = p_group_id
+	                AND hos_id = p_hos_id
+	                AND copy_code = p_copy_code
+	                and mod_code = '04'
+	        );*/
+	      if num = 0 then
+	         before_year := '';
+	         before_month := '';
+	       end if;
+	
+	
+	      /*返回信息*/
+	      msg := '{"msg":"操作成功","state":"true","year":"'||p_last_year||'","month":"'||p_last_month||'","last_year":"'||before_year||'","last_month":"'||before_month||'"}';
+	    END MED_FINAL_INVERSE_MONTH_STORE;
+		  
+	
+	]]></sql>
+	 
+</root>
+

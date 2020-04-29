@@ -1,0 +1,266 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+	<sql id="v_acc_ass_back_rest_m" type="view" desc="采购入库主表视图"><![CDATA[
+	CREATE OR REPLACE VIEW V_ACC_ASS_BACK_REST_M AS
+     SELECT 
+        RS.GROUP_ID,  --集团ID
+        RS.HOS_ID,    --医院ID
+        RS.COPY_CODE, --账套编码
+        RS.BUS_TYPE_CODE,   --业务类型
+        RS.ASS_BACK_NO AS BUSINESS_ID,     --退货单ID
+        RS.ASS_BACK_NO AS BUSINESS_NO,     --退货单号
+        RS.ASS_NATURS,--归属
+        RS.ASS_NATURS_NAME,--归属名称
+        RS.STORE_ID,  --仓库ID
+        HST.STORE_NO,  --仓库变更ID
+        HST.STORE_CODE,    --仓库编码
+        HST.STORE_NAME,    --仓库名称  
+        MS.DEPT_ID,    --仓库管理科室ID
+        C.DEPT_NO,     --仓库管理科室NO 
+        RS.BACK_MONEY, --退货金额      
+        RS.CREATE_EMP MAKER,    --制单人ID
+        SM.USER_NAME AS MAKER_NAME, --制单人名称      
+        RS.CREATE_DATE AS MAKE_DATE,    --编制日期
+        RS.BACK_DATE AS BUSI_DATE,    --业务日期
+        RS.CONFIRM_EMP CONFIRMER,    --确认人ID
+        SF.USER_NAME AS CONFIRMER_NAME,    --确认人
+        RS.STATE       --状态
+     FROM (
+        SELECT 
+          '01' ASS_NATURS,
+          '房屋及建筑' ASS_NATURS_NAME,
+          T.GROUP_ID,
+          T.HOS_ID,
+          T.COPY_CODE,
+          T.BUS_TYPE_CODE,
+          T.ASS_BACK_NO,
+          NULL STORE_ID,
+          NULL STORE_NO,
+          T.BACK_MONEY,
+          T.NOTE,
+          T.CREATE_EMP,
+          T.CREATE_DATE,
+          T.BACK_DATE,
+          T.CONFIRM_EMP,
+          T.STATE 
+        FROM ASS_BACK_REST_HOUSE T
+        WHERE T.STATE=2
+        UNION ALL
+        SELECT 
+          '02' ASS_NATURS,
+          '专用设备' ASS_NATURS_NAME,
+          T.GROUP_ID,
+          T.HOS_ID,
+          T.COPY_CODE,
+          T.BUS_TYPE_CODE,
+          T.ASS_BACK_NO,
+          T.STORE_ID,
+          T.STORE_NO,
+          T.BACK_MONEY,
+          T.NOTE,
+          T.CREATE_EMP,
+          T.CREATE_DATE,
+          T.BACK_DATE,
+          T.CONFIRM_EMP,
+          T.STATE 
+        FROM ASS_BACK_REST_SPECIAL T
+        WHERE T.STATE=2
+        UNION ALL
+        SELECT 
+          '03' ASS_NATURS,
+          '一般设备' ASS_NATURS_NAME,
+          T.GROUP_ID,
+          T.HOS_ID,
+          T.COPY_CODE,
+          T.BUS_TYPE_CODE,
+          T.ASS_BACK_NO,
+          T.STORE_ID,
+          T.STORE_NO,
+          T.BACK_MONEY,
+          T.NOTE,
+          T.CREATE_EMP,
+          T.CREATE_DATE,
+          T.BACK_DATE,
+          T.CONFIRM_EMP,
+          T.STATE 
+        FROM ASS_BACK_REST_GENERAL T
+        WHERE T.STATE=2
+        UNION ALL
+        SELECT 
+          '04' ASS_NATURS,
+          '其他固定资产' ASS_NATURS_NAME,
+          T.GROUP_ID,
+          T.HOS_ID,
+          T.COPY_CODE,
+          T.BUS_TYPE_CODE,
+          T.ASS_BACK_NO,
+          T.STORE_ID,
+          T.STORE_NO,
+          T.BACK_MONEY,
+          T.NOTE,
+          T.CREATE_EMP,
+          T.CREATE_DATE,
+          T.BACK_DATE,
+          T.CONFIRM_EMP,
+          T.STATE 
+        FROM ASS_BACK_REST_OTHER T
+        WHERE T.STATE=2
+     ) RS
+     LEFT JOIN HOS_STORE_DICT HST --仓库
+     ON 
+        RS.GROUP_ID=HST.GROUP_ID
+        AND RS.HOS_ID=HST.HOS_ID
+        AND RS.STORE_ID=HST.STORE_ID
+        AND RS.STORE_NO=HST.STORE_NO 
+     LEFT JOIN MAT_STORE MS   --仓库管理科室
+     ON 
+        MS.GROUP_ID = HST.GROUP_ID
+        AND MS.HOS_ID = HST.HOS_ID
+        AND MS.STORE_ID = HST.STORE_ID
+     LEFT JOIN HOS_DEPT_DICT C   --仓库管理科室
+     ON 
+        MS.GROUP_ID = C.GROUP_ID
+        AND MS.HOS_ID = C.HOS_ID
+        AND MS.DEPT_ID = C.DEPT_ID
+        AND C.IS_STOP = 0 
+     LEFT JOIN SYS_USER SM  --制单人
+     ON 
+        RS.GROUP_ID=SM.GROUP_ID
+        AND RS.HOS_ID=SM.HOS_ID
+        AND RS.COPY_CODE=SM.COPY_CODE
+        AND RS.CREATE_EMP=SM.USER_ID
+     LEFT JOIN SYS_USER SF   --确认人
+     ON 
+        RS.GROUP_ID=SF.GROUP_ID
+        AND RS.HOS_ID=SF.HOS_ID
+        AND RS.COPY_CODE=SF.COPY_CODE
+        AND RS.CONFIRM_EMP=SF.USER_ID
+    ]]></sql>
+    <sql id="v_acc_ass_back_rest_d" type="view" desc="资产卡片折旧汇总视图"><![CDATA[
+       CREATE OR REPLACE VIEW V_ACC_ASS_BACK_REST_D AS
+       SELECT 
+         RS.GROUP_ID,--集团ID
+         RS.HOS_ID,  --单位ID
+         RS.COPY_CODE, --账套编码
+         RS.ASS_BACK_NO AS BUSINESS_ID,  --退货单ID
+         RS.ASS_CARD_NO||RS.SOURCE_ID FUND_ID ,--关联三级主键
+         AC.ASS_ID ,    --资产ID
+         ATD.ASS_TYPE_ID AS SUB_TYPE_ID, --分类ID
+         ATD.ASS_TYPE_CODE, --分类编码
+         ATD.ASS_TYPE_NAME, --分类名称
+         RS.ASS_CARD_NO, --卡片号
+         RS.SOURCE_ID,  --资金来源ID
+         HS.SOURCE_CODE,    --资金来源编码
+         HS.SOURCE_NAME,    --资金来源名称
+         HSN.NATURE_CODE AS FUND_SOURCE_ATTR, --资金来源属性
+         HSN.NATURE_NAME AS SOURCE_NATURE_NAME, --资金来源性质名称
+         (-1*RS.PRICE) PRIM_MONEY,  --原值金额
+         (-1*RS.CUR_MONEY) CUR_MONEY,--净值
+         (-1*RS.ADD_DEPRE) ADD_DEPRE --累计折旧
+       FROM (
+         SELECT 
+             T.GROUP_ID,
+             T.HOS_ID,
+             T.COPY_CODE,
+             T.ASS_BACK_NO,
+             T.ASS_CARD_NO,
+             S.SOURCE_ID,
+             S.PRICE,
+             S.CUR_MONEY,
+             S.ADD_DEPRE
+           FROM ASS_BACK_REST_DETAIL_HOUSE T
+           LEFT JOIN ASS_BACK_REST_SOURCE_HOUSE S 
+           ON 
+             T.GROUP_ID=S.GROUP_ID
+             AND T.HOS_ID=S.HOS_ID
+             AND T.COPY_CODE=S.COPY_CODE
+             AND T.ASS_BACK_NO=S.ASS_BACK_NO
+             AND T.ASS_CARD_NO=S.ASS_CARD_NO
+           UNION ALL
+           SELECT 
+             T.GROUP_ID,
+             T.HOS_ID,
+             T.COPY_CODE,
+             T.ASS_BACK_NO,
+             T.ASS_CARD_NO,
+             S.SOURCE_ID,
+             S.PRICE,
+             S.CUR_MONEY,
+             S.ADD_DEPRE
+           FROM ASS_BACK_REST_DETAIL_SPECIAL T
+           LEFT JOIN ASS_BACK_REST_SOURCE_SPECIAL S 
+           ON 
+             T.GROUP_ID=S.GROUP_ID
+             AND T.HOS_ID=S.HOS_ID
+             AND T.COPY_CODE=S.COPY_CODE
+             AND T.ASS_BACK_NO=S.ASS_BACK_NO
+             AND T.ASS_CARD_NO=S.ASS_CARD_NO
+           UNION ALL
+           SELECT 
+             T.GROUP_ID,
+             T.HOS_ID,
+             T.COPY_CODE,
+             T.ASS_BACK_NO,
+             T.ASS_CARD_NO,
+             S.SOURCE_ID,
+             S.PRICE,
+             S.CUR_MONEY,
+             S.ADD_DEPRE
+           FROM ASS_BACK_REST_DETAIL_GENERAL T
+           LEFT JOIN ASS_BACK_REST_SOURCE_GENERAL S 
+           ON 
+             T.GROUP_ID=S.GROUP_ID
+             AND T.HOS_ID=S.HOS_ID
+             AND T.COPY_CODE=S.COPY_CODE
+             AND T.ASS_BACK_NO=S.ASS_BACK_NO
+             AND T.ASS_CARD_NO=S.ASS_CARD_NO
+           UNION ALL
+           SELECT
+             T.GROUP_ID,
+             T.HOS_ID,
+             T.COPY_CODE,
+             T.ASS_BACK_NO,
+             T.ASS_CARD_NO,
+             S.SOURCE_ID,
+             S.PRICE,
+             S.CUR_MONEY,
+             S.ADD_DEPRE
+           FROM ASS_BACK_REST_DETAIL_OTHER T
+           LEFT JOIN ASS_BACK_REST_SOURCE_OTHER S 
+           ON 
+             T.GROUP_ID=S.GROUP_ID
+             AND T.HOS_ID=S.HOS_ID
+             AND T.COPY_CODE=S.COPY_CODE
+             AND T.ASS_BACK_NO=S.ASS_BACK_NO
+             AND T.ASS_CARD_NO=S.ASS_CARD_NO
+         ) RS
+         LEFT JOIN V_ACC_ASS_CARD AC     --资产卡片
+         ON 
+           RS.GROUP_ID=AC.GROUP_ID
+           AND RS.HOS_ID=AC.HOS_ID
+           AND RS.COPY_CODE=AC.COPY_CODE
+           AND RS.ASS_CARD_NO=AC.ASS_CARD_NO
+         LEFT JOIN HOS_SOURCE HS         --资金来源
+         ON 
+           RS.GROUP_ID=HS.GROUP_ID
+           AND RS.HOS_ID=HS.HOS_ID
+           AND RS.SOURCE_ID=HS.SOURCE_ID
+         LEFT JOIN HOS_SOURCE_NATURE HSN --资金来源性质
+         ON 
+           HS.SOURCE_ATTR=HSN.NATURE_CODE
+         LEFT JOIN ASS_NO_DICT AD        --资产字典
+         ON 
+           RS.GROUP_ID=AD.GROUP_ID
+           AND RS.HOS_ID=AD.HOS_ID
+           AND RS.COPY_CODE=AD.COPY_CODE
+           AND AC.ASS_ID=AD.ASS_ID
+           AND AC.ASS_NO=AD.ASS_NO
+         LEFT JOIN ASS_TYPE_DICT ATD     --资产类别
+         ON 
+           RS.GROUP_ID=ATD.GROUP_ID
+           AND RS.HOS_ID=ATD.HOS_ID
+           AND RS.COPY_CODE=ATD.COPY_CODE
+           AND AD.ASS_TYPE_ID=ATD.ASS_TYPE_ID 
+             
+	]]></sql>
+</root>

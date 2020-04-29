@@ -1,0 +1,114 @@
+﻿
+/** 
+ * @Description:
+ * @Copyright: Copyright (c) 2015-9-16 下午9:54:34
+ * @Company: 智慧云康（北京）数据科技有限公司
+ * @网站：www.s-chd.com
+ */
+ package com.chd.hrp.prm.service;
+import java.util.*;
+
+import org.springframework.dao.DataAccessException;
+
+import com.chd.hrp.prm.entity.PrmFunType;
+/**
+ * 
+ * @Description:
+ * 9909 绩效函数分类表
+ * @Table:
+ * PRM_FUN_TYPE
+ * @Author: bell
+ * @email:  bell@s-chd.com
+ * @Version: 1.0
+ */
+ 
+
+
+public interface PrmFunTypeService {
+
+	/**
+	 * @Description 
+	 * 添加9909 绩效函数分类表<BR> 
+	 * @param  entityMap
+	 * @return String
+	 * @throws DataAccessException
+	*/
+	public String addPrmFunType(Map<String,Object> entityMap)throws DataAccessException;
+	
+	/**
+	 * @Description 
+	 * 批量添加9909 绩效函数分类表<BR> 
+	 * @param  entityMap
+	 * @return String
+	 * @throws DataAccessException
+	*/
+	public String addBatchPrmFunType(List<Map<String, Object>> entityMap)throws DataAccessException;
+	
+	/**
+	 * @Description 
+	 * 更新9909 绩效函数分类表<BR> 
+	 * @param  entityMap
+	 * @return int
+	 * @throws DataAccessException
+	*/
+	public String updatePrmFunType(Map<String,Object> entityMap)throws DataAccessException;
+	
+	/**
+	 * @Description 
+	 * 批量更新9909 绩效函数分类表<BR> 
+	 * @param  entityMap
+	 * @return int
+	 * @throws DataAccessException
+	*/
+	public String updateBatchPrmFunType(List<Map<String, Object>> entityMap)throws DataAccessException;
+	/**
+	 * @Description 
+	 * 删除9909 绩效函数分类表<BR> 
+	 * @param  entityMap
+	 * @return String
+	 * @throws DataAccessException
+	*/
+	public String deletePrmFunType(Map<String,Object> entityMap)throws DataAccessException;
+	
+	/**
+	 * @Description 
+	 * 批量删除9909 绩效函数分类表<BR> 
+	 * @param  entityMap
+	 * @return String
+	 * @throws DataAccessException
+	*/
+	public String deleteBatchPrmFunType(List<Map<String, Object>> entityMap)throws DataAccessException;
+	
+
+	/**
+	 * @Description 
+	 * 查询结果集9909 绩效函数分类表<BR> 
+	 * @param  entityMap
+	 * @return String
+	 * @throws DataAccessException
+	*/
+	public String queryPrmFunType(Map<String,Object> entityMap) throws DataAccessException;
+	
+	/**
+	 * @Description 
+	 * 打印结果集9909 绩效函数分类表<BR> 
+	 * @param  entityMap
+	 * @return String
+	 * @throws DataAccessException
+	 */
+	public List<Map<String,Object>> queryPrmFunTypePrint(Map<String,Object> entityMap) throws DataAccessException;
+	
+	/**
+	 * @Description 
+	 * 查询对象9909 绩效函数分类表<BR> 
+	 * @param  entityMap
+	 * @return String
+	 * @throws DataAccessException
+	*/
+	public PrmFunType queryPrmFunTypeByCode(Map<String,Object> entityMap)throws DataAccessException;
+	
+	/**
+	 * 函数分类树
+	 */
+	public String queryPrmFunTree(Map<String,Object> entityMap) throws DataAccessException;
+}

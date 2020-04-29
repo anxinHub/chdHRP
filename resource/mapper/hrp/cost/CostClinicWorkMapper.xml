@@ -1,0 +1,402 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.cost.dao.CostClinicWorkMapper">
+
+	<resultMap id="costClinicWork" type="com.chd.hrp.cost.entity.CostClinicWork">
+        <result property="group_id" column="group_id"/>
+        <result property="hos_id" column="hos_id"/>
+        <result property="copy_code" column="copy_code"/>
+         <result property="acc_year" column="acc_year"/>
+        <result property="acc_month" column="acc_month"/>
+        <result property="dept_id" column="dept_id"/>
+        <result property="dept_no" column="dept_no"/>
+        <result property="dept_code" column="dept_code"/>
+        <result property="dept_name" column="dept_name"/>
+        <result property="patient_id" column="patient_id"/>
+        <result property="patient_type_code" column="patient_type_code"/>
+        <result property="patient_name" column="patient_name"/>
+        <result property="clinic_num" column="clinic_num"/>
+        <result property="operation_num" column="operation_num"/>
+	</resultMap>
+	
+    <insert id="addCostClinicWork" useGeneratedKeys="true" >
+    
+        INSERT INTO COST_CLINIC_WORK 
+		(
+            group_id,
+            hos_id,
+            copy_code,
+            acc_year,
+            acc_month,
+            dept_id,
+            dept_no,
+            patient_type_code,
+            clinic_num,
+            operation_num
+        ) 
+		VALUES 
+		(
+		 #{group_id},
+		 #{hos_id},
+		 #{copy_code},
+		  #{acc_year},
+		 #{acc_month},
+		 #{dept_id},
+		 #{dept_no},
+		 #{patient_type_code},
+		 #{clinic_num},
+		 #{operation_num}
+        )
+    
+    </insert>
+	
+	<insert id="addBatchCostClinicWork" parameterType="java.util.List" >
+    
+        INSERT INTO COST_CLINIC_WORK 
+		(
+    		group_id,
+    		hos_id,
+    		copy_code,
+    		acc_year,
+    		acc_month,
+    		dept_id,
+    		dept_no,
+    		patient_type_code,
+    		clinic_num,
+    		operation_num
+        ) 
+		<!-- 没有序列的变通调整 顺序要调整一下 -->
+		select A.* FROM (
+		 <foreach collection="list" item="item" index="index" separator=" union all " >
+        select 		
+		    #{item.group_id},
+		    #{item.hos_id},
+		    #{item.copy_code},
+		     #{item.acc_year},
+		    #{item.acc_month},
+		    #{item.dept_id},
+		    #{item.dept_no},
+		    #{item.patient_type_code},
+		    #{item.clinic_num},
+		    #{item.operation_num}
+		 from dual 
+		</foreach>
+		) A
+    
+    </insert>
+
+	<update id="updateCostClinicWork" parameterType="java.util.Map">
+    
+        UPDATE cost_clinic_work SET
+			 clinic_num = #{clinic_num},
+			 operation_num = #{operation_num}
+        WHERE 
+		    group_id = #{group_id} and 
+		    hos_id = #{hos_id} and 
+		    copy_code = #{copy_code} and 
+		    acc_year = #{acc_year} and
+		    acc_month = #{acc_month} and  
+		    dept_id = #{dept_id} and 
+		    dept_no = #{dept_no} and
+		    patient_type_code = #{patient_type_code}
+   
+	</update>
+	
+	<update id="updateBatchCostClinicWork" parameterType="java.util.List">
+     
+	<foreach collection="list" item="item" index="index" open="begin" close="end;" separator=";" >
+        UPDATE cost_clinic_work SET
+			 clinic_num = #{clinic_num},
+			 operation_num = #{operation_num}
+        WHERE 
+		    group_id = #{item.group_id} and 
+		    hos_id = #{item.hos_id} and 
+		    copy_code = #{item.copy_code} and 
+		    acc_year = #{item.acc_year} and 
+		    acc_month = #{item.acc_month} and 
+		    dept_id = #{item.dept_id} and 
+		    dept_no = #{item.dept_no} and 
+		     patient_type_code = #{item.patient_type_code}
+    </foreach>
+	</update>
+
+    <delete id="deleteCostClinicWork" parameterType="java.util.Map">
+   
+        DELETE FROM cost_clinic_work 
+			WHERE
+				group_id = #{group_id}  and 
+				hos_id = #{hos_id}  and 
+				copy_code = #{copy_code}  and 
+				acc_year = #{acc_year}  and 
+			    acc_month = #{acc_month}  and 
+				dept_id = #{dept_id}  and 
+				dept_no = #{dept_no} and
+   				patient_type_code = #{patient_type_code}
+    </delete>
+	
+    <delete id="deleteBatchCostClinicWork" parameterType="java.util.List">
+        DELETE FROM cost_clinic_work 
+			WHERE
+			<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+			    group_id = #{item.group_id} and 
+			    hos_id = #{item.hos_id} and 
+			    copy_code = #{item.copy_code} and 
+			    acc_year = #{item.acc_year} and 
+			    acc_month = #{item.acc_month} and 
+			    dept_id = #{item.dept_id} and 
+			    dept_no = #{item.dept_no} and 
+			    patient_type_code = #{item.patient_type_code}
+			</foreach>
+        
+    </delete>
+    
+    <delete id="deleteMonthlyCostClinicWork" parameterType="java.util.Map">
+   
+        DELETE FROM cost_clinic_work 
+			WHERE group_id = #{group_id}  
+			and hos_id = #{hos_id}  
+			and copy_code = #{copy_code} 
+		    and acc_year || acc_month between #{b_year_month} and  #{e_year_month}
+    </delete>
+    <!-- 
+    	2016/11/3 lxj
+    	在left join HOS_PATIENT_TYPE 连接条件中,将ccw.patient_type_code= hpt.patient_id改为了ccw.patient_type_code= hpt.patient_code
+    	在这个连接条件后面加了 and hpt.is_stop = 0
+     -->
+    <select id="queryCostClinicWorkByCode" resultType="com.chd.hrp.cost.entity.CostClinicWork" parameterType="string" >
+	  
+        SELECT 
+            ccw.group_id,
+            ccw.hos_id,
+            ccw.copy_code,
+            ccw.acc_year,
+            ccw.acc_month,
+            ccw.dept_id,
+            ccw.dept_no,
+            hdd.dept_code,
+            hdd.dept_name,
+            ccw.patient_type_code,
+            hpt.patient_name,
+            ccw.clinic_num,
+            ccw.operation_num
+        FROM COST_CLINIC_WORK ccw
+        left join hos_dept_dict hdd
+        	on 
+        		ccw.group_id = hdd.group_id 
+        		and ccw.hos_id = hdd.hos_id 
+        		and ccw.dept_id = hdd.dept_id
+				<if test="is_flag == 1">
+         			and ccw.dept_no = hdd.dept_no 
+        		</if>    
+        		<if test="is_flag == 0 or is_flag == ''">
+					and hdd.is_stop=0
+				</if>        
+ 		left join HOS_PATIENT_TYPE hpt
+        	on 
+        		ccw.group_id = hpt.group_id 
+        		and ccw.hos_id = hpt.hos_id 
+        		and ccw.patient_type_code= hpt.patient_code 
+        		and hpt.is_stop=0
+	        <where> 
+			    <if test="group_id != null and group_id != ''">
+                    AND ccw.group_id = #{group_id}
+               </if>
+			    <if test="hos_id != null and hos_id != ''">
+                    AND ccw.hos_id = #{hos_id}
+               </if>
+			    <if test="copy_code != null and copy_code != ''">
+                    AND ccw.copy_code = #{copy_code}
+               </if>
+			    <if test="acc_year_month != null and acc_year_month != ''">
+                    AND ccw.acc_year || '' || ccw.acc_month = #{acc_year_month}
+               </if>
+                <if test="acc_year != null and acc_year != ''">
+                    AND ccw.acc_year = #{acc_year}
+               </if>
+               <if test="acc_month != null and acc_month != ''">
+                    AND ccw.acc_month = #{acc_month}
+               </if>
+			    <if test="dept_id != null and dept_id != ''">
+                    AND ccw.dept_id = #{dept_id}
+               </if>
+			   
+               	 <if test="dept_code != null and dept_code != ''">
+                    AND hdd.dept_code = #{dept_code}
+               </if>
+			    <if test="patient_type_code != null and patient_type_code != ''">
+                    AND ccw.patient_type_code = #{patient_type_code}
+               </if>
+			   
+        </where>   	  
+        
+	</select>
+	
+	
+	<!-- 2016/11/3 lxj
+		门急诊人次和手术人次 ,不作为查询条件，已去除
+		修改排序为:按照统计年月、科室编码、患者类别代码升序排列
+	 -->
+	<select id="queryCostClinicWork" parameterType="java.util.Map" resultMap="costClinicWork" >
+      with temp as
+      (
+       SELECT 
+            ccw.group_id,
+            ccw.hos_id,
+            ccw.copy_code,
+             ccw.acc_year,
+            ccw.acc_month,
+            ccw.acc_year||ccw.acc_month as year_month,
+            ccw.dept_id,
+            ccw.dept_no,
+            hdd.dept_code,
+            hdd.dept_name,
+            ccw.patient_type_code,
+            hpt.patient_name,
+            ccw.clinic_num,
+            ccw.operation_num
+        FROM COST_CLINIC_WORK ccw
+        left join hos_dept_dict hdd
+        	on 
+        		ccw.group_id = hdd.group_id 
+        		and ccw.hos_id = hdd.hos_id 
+        		and ccw.dept_id = hdd.dept_id
+        		<if test="is_flag == 1">
+         			and ccw.dept_no = hdd.dept_no 
+        		</if>
+        		<if test="is_flag == 0 or is_flag == ''">
+					and hdd.is_stop=0
+				</if> 
+        left join HOS_PATIENT_TYPE hpt
+        	on 
+        		ccw.group_id = hpt.group_id 
+        		and ccw.hos_id = hpt.hos_id 
+        		and ccw.patient_type_code= hpt.patient_code
+        		and hpt.is_stop= 0
+            <where>                         
+			    <if test="group_id != null and group_id != ''">
+                    AND ccw.group_id = #{group_id}
+               </if>
+			    <if test="hos_id != null and hos_id != ''">
+                    AND ccw.hos_id = #{hos_id}
+               </if>
+			    <if test="copy_code != null and copy_code != ''">
+                    AND ccw.copy_code = #{copy_code}
+               </if>
+			   <if test=" b_year_month != null and b_year_month != '' and e_year_month != null and e_year_month != ''">
+                  AND ccw.acc_year ||''|| ccw.acc_month between #{b_year_month} and  #{e_year_month}
+            	</if>
+<!--                <if test="acc_year != null and acc_year != ''"> -->
+<!--                     AND ccw.acc_year = #{acc_year} -->
+<!--                </if> -->
+<!--                <if test="acc_month != null and acc_month != ''"> -->
+<!--                     AND ccw.acc_month = #{acc_month} -->
+<!--                </if> -->
+			    <if test="dept_id != null and dept_id != ''">
+                    AND ccw.dept_id = #{dept_id}
+               </if>
+			    
+			    <if test="patient_type_code != null and patient_type_code != ''">
+                    AND ccw.patient_type_code = #{patient_type_code}
+               </if>
+             </where> 
+				ORDER BY acc_year, acc_month, dept_id, patient_type_code
+			)select group_id,hos_id,copy_code,acc_year,acc_month,acc_year||acc_month as year_month,dept_id,dept_no,dept_code,dept_name,
+		 patient_type_code,patient_name,clinic_num,operation_num from temp
+   union all
+   select  null,null, null,'总','计' ,null, null, null, '', null,null, null, sum(clinic_num),sum(operation_num) from temp
+    
+    </select>
+    
+    <select id="queryCostClinicWorkPrint" parameterType="java.util.Map" resultType="java.util.Map" >
+      with temp as
+      (
+       SELECT 
+            ccw.group_id,
+            ccw.hos_id,
+            ccw.copy_code,
+             ccw.acc_year,
+            ccw.acc_month,
+            ccw.acc_year||ccw.acc_month as year_month,
+            ccw.dept_id,
+            ccw.dept_no,
+            hdd.dept_code,
+            hdd.dept_name,
+            ccw.patient_type_code,
+            hpt.patient_name,
+            ccw.clinic_num,
+            ccw.operation_num
+        FROM COST_CLINIC_WORK ccw
+        left join hos_dept_dict hdd
+        on ccw.group_id = hdd.group_id and ccw.hos_id = hdd.hos_id and ccw.dept_id = hdd.dept_id
+        <if test="is_flag == 1">
+         and ccw.dept_no = hdd.dept_no 
+        </if>
+        left join HOS_PATIENT_TYPE hpt
+        on ccw.group_id = hpt.group_id and ccw.hos_id = hpt.hos_id and ccw.patient_type_code= hpt.patient_code
+            <where>  
+            <if test="is_flag == 0 or is_flag == ''">
+					and hdd.is_stop=0
+				</if>  
+            and hpt.is_stop='0'                   
+			    <if test="group_id != null and group_id != ''">
+                    AND ccw.group_id = #{group_id}
+               </if>
+			    <if test="hos_id != null and hos_id != ''">
+                    AND ccw.hos_id = #{hos_id}
+               </if>
+			    <if test="copy_code != null and copy_code != ''">
+                    AND ccw.copy_code = #{copy_code}
+               </if>
+			   <if test=" b_year_month != null and b_year_month != '' and e_year_month != null and e_year_month != ''">
+                  AND ccw.acc_year ||''|| ccw.acc_month between #{b_year_month} and  #{e_year_month}
+            	</if>
+<!--                <if test="acc_year != null and acc_year != ''"> -->
+<!--                     AND ccw.acc_year = #{acc_year} -->
+<!--                </if> -->
+<!--                <if test="acc_month != null and acc_month != ''"> -->
+<!--                     AND ccw.acc_month = #{acc_month} -->
+<!--                </if> -->
+			    <if test="dept_id != null and dept_id != ''">
+                    AND ccw.dept_id = #{dept_id}
+               </if>
+			   
+			    <if test="patient_type_code != null and patient_type_code != ''">
+                    AND ccw.patient_type_code = #{patient_type_code}
+               </if>
+             </where> 
+				ORDER BY acc_year, acc_month, dept_id, patient_type_code
+			)select group_id,hos_id,copy_code,acc_year,acc_month,acc_year||acc_month as year_month,dept_id,dept_no,dept_code,dept_name,
+		 patient_type_code,patient_name,clinic_num,operation_num from temp
+   union all
+   select  null,null, null,'总','计' ,null, null, null, '', null,null, null, sum(clinic_num),sum(operation_num) from temp
+    
+    </select>
+    
+    <select id="queryCostPatientType" resultType="com.chd.hrp.cost.entity.CostClinicWork" parameterType="string" >
+	  
+        SELECT 
+            group_id,
+            hos_id,
+            patient_id,
+            patient_code as patient_type_code,
+            patient_name
+		FROM hos_patient_type 
+	        <where>
+	        <if test="group_id != null and group_id != ''">
+                    AND group_id = #{group_id}
+               </if>
+			    <if test="hos_id != null and hos_id != ''">
+                    AND hos_id = #{hos_id}
+               </if>
+	        <if test="patient_code != null and patient_code != ''">
+		        AND patient_code = #{patient_code}
+	        </if>
+	        <if test="is_stop != null and is_stop != ''">
+		       and  is_stop = #{is_stop}
+	        </if>
+	        </where>
+        
+	</select>
+	
+</mapper>
+

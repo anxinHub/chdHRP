@@ -1,0 +1,1024 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.ass.dao.assquery.AssDistributionMapper">    
+
+	<!-- 汇总 -->
+	<resultMap id="assDistributionMap" type="java.util.Map">
+       <result column="ass_code" property="ass_code"/>
+       <result column="ass_name" property="ass_name"/>
+       <result column="ass_spec" property="ass_spec"/>
+       <result column="ass_mondl" property="ass_mondl"/>
+       <result column="ass_brand" property="ass_brand"/>
+       <result column="unit_name" property="unit_name"/>
+       <result column="price" property="price"/>
+       <result column="ass_amount" property="ass_amount"/>
+       <result column="total_price" property="total_price"/>
+       <result column="dept_name" property="dept_name"/>
+       <result column="gb_name" property="gb_name"/>
+       <result column="fina_type_name" property="fina_type_name"/>
+       
+	</resultMap>  
+
+	<select id="queryAssDistribution" parameterType="java.util.Map"
+		resultMap="assDistributionMap"> 
+		select * from (
+		select t.ass_code,
+		       t.ass_name,
+		       card.ass_spec,
+		       card.ass_mondl,
+		       card.ass_brand,
+		       unit.unit_name,
+		       card.price,
+		       sum(card.ass_amount) ass_amount,
+		       sum(card.price) total_price,
+		       deptd.dept_name,
+		       gb.gb_name,
+		       fina.fina_type_name
+		   from v_ass_card card
+      
+      left join ass_no_dict t
+        on card.ass_id =  t.ass_id
+       and card.group_id =  t.group_id
+       and card.hos_id =  t.hos_id
+       and card.copy_code =  t.copy_code
+       and t.is_stop = 0
+       
+      left join hos_unit unit
+        on card.unit_code = unit.unit_code
+       and card.group_id = unit.group_id
+       and card.hos_id = unit.hos_id
+       
+      left join ass_gb_dict gb
+        on card.gb_code = gb.gb_code
+        
+      left join ass_type_dict typed
+        on t.ass_type_id = typed.ass_type_id
+       and t.group_id = typed.group_id
+       and t.hos_id = typed.hos_id
+       and t.copy_code = typed.copy_code
+       
+      left join ass_fina_dict fina
+        on typed.acc_type_code = fina.fina_type_code
+       and t.group_id = fina.group_id
+       and t.hos_id = fina.hos_id
+       and t.copy_code = fina.copy_code
+       
+       
+      left join hos_dept_dict deptd
+        on card.dept_id = deptd.dept_id
+       and card.dept_no = deptd.dept_no
+       and card.group_id = deptd.group_id
+       and card.hos_id = deptd.hos_id
+		   
+		 where 
+		 	   t.group_id = #{group_id}
+		   and t.hos_id = #{hos_id}
+		   and t.copy_code = #{copy_code}
+		   and card.use_state != 6
+		   and card.use_state != 7
+		   <if test="price_beg != null and price_beg != ''">
+		   	and card.price &gt;= #{price_beg}
+		   </if>
+		   <if test="price_end != null and price_end != ''">
+		   	and card.price &lt;= #{price_end}
+		   </if>
+		   <if test="ass_type_id != null and ass_type_id != ''">
+		   	and typed.ass_type_id = #{ass_type_id}
+		   </if>
+		   <if test="ass_name != null and ass_name != ''">
+		   	and (t.ass_code like '%${ass_name}%' or t.ass_name like '%${ass_name}%' or t.spell_code like upper('%${ass_name}%') or
+				t.wbx_code like upper('%${ass_name}%'))
+		   </if>
+		   <if test="use_dept_id != null and use_dept_id != ''">
+		   	and card.dept_id = #{use_dept_id}
+		   </if>
+		   <if test="store_id != null and store_id != ''">
+		   	and card.store_id = #{store_id}
+		   </if>
+		   <if test="use_state != null and use_state != ''">
+		   	and card.use_state = #{use_state}
+		   </if>
+		   <if test="is_measure != null and is_measure != ''">
+		   	and card.is_measure = #{is_measure}
+		   </if>
+		   <if test="is_dept != null and is_dept != ''">
+		   	and card.is_dept = #{is_dept}
+		   </if>
+		   <if test="ass_naturs != null and ass_naturs != ''">
+		   	and card.ass_naturs = #{ass_naturs}
+		   </if>
+		   <if test="in_date_beg != null and in_date_beg != ''">
+		   	and card.in_date &gt;= to_date(#{in_date_beg},'YYYYMMDD')
+		   </if>
+		   <if test="in_date_end != null and in_date_end != ''">
+		   	and card.in_date &lt;= to_date(#{in_date_end},'YYYYMMDD')
+		   </if>
+		   <if test="run_date_beg != null and run_date_beg != ''">
+		   	and card.run_date &gt;= to_date(#{run_date_beg},'YYYYMMDD')
+		   </if>
+		   <if test="run_date_end != null and run_date_end != ''">
+		    and card.run_date &lt;= to_date(#{run_date_end},'YYYYMMDD')
+		   </if>
+		   <if test="bar_code != null and bar_code != ''">
+		    and (
+				card.bar_code = #{bar_code} or
+				card.ASS_CARD_NO = #{bar_code} or
+                card.ASS_ORI_CARD_NO = #{bar_code}
+				)
+		   </if>
+		 group by t.ass_code,
+		          t.ass_name,
+		          card.ass_spec,
+		          card.ass_mondl,
+		          card.ass_brand,
+		          unit.unit_name,
+		          card.price,
+		          card.ass_amount,
+		          deptd.dept_name,
+		          gb.gb_name,
+		          fina.fina_type_name
+		          
+		 union all
+		 
+		 select '合计' ass_code,
+		       null ass_name,
+		       null ass_spec,
+		       null ass_mondl,
+		       null ass_brand,
+		       null unit_name,
+		       sum(card.price) price,
+		       sum(card.ass_amount) ass_amount,
+		       sum(card.price) total_price,
+		       null dept_name,
+		       null gb_name,
+		       null fina_type_name
+		  from v_ass_card card
+		
+		 left join ass_no_dict t
+        on card.ass_id =  t.ass_id
+       and card.group_id =  t.group_id
+       and card.hos_id =  t.hos_id
+       and card.copy_code =  t.copy_code
+       and t.is_stop = 0
+       
+      left join hos_unit unit
+        on card.unit_code = unit.unit_code
+       and card.group_id = unit.group_id
+       and card.hos_id = unit.hos_id
+       
+      left join ass_gb_dict gb
+        on card.gb_code = gb.gb_code
+        
+      left join ass_type_dict typed
+        on t.ass_type_id = typed.ass_type_id
+       and t.group_id = typed.group_id
+       and t.hos_id = typed.hos_id
+       and t.copy_code = typed.copy_code
+       
+      left join ass_fina_dict fina
+        on typed.acc_type_code = fina.fina_type_code
+       and t.group_id = fina.group_id
+       and t.hos_id = fina.hos_id
+       and t.copy_code = fina.copy_code
+       
+       
+      left join hos_dept_dict deptd
+        on card.dept_id = deptd.dept_id
+       and card.dept_no = deptd.dept_no
+       and card.group_id = deptd.group_id
+       and card.hos_id = deptd.hos_id
+		   
+		 where 
+		 	   t.group_id = #{group_id}
+		   and t.hos_id = #{hos_id}
+		   and t.copy_code = #{copy_code}
+		   and card.use_state != 6
+		   and card.use_state != 7
+		   <if test="price_beg != null and price_beg != ''">
+		   	and card.price &gt;= #{price_beg}
+		   </if>
+		   <if test="price_end != null and price_end != ''">
+		   	and card.price &lt;= #{price_end}
+		   </if>
+		   <if test="ass_type_id != null and ass_type_id != ''">
+		   	and typed.ass_type_id = #{ass_type_id}
+		   </if>
+		   <if test="ass_name != null and ass_name != ''">
+		   	and (t.ass_code like '%${ass_name}%' or t.ass_name like '%${ass_name}%' or t.spell_code like upper('%${ass_name}%') or
+				t.wbx_code like upper('%${ass_name}%'))
+		   </if>
+		   <if test="use_dept_id != null and use_dept_id != ''">
+		   	and card.dept_id = #{use_dept_id}
+		   </if>
+		   <if test="store_id != null and store_id != ''">
+		   	and card.store_id = #{store_id}
+		   </if>
+		   <if test="use_state != null and use_state != ''">
+		   	and card.use_state = #{use_state}
+		   </if>
+		   <if test="is_measure != null and is_measure != ''">
+		   	and card.is_measure = #{is_measure} 
+		   </if>
+		   <if test="is_dept != null and is_dept != ''">
+		   	and card.is_dept = #{is_dept}
+		   </if>
+		   <if test="ass_naturs != null and ass_naturs != ''">
+		   	and card.ass_naturs = #{ass_naturs}
+		   </if>
+		   <if test="in_date_beg != null and in_date_beg != ''">
+		   	and card.in_date &gt;= to_date(#{in_date_beg},'YYYYMMDD')
+		   </if>
+		   <if test="in_date_end != null and in_date_end != ''">
+		   	and card.in_date &lt;= to_date(#{in_date_end},'YYYYMMDD')
+		   </if>
+		   <if test="run_date_beg != null and run_date_beg != ''">
+		   	and card.run_date &gt;= to_date(#{run_date_beg},'YYYYMMDD')
+		   </if>
+		   <if test="run_date_end != null and run_date_end != ''">
+		    and card.run_date &lt;= to_date(#{run_date_end},'YYYYMMDD')
+		   </if>
+		   <if test="bar_code != null and bar_code != ''">
+		    and (
+				card.bar_code = #{bar_code} or
+				card.ASS_CARD_NO = #{bar_code} or
+                card.ASS_ORI_CARD_NO = #{bar_code}
+				)
+		   </if>
+		 ) t  
+		 order by t.ass_code
+		
+	</select>
+	
+	<!-- 明细 -->
+	<resultMap type="java.util.Map" id="assDistributionDetailMap">
+		<result column="ass_card_no" property="ass_card_no"/>
+		<result column="ass_code" property="ass_code"/>
+		<result column="ass_name" property="ass_name"/>
+		<result column="ass_type_name" property="ass_type_name"/>
+		<result column="ass_spec" property="ass_spec"/>
+		<result column="ass_mondl" property="ass_mondl"/>
+		<result column="ass_brand" property="ass_brand"/>
+		<result column="fac_name" property="fac_name"/>
+		<result column="unit_name" property="unit_name"/>
+		<result column="price" property="price"/>
+		<result column="depre_money" property="depre_money"/>
+		<result column="cur_money" property="cur_money"/>
+		<result column="ass_amount" property="ass_amount"/>
+		<result column="in_date" property="in_date"/>
+		<result column="run_date" property="run_date"/>
+		<result column="is_dept" property="is_dept"/>
+		<result column="dept_name" property="dept_name"/>
+		<result column="store_name" property="store_name"/>
+		<result column="bus_type_name" property="bus_type_name"/>
+		<result column="ass_seq_no" property="ass_seq_no"/>
+		<result column="location" property="location"/>
+		<result column="state_name" property="state_name"/>
+		<result column="bar_code" property="bar_code"/>
+		<result column="gb_name" property="gb_name"/>
+		<result column="ass_ori_card_no" property="ass_ori_card_no"/>
+		<result column="ven_name" property="ven_name"/>
+		<result column="file_number" property="file_number"/>
+	</resultMap>
+	
+	<select id="queryAssDistributionDetail" parameterType="java.util.Map" resultMap="assDistributionDetailMap">
+		select * from (
+		select card.ass_card_no,
+		       ass.ass_code,
+		       ass.ass_name,
+		       typed.ass_type_name,
+		       card.ass_spec,
+		       card.ass_mondl,
+		       card.ass_brand,
+		       fac.fac_name,
+		       unit.unit_name,
+		       card.price,
+		       card.depre_money,
+		       card.cur_money,
+		       card.ass_amount,
+		       card.in_date,
+		       card.run_date,
+		       case when card.is_dept = 1 then '在用' else '在库' end is_dept,
+		       deptd.dept_name,
+		       sto.store_name,
+		       bus.bus_type_name,
+		       card.ass_seq_no,
+		       card.location,
+		       state.state_name,
+		       card.bar_code,
+		       gb.gb_name,
+		       card.ASS_ORI_CARD_NO,
+		       hsd.sup_name ven_name,
+		       card.file_number
+		       
+		  from v_ass_card card
+		
+		  left join ass_no_dict ass
+		    on card.ass_id = ass.ass_id
+		   and card.ass_no = ass.ass_no
+		   and card.group_id = ass.group_id
+		   and card.hos_id = ass.hos_id
+		   and card.copy_code = ass.copy_code
+		   
+		  left join ass_type_dict typed
+		    on ass.ass_type_id = typed.ass_type_id
+		   and ass.group_id = typed.group_id
+		   and ass.hos_id = typed.hos_id
+		   and ass.copy_code = typed.copy_code
+		   
+		 left join hos_sup_dict hsd on
+		 card.ven_id = hsd.sup_id
+		   and card.group_id = hsd.group_id
+		   and card.hos_id = hsd.hos_id
+		   and hsd.is_stop = 0
+		   
+		
+		  left join hos_fac_dict fac
+		    on card.fac_id = fac.fac_id
+		   and card.group_id = fac.group_id
+		   and card.hos_id = fac.hos_id
+		   and fac.is_stop = 0
+		
+		  left join hos_unit unit
+		    on card.unit_code = unit.unit_code
+		   and card.group_id = unit.group_id
+		   and card.hos_id = unit.hos_id
+		   
+		  left join hos_dept_dict deptd
+		    on card.dept_id = deptd.dept_id
+		   and card.group_id = deptd.group_id
+		   and card.hos_id = deptd.hos_id
+		   and deptd.is_stop = 0
+		  
+		  left join hos_store_dict sto
+		    on card.store_id = sto.store_id
+		   and card.store_no = sto.store_no
+		   and card.group_id = sto.group_id
+		   and card.hos_id = sto.hos_id
+		  
+		  left join ass_bus_type_dict bus
+		    on card.buy_type = bus.bus_type_code
+		   and card.group_id = bus.group_id
+		   and card.hos_id = bus.hos_id
+		   and card.copy_code = bus.copy_code
+		   
+		  left join ass_card_use_state state
+		    on card.use_state = state.state_code
+		    
+		     left join ass_gb_dict gb
+        on card.gb_code = gb.gb_code
+		 
+		 where  
+		       card.group_id = #{group_id}
+		   and card.hos_id = #{hos_id}
+		   and card.copy_code = #{copy_code}
+		   and card.use_state != 6
+		   and card.use_state != 7
+		   <if test="price_beg != null and price_beg != ''">
+		   	and card.price &gt;= #{price_beg}
+		   </if>
+		   <if test="price_end != null and price_end != ''">
+		   	and card.price &lt;= #{price_end}
+		   </if>
+		   <if test="ass_card_no != null and ass_card_no != ''">
+		   	and card.ass_card_no = #{ass_card_no}
+		   </if>
+		   <if test="ass_type_id != null and ass_type_id != ''">
+		   	and typed.ass_type_id = #{ass_type_id}
+		   </if>
+		   <if test="ass_name != null and ass_name != ''">
+		   	and (ass.ass_code like '%${ass_name}%' or ass.ass_name like '%${ass_name}%' or ass.spell_code like upper('%${ass_name}%') or
+				ass.wbx_code like upper('%${ass_name}%'))
+		   </if>
+		   <if test="use_dept_id != null and use_dept_id != ''">
+		   	and card.dept_id = #{use_dept_id}
+		   </if>
+		   <if test="store_id != null and store_id != ''">
+		   	and card.store_id = #{store_id}
+		   </if>
+		   <if test="use_state != null and use_state != ''">
+		   	and card.use_state = #{use_state}
+		   </if>
+		   <if test="is_measure != null and is_measure != ''">
+		   	and card.is_measure = #{is_measure}
+		   </if>
+		   <if test="is_dept != null and is_dept != ''">
+		   	and card.is_dept = #{is_dept}
+		   </if>
+		   <if test="ass_naturs != null and ass_naturs != ''">
+		   	and card.ass_naturs = #{ass_naturs}
+		   </if>
+		   <if test="in_date_beg != null and in_date_beg != ''">
+		   	and card.in_date &gt;= to_date(#{in_date_beg},'YYYYMMDD')
+		   </if>
+		   <if test="in_date_end != null and in_date_end != ''">
+		   	and card.in_date &lt;= to_date(#{in_date_end},'YYYYMMDD')
+		   </if>
+		   <if test="run_date_beg != null and run_date_beg != ''">
+		   	and card.run_date &gt;= to_date(#{run_date_beg},'YYYYMMDD')
+		   </if>
+		   <if test="run_date_end != null and run_date_end != ''">
+		    and card.run_date &lt;= to_date(#{run_date_end},'YYYYMMDD')
+		   </if>
+		   <if test="bar_code != null and bar_code != ''">
+		    and (
+				card.bar_code = #{bar_code} or
+				card.ASS_CARD_NO = #{bar_code} or
+                card.ASS_ORI_CARD_NO = #{bar_code}
+				)
+		   </if>
+		   union all
+		   
+		   select '合计' ass_card_no,
+		       null ass_code,
+		       null ass_name,
+		       null ass_type_name,
+		       null ass_spec,
+		       null ass_mondl,
+		       null ass_brand,
+		       null fac_name,
+		       null unit_name,
+		       sum(card.price) price,
+		       sum(card.depre_money) depre_money,
+		       sum(card.cur_money) cur_money,
+		       sum(card.ass_amount) ass_amount,
+		       null in_date,
+		       null run_date,
+		       null is_dept,
+		       null dept_name,
+		       null store_name,
+		       null bus_type_name,
+		       null ass_seq_no,
+		       null location,
+		       null state_name,
+		       null bar_code,
+		       null gb_name,
+		       null ASS_ORI_CARD_NO,
+		       null ven_name,
+		       null file_number
+		  from v_ass_card card
+		
+		  left join ass_no_dict ass
+		    on card.ass_id = ass.ass_id
+		   and card.ass_no = ass.ass_no
+		   and card.group_id = ass.group_id
+		   and card.hos_id = ass.hos_id
+		   and card.copy_code = ass.copy_code
+		   
+		  left join ass_type_dict typed
+		    on ass.ass_type_id = typed.ass_type_id
+		   and card.group_id = typed.group_id
+		   and card.hos_id = typed.hos_id
+		   and card.copy_code = typed.copy_code
+		 
+		 where 
+		       card.group_id = #{group_id}
+		   and card.hos_id = #{hos_id}
+		   and card.copy_code = #{copy_code}
+		   and card.use_state != 6
+		   and card.use_state != 7
+		   <if test="price_beg != null and price_beg != ''">
+		   	and card.price &gt;= #{price_beg}
+		   </if>
+		   <if test="price_end != null and price_end != ''">
+		   	and card.price &lt;= #{price_end}
+		   </if>
+		   <if test="ass_card_no != null and ass_card_no != ''">
+		   	and card.ass_card_no = #{ass_card_no}
+		   </if>
+		   <if test="ass_type_id != null and ass_type_id != ''">
+		   	and typed.ass_type_id = #{ass_type_id}
+		   </if>
+		   <if test="ass_name != null and ass_name != ''">
+		   	and (ass.ass_code like '%${ass_name}%' or ass.ass_name like '%${ass_name}%' or ass.spell_code like upper('%${ass_name}%') or
+				ass.wbx_code like upper('%${ass_name}%'))
+		   </if>
+		   <if test="use_dept_id != null and use_dept_id != ''">
+		   	and card.dept_id = #{use_dept_id}
+		   </if>
+		   <if test="store_id != null and store_id != ''">
+		   	and card.store_id = #{store_id}
+		   </if>
+		   <if test="use_state != null and use_state != ''">
+		   	and card.use_state = #{use_state}
+		   </if>
+		   <if test="is_measure != null and is_measure != ''">
+		   	and card.is_measure = #{is_measure}
+		   </if>
+		   <if test="is_dept != null and is_dept != ''">
+		   	and card.is_dept = #{is_dept}
+		   </if>
+		   <if test="ass_naturs != null and ass_naturs != ''">
+		   	and card.ass_naturs = #{ass_naturs}
+		   </if>
+		   <if test="in_date_beg != null and in_date_beg != ''">
+		   	and card.in_date &gt;= to_date(#{in_date_beg},'YYYYMMDD')
+		   </if>
+		   <if test="in_date_end != null and in_date_end != ''">
+		   	and card.in_date &lt;= to_date(#{in_date_end},'YYYYMMDD')
+		   </if>
+		   <if test="run_date_beg != null and run_date_beg != ''">
+		   	and card.run_date &gt;= to_date(#{run_date_beg},'YYYYMMDD')
+		   </if>
+		   <if test="run_date_end != null and run_date_end != ''">
+		    and card.run_date &lt;= to_date(#{run_date_end},'YYYYMMDD')
+		   </if>
+		   <if test="bar_code != null and bar_code != ''">
+		    and (
+				card.bar_code = #{bar_code} or
+				card.ASS_CARD_NO = #{bar_code} or
+                card.ASS_ORI_CARD_NO = #{bar_code}
+				)
+		   </if>
+		 ) t
+		 order by t.ass_card_no
+	</select>
+
+
+	<select id="queryAssbuttonPrint" parameterType="java.util.Map"
+		resultMap="assDistributionMap">
+	select * from (
+		select t.ass_code,
+		       t.ass_name,
+		       card.ass_spec,
+		       card.ass_mondl,
+		       card.ass_brand,
+		       unit.unit_name,
+		       to_char(card.price,'FM999,999,990.00') price,
+		       sum(card.ass_amount) ass_amount,
+		      to_char(sum(card.price),'FM999,999,990.00') total_price,
+		       deptd.dept_name,
+		       gb.gb_name,
+		       fina.fina_type_name
+		   from v_ass_card card
+      
+      left join ass_no_dict t
+        on card.ass_id =  t.ass_id
+       and card.group_id =  t.group_id
+       and card.hos_id =  t.hos_id
+       and card.copy_code =  t.copy_code
+       and t.is_stop = 0
+       
+      left join hos_unit unit
+        on card.unit_code = unit.unit_code
+       and card.group_id = unit.group_id
+       and card.hos_id = unit.hos_id
+       
+      left join ass_gb_dict gb
+        on card.gb_code = gb.gb_code
+        
+      left join ass_type_dict typed
+        on t.ass_type_id = typed.ass_type_id
+       and t.group_id = typed.group_id
+       and t.hos_id = typed.hos_id
+       and t.copy_code = typed.copy_code
+       
+      left join ass_fina_dict fina
+        on typed.acc_type_code = fina.fina_type_code
+       and t.group_id = fina.group_id
+       and t.hos_id = fina.hos_id
+       and t.copy_code = fina.copy_code
+       
+       
+      left join hos_dept_dict deptd
+        on card.dept_id = deptd.dept_id
+       and card.dept_no = deptd.dept_no
+       and card.group_id = deptd.group_id
+       and card.hos_id = deptd.hos_id
+		   
+		 where 
+		 	   t.group_id = #{group_id}
+		   and t.hos_id = #{hos_id}
+		   and t.copy_code = #{copy_code}
+		   and card.use_state != 6
+		   and card.use_state != 7
+		   <if test="price_beg != null and price_beg != ''">
+		   	and card.price &gt;= #{price_beg}
+		   </if>
+		   <if test="price_end != null and price_end != ''">
+		   	and card.price &lt;= #{price_end}
+		   </if>
+		   <if test="ass_type_id != null and ass_type_id != ''">
+		   	and typed.ass_type_id = #{ass_type_id}
+		   </if>
+		   <if test="ass_name != null and ass_name != ''">
+		   	and (t.ass_code like '%${ass_name}%' or t.ass_name like '%${ass_name}%' or t.spell_code like upper('%${ass_name}%') or
+				t.wbx_code like like upper('%${ass_name}%'))
+		   </if>
+		   <if test="use_dept_id != null and use_dept_id != ''">
+		   	and card.dept_id = #{use_dept_id}
+		   </if>
+		   <if test="store_id != null and store_id != ''">
+		   	and card.store_id = #{store_id}
+		   </if>
+		   <if test="use_state != null and use_state != ''">
+		   	and card.use_state = #{use_state}
+		   </if>
+		   <if test="is_measure != null and is_measure != ''">
+		   	and card.is_measure = #{is_measure}
+		   </if>
+		   <if test="is_dept != null and is_dept != ''">
+		   	and card.is_dept = #{is_dept}
+		   </if>
+		   <if test="ass_naturs != null and ass_naturs != ''">
+		   	and card.ass_naturs = #{ass_naturs}
+		   </if>
+		   <if test="in_date_beg != null and in_date_beg != ''">
+		   	and card.in_date &gt;= to_date(#{in_date_beg},'YYYYMMDD')
+		   </if>
+		   <if test="in_date_end != null and in_date_end != ''">
+		   	and card.in_date &lt;= to_date(#{in_date_end},'YYYYMMDD')
+		   </if>
+		   <if test="run_date_beg != null and run_date_beg != ''">
+		   	and card.run_date &gt;= to_date(#{run_date_beg},'YYYYMMDD')
+		   </if>
+		   <if test="run_date_end != null and run_date_end != ''">
+		    and card.run_date &lt;= to_date(#{run_date_end},'YYYYMMDD')
+		   </if>
+		   <if test="bar_code != null and bar_code != ''">
+		    and (
+				card.bar_code = #{bar_code} or
+				card.ASS_CARD_NO = #{bar_code} or
+                card.ASS_ORI_CARD_NO = #{bar_code}
+				)
+		   </if>
+		 group by t.ass_code,
+		          t.ass_name,
+		          card.ass_spec,
+		          card.ass_mondl,
+		          card.ass_brand,
+		          unit.unit_name,
+		          card.price,
+		          card.ass_amount,
+		          deptd.dept_name,
+		          gb.gb_name,
+		          fina.fina_type_name
+		          
+		 union all
+		 
+		 select '合计' ass_code,
+		       null ass_name,
+		       null ass_spec,
+		       null ass_mondl,
+		       null ass_brand,
+		       null unit_name,
+		       to_char(sum(card.price),'FM999,999,990.00')  price,
+		       sum(card.ass_amount) ass_amount,
+		       to_char(sum(card.price),'FM999,999,990.00') total_price,
+		       null dept_name,
+		       null gb_name,
+		       null fina_type_name
+		  from v_ass_card card
+		
+		 left join ass_no_dict t
+        on card.ass_id =  t.ass_id
+       and card.group_id =  t.group_id
+       and card.hos_id =  t.hos_id
+       and card.copy_code =  t.copy_code
+       and t.is_stop = 0
+       
+      left join hos_unit unit
+        on card.unit_code = unit.unit_code
+       and card.group_id = unit.group_id
+       and card.hos_id = unit.hos_id
+       
+      left join ass_gb_dict gb
+        on card.gb_code = gb.gb_code
+        
+      left join ass_type_dict typed
+        on t.ass_type_id = typed.ass_type_id
+       and t.group_id = typed.group_id
+       and t.hos_id = typed.hos_id
+       and t.copy_code = typed.copy_code
+       
+      left join ass_fina_dict fina
+        on typed.acc_type_code = fina.fina_type_code
+       and t.group_id = fina.group_id
+       and t.hos_id = fina.hos_id
+       and t.copy_code = fina.copy_code
+       
+       
+      left join hos_dept_dict deptd
+        on card.dept_id = deptd.dept_id
+       and card.dept_no = deptd.dept_no
+       and card.group_id = deptd.group_id
+       and card.hos_id = deptd.hos_id
+		   
+		 where 
+		 	   t.group_id = #{group_id}
+		   and t.hos_id = #{hos_id}
+		   and t.copy_code = #{copy_code}
+		   and card.use_state != 6
+		   and card.use_state != 7
+		   <if test="price_beg != null and price_beg != ''">
+		   	and card.price &gt;= #{price_beg}
+		   </if>
+		   <if test="price_end != null and price_end != ''">
+		   	and card.price &lt;= #{price_end}
+		   </if>
+		   <if test="ass_type_id != null and ass_type_id != ''">
+		   	and typed.ass_type_id = #{ass_type_id}
+		   </if>
+		   <if test="ass_name != null and ass_name != ''">
+		   	and (t.ass_code like '%${ass_name}%' or t.ass_name like '%${ass_name}%' or t.spell_code like upper('%${ass_name}%') or
+				t.wbx_code like like upper('%${ass_name}%'))
+		   </if>
+		   <if test="use_dept_id != null and use_dept_id != ''">
+		   	and card.dept_id = #{use_dept_id}
+		   </if>
+		   <if test="store_id != null and store_id != ''">
+		   	and card.store_id = #{store_id}
+		   </if>
+		   <if test="use_state != null and use_state != ''">
+		   	and card.use_state = #{use_state}
+		   </if>
+		   <if test="is_measure != null and is_measure != ''">
+		   	and card.is_measure = #{is_measure}
+		   </if>
+		   <if test="is_dept != null and is_dept != ''">
+		   	and card.is_dept = #{is_dept}
+		   </if>
+		   <if test="ass_naturs != null and ass_naturs != ''">
+		   	and card.ass_naturs = #{ass_naturs}
+		   </if>
+		   <if test="in_date_beg != null and in_date_beg != ''">
+		   	and card.in_date &gt;= to_date(#{in_date_beg},'YYYYMMDD')
+		   </if>
+		   <if test="in_date_end != null and in_date_end != ''">
+		   	and card.in_date &lt;= to_date(#{in_date_end},'YYYYMMDD')
+		   </if>
+		   <if test="run_date_beg != null and run_date_beg != ''">
+		   	and card.run_date &gt;= to_date(#{run_date_beg},'YYYYMMDD')
+		   </if>
+		   <if test="run_date_end != null and run_date_end != ''">
+		    and card.run_date &lt;= to_date(#{run_date_end},'YYYYMMDD')
+		   </if>
+		   <if test="bar_code != null and bar_code != ''">
+		    and (
+				card.bar_code = #{bar_code} or
+				card.ASS_CARD_NO = #{bar_code} or
+                card.ASS_ORI_CARD_NO = #{bar_code}
+				)
+		   </if>
+		 ) t  
+		 order by t.ass_code
+	
+	
+	</select>
+	
+	<select id="queryAssbuttonsPrint" parameterType="java.util.Map" resultMap="assDistributionDetailMap">
+	select * from (
+		select card.ass_card_no,
+		       ass.ass_code,
+		       ass.ass_name,
+		       typed.ass_type_name,
+		       card.ass_spec,
+		       card.ass_mondl,
+		       card.ass_brand,
+		       fac.fac_name,
+		       unit.unit_name,
+		        to_char(card.price,'FM999,999,990.00') price,
+		       to_char(card.depre_money,'FM999,999,990.00') depre_money,
+		       to_char(card.cur_money,'FM999,999,990.00') cur_money,
+		       card.ass_amount,
+		       to_char(card.in_date,'YYYY-MM-DD') in_date,
+		       to_char(card.run_date,'YYYY-MM-DD') run_date,
+		       case when card.is_dept = 1 then '在用' else '在库' end is_dept,
+		       deptd.dept_name,
+		       sto.store_name,
+		       bus.bus_type_name,
+		       card.ass_seq_no,
+		       card.location,
+		       state.state_name,
+		       card.bar_code,
+		       gb.gb_name,
+		       card.ASS_ORI_CARD_NO,
+		       hsd.sup_name ven_name,
+		       card.file_number
+		  from v_ass_card card
+		
+		  left join ass_no_dict ass
+		    on card.ass_id = ass.ass_id
+		   and card.ass_no = ass.ass_no
+		   and card.group_id = ass.group_id
+		   and card.hos_id = ass.hos_id
+		   and card.copy_code = ass.copy_code
+		   
+		  left join ass_type_dict typed
+		    on ass.ass_type_id = typed.ass_type_id
+		   and card.group_id = typed.group_id
+		   and card.hos_id = typed.hos_id
+		   and card.copy_code = typed.copy_code
+		
+		  left join hos_fac_dict fac
+		    on card.fac_id = fac.fac_id
+		   and card.fac_no = fac.fac_no
+		   and card.group_id = fac.group_id
+		   and card.hos_id = fac.hos_id
+		   
+		 left join hos_sup_dict hsd on
+		 card.ven_id = hsd.sup_id
+		   and card.group_id = hsd.group_id
+		   and card.hos_id = hsd.hos_id
+		   and hsd.is_stop = 0 
+		   
+		
+		  left join hos_unit unit
+		    on card.unit_code = unit.unit_code
+		   and card.group_id = unit.group_id
+		   and card.hos_id = unit.hos_id
+		   
+		  left join hos_dept_dict deptd
+		    on card.dept_id = deptd.dept_id
+		   and card.group_id = deptd.group_id
+		   and card.hos_id = deptd.hos_id
+		   and deptd.is_stop = 0
+		  
+		  left join hos_store_dict sto
+		    on card.store_id = sto.store_id
+		   and card.store_no = sto.store_no
+		   and card.group_id = sto.group_id
+		   and card.hos_id = sto.hos_id
+		  
+		  left join ass_bus_type_dict bus
+		    on card.buy_type = bus.bus_type_code
+		   and card.group_id = bus.group_id
+		   and card.hos_id = bus.hos_id
+		   and card.copy_code = bus.copy_code
+		   
+		  left join ass_card_use_state state
+		    on card.use_state = state.state_code
+		    
+		    left join ass_gb_dict gb
+        on card.gb_code = gb.gb_code
+		 
+		 where 
+		       card.group_id = #{group_id}
+		   and card.hos_id = #{hos_id}
+		   and card.copy_code = #{copy_code}
+		   and card.use_state != 6
+		   and card.use_state != 7
+		   <if test="price_beg != null and price_beg != ''">
+		   	and card.price &gt;= #{price_beg}
+		   </if>
+		   <if test="price_end != null and price_end != ''">
+		   	and card.price &lt;= #{price_end}
+		   </if>
+		   <if test="ass_card_no != null and ass_card_no != ''">
+		   	and card.ass_card_no = #{ass_card_no}
+		   </if>
+		   <if test="ass_type_id != null and ass_type_id != ''">
+		   	and typed.ass_type_id = #{ass_type_id}
+		   </if>
+		   <if test="ass_name != null and ass_name != ''">
+		   	and (ass.ass_code like '%${ass_name}%' or ass.ass_name like '%${ass_name}%' or ass.spell_code like upper('%${ass_name}%') or
+				ass.wbx_code like upper('%${ass_name}%'))
+		   </if>
+		   <if test="use_dept_id != null and use_dept_id != ''">
+		   	and card.dept_id = #{use_dept_id}
+		   </if>
+		   <if test="store_id != null and store_id != ''">
+		   	and card.store_id = #{store_id}
+		   </if>
+		   <if test="use_state != null and use_state != ''">
+		   	and card.use_state = #{use_state}
+		   </if>
+		   <if test="is_measure != null and is_measure != ''">
+		   	and card.is_measure = #{is_measure}
+		   </if>
+		   <if test="is_dept != null and is_dept != ''">
+		   	and card.is_dept = #{is_dept}
+		   </if>
+		   <if test="ass_naturs != null and ass_naturs != ''">
+		   	and card.ass_naturs = #{ass_naturs}
+		   </if>
+		   <if test="in_date_beg != null and in_date_beg != ''">
+		   	and card.in_date &gt;= to_date(#{in_date_beg},'YYYYMMDD')
+		   </if>
+		   <if test="in_date_end != null and in_date_end != ''">
+		   	and card.in_date &lt;= to_date(#{in_date_end},'YYYYMMDD')
+		   </if>
+		   <if test="run_date_beg != null and run_date_beg != ''">
+		   	and card.run_date &gt;= to_date(#{run_date_beg},'YYYYMMDD')
+		   </if>
+		   <if test="run_date_end != null and run_date_end != ''">
+		    and card.run_date &lt;= to_date(#{run_date_end},'YYYYMMDD')
+		   </if>
+		   <if test="bar_code != null and bar_code != ''">
+		    and (
+				card.bar_code = #{bar_code} or
+				card.ASS_CARD_NO = #{bar_code} or
+                card.ASS_ORI_CARD_NO = #{bar_code}
+				)
+		   </if>
+		   union all
+		   
+		   select '合计' ass_card_no,
+		       null ass_code,
+		       null ass_name,
+		       null ass_type_name,
+		       null ass_spec,
+		       null ass_mondl,
+		       null ass_brand,
+		       null fac_name,
+		       null unit_name,
+		       to_char(sum(card.price),'FM999,999,990.00') price,
+		       to_char(sum(card.depre_money),'FM999,999,990.00') depre_money,
+		       to_char(sum(card.cur_money),'FM999,999,990.00') cur_money,
+		       sum(card.ass_amount) ass_amount,
+		       null in_date,
+		       null run_date,
+		       null is_dept,
+		       null dept_name,
+		       null store_name,
+		       null bus_type_name,
+		       null ass_seq_no,
+		       null location,
+		       null state_name,
+		       null bar_code,
+		       null gb_name,
+		       null as ASS_ORI_CARD_NO,
+		       null ven_name,
+		       null file_number
+		  from v_ass_card card
+		
+		  left join ass_no_dict ass
+		    on card.ass_id = ass.ass_id
+		   and card.ass_no = ass.ass_no
+		   and card.group_id = ass.group_id
+		   and card.hos_id = ass.hos_id
+		   and card.copy_code = ass.copy_code
+		   
+		  left join ass_type_dict typed
+		    on ass.ass_type_id = typed.ass_type_id
+		   and card.group_id = typed.group_id
+		   and card.hos_id = typed.hos_id
+		   and card.copy_code = typed.copy_code
+		
+		 
+		 where 
+		       card.group_id = #{group_id}
+		   and card.hos_id = #{hos_id}
+		   and card.copy_code = #{copy_code}
+		   and card.use_state != 6
+		   and card.use_state != 7
+		   <if test="price_beg != null and price_beg != ''">
+		   	and card.price &gt;= #{price_beg}
+		   </if>
+		   <if test="price_end != null and price_end != ''">
+		   	and card.price &lt;= #{price_end}
+		   </if>
+		   <if test="ass_card_no != null and ass_card_no != ''">
+		   	and card.ass_card_no = #{ass_card_no}
+		   </if>
+		   <if test="ass_type_id != null and ass_type_id != ''">
+		   	and typed.ass_type_id = #{ass_type_id}
+		   </if>
+		   <if test="ass_name != null and ass_name != ''">
+		   	and (ass.ass_code like '%${ass_name}%' or ass.ass_name like '%${ass_name}%' or ass.spell_code like upper('%${ass_name}%') or
+				ass.wbx_code like upper('%${ass_name}%'))
+		   </if>
+		   <if test="use_dept_id != null and use_dept_id != ''">
+		   	and card.dept_id = #{use_dept_id}
+		   </if>
+		   <if test="store_id != null and store_id != ''">
+		   	and card.store_id = #{store_id}
+		   </if>
+		   <if test="use_state != null and use_state != ''">
+		   	and card.use_state = #{use_state}
+		   </if>
+		   <if test="is_measure != null and is_measure != ''">
+		   	and card.is_measure = #{is_measure}
+		   </if>
+		   <if test="is_dept != null and is_dept != ''">
+		   	and card.is_dept = #{is_dept}
+		   </if>
+		   <if test="ass_naturs != null and ass_naturs != ''">
+		   	and card.ass_naturs = #{ass_naturs}
+		   </if>
+		   <if test="in_date_beg != null and in_date_beg != ''">
+		   	and card.in_date &gt;= to_date(#{in_date_beg},'YYYYMMDD')
+		   </if>
+		   <if test="in_date_end != null and in_date_end != ''">
+		   	and card.in_date &lt;= to_date(#{in_date_end},'YYYYMMDD')
+		   </if>
+		   <if test="run_date_beg != null and run_date_beg != ''">
+		   	and card.run_date &gt;= to_date(#{run_date_beg},'YYYYMMDD')
+		   </if>
+		   <if test="run_date_end != null and run_date_end != ''">
+		    and card.run_date &lt;= to_date(#{run_date_end},'YYYYMMDD')
+		   </if>
+		   <if test="bar_code != null and bar_code != ''">
+		    and (
+				card.bar_code = #{bar_code} or
+				card.ASS_CARD_NO = #{bar_code} or
+                card.ASS_ORI_CARD_NO = #{bar_code}
+				)
+		   </if>
+		 ) t
+		 order by t.ass_card_no
+	
+	
+	
+	</select>
+</mapper>
+

@@ -1,0 +1,404 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.cost.dao.director.CostItemAnalysisMapper">
+
+		<select id="queryCostProjectTrend" parameterType="java.util.Map" resultType="java.util.Map">
+						   				with temp as (
+					 select 
+						 cidn.cost_item_id,
+						 cidn.cost_item_code,
+						 cidn.cost_item_name
+					 from cost_item_dict_no cidn
+					 where cidn.group_id = #{group_id}
+					 and cidn.hos_id = #{hos_id}
+					 and cidn.copy_code = #{copy_code}
+					 and cidn.is_stop = 0
+					 order by cidn.cost_item_code
+			),cost as(
+			 select 
+			   cdc.acc_year||cdc.acc_month year_month,
+			   cidn.cost_item_code,
+				 cidn.cost_item_name,
+				 sum(dir_amount + 
+				 dir_ass_amount + 
+				 dir_med_amount + 
+				 indir_med_ass_amount + 
+				 dir_man_amount + 
+				 indir_ass_man_amount + 
+				 indir_med_man_amount + 
+				 indir_ass_med_man_amount) all_amount
+			 from cost_dept_cost cdc
+			 left join cost_item_dict_no cidn
+			 on cdc.group_id = cidn.group_id
+			 and cdc.hos_id = cidn.hos_id
+			 and cdc.copy_code = cidn.copy_code
+			 and cdc.cost_item_id = cidn.cost_item_id
+			 and cidn.is_stop=0
+			 left join hos_dept_dict hdd
+			 on hdd.group_id = cdc.group_id
+			 and hdd.hos_id = cdc.hos_id
+			 and hdd.dept_id = cdc.dept_id
+			 and hdd.is_stop=0
+			 where cdc.group_id = #{group_id}
+			 and cdc.hos_id = #{hos_id}
+			 and cdc.copy_code = #{copy_code}
+			 
+			 and to_char(cdc.dept_id) in (
+				                select b.perm_code
+				                from v_user_data_perm b
+				                where b.group_id = #{group_id}
+					            and b.hos_id = #{hos_id}
+					            and b.user_id = #{user_id}
+					            and b.table_code = 'HOS_DEPT_DICT'
+					            and (b.is_write = 1
+						        or b.is_read = 1)
+			                    )
+			 
+			 and cdc.acc_year || cdc.acc_month between  #{year_month_begin} and  #{year_month_end}
+		     <if test="dept_code != null and dept_code != ''">
+                 and hdd.dept_code like #{dept_code}||'%'
+             </if>
+			 group by  cdc.acc_year||cdc.acc_month,cidn.cost_item_code,cidn.cost_item_name
+			)select 
+			 	  t.cost_item_code
+				 ,t.cost_item_name
+				 ${selectHead}
+			 from temp  t
+			 left join cost t1
+			 on t1.cost_item_code like t.cost_item_code||'%'
+			 group by t.cost_item_code,t.cost_item_name
+			 union all
+			 select 
+			    ''
+			  ,'合计'
+			  ${selectHead}
+			 from cost
+			 order by cost_item_code
+		</select>
+		
+		<select id="queryCostProjectTrendPrint" parameterType="java.util.Map" resultType="java.util.Map">
+						   				with temp as (
+					 select 
+						 cidn.cost_item_id,
+						 cidn.cost_item_no,
+						 cidn.cost_item_code,
+						 cidn.cost_item_name
+					 from cost_item_dict_no cidn
+					 where cidn.group_id = #{group_id}
+					 and cidn.hos_id = #{hos_id}
+					 and cidn.copy_code = #{copy_code}
+					 and cidn.is_stop = 0
+					 order by cidn.cost_item_code
+			),cost as(
+			 select 
+			   cdc.acc_year||cdc.acc_month year_month,
+			   cidn.cost_item_code,
+				 cidn.cost_item_name,
+				 sum(dir_amount + 
+				 dir_ass_amount + 
+				 dir_med_amount + 
+				 indir_med_ass_amount + 
+				 dir_man_amount + 
+				 indir_ass_man_amount + 
+				 indir_med_man_amount + 
+				 indir_ass_med_man_amount) all_amount
+			 from cost_dept_cost cdc
+			 left join cost_item_dict_no cidn
+			 on cdc.group_id = cidn.group_id
+			 and cdc.hos_id = cidn.hos_id
+			 and cdc.copy_code = cidn.copy_code
+			 and cdc.cost_item_id = cidn.cost_item_id
+			 and cdc.cost_item_no = cidn.cost_item_no
+			 left join hos_dept_dict hdd
+			 on hdd.group_id = cdc.group_id
+			 and hdd.hos_id = cdc.hos_id
+			 and hdd.dept_id = cdc.dept_id
+			 and hdd.dept_no = cdc.dept_no
+			 where cdc.group_id = #{group_id}
+			 and cdc.hos_id = #{hos_id}
+			 and cdc.copy_code = #{copy_code}
+			 
+			 and to_char(cdc.dept_id) in (
+				                select b.perm_code
+				                from v_user_data_perm b
+				                where b.group_id = #{group_id}
+					            and b.hos_id = #{hos_id}
+					            and b.user_id = #{user_id}
+					            and b.table_code = 'HOS_DEPT_DICT'
+					            and (b.is_write = 1
+						        or b.is_read = 1)
+			                    )
+			 
+			 and cdc.acc_year || cdc.acc_month between  #{year_month_begin} and  #{year_month_end}
+		     <if test="dept_code != null and dept_code != ''">
+                 and hdd.dept_code like #{dept_code}||'%'
+             </if>
+			 group by  cdc.acc_year||cdc.acc_month,cidn.cost_item_code,cidn.cost_item_name
+			)select 
+			 	  t.cost_item_code
+				 ,t.cost_item_name
+				 ${selectHead}
+			 from temp  t
+			 left join cost t1
+			 on t1.cost_item_code like t.cost_item_code||'%'
+			 group by t.cost_item_code,t.cost_item_name
+			 union all
+			 select 
+			    ''
+			  ,'合计'
+			  ${selectHead}
+			 from cost
+			 order by cost_item_code
+		</select>
+		
+	    <select id="queryCostProjectTrendEcharts" parameterType="java.util.Map" resultType="java.util.Map">
+	              with temp as (
+							 select 
+								 cidn.cost_item_id,
+								 cidn.cost_item_code,
+								 cidn.cost_item_name
+							 from cost_item_dict_no cidn
+							 where cidn.group_id = #{group_id}
+							 and cidn.hos_id = #{hos_id}
+							 and cidn.copy_code = #{copy_code}
+							 and cidn.is_stop = 0
+							 order by cidn.cost_item_code
+					),cost as(
+					 select 
+					   cdc.acc_year||cdc.acc_month year_month,
+					     cidn.cost_item_code,
+						 cidn.cost_item_name,
+						 sum(dir_amount + 
+						 dir_ass_amount + 
+						 dir_med_amount + 
+						 indir_med_ass_amount + 
+						 dir_man_amount + 
+						 indir_ass_man_amount + 
+						 indir_med_man_amount + 
+						 indir_ass_med_man_amount) all_amount
+					 from cost_dept_cost cdc
+					 left join cost_item_dict_no cidn
+					 on cdc.group_id = cidn.group_id
+					 and cdc.hos_id = cidn.hos_id
+					 and cdc.copy_code = cidn.copy_code
+					 and cdc.cost_item_id = cidn.cost_item_id
+					 and cidn.is_stop=0
+					 left join hos_dept_dict hdd
+					 on hdd.group_id = cdc.group_id
+					 and hdd.hos_id = cdc.hos_id
+					 and hdd.dept_id = cdc.dept_id
+					 and hdd.is_stop=0
+					 where cdc.group_id = #{group_id}
+					 and cdc.hos_id = #{hos_id}
+					 and cdc.copy_code = #{copy_code}
+					 and cdc.acc_year || cdc.acc_month between #{year_month_begin} and #{year_month_end}
+					 <if test="dept_code != null and dept_code != ''">
+		                 and hdd.dept_code like #{dept_code}||'%'
+		             </if>
+					 group by  cdc.acc_year||cdc.acc_month,cidn.cost_item_code,cidn.cost_item_name
+					),t as (
+					   select 
+					 	 t.cost_item_code,
+						 t.cost_item_name,
+						 year_month,
+					   sum(all_amount) all_amount
+					 from temp  t
+					 left join cost t1
+					 on t1.cost_item_code like t.cost_item_code||'%'
+					 <if test="cost_item_code_str != null and cost_item_code_str != ''">
+				         and t.cost_item_code in ${cost_item_code_str}
+				     </if>
+					 group by t.cost_item_code,t.cost_item_name,year_month
+					)select 
+					     cost_item_code,
+						 cost_item_name,
+						 year_month,
+						 sum(all_amount) all_amount
+					 from t
+					group by grouping sets ((cost_item_code,cost_item_name,year_month), cost_item_code)
+					order by cost_item_code,cost_item_name,year_month
+					 
+	    </select>
+	   
+	    <select id="queryCostProjectCompare" parameterType="java.util.Map" resultType="java.util.Map">
+	         		with temp as
+				 (select cidn.cost_item_id,
+								 cidn.cost_item_code,
+								 cidn.cost_item_name
+						from cost_item_dict_no cidn
+					 where cidn.group_id = #{group_id}
+						 and cidn.hos_id = #{hos_id}
+						 and cidn.copy_code = #{copy_code}
+						 and cidn.is_stop = 0
+					 order by cidn.cost_item_code),
+				b_cost as
+				 (select 
+				         cidn.cost_item_id,
+				         cidn.cost_item_code,
+								 cidn.cost_item_name,
+								 sum(dir_amount + dir_ass_amount + dir_med_amount +
+										 indir_med_ass_amount + dir_man_amount + indir_ass_man_amount +
+										 indir_med_man_amount + indir_ass_med_man_amount) as all_amount
+						from cost_dept_cost cdc
+						left join cost_item_dict_no cidn
+							on cdc.group_id = cidn.group_id
+						 and cdc.hos_id = cidn.hos_id
+						 and cdc.copy_code = cidn.copy_code
+						 and cdc.cost_item_id = cidn.cost_item_id
+						 and cidn.is_stop=0
+						left join hos_dept_dict hdd
+							on hdd.group_id = cdc.group_id
+						 and hdd.hos_id = cdc.hos_id
+						 and hdd.dept_id = cdc.dept_id
+						 and hdd.is_stop=0
+					 where cdc.group_id = #{group_id}
+						 and cdc.hos_id = #{hos_id}
+						 and cdc.copy_code = #{copy_code}
+						 and cdc.acc_year || cdc.acc_month between #{year_month_begin} and #{year_month_end}
+						 <if test="dept_code != null and dept_code != ''">
+			                 and hdd.dept_code like #{dept_code}||'%'
+			             </if>
+			             	 and to_char(hdd.dept_id) in (
+				                select b.perm_code
+				                from v_user_data_perm b
+				                where b.group_id = #{group_id}
+					            and b.hos_id = #{hos_id}
+					            and b.user_id = #{user_id}
+					            and b.table_code = 'HOS_DEPT_DICT'
+					            and (b.is_write = 1
+						        or b.is_read = 1)
+			                    )
+					 group by cidn.cost_item_id,
+					          cidn.cost_item_code,
+										cidn.cost_item_name),
+					s_cost as
+				 (select 
+				         cidn.cost_item_id,
+				         cidn.cost_item_code,
+								 cidn.cost_item_name,
+								 sum(dir_amount + dir_ass_amount + dir_med_amount +
+										 indir_med_ass_amount + dir_man_amount + indir_ass_man_amount +
+										 indir_med_man_amount + indir_ass_med_man_amount) as all_amount
+						from cost_dept_cost cdc
+						left join cost_item_dict_no cidn
+							on cdc.group_id = cidn.group_id
+						 and cdc.hos_id = cidn.hos_id
+						 and cdc.copy_code = cidn.copy_code
+						 and cdc.cost_item_id = cidn.cost_item_id
+						 and cidn.is_stop=0
+						left join hos_dept_dict hdd
+							on hdd.group_id = cdc.group_id
+						 and hdd.hos_id = cdc.hos_id
+						 and hdd.dept_id = cdc.dept_id
+						 and hdd.is_stop=0
+					 where cdc.group_id = #{group_id}
+						 and cdc.hos_id = #{hos_id}
+						 and cdc.copy_code = #{copy_code}
+						 and cdc.acc_year || cdc.acc_month = to_char(add_months(trunc(to_date(#{year_month_begin}||'01','yyyy/mm/dd')),-1),'YYYYmm')
+						 <if test="dept_code != null and dept_code != ''">
+			                 and hdd.dept_code like #{dept_code}||'%'
+			             </if>
+			              and to_char(hdd.dept_id) in (
+				                select b.perm_code
+				                from v_user_data_perm b
+				                where b.group_id = #{group_id}
+					            and b.hos_id = #{hos_id}
+					            and b.user_id = #{user_id}
+					            and b.table_code = 'HOS_DEPT_DICT'
+					            and (b.is_write = 1
+						        or b.is_read = 1)
+			                    )
+					 group by cidn.cost_item_id,
+					          cidn.cost_item_code,
+										cidn.cost_item_name),
+				t_cost as
+			 (select 
+							 cidn.cost_item_id,
+							 cidn.cost_item_code,
+							 cidn.cost_item_name,
+							 sum(dir_amount + dir_ass_amount + dir_med_amount +
+									 indir_med_ass_amount + dir_man_amount + indir_ass_man_amount +
+									 indir_med_man_amount + indir_ass_med_man_amount) as all_amount
+					from cost_dept_cost cdc
+					left join cost_item_dict_no cidn
+						on cdc.group_id = cidn.group_id
+					 and cdc.hos_id = cidn.hos_id
+					 and cdc.copy_code = cidn.copy_code
+					 and cdc.cost_item_id = cidn.cost_item_id
+					 and cidn.is_stop=0
+					left join hos_dept_dict hdd
+						on hdd.group_id = cdc.group_id
+					 and hdd.hos_id = cdc.hos_id
+					 and hdd.dept_id = cdc.dept_id
+					 and hdd.is_stop=0
+				 where cdc.group_id = #{group_id}
+					 and cdc.hos_id = #{hos_id}
+					 and cdc.copy_code = #{copy_code}
+					 and cdc.acc_year || cdc.acc_month	between to_char(add_months(trunc(to_date(#{year_month_begin}||'01','yyyy/mm/dd')),-12),'YYYYmm')
+								and to_char(add_months(trunc(to_date(#{year_month_end}||'01','yyyy/mm/dd')),-12),'YYYYmm')
+						 <if test="dept_code != null and dept_code != ''">
+			                 and hdd.dept_code like #{dept_code}||'%'
+			             </if>
+			              and to_char(hdd.dept_id) in (
+				                select b.perm_code
+				                from v_user_data_perm b
+				                where b.group_id = #{group_id}
+					            and b.hos_id = #{hos_id}
+					            and b.user_id = #{user_id}
+					            and b.table_code = 'HOS_DEPT_DICT'
+					            and (b.is_write = 1
+						        or b.is_read = 1)
+			                    )
+				 group by cidn.cost_item_id,
+									cidn.cost_item_code,
+									cidn.cost_item_name),
+				  result as (
+				  select 
+				   temp.cost_item_id,
+					 temp.cost_item_code,
+					 temp.cost_item_name,
+					 b_cost.all_amount b_all_amount,
+					 s_cost.all_amount s_all_amount,
+					 t_cost.all_amount t_all_amount
+				 from temp 
+				 left join b_cost 
+				 on temp.cost_item_id = b_cost.cost_item_id
+				 left join s_cost
+				 on temp.cost_item_id = s_cost.cost_item_id
+				 left join t_cost
+				 on temp.cost_item_id = t_cost.cost_item_id
+				)select 
+				  temp.cost_item_code,
+					temp.cost_item_name,
+					sum(b_all_amount) t_1,
+					sum(s_all_amount) t_2,
+					sum(b_all_amount) - sum(s_all_amount) t_3,
+					divide(sum(b_all_amount) - sum(s_all_amount),sum(s_all_amount)) * 100 t_4,
+					sum(t_all_amount) t_5,
+					sum(b_all_amount) - sum(t_all_amount) t_6,
+					divide(sum(b_all_amount) - sum(t_all_amount),sum(t_all_amount)) * 100 t_7,
+					sum(b_all_amount) t_8
+				 from temp 
+				 left join result
+				 on result.cost_item_code like (temp.cost_item_code || '%')
+				 group by temp.cost_item_code,temp.cost_item_name
+				 union all
+					select 
+					    '', 
+						  '合计',
+						  sum(b_all_amount) as t_1
+						, sum(s_all_amount) as t_2
+						, sum(b_all_amount) - sum(s_all_amount) as t_3
+						, divide(sum(b_all_amount) - sum(s_all_amount), sum(s_all_amount)) * 100 as t_4
+						, sum(t_all_amount) as t_5
+						, sum(b_all_amount) - sum(t_all_amount) as t_6
+						, divide(sum(b_all_amount) - sum(t_all_amount), sum(t_all_amount)) * 100 as t_7
+			      , sum(b_all_amount) as t_8
+			    from result
+			    order by cost_item_code
+			         
+	    </select>
+	
+
+</mapper>
+

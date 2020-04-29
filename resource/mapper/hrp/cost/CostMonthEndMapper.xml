@@ -1,0 +1,377 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.cost.dao.CostMonthEndMapper">
+
+	<resultMap id="costMonthEnd" type="com.chd.hrp.cost.entity.CostMonthEnd">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="acc_year" column="acc_year" />
+		<result property="acc_month" column="acc_month" />
+		<result property="is_end" column="is_end" />
+	</resultMap>
+
+	<resultMap id="costYearMonth" type="java.util.Map">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="acc_year" column="acc_year" />
+		<result property="acc_month" column="acc_month" />
+		<result property="begin_date" column="begin_date" />
+		<result property="end_date" column="end_date" />
+		<result property="cost_flag" column="cost_flag" />
+		<result property="cost_user" column="cost_user" />
+		<result property="cost_date" column="cost_date" />
+	</resultMap>
+
+	<!-- 取出当前成本的未结账最小会计期间 -->
+	<resultMap id="costCurYearMonth" type="java.util.Map">
+		<result property="acc_year" column="acc_year" />
+		<result property="acc_month" column="acc_month" />
+		<result property="begin_date" column="begin_date" />
+		<result property="end_date" column="end_date" />
+	</resultMap>
+
+	<insert id="addCostMonthEnd" useGeneratedKeys="true">
+
+		INSERT INTO
+		COST_MONTH_END (
+		group_id
+		,
+		hos_id
+		,
+		copy_code
+		,
+		acc_year
+		,
+		acc_month
+		,
+		is_end
+
+		)
+		VALUES (
+		#{group_id} ,
+		#{hos_id} ,
+		#{copy_code} ,
+		#{acc_year} ,
+		#{acc_month} ,
+		'1'
+		)
+
+	</insert>
+	<insert id="addBatchCostMonthEnd" parameterType="java.util.List">
+
+		INSERT INTO COST_MONTH_END (
+		group_id
+		,
+		hos_id
+		,
+		copy_code
+		,
+		acc_year
+		,
+		acc_month
+		,
+		is_end
+
+		)
+		<foreach collection="list" item="item" index="index"
+			separator=" union all ">
+			select
+			#{item.group_id} ,
+			#{item.hos_id} ,
+			#{item.copy_code} ,
+			#{item.acc_year} ,
+			#{item.acc_month} ,
+			#{item.is_end}
+			from dual
+		</foreach>
+
+	</insert>
+
+	<update id="updateCostMonthEnd" parameterType="java.util.Map">
+
+		UPDATE
+		cost_month_end SET
+		is_end = #{is_end}
+
+		WHERE
+		group_id = #{group_id}
+		and
+		hos_id = #{hos_id}
+		and
+		copy_code = #{copy_code}
+		and
+		acc_year = #{acc_year}
+		and
+		acc_month = #{acc_month}
+
+
+	</update>
+	<update id="updateBatchCostMonthEnd" parameterType="java.util.List">
+
+		<foreach collection="list" item="item" index="index" open="begin"
+			close="end;" separator=";">
+			UPDATE cost_month_end SET
+			is_end = #{is_end}
+
+			WHERE
+			group_id = #{item.group_id}
+			and
+			hos_id = #{item.hos_id}
+			and
+			copy_code = #{item.copy_code}
+			and
+			acc_year = #{item.acc_year}
+			and
+			acc_month = #{item.acc_month}
+
+		</foreach>
+	</update>
+
+	<delete id="deleteCostMonthEnd" parameterType="java.util.Map">
+
+		DELETE FROM
+		cost_month_end WHERE
+		<!-- group_id = #{group_id} and
+		hos_id = #{hos_id} and
+		copy_code = #{copy_code} and -->
+		acc_year = #{acc_year} and
+		acc_month =
+		#{acc_month}
+
+	</delete>
+	<delete id="deleteCost" parameterType="java.util.Map">
+		DELETE FROM
+		cost_c0508 WHERE
+		group_id = #{group_id} and
+		hos_id = #{hos_id} and
+		copy_code = #{copy_code} and
+		acc_year = #{acc_year} and
+		acc_month =
+		#{acc_month}
+	
+	
+	</delete>
+	<delete id="deleteBatchCostMonthEnd" parameterType="java.util.List">
+		DELETE FROM cost_month_end WHERE
+		<foreach collection="list" index="index" item="item" open="("
+			separator="or" close=")">
+			group_id = #{item.group_id}
+			and
+			hos_id =
+			#{item.hos_id}
+			and
+			copy_code = #{item.copy_code}
+			and
+			acc_year =
+			#{item.acc_year}
+			and
+			acc_month = #{item.acc_month}
+
+		</foreach>
+
+
+	</delete>
+
+	<select id="queryCostYearMonthByCode" parameterType="java.util.Map" 
+		resultMap="costYearMonth">
+
+			select group_id, 
+			       hos_id,
+			       copy_code,
+			       acc_year,
+			       acc_month,
+			       begin_date,
+			       end_date,
+			       cost_flag,
+			       cost_user,
+			       cost_date
+			  from acc_year_month
+			  where group_id = #{group_id}
+			  and hos_id = #{hos_id}
+			  and copy_code = #{copy_code}
+			  and acc_year = #{acc_year}
+			  and acc_month = #{acc_month}
+
+
+	</select>
+	<select id="queryCostMonthEnd" parameterType="java.util.Map"
+		resultMap="costMonthEnd">
+
+		SELECT
+		group_id,
+		hos_id,
+		copy_code,
+		acc_year,
+		acc_month,
+		is_end
+		FROM
+		COST_MONTH_END
+		<where>
+			<if test="group_id != null and group_id != ''">
+				AND group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				AND copy_code = #{copy_code}
+			</if>
+			<if test="acc_year != null and acc_year != ''">
+				AND acc_year = #{acc_year}
+			</if>
+			<if test="acc_month != null and acc_month != ''">
+				AND acc_month = #{acc_month}
+			</if>
+			<if test="is_end != null and is_end != ''">
+				AND is_end = #{is_end}
+			</if>
+		</where>
+		order by group_id asc
+	</select>
+
+	<select id="queryLastCostMonthEnd" parameterType="java.util.Map"
+		resultMap="costMonthEnd">
+
+		SELECT
+		group_id,
+		hos_id,
+		copy_code,
+		acc_year||''||acc_month acc_year,
+		acc_month,
+		is_end
+		FROM COST_MONTH_END
+		<where>
+			is_end ='1'
+			<if test="group_id != null and group_id != ''">
+				AND group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				AND copy_code = #{copy_code}
+			</if>
+			<if test="acc_year != null and acc_year != ''">
+				AND acc_year = #{acc_year}
+			</if>
+			<if test="acc_month != null and acc_month != ''">
+				AND acc_month = #{acc_month}
+			</if>
+
+		</where>
+		order by acc_year desc
+	</select>
+
+
+
+	<!-- 查询成本相关的结账信息 -->
+	<select id="queryCostYearMonth" parameterType="java.util.Map"
+		resultMap="costYearMonth">
+
+		SELECT
+		AMY.group_id,
+		AMY.hos_id,
+		AMY.copy_code,
+		AMY.acc_year,
+		AMY.acc_month,
+		AMY.begin_date,
+		AMY.end_date,
+		AMY.cost_flag,
+		SU.USER_NAME cost_user,
+		AMY.cost_date
+		FROM
+		ACC_YEAR_MONTH AMY
+		LEFT JOIN SYS_USER SU ON AMY.COST_USER = SU.USER_ID
+		<where>
+			<if test="group_id != null and group_id != ''">
+				AND AMY.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND AMY.hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				AND AMY.copy_code = #{copy_code}
+			</if>
+			<if test="acc_year != null and acc_year != ''">
+				AND AMY.acc_year = #{acc_year}
+			</if>
+			<if test="acc_month != null and acc_month != ''">
+				AND AMY.acc_month = #{acc_month}
+			</if>
+			<if test="ass_flag !=null and ass_flag != ''">
+				AND AMY.cost_flag = #{cost_flag}
+			</if>
+		</where>
+		order by AMY.begin_date asc
+	</select>
+
+
+	<select id="queryCostCurYearMonth" parameterType="java.util.Map"
+		resultMap="costCurYearMonth">
+		SELECT acc_year, acc_month, begin_date, end_date
+		FROM
+		acc_year_month
+		WHERE
+		group_id = #{group_id}
+		AND hos_id = #{hos_id}
+		AND copy_code = #{copy_code}
+		AND nvl(cost_flag,
+		0) = 0
+		AND begin_date = (
+		SELECT MIN(begin_date)
+		FROM
+		acc_year_month
+		WHERE group_id = #{group_id}
+		AND hos_id = #{hos_id}
+		AND copy_code =
+		#{copy_code}
+		AND nvl(cost_flag, 0) = 0
+		)
+
+	</select>
+
+
+	<update id="updateCostFinalCharge" parameterType="java.util.Map">
+		UPDATE
+		acc_year_month SET
+		cost_flag = #{cost_flag,jdbcType=INTEGER},
+		cost_user
+		= #{cost_user,jdbcType=INTEGER},
+		cost_date = #{cost_date}
+		WHERE
+		group_id
+		= #{group_id,jdbcType=INTEGER}
+		and
+		hos_id = #{hos_id,jdbcType=INTEGER}
+		and
+		copy_code = #{copy_code,jdbcType=VARCHAR}
+		and
+		acc_year =
+		#{acc_year,jdbcType=VARCHAR}
+		and
+		acc_month =
+		#{acc_month,jdbcType=VARCHAR}
+	</update>
+
+	<update id="updateCostFinalUnCharge" parameterType="java.util.Map">
+		UPDATE
+		acc_year_month SET
+		cost_flag = null,
+		cost_user = null,
+		cost_date = null
+		WHERE
+		group_id = #{group_id}
+		and
+		hos_id = #{hos_id}
+		and
+		copy_code =
+		#{copy_code}
+		and
+		acc_year = #{acc_year}
+		and
+		acc_month = #{acc_month}
+	</update>
+</mapper>
+

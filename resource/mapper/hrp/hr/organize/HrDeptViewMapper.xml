@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.hr.dao.organize.HrDeptViewMapper">
+	<resultMap type="java.util.Map" id="hrpDeptSelectMap">
+		<result property="id" column="id" />
+		<result property="name" column="text" />
+		<result property="pId" column="pId" />
+	</resultMap>
+	<resultMap id="by_tree" type="java.util.Map">
+		<result property="id" column="id" />
+		<result property="name" column="name" />
+		<result property="pId" column="pId" />
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+	</resultMap>
+	
+	<resultMap id="dept" type="com.chd.hrp.hr.entity.orangnize.HrDept">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="dept_id" column="dept_id" />
+		<result property="dept_code" column="dept_code" />
+		<result property="kind_code" column="kind_code" />
+		<result property="kind_name" column="kind_name" />
+		<result property="dept_name" column="dept_name" />
+		<result property="super_code" column="super_code" />
+		<result property="super_id" column="super_id" />
+		<result property="udefine_code" column="udefine_code" />
+		<result property="sort_code" column="sort_code" />
+		<result property="is_stop" column="is_stop" />
+		<result property="is_last" column="is_last" />
+		<result property="spell_code" column="spell_code" />
+		<result property="wbx_code" column="wbx_code" />
+		<result property="note" column="note" />
+		<result property="dept_level" column="dept_level" />
+	</resultMap>
+	
+	<resultMap id="deptmap" type="java.util.Map">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="kind_code" column="kind_code" />
+		<result property="kind_name" column="kind_name" />
+
+	</resultMap>
+
+	<resultMap id="deptselect" type="java.util.Map">
+		<result property="id" column="id" />
+		<result property="text" column="text" />
+		
+
+	</resultMap>
+	
+	<resultMap id="deptkindselect" type="java.util.Map">
+		<result property="id" column="id" />
+		<result property="text" column="text" />
+		
+
+	</resultMap>
+	
+	<resultMap id="deptKind" type="com.chd.hrp.hr.entity.orangnize.HrDeptKind">
+        <result property="group_id" column="group_id"/>
+        <result property="hos_id" column="hos_id"/>
+        <result property="kind_code" column="kind_code"/>
+        <result property="kind_name" column="kind_name"/>
+        <result property="is_stop" column="is_stop"/>
+        <result property="spell_code" column="spell_code"/>
+        <result property="wbx_code" column="wbx_code"/>
+        <result property="note" column="note"/>
+	</resultMap>
+	
+	<select id="queryDeptViewOrgSet" parameterType="java.util.Map" resultType="java.util.Map">
+		select a.dept_code "name",a.dept_name "title",a.dept_level "dept_level",a.is_last "is_last",
+		a.super_code "super_code"
+		from HOS_DEPT_DICT a
+		where a.group_id = #{group_id} AND a.hos_id = #{hos_id} and a.is_stop=0
+		and exists (
+			select 1
+			from v_user_data_perm b
+			where a.group_id = b.group_id
+			and a.hos_id = b.hos_id
+			and to_char(a.dept_id) = b.perm_code
+			and b.user_id =#{user_id,jdbcType=VARCHAR}
+			and b.TABLE_CODE = upper('HOS_DEPT_DICT')
+			and (b.is_read = 1 or b.is_write = 1)
+		)	
+		order by a.dept_code
+	</select>
+		<select id="query" parameterType="java.util.Map" resultMap="dept">
+
+		SELECT
+		    hd.group_id,
+		    hd.hos_id,
+		    hd.dept_id,
+		   	hd.dept_code,
+		    hd.kind_code,
+		    hdk.kind_name,
+		    hd.dept_name,
+		    hd.super_code,
+		    hod.dept_name super_name,
+		    hod.dept_id super_id,
+		    hd.udefine_code,
+		    hd.sort_code,
+		    hd.is_stop,
+		    hd.is_last,
+		    hd.spell_code,
+		    hd.wbx_code,
+		   	hd.note,
+		   	hd.dept_level
+    	FROM HOS_DEPT hd
+    	left join hos_dept_kind hdk on hdk.kind_code=hd.kind_code
+     		and hdk.group_id=hd.group_id
+     		and hdk.hos_id=hd.hos_id
+		left join hos_dept hod  on hd.super_code=hod.dept_code
+			and hod.group_id=hd.group_id
+			and hod.hos_id=hd.hos_id
+		WHERE hd.group_id = #{group_id}
+			AND hd.hos_id = #{hos_id}
+			AND exists (
+				select 1 from sys_user_perm_data b
+				where hd.group_id = b.group_id
+					and hd.hos_id = b.hos_id
+					and to_char(hd.dept_id) = b.perm_code
+					and user_id =#{user_id,jdbcType=VARCHAR}
+					and TABLE_CODE = upper('HOS_DEPT_DICT')
+					and (b.is_read = 1 or b.is_write = 1)
+			)
+			
+		order by hd.dept_code asc
+	</select>
+	<select id="queryDeptViewOrgMenu" parameterType="java.util.Map" resultType="java.util.Map">
+	
+	
+	
+	</select>
+	<select id="queryDeptViewOrgImg" parameterType="java.util.Map"  resultType="string">
+	
+ select  he.photo
+from hos_emp he
+  left join HR_HOS_DUTY hd on he.emp_id = hd.emp_id
+and he.group_id = hd.group_id
+and he.hos_id = hd.hos_id
+
+left join hos_dept_dict hdd on he.dept_no=hdd.dept_no
+and he.dept_id=hdd.dept_id
+and he.group_id=hdd.group_id
+and he.hos_id=hdd.hos_id
+
+WHERE he.group_id = #{group_id}
+			AND he.hos_id = #{hos_id}
+			and  hdd.dept_code=#{dept_id}
+			and hd.duty_code='14'
+	</select>
+</mapper>
+

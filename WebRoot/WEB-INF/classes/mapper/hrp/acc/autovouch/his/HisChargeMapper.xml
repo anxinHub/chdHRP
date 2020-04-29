@@ -1,0 +1,959 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.acc.dao.autovouch.his.HisAccChargeMapper">
+ 
+	<!-- 查询凭证模板 -->
+	<resultMap id="busiTemplateMap" type="com.chd.hrp.acc.entity.HrpAccSelect">
+		<result property="id" column="id" /> 
+		<result property="text" column="text" />
+	</resultMap>
+	<select id="queryAutoBusiTemplate" resultMap="busiTemplateMap">
+		SELECT template_code id,template_name text FROM acc_busi_template
+		where group_id = #{group_id} and hos_id = #{hos_id} and copy_code = #{copy_code} 
+		and busi_type_code=#{busi_type_code} and acc_year=#{acc_year}
+		order by template_code
+	</select>
+	
+	<!-- 判断是否生成凭证，收入通用，除住院收费 -->
+	<select id="queryAutoVouchIsCreate" parameterType="java.util.Map" resultType="String">
+
+		select business_no from ${busi_log_table}
+		where group_id =#{group_id} AND hos_id =#{hos_id} AND copy_code = #{copy_code} 
+  		and busi_type_code=#{busi_type_code}<!--  and business_no in(${busi_no}) -->
+  		and exists ( select ${busi_no} from dual)
+  				
+	</select>
+	
+	<!--*************************************************门诊收费*************************************************-->
+	<!-- 查询门诊收费类别-表头 -->
+	<select id="queryHisChargeHeadO" parameterType="java.util.Map" resultType="java.util.Map">
+
+		select distinct b.charge_kind_code,b.charge_kind_name from ACC_CHARGE_O a
+		left join  COST_CHARGE_KIND_ARRT b on a.group_id=b.group_id and a.hos_id=b.hos_id and a.copy_code=b.copy_code and a.charge_kind_code=b.charge_kind_code
+		where a.group_id = #{group_id} and a.hos_id = #{hos_id} and a.copy_code = #{copy_code} 
+		and to_char(a.charge_date,'yyyy-MM-dd') between #{charge_date_b} and #{charge_date_e} and a.is_back in(0,1) and a.charge_money!=0
+		<if test="charge_code != null and charge_code != ''">
+			and (a.charge_code like '${charge_code}%' or a.charge_name like '%${charge_code}%')
+		</if>
+		<if test="rep_no != null and rep_no != ''">
+			and a.rep_no like '${rep_no}%'
+		</if>
+		and b.charge_kind_code is not null 
+		order by b.charge_kind_code
+	</select>
+
+	<!-- 查询门诊收费数据 -->
+	<select id="queryHisChargeDataO" parameterType="java.util.Map" resultType="java.util.Map">
+
+	select 
+			${column_sum_sql} ${vouch_no_sum}
+		from ACC_CHARGE_O a
+		left join COST_CHARGE_KIND_ARRT k on a.group_id=k.group_id and a.hos_id=k.hos_id and a.copy_code=k.copy_code and a.charge_kind_code=k.charge_kind_code
+		${left_sql}
+		where a.group_id = #{group_id} and a.hos_id = #{hos_id} and a.copy_code = #{copy_code}
+		and to_char(a.charge_date,'yyyy-MM-dd') between #{charge_date_b} and #{charge_date_e} and a.is_back in(0,1) and a.charge_money!=0
+	<if test="charge_code != null and charge_code != ''">
+		and (a.charge_code like '${charge_code}%' or a.charge_name like '%${charge_code}%')
+	</if>
+	<if test="rep_no != null and rep_no != ''">
+		and a.rep_no like '${rep_no}%'
+	</if>
+	union all
+	select t1.*${vouch_no} from
+	(
+		select 
+			${column_sql}
+		from ACC_CHARGE_O a
+		left join COST_CHARGE_KIND_ARRT k on a.group_id=k.group_id and a.hos_id=k.hos_id and a.copy_code=k.copy_code and a.charge_kind_code=k.charge_kind_code
+		${left_sql}
+		where a.group_id = #{group_id} and a.hos_id = #{hos_id} and a.copy_code = #{copy_code}
+		and to_char(a.charge_date,'yyyy-MM-dd') between #{charge_date_b} and #{charge_date_e} and a.is_back in(0,1) and a.charge_money!=0
+		<if test="charge_code != null and charge_code != ''">
+			and (a.charge_code like '${charge_code}%' or a.charge_name like '%${charge_code}%')
+		</if>
+		<if test="rep_no != null and rep_no != ''">
+			and a.rep_no like '${rep_no}%'
+		</if>
+		group by ${group_sql}
+		order by ${order_sql}
+	) t1
+	${vouch_sql}
+	</select>
+	
+	<!-- 查询门诊结算数据 -->
+	<select id="queryHisBalO" parameterType="java.util.Map" resultType="java.util.Map">
+
+	select t1.*,t.vouch_type_short||'-'||v.vouch_no vouch_no,v.vouch_id from 
+	(
+		select a.rep_no,a.charge_code,a.charge_name,a.pay_type_code,t.pay_name,p.patient_code,p.patient_name,
+		case a.is_back when 1 then '是' else '否' end is_back,
+		to_char(sum(a.charge_money),'999,999,990.00') charge_money
+		from acc_bal_o a
+		left join acc_pay_type t on a.group_id=t.group_id and a.hos_id=t.hos_id and a.copy_code=t.copy_code and a.pay_type_code=t.pay_code
+		left join hos_patient_type p on a.group_id=p.group_id and a.hos_id=p.hos_id and a.patient_id=p.patient_id
+		where a.group_id = #{group_id} and a.hos_id = #{hos_id} and a.copy_code = #{copy_code}
+		and to_char(a.charge_date,'yyyy-MM-dd') between #{charge_date_b} and #{charge_date_e} and a.is_back in(0,1)
+		<if test="charge_code != null and charge_code != ''">
+			and (a.charge_code like '${charge_code}%' or a.charge_name like '%${charge_code}%')
+		</if>
+		<if test="rep_no != null and rep_no != ''">
+			and a.rep_no like '${rep_no}%'
+		</if>
+		group by a.rep_no,a.charge_code,a.charge_name,a.pay_type_code,t.pay_name,p.patient_code,p.patient_name,a.is_back
+		order by a.rep_no,a.charge_code
+	)t1	
+	  left join acc_busi_log_0102 bl on bl.group_id=#{group_id} and bl.hos_id=#{hos_id} and bl.copy_code=#{copy_code}
+	  and bl.busi_type_code='0102' and bl.business_no=t1.rep_no||'-'||t1.charge_code
+	  left join acc_vouch v on bl.group_id=v.group_id and bl.hos_id=v.hos_id and bl.copy_code=v.copy_code and bl.vouch_id=v.vouch_id
+	  left join acc_vouch_type t on v.group_id=t.group_id and v.hos_id=t.hos_id and v.copy_code=t.copy_code and v.vouch_type_code=t.vouch_type_code
+	</select>
+	
+	
+	<!-- 查询门诊结算凭证数据 meta=0101 -->
+	<select id="queryHisBalVouchO_0101" parameterType="java.util.Map" resultType="java.util.Map">
+
+		select t1.subj_code "subj_code",#{summary} "summary",
+		case ${direction} when 0 then t1.c_money else 0 end "debit", 
+		case ${direction} when 1 then t1.c_money else 0 end "credit",
+		s.subj_code||' '||s.subj_name_all "subj_name",
+		s.subj_dire "subj_dire",s.subj_type_code "subj_type_code",s.subj_nature_code "subj_nature_code",
+		s.is_check "is_check",s.is_cash "is_cash",s.is_bill "is_bill",
+		c1.column_check "check1",c2.column_check "check2",c3.column_check "check3",c4.column_check "check4"
+		from(
+			select b.subj_code,sum(a.charge_money) c_money 
+			from acc_bal_o a
+			
+			inner join acc_busi_map b on a.group_id=b.group_id and a.hos_id=b.hos_id and a.copy_code=b.copy_code 
+			and b.acc_year=#{acc_year} and b.mod_code=#{mod_code} and b.meta_code=#{meta_code} and a.pay_type_code=b.sub_type_id
+						
+			where a.group_id=#{group_id} and a.hos_id=#{hos_id} and a.copy_code=#{copy_code}
+			and to_char(a.charge_date,'yyyy-MM-dd') between #{charge_date_b} and #{charge_date_e} and a.is_back in(0,1)
+			<if test="sel_code != null and sel_code != ''">
+				and a.rep_no||''||a.charge_code in(${sel_code})
+			</if>
+			group by b.subj_code
+			
+		) t1
+		INNER JOIN acc_subj s ON s.group_id =#{group_id} AND s.hos_id =#{hos_id} AND s.copy_code = #{copy_code}
+  		AND s.acc_year =#{acc_year} AND s.subj_code = t1.subj_code 
+  		left join acc_check_type c1 on s.group_id=c1.group_id and s.hos_id=c1.hos_id and s.copy_code=c1.copy_code and s.check1=c1.check_type_id
+		left join acc_check_type c2 on s.group_id=c2.group_id and s.hos_id=c2.hos_id and s.copy_code=c2.copy_code and s.check2=c2.check_type_id
+		left join acc_check_type c3 on s.group_id=c3.group_id and s.hos_id=c3.hos_id and s.copy_code=c3.copy_code and s.check3=c3.check_type_id
+		left join acc_check_type c4 on s.group_id=c4.group_id and s.hos_id=c4.hos_id and s.copy_code=c4.copy_code and s.check4=c4.check_type_id 
+		where t1.c_money != 0
+		order by s.subj_code
+	</select>
+	
+	<!-- 查询门诊预交金凭证数据 meta=0102 -->
+	<select id="queryHisPreVouchO_0102" parameterType="java.util.Map" resultType="java.util.Map">
+
+		select t1.subj_code "subj_code",#{summary} "summary",
+		case ${direction} when 0 then t1.c_money else 0 end "debit", 
+		case ${direction} when 1 then t1.c_money else 0 end "credit",
+		s.subj_code||' '||s.subj_name_all "subj_name",
+		s.subj_dire "subj_dire",s.subj_type_code "subj_type_code",s.subj_nature_code "subj_nature_code",
+		s.is_check "is_check",s.is_cash "is_cash",
+		c1.column_check "check1",c2.column_check "check2",c3.column_check "check3",c4.column_check "check4"
+		from(
+			select b.subj_code,sum(a.charge_money) c_money 
+			from 
+			<choose>  
+             <when test='meta_code == "0110"'>
+             acc_pre_detail_o a
+             </when>  
+             <otherwise>
+              acc_pre_o a
+             </otherwise>
+          </choose>
+			
+			inner join acc_busi_map b on a.group_id=b.group_id and a.hos_id=b.hos_id and a.copy_code=b.copy_code 
+			and b.acc_year=#{acc_year} and b.mod_code=#{mod_code} and b.meta_code=#{meta_code} 
+			<if test='meta_code == "0110"'>
+				 and a.pay_type_code=b.sub_type_id
+			</if>									
+			where a.group_id=#{group_id} and a.hos_id=#{hos_id} and a.copy_code=#{copy_code}
+			and to_char(a.charge_date,'yyyy-MM-dd') between #{charge_date_b} and #{charge_date_e}
+			and a.state in(${state})
+			<if test="sel_code != null and sel_code != ''">
+				and a.rep_no||''||a.charge_code in(${sel_code})
+			</if>
+			group by b.subj_code
+			
+		) t1
+		INNER JOIN acc_subj s ON s.group_id =#{group_id} AND s.hos_id =#{hos_id} AND s.copy_code = #{copy_code}
+  		AND s.acc_year =#{acc_year} AND s.subj_code = t1.subj_code 
+  		left join acc_check_type c1 on s.group_id=c1.group_id and s.hos_id=c1.hos_id and s.copy_code=c1.copy_code and s.check1=c1.check_type_id
+		left join acc_check_type c2 on s.group_id=c2.group_id and s.hos_id=c2.hos_id and s.copy_code=c2.copy_code and s.check2=c2.check_type_id
+		left join acc_check_type c3 on s.group_id=c3.group_id and s.hos_id=c3.hos_id and s.copy_code=c3.copy_code and s.check3=c3.check_type_id
+		left join acc_check_type c4 on s.group_id=c4.group_id and s.hos_id=c4.hos_id and s.copy_code=c4.copy_code and s.check4=c4.check_type_id 
+		where t1.c_money != 0
+		order by s.subj_code
+	</select>
+	
+	<!-- 查询门诊收费凭证数据 meta=0104-->
+	<select id="queryHisChargeVouchO_0104" parameterType="java.util.Map" resultType="java.util.Map">
+
+		select t1.subj_code "subj_code",#{summary} "summary",
+		case ${direction} when 0 then t1.c_money else 0 end "debit", 
+		case ${direction} when 1 then t1.c_money else 0 end "credit",
+		s.subj_code||' '||s.subj_name_all "subj_name",
+		s.subj_dire "subj_dire",s.subj_type_code "subj_type_code",s.subj_nature_code "subj_nature_code",
+		s.is_check "is_check",s.is_cash "is_cash",
+		c1.column_check "check1",c2.column_check "check2",c3.column_check "check3",c4.column_check "check4"
+		from(
+			select b.subj_code,sum(a.charge_money) c_money 
+			from acc_charge_o a
+			
+			inner join acc_busi_map b on a.group_id=b.group_id and a.hos_id=b.hos_id and a.copy_code=b.copy_code 
+			and b.acc_year=#{acc_year} and b.mod_code=#{mod_code} and b.meta_code=#{meta_code} and a.charge_kind_code=b.sub_type_id	
+					
+			where a.group_id=#{group_id} and a.hos_id=#{hos_id} and a.copy_code=#{copy_code}
+			and to_char(a.charge_date,'yyyy-MM-dd') between #{charge_date_b} and #{charge_date_e} and a.is_back in(0,1)
+			<if test="sel_code != null and sel_code != ''">
+				and a.rep_no||''||a.charge_code in(${sel_code})
+			</if>
+			group by b.subj_code
+			
+		) t1
+		INNER JOIN acc_subj s ON s.group_id =#{group_id} AND s.hos_id =#{hos_id} AND s.copy_code = #{copy_code}
+  		AND s.acc_year =#{acc_year} AND s.subj_code = t1.subj_code 
+  		left join acc_check_type c1 on s.group_id=c1.group_id and s.hos_id=c1.hos_id and s.copy_code=c1.copy_code and s.check1=c1.check_type_id
+		left join acc_check_type c2 on s.group_id=c2.group_id and s.hos_id=c2.hos_id and s.copy_code=c2.copy_code and s.check2=c2.check_type_id
+		left join acc_check_type c3 on s.group_id=c3.group_id and s.hos_id=c3.hos_id and s.copy_code=c3.copy_code and s.check3=c3.check_type_id
+		left join acc_check_type c4 on s.group_id=c4.group_id and s.hos_id=c4.hos_id and s.copy_code=c4.copy_code and s.check4=c4.check_type_id 
+		where t1.c_money != 0
+		order by s.subj_code
+	</select>
+
+	<!-- 查询门诊收费凭证-科室辅助核算数据 meta=0104-->
+	<select id="queryHisChargeVouchCheckO_0104" parameterType="java.util.Map" resultType="java.util.Map">
+
+		SELECT t1.subj_code "subj_code", case when t1.dept_id is null then '字典没有对应关系' else #{summary} end "summary", 
+		t1.c_money "money", 
+		t1.dept_id||'@'||t1.dept_no "check1",t1.dept_code||' '||t1.dept_name "check1_name"
+		FROM (
+		
+		  SELECT b.subj_code,d.dept_id,d.dept_no,d.dept_code,d.dept_name,SUM(a.charge_money) AS c_money
+		  FROM acc_charge_o a
+		  
+		  INNER JOIN acc_busi_map b ON a.group_id = b.group_id AND a.hos_id = b.hos_id AND a.copy_code = b.copy_code
+		  AND b.acc_year = #{acc_year} AND b.mod_code = #{mod_code} AND b.meta_code = #{meta_code} AND a.charge_kind_code = b.sub_type_id 
+		  left join hos_dept_dict d on a.group_id = d.group_id AND a.hos_id = d.hos_id and a.dept_id=d.dept_id and a.dept_no=d.dept_no 
+		  
+		  where a.group_id=#{group_id} and a.hos_id=#{hos_id} and a.copy_code=#{copy_code}
+		  and to_char(a.charge_date,'yyyy-MM-dd') between #{charge_date_b} and #{charge_date_e} and a.is_back in(0,1)
+		  and b.subj_code in (${subj_code})
+		  <if test="sel_code != null and sel_code != ''">
+				and a.rep_no||''||a.charge_code in(${sel_code})
+		  </if>
+		  group by b.subj_code,d.dept_id,d.dept_no,d.dept_code,d.dept_name
+		  
+		) t1
+		where t1.c_money != 0
+		ORDER BY t1.dept_code
+	</select>
+	<!-- 查询门诊收费凭证-科室辅助核算数据 meta=0104-->
+	<insert id="saveHisChargeVouchCheckO_0104" parameterType="java.util.Map" >
+		insert into acc_auto_check(GROUP_ID,HOS_ID,COPY_CODE,VOUCH_ID,VOUCH_ROW,VOUCH_CHECK_ID,SUBJ_CODE,SUMMARY,
+		debit,credit,debit_w,credit_w,check1_id,check1_no)
+		SELECT #{group_id},#{hos_id},#{copy_code},#{vouch_id},#{vouch_row},rownum,t1.subj_code, case when t1.dept_id is null then '字典没有对应关系' else #{summary} end "summary", 
+		case ${direction} when 0 then t1.c_money else 0 end , 
+		case ${direction} when 1 then t1.c_money else 0 end ,0,0,
+		t1.dept_id,t1.dept_no
+		FROM (
+		
+		  SELECT b.subj_code,d.dept_id,d.dept_no,d.dept_code,d.dept_name,SUM(a.charge_money) AS c_money
+		  FROM acc_charge_o a
+		  
+		  INNER JOIN acc_busi_map b ON a.group_id = b.group_id AND a.hos_id = b.hos_id AND a.copy_code = b.copy_code
+		  AND b.acc_year = #{acc_year} AND b.mod_code = #{mod_code} AND b.meta_code = #{meta_code} AND a.charge_kind_code = b.sub_type_id 
+		  left join hos_dept_dict d on a.group_id = d.group_id AND a.hos_id = d.hos_id and a.dept_id=d.dept_id and a.dept_no=d.dept_no 
+		  
+		  where a.group_id=#{group_id} and a.hos_id=#{hos_id} and a.copy_code=#{copy_code}
+		  and to_char(a.charge_date,'yyyy-MM-dd') between #{charge_date_b} and #{charge_date_e} and a.is_back in(0,1)
+		  and b.subj_code = #{subj_code}
+		  <if test="sel_code != null and sel_code != ''">
+				and a.rep_no||''||a.charge_code in(${sel_code})
+		  </if>
+		  group by b.subj_code,d.dept_id,d.dept_no,d.dept_code,d.dept_name
+		) t1
+		where t1.c_money != 0
+		ORDER BY t1.dept_code
+	</insert>
+	
+	<!-- 现金/银行科目 现金流量标注默认标101 meta=0101-->
+	<select id="queryHisChargeVouchCashO_0101" parameterType="java.util.Map" resultType="java.util.Map">
+
+		select c.cash_item_id "cash_item_id",
+		#{summary} "summary"
+		from acc_cash_item c
+		where c.group_id=#{group_id} and c.hos_id=#{hos_id} and c.copy_code=#{copy_code} 
+		and c.cash_item_code='103'  
+	</select>
+	<insert id="saveAccAutoCash">
+		 insert into acc_auto_cash
+			  (group_id,
+			   hos_id,
+			   copy_code,
+			   vouch_id,
+			   vouch_row,
+			   cash_item_id,
+			   summary,
+			   cash_money)
+			values
+			  (#{group_id},
+			   #{hos_id},
+			   #{copy_code},
+			   #{vouch_id},
+			   #{vouch_row},
+			   #{cash_item_id},
+			   #{summary},
+			   #{money});
+	 
+	</insert>
+
+	<!-- 门诊结算凭证，按票据号生成辅助核算 -->
+	<select id="queryHisChargeVouchPaperCheckO" parameterType="java.util.Map" resultType="java.util.Map">
+		 
+		SELECT t1.subj_code, #{summary} as "summary ",t1.type_code as "paper_type_code",t1.paper_num as "paper_type_code"
+		,t1.c_money "money"		
+		FROM (
+		
+		  SELECT b.subj_code,pt.type_code,pd.paper_num,SUM(a.charge_money) AS c_money
+		  FROM acc_bal_o a
+		  
+		  INNER JOIN acc_busi_map b ON a.group_id = b.group_id AND a.hos_id = b.hos_id AND a.copy_code = b.copy_code
+		  AND b.acc_year = #{acc_year} AND b.mod_code = #{mod_code} AND b.meta_code = #{meta_code} AND a.pay_type_code=b.sub_type_id
+		  inner join acc_paper_detail pd on a.group_id = pd.group_id AND a.hos_id = pd.hos_id and a.copy_code=pd.copy_code and  a.CHECK_NO=pd.paper_num 
+		  inner join acc_paper_type pt on pd.group_id = pt.group_id AND pd.hos_id = pt.hos_id and pd.copy_code=pt.copy_code and pd.type_code=pt.type_code
+		  
+		  where a.group_id=#{group_id} and a.hos_id=#{hos_id} and a.copy_code=#{copy_code}
+		  and to_char(a.charge_date,'yyyy-MM-dd') between #{charge_date_b} and #{charge_date_e} and a.is_back in(0,1)
+		  and b.subj_code in (${subjWhere}) 
+		  and pd.is_check=0 and ((pt.paper_use_type=1 and state1=2) or (pt.paper_use_type=2 and state2=2)) 
+		  <if test="sel_code != null and sel_code != ''">
+				and a.rep_no||''||a.charge_code in(${sel_code})
+		  </if>
+		  group by b.subj_code,pt.type_code,pd.paper_num
+		  
+		) t1		
+		where t1.c_money != 0
+		ORDER BY t1.type_code,t1.paper_num
+	</select>
+	<!-- 门诊结算凭证，按票据号生成辅助核算 -->
+	<insert id="saveHisChargeVouchPaperCheckO" parameterType="java.util.Map" >
+		insert into acc_auto_check
+ 		(
+  				group_id,hos_id,copy_code,subj_code,summary,paper_type_code,check_no,vouch_id,vouch_row,vouch_check_id,
+  				debit,credit,debit_w,credit_w
+   		)
+		SELECT #{group_id},#{hos_id},#{copy_code} ,t1.subj_code, #{summary},t1.type_code ,t1.paper_num ,#{vouch_id},#{vouch_row},rownum,
+		case ${direction} when 0 then t1.c_money else 0 end , 
+		case ${direction} when 1 then t1.c_money else 0 end ,0,0
+		FROM (
+		
+		  SELECT b.subj_code,pt.type_code,pd.paper_num,SUM(a.charge_money) AS c_money
+		  FROM acc_bal_o a
+		  
+		  INNER JOIN acc_busi_map b ON a.group_id = b.group_id AND a.hos_id = b.hos_id AND a.copy_code = b.copy_code
+		  AND b.acc_year = #{acc_year} AND b.mod_code = #{mod_code} AND b.meta_code = #{meta_code} AND a.pay_type_code=b.sub_type_id
+		  inner join acc_paper_detail pd on a.group_id = pd.group_id AND a.hos_id = pd.hos_id and a.copy_code=pd.copy_code and  a.CHECK_NO=pd.paper_num 
+		  inner join acc_paper_type pt on pd.group_id = pt.group_id AND pd.hos_id = pt.hos_id and pd.copy_code=pt.copy_code and pd.type_code=pt.type_code
+		  where a.group_id=#{group_id} and a.hos_id=#{hos_id} and a.copy_code=#{copy_code}
+		  and to_char(a.charge_date,'yyyy-MM-dd') between #{charge_date_b} and #{charge_date_e} and a.is_back in(0,1)
+		  and b.subj_code =#{subj_code}
+		  and pd.is_check=0 and ((pt.paper_use_type=1 and state1=2) or (pt.paper_use_type=2 and state2=2)) 
+		  <if test="sel_code != null and sel_code != ''">
+				and a.rep_no||''||a.charge_code in(${sel_code})
+		  </if>
+		  group by b.subj_code,pt.type_code,pd.paper_num
+		  
+		) t1		
+		where t1.c_money != 0
+		ORDER BY t1.type_code,t1.paper_num
+	</insert>
+	
+	
+	<insert id="saveHisChargeVouchPaperCashO" parameterType="java.util.Map" >
+		insert into acc_auto_cash
+ 		(
+  				group_id,hos_id,copy_code,cash_id,vouch_id,vouch_row,cash_item_id,cash_money,summary
+   		)
+		SELECT #{group_id},#{hos_id},#{copy_code} ,rownum,#{vouch_id},#{vouch_row},t2.cash_item_id,t1.c_money,#{summary}
+		FROM (
+		
+		  SELECT pt.type_code,pd.paper_num,SUM(a.charge_money) AS c_money,a.group_id,a.hos_id,a.copy_code
+		  FROM acc_bal_o a
+		  inner join acc_paper_detail pd on a.group_id = pd.group_id AND a.hos_id = pd.hos_id and a.copy_code=pd.copy_code and  a.CHECK_NO=pd.paper_num 
+		  inner join acc_paper_type pt on pd.group_id = pt.group_id AND pd.hos_id = pt.hos_id and pd.copy_code=pt.copy_code and pd.type_code=pt.type_code
+		  where a.group_id=#{group_id} and a.hos_id=#{hos_id} and a.copy_code=#{copy_code}
+		  and to_char(a.charge_date,'yyyy-MM-dd') between #{charge_date_b} and #{charge_date_e} and a.is_back in(0,1)
+		  and pd.is_check=0 and ((pt.paper_use_type=1 and state1=2) or (pt.paper_use_type=2 and state2=2)) 
+		  <if test="sel_code != null and sel_code != ''">
+				and a.rep_no||''||a.charge_code in(${sel_code})
+		  </if>
+		  group by pt.type_code,pd.paper_num,a.group_id,a.hos_id,a.copy_code
+		  
+		) t1		
+		left join acc_cash_item  t2
+			on t1.group_id=t2.group_id and t1.hos_id=t2.hos_id and t1.copy_code=t2.copy_code
+			and t2.cash_item_code='103'  
+		where t1.c_money != 0
+	</insert>
+	
+	<insert id="saveHisChargeVouchCashO_0101" parameterType="java.util.Map">
+		 insert into acc_auto_cash
+	   (group_id, hos_id, copy_code, CASH_ID,vouch_id, vouch_row, cash_item_id, summary, cash_money)
+	 select
+	   #{group_id}, #{hos_id}, #{copy_code},1, #{vouch_id}, #{vouch_row},cash_item_id, #{summary},${debit}+${credit}
+	   from acc_cash_item 
+			where group_id=#{group_id} and hos_id=#{hos_id} and copy_code=#{copy_code} 
+			and cash_item_code='103' and is_stop=0  
+	</insert>
+
+	<!-- 查询门诊结算凭证数据 meta=0109 -->
+	<select id="queryHisBalVouchO_0109" parameterType="java.util.Map" resultType="java.util.Map">
+
+		select t1.subj_code "subj_code",#{summary} "summary",
+		case ${direction} when 0 then t1.c_money else 0 end "debit", 
+		case ${direction} when 1 then t1.c_money else 0 end "credit",
+		s.subj_code||' '||s.subj_name_all "subj_name",
+		s.subj_dire "subj_dire",s.subj_type_code "subj_type_code",s.subj_nature_code "subj_nature_code",
+		s.is_check "is_check",s.is_cash "is_cash",
+		c1.column_check "check1",c2.column_check "check2",c3.column_check "check3",c4.column_check "check4"
+		from(
+			select b.subj_code,sum(a.charge_money) c_money 
+			from acc_bal_o a
+			
+			inner join acc_busi_map b on a.group_id=b.group_id and a.hos_id=b.hos_id and a.copy_code=b.copy_code 
+			and b.acc_year=#{acc_year} and b.mod_code=#{mod_code} and b.meta_code=#{meta_code} and a.pay_type_code=b.sub_type_id
+						
+			where a.group_id=#{group_id} and a.hos_id=#{hos_id} and a.copy_code=#{copy_code}
+			and to_char(a.charge_date,'yyyy-MM-dd') between #{charge_date_b} and #{charge_date_e} and a.is_back in(0,1)
+			<if test="sel_code != null and sel_code != ''">
+				and a.rep_no||''||a.charge_code in(${sel_code})
+			</if>
+			group by b.subj_code
+			
+		) t1
+		INNER JOIN acc_subj s ON s.group_id =#{group_id} AND s.hos_id =#{hos_id} AND s.copy_code = #{copy_code}
+  		AND s.acc_year =#{acc_year} AND s.subj_code = t1.subj_code
+  		left join acc_check_type c1 on s.group_id=c1.group_id and s.hos_id=c1.hos_id and s.copy_code=c1.copy_code and s.check1=c1.check_type_id
+		left join acc_check_type c2 on s.group_id=c2.group_id and s.hos_id=c2.hos_id and s.copy_code=c2.copy_code and s.check2=c2.check_type_id
+		left join acc_check_type c3 on s.group_id=c3.group_id and s.hos_id=c3.hos_id and s.copy_code=c3.copy_code and s.check3=c3.check_type_id
+		left join acc_check_type c4 on s.group_id=c4.group_id and s.hos_id=c4.hos_id and s.copy_code=c4.copy_code and s.check4=c4.check_type_id  
+		where t1.c_money != 0
+		order by s.subj_code
+	</select>
+
+
+	<!--*************************************************住院收费*************************************************-->
+	
+	<!-- 生成凭证取最小、最大收费日期，用来存日志表 -->
+	<select id="queryHisChargeDataIMinMaxDate" parameterType="java.util.Map" resultType="java.util.Map">
+		select to_char(min(a.charge_date),'yyyy-MM-dd') "min_date",to_char(max(a.charge_date),'yyyy-MM-dd') "max_date" from acc_charge_i a 
+		where a.group_id = #{group_id} and a.hos_id = #{hos_id} and a.copy_code = #{copy_code} and a.his_type=#{io_type}
+		and to_char(a.charge_date,'yyyy-MM-dd') between #{charge_date_b} and #{charge_date_e}
+	</select>
+	
+	
+	<!-- 自动凭证日志临时表 -->
+	<insert id="saveAutoVouchLogTemp" parameterType="java.util.Map">
+		
+		insert into ACC_BUSI_LOG_TEMP(group_id,hos_id,copy_code,vouch_id,business_no,busi_type_code,template_code,create_date)
+		select distinct #{group_id},#{hos_id},#{copy_code},#{vouch_id},to_char(charge_date,'yyyy-mm-dd'),#{busi_type_code},#{template_code},#{create_date} from acc_charge_i
+		where  group_id = #{group_id} and hos_id = #{hos_id} and copy_code = #{copy_code} and to_char(charge_date,'yyyy-MM-dd') between #{charge_date_b} and #{charge_date_e}
+	</insert>
+	<!-- 自动凭证日志临时表 门诊收费 -->
+	<insert id="saveAutoVouchLogOutpatient" parameterType="java.util.Map">
+		
+		insert into ACC_BUSI_LOG_TEMP(group_id,hos_id,copy_code,vouch_id,business_no,busi_type_code,template_code,create_date)
+		select #{group_id},#{hos_id},#{copy_code},#{vouch_id},rep_no || '-' || charge_code,#{busi_type_code},#{template_code},#{create_date}
+		from ${table} 
+		where group_id = #{group_id} 
+			and hos_id = #{hos_id} 
+			and copy_code = #{copy_code} 
+			<!-- and rep_no || '-' || charge_code in(${busi_no})  -->
+			and exists ( select ${busi_no} from dual)
+	</insert>
+	
+
+	
+	<!-- 查询住院收费类别-表头 -->
+	<select id="queryHisChargeHeadI" parameterType="java.util.Map" resultType="java.util.Map">
+
+		select distinct b.charge_kind_code,b.charge_kind_name from ACC_CHARGE_I a
+		left join  COST_CHARGE_KIND_ARRT b on a.group_id=b.group_id and a.hos_id=b.hos_id and a.copy_code=b.copy_code and a.charge_kind_code=b.charge_kind_code
+		where a.group_id = #{group_id} and a.hos_id = #{hos_id} and a.copy_code = #{copy_code} and a.his_type=#{io_type}
+		and to_char(a.charge_date,'yyyy-MM-dd') between #{charge_date_b} and #{charge_date_e} and a.is_back in(0,1) and a.charge_money!=0
+		<if test="charge_code != null and charge_code != ''">
+			and (a.charge_code like '${charge_code}%' or a.charge_name like '%${charge_code}%')
+		</if>
+		and b.charge_kind_code is not null
+		order by b.charge_kind_code
+	</select>
+	
+	<!-- 查询住院收费数据 -->
+	<select id="queryHisChargeDataI" parameterType="java.util.Map" resultType="java.util.Map">		
+		
+		select '合计' dept_code,to_char(sum(a.charge_money),'999,999,990.00') dept_name ${column_sum_sql},'凭证详情' vouch_no
+		from ACC_CHARGE_I a
+		left join COST_CHARGE_KIND_ARRT k on a.group_id=k.group_id and a.hos_id=k.hos_id and a.copy_code=k.copy_code and a.charge_kind_code=k.charge_kind_code
+		where a.group_id = #{group_id} and a.hos_id = #{hos_id} and a.copy_code = #{copy_code} and a.his_type=#{io_type}
+		and to_char(a.charge_date,'yyyy-MM-dd') between #{charge_date_b} and #{charge_date_e} and a.is_back in(0,1)
+		<if test="dept_code != null and dept_code != ''">
+			and (a.dept_code like '${dept_code}%' or d.dept_name like '%${dept_code}%')
+		</if>			
+		union all
+		select t1.* ,'-' as vouch_no from
+		(
+					
+			select 
+				d.dept_code,d.dept_name ${column_sql}
+			from ACC_CHARGE_I a
+			left join COST_CHARGE_KIND_ARRT k on a.group_id=k.group_id and a.hos_id=k.hos_id and a.copy_code=k.copy_code and a.charge_kind_code=k.charge_kind_code
+			left join hos_dept_dict d on a.group_id=d.group_id and a.hos_id=d.hos_id and a.dept_id=d.dept_id and a.dept_no=d.dept_no
+			where a.group_id = #{group_id} and a.hos_id = #{hos_id} and a.copy_code = #{copy_code} and a.his_type=#{io_type}
+			and to_char(a.charge_date,'yyyy-MM-dd') between #{charge_date_b} and #{charge_date_e} and a.is_back in(0,1) 
+			<if test="dept_code != null and dept_code != ''">
+				and (a.dept_code like '${dept_code}%' or d.dept_name like '%${dept_code}%')
+			</if>
+			group by d.dept_code,d.dept_name
+			order by d.dept_code
+		) t1
+		left join acc_busi_log_0103 bl on bl.group_id=#{group_id} and bl.hos_id=#{hos_id} and bl.copy_code=#{copy_code}
+			and bl.busi_type_code=#{busi_type_code} 
+			and bl.business_no=#{charge_date_b}||'至'||#{charge_date_e}
+		left join acc_vouch v on bl.group_id=v.group_id and bl.hos_id=v.hos_id and bl.copy_code=v.copy_code and bl.vouch_id=v.vouch_id
+		
+		left join acc_vouch_type t on v.group_id=t.group_id and v.hos_id=t.hos_id and v.copy_code=t.copy_code and v.vouch_type_code=t.vouch_type_code
+		
+	</select>
+	
+	<!-- 查询住院收费凭证数据 应收在院病人医疗款 meta=0107-->
+	<select id="queryHisChargeI_0107" parameterType="java.util.Map" resultType="java.util.Map">
+
+		select t1.subj_code "subj_code",#{summary} "summary",
+		case ${direction} when 0 then t1.c_money else 0 end "debit", 
+		case ${direction} when 1 then t1.c_money else 0 end "credit",
+		s.subj_code||' '||s.subj_name_all "subj_name",
+		s.subj_dire "subj_dire",s.subj_type_code "subj_type_code",s.subj_nature_code "subj_nature_code",
+		s.is_check "is_check",s.is_cash "is_cash",
+		c1.column_check "check1",c2.column_check "check2",c3.column_check "check3",c4.column_check "check4"
+		from(
+			select b.subj_code,sum(a.charge_money) c_money 
+			from acc_charge_i a
+			
+			inner join acc_busi_map b on a.group_id=b.group_id and a.hos_id=b.hos_id and a.copy_code=b.copy_code 
+			and b.acc_year=#{acc_year} and b.mod_code=#{mod_code} and b.meta_code=#{meta_code} and a.charge_kind_code=b.sub_type_id	
+					
+			where a.group_id=#{group_id} and a.hos_id=#{hos_id} and a.copy_code=#{copy_code} and a.his_type=#{io_type}
+			and to_char(a.charge_date,'yyyy-MM-dd') between #{charge_date_b} and #{charge_date_e} and a.is_back in(0,1)
+			group by b.subj_code
+			
+		) t1
+		INNER JOIN acc_subj s ON s.group_id =#{group_id} AND s.hos_id =#{hos_id} AND s.copy_code = #{copy_code}
+  		AND s.acc_year =#{acc_year} AND s.subj_code = t1.subj_code 
+  		left join acc_check_type c1 on s.group_id=c1.group_id and s.hos_id=c1.hos_id and s.copy_code=c1.copy_code and s.check1=c1.check_type_id
+		left join acc_check_type c2 on s.group_id=c2.group_id and s.hos_id=c2.hos_id and s.copy_code=c2.copy_code and s.check2=c2.check_type_id
+		left join acc_check_type c3 on s.group_id=c3.group_id and s.hos_id=c3.hos_id and s.copy_code=c3.copy_code and s.check3=c3.check_type_id
+		left join acc_check_type c4 on s.group_id=c4.group_id and s.hos_id=c4.hos_id and s.copy_code=c4.copy_code and s.check4=c4.check_type_id 
+		where t1.c_money != 0
+		order by s.subj_code
+	</select>
+	
+	
+	<!-- 保存自动凭证-辅助核算表acc_auto_check-->
+	<insert id="saveAccAutoCheckI_0108" parameterType="java.util.Map">
+	
+		insert into acc_auto_check(GROUP_ID,HOS_ID,COPY_CODE,VOUCH_ID,VOUCH_ROW,VOUCH_CHECK_ID,SUBJ_CODE,SUMMARY,
+		debit,credit,debit_w,credit_w,check1_id,check1_no)
+		SELECT #{group_id},#{hos_id},#{copy_code},#{vouch_id},#{vouch_row},rownum,t1.subj_code, case when t1.dept_id is null then '字典没有对应关系' else #{summary} end "summary", 
+		case ${direction} when 0 then t1.c_money else 0 end , 
+		case ${direction} when 1 then t1.c_money else 0 end ,0,0,
+		t1.dept_id,t1.dept_no
+		FROM (
+		
+		  SELECT b.subj_code,d.dept_id,d.dept_no,SUM(a.charge_money) AS c_money
+		  FROM acc_charge_i a
+		  
+		  INNER JOIN acc_busi_map b ON a.group_id = b.group_id AND a.hos_id = b.hos_id AND a.copy_code = b.copy_code
+		  AND b.acc_year = #{acc_year} AND b.mod_code = '01' AND b.meta_code = #{meta_code} AND a.charge_kind_code = b.sub_type_id 
+		  
+		  left join hos_dept_dict d on a.group_id = d.group_id AND a.hos_id = d.hos_id and 
+		  (
+		  	(a.dept_id=d.dept_id and a.dept_no=d.dept_no )
+		  or (a.dept_code=d.dept_code and d.is_stop=0)
+		  )
+		  
+		  where a.group_id=#{group_id} and a.hos_id=#{hos_id} and a.copy_code=#{copy_code} and a.his_type=#{io_type}
+		  and to_char(a.charge_date,'yyyy-MM-dd') between #{charge_date_b} and #{charge_date_e} and a.is_back in(0,1)
+		  and b.subj_code = #{subj_code}
+		  group by b.subj_code,d.dept_id,d.dept_no
+		  
+		) t1		
+		where t1.c_money != 0
+		ORDER BY t1.dept_id
+		
+	</insert>
+	
+	<!-- 查询住院收费凭证-科室辅助核算数据 meta=0108-->
+	<select id="queryHisChargeVouchCheckI_0108" parameterType="java.util.Map" resultType="java.util.Map">
+
+		SELECT t1.subj_code "subj_code", case when t1.dept_id is null then '字典没有对应关系' else #{summary} end "summary", 
+		t1.c_money "money", 
+		t1.dept_id||'@'||t1.dept_no "check1",t1.dept_code||' '||t1.dept_name "check1_name"
+		FROM (
+		
+		  SELECT b.subj_code,d.dept_id,d.dept_no,d.dept_code,d.dept_name,SUM(a.charge_money) AS c_money
+		  FROM acc_charge_i a
+		  
+		  INNER JOIN acc_busi_map b ON a.group_id = b.group_id AND a.hos_id = b.hos_id AND a.copy_code = b.copy_code
+		  AND b.acc_year = #{acc_year} AND b.mod_code = #{mod_code} AND b.meta_code = #{meta_code} AND a.charge_kind_code = b.sub_type_id 
+		  left join hos_dept_dict d on a.group_id = d.group_id AND a.hos_id = d.hos_id and a.dept_id=d.dept_id and a.dept_no=d.dept_no 
+		  
+		  where a.group_id=#{group_id} and a.hos_id=#{hos_id} and a.copy_code=#{copy_code} and a.his_type=#{io_type}
+		  and to_char(a.charge_date,'yyyy-MM-dd') between #{charge_date_b} and #{charge_date_e} and a.is_back in(0,1)
+		  and b.subj_code in (${subj_code})
+		  group by b.subj_code,d.dept_id,d.dept_no,d.dept_code,d.dept_name
+		  
+		) t1		
+		where t1.c_money != 0
+		ORDER BY t1.dept_code
+	</select>
+	
+		<!-- 查询住院收费凭证-科室辅助核算数据 meta=0108-->
+	<insert id="saveHisChargeVouchCheckI_0108" parameterType="java.util.Map" >
+
+		insert into acc_auto_check(GROUP_ID,HOS_ID,COPY_CODE,VOUCH_ID,VOUCH_ROW,VOUCH_CHECK_ID,SUBJ_CODE,SUMMARY,
+		debit,credit,debit_w,credit_w,check1_id,check1_no)
+		SELECT #{group_id},#{hos_id},#{copy_code},#{vouch_id},#{vouch_row},rownum,t1.subj_code, case when t1.dept_id is null then '字典没有对应关系' else #{summary} end "summary", 
+		case ${direction} when 0 then t1.c_money else 0 end , 
+		case ${direction} when 1 then t1.c_money else 0 end ,0,0,
+		t1.dept_id,t1.dept_no
+		FROM (
+		
+		  SELECT b.subj_code,d.dept_id,d.dept_no,d.dept_code,d.dept_name,SUM(a.charge_money) AS c_money
+		  FROM acc_charge_i a
+		  
+		  INNER JOIN acc_busi_map b ON a.group_id = b.group_id AND a.hos_id = b.hos_id AND a.copy_code = b.copy_code
+		  AND b.acc_year = #{acc_year} AND b.mod_code = #{mod_code} AND b.meta_code = #{meta_code} AND a.charge_kind_code = b.sub_type_id 
+		  left join hos_dept_dict d on a.group_id = d.group_id AND a.hos_id = d.hos_id and a.dept_id=d.dept_id and a.dept_no=d.dept_no 
+		  
+		  where a.group_id=#{group_id} and a.hos_id=#{hos_id} and a.copy_code=#{copy_code} and a.his_type=#{io_type}
+		  and to_char(a.charge_date,'yyyy-MM-dd') between #{charge_date_b} and #{charge_date_e} and a.is_back in(0,1)
+		  and b.subj_code in (${subj_code})
+		  group by b.subj_code,d.dept_id,d.dept_no,d.dept_code,d.dept_name
+		  
+		) t1		
+		where t1.c_money != 0
+		ORDER BY t1.dept_code
+	</insert>
+	
+	
+	<!-- 查询住院收费凭证数据 应收在院病人医疗款 meta=0108-->
+	<select id="queryHisChargeI_0108" parameterType="java.util.Map" resultType="java.util.Map">
+
+		select t1.subj_code "subj_code",#{summary} "summary",
+		case ${direction} when 0 then t1.c_money else 0 end "debit", 
+		case ${direction} when 1 then t1.c_money else 0 end "credit",
+		s.subj_code||' '||s.subj_name_all "subj_name",
+		s.subj_dire "subj_dire",s.subj_type_code "subj_type_code",s.subj_nature_code "subj_nature_code",
+		s.is_check "is_check",s.is_cash "is_cash",
+		c1.column_check "check1",c2.column_check "check2",c3.column_check "check3",c4.column_check "check4"
+		from(
+			select b.subj_code,sum(a.charge_money) c_money 
+			from acc_charge_i a
+			
+			inner join acc_busi_map b on a.group_id=b.group_id and a.hos_id=b.hos_id and a.copy_code=b.copy_code 
+			and b.acc_year=#{acc_year} and b.mod_code=#{mod_code} and b.meta_code=#{meta_code} and a.charge_kind_code=b.sub_type_id	
+					
+			where a.group_id=#{group_id} and a.hos_id=#{hos_id} and a.copy_code=#{copy_code} and a.his_type=#{io_type}
+			and to_char(a.charge_date,'yyyy-MM-dd') between #{charge_date_b} and #{charge_date_e} and a.is_back in(0,1)
+			group by b.subj_code
+			
+		) t1
+		INNER JOIN acc_subj s ON s.group_id =#{group_id} AND s.hos_id =#{hos_id} AND s.copy_code = #{copy_code}
+  		AND s.acc_year =#{acc_year} AND s.subj_code = t1.subj_code
+  		left join acc_check_type c1 on s.group_id=c1.group_id and s.hos_id=c1.hos_id and s.copy_code=c1.copy_code and s.check1=c1.check_type_id
+		left join acc_check_type c2 on s.group_id=c2.group_id and s.hos_id=c2.hos_id and s.copy_code=c2.copy_code and s.check2=c2.check_type_id
+		left join acc_check_type c3 on s.group_id=c3.group_id and s.hos_id=c3.hos_id and s.copy_code=c3.copy_code and s.check3=c3.check_type_id
+		left join acc_check_type c4 on s.group_id=c4.group_id and s.hos_id=c4.hos_id and s.copy_code=c4.copy_code and s.check4=c4.check_type_id  
+		where t1.c_money != 0
+		order by s.subj_code
+	</select>
+	
+	<!--*************************************************住院结算*************************************************-->
+	<!-- 查询住院结算数据 -->
+	<select id="queryHisBalI" parameterType="java.util.Map" resultType="java.util.Map">
+		select t1.*,t.vouch_type_short||'-'||v.vouch_no vouch_no,v.vouch_id from 
+		(
+			select a.rep_no,a.charge_code,a.charge_name,a.pay_type_code,t.pay_name,p.patient_code,p.patient_name,
+			case a.is_back when 1 then '是' else '否' end is_back,
+			to_char(sum(a.charge_money),'999,999,990.00') charge_money
+			from acc_bal_i a
+			left join acc_pay_type t on a.group_id=t.group_id and a.hos_id=t.hos_id and a.copy_code=t.copy_code and a.pay_type_code=t.pay_code
+			left join hos_patient_type p on a.group_id=p.group_id and a.hos_id=p.hos_id and a.patient_id=p.patient_id
+			where a.group_id = #{group_id} and a.hos_id = #{hos_id} and a.copy_code = #{copy_code} and a.his_type=#{io_type}
+			and to_char(a.charge_date,'yyyy-MM-dd') between #{charge_date_b} and #{charge_date_e} and a.is_back in(0,1)
+			<if test="charge_code != null and charge_code != ''">
+				and (a.charge_code like '${charge_code}%' or a.charge_name like '%${charge_code}%')
+			</if>
+			<if test="rep_no != null and rep_no != ''">
+				and a.rep_no like '${rep_no}%'
+			</if>
+			<if test="pay_type_code != null and pay_type_code != ''">
+				and a.pay_type_code =#{pay_type_code}
+			</if>
+			group by a.rep_no,a.charge_code,a.charge_name,a.pay_type_code,t.pay_name,p.patient_code,p.patient_name,a.is_back
+			order by a.rep_no,a.charge_code
+		)t1	
+		  left join acc_busi_log_0104 bl on bl.group_id=#{group_id} and bl.hos_id=#{hos_id} and bl.copy_code=#{copy_code}
+		  and bl.busi_type_code='0104' and bl.business_no=t1.rep_no||'-'||t1.charge_code
+		  left join acc_vouch v on bl.group_id=v.group_id and bl.hos_id=v.hos_id and bl.copy_code=v.copy_code and bl.vouch_id=v.vouch_id
+		  left join acc_vouch_type t on v.group_id=t.group_id and v.hos_id=t.hos_id and v.copy_code=t.copy_code and v.vouch_type_code=t.vouch_type_code
+	</select>
+	
+	<!-- 查询住院结算凭证数据 meta=0101 -->
+	<select id="queryHisBalVouchI_0101" parameterType="java.util.Map" resultType="java.util.Map">
+
+		select t1.subj_code "subj_code",#{summary} "summary",
+		case ${direction} when 0 then t1.c_money else 0 end "debit", 
+		case ${direction} when 1 then t1.c_money else 0 end "credit",
+		s.subj_code||' '||s.subj_name_all "subj_name",
+		s.subj_dire "subj_dire",s.subj_type_code "subj_type_code",s.subj_nature_code "subj_nature_code",
+		s.is_check "is_check",s.is_cash "is_cash",s.is_bill "is_bill",
+		c1.column_check "check1",c2.column_check "check2",c3.column_check "check3",c4.column_check "check4"
+		from(
+			select b.subj_code,sum(a.charge_money) c_money 
+			from acc_bal_i a
+			
+			inner join acc_busi_map b on a.group_id=b.group_id and a.hos_id=b.hos_id and a.copy_code=b.copy_code 
+			and b.acc_year=#{acc_year} and b.mod_code=#{mod_code} and b.meta_code=#{meta_code} and a.pay_type_code=b.sub_type_id
+						
+			where a.group_id=#{group_id} and a.hos_id=#{hos_id} and a.copy_code=#{copy_code} and a.his_type=#{io_type}
+			and to_char(a.charge_date,'yyyy-MM-dd') between #{charge_date_b} and #{charge_date_e} and a.is_back in(0,1)
+			<if test="sel_code != null and sel_code != ''">
+				and a.rep_no||''||a.charge_code in(${sel_code})
+			</if>
+			group by b.subj_code
+			
+		) t1
+		INNER JOIN acc_subj s ON s.group_id =#{group_id} AND s.hos_id =#{hos_id} AND s.copy_code = #{copy_code}
+  		AND s.acc_year =#{acc_year} AND s.subj_code = t1.subj_code
+  		left join acc_check_type c1 on s.group_id=c1.group_id and s.hos_id=c1.hos_id and s.copy_code=c1.copy_code and s.check1=c1.check_type_id
+		left join acc_check_type c2 on s.group_id=c2.group_id and s.hos_id=c2.hos_id and s.copy_code=c2.copy_code and s.check2=c2.check_type_id
+		left join acc_check_type c3 on s.group_id=c3.group_id and s.hos_id=c3.hos_id and s.copy_code=c3.copy_code and s.check3=c3.check_type_id
+		left join acc_check_type c4 on s.group_id=c4.group_id and s.hos_id=c4.hos_id and s.copy_code=c4.copy_code and s.check4=c4.check_type_id  
+		where t1.c_money != 0
+		order by s.subj_code
+	</select>
+	
+	<!-- 查询住院结算凭证数据 meta=0109 -->
+	<select id="queryHisBalVouchI_0109" parameterType="java.util.Map" resultType="java.util.Map">
+
+		select t1.subj_code "subj_code",#{summary} "summary",
+		case ${direction} when 0 then t1.c_money else 0 end "debit", 
+		case ${direction} when 1 then t1.c_money else 0 end "credit",
+		s.subj_code||' '||s.subj_name_all "subj_name",
+		s.subj_dire "subj_dire",s.subj_type_code "subj_type_code",s.subj_nature_code "subj_nature_code",
+		s.is_check "is_check",s.is_cash "is_cash",
+		c1.column_check "check1",c2.column_check "check2",c3.column_check "check3",c4.column_check "check4"
+		from(
+			select b.subj_code,sum(a.charge_money) c_money 
+			from acc_bal_i a
+			
+			inner join acc_busi_map b on a.group_id=b.group_id and a.hos_id=b.hos_id and a.copy_code=b.copy_code 
+			and b.acc_year=#{acc_year} and b.mod_code=#{mod_code} and b.meta_code=#{meta_code} and a.pay_type_code=b.sub_type_id
+						
+			where a.group_id=#{group_id} and a.hos_id=#{hos_id} and a.copy_code=#{copy_code} and a.his_type=#{io_type}
+			and to_char(a.charge_date,'yyyy-MM-dd') between #{charge_date_b} and #{charge_date_e} and a.is_back in(0,1)
+			<if test="sel_code != null and sel_code != ''">
+				and a.rep_no||''||a.charge_code in(${sel_code})
+			</if>
+			group by b.subj_code
+			
+		) t1
+		INNER JOIN acc_subj s ON s.group_id =#{group_id} AND s.hos_id =#{hos_id} AND s.copy_code = #{copy_code}
+  		AND s.acc_year =#{acc_year} AND s.subj_code = t1.subj_code
+  		left join acc_check_type c1 on s.group_id=c1.group_id and s.hos_id=c1.hos_id and s.copy_code=c1.copy_code and s.check1=c1.check_type_id
+		left join acc_check_type c2 on s.group_id=c2.group_id and s.hos_id=c2.hos_id and s.copy_code=c2.copy_code and s.check2=c2.check_type_id
+		left join acc_check_type c3 on s.group_id=c3.group_id and s.hos_id=c3.hos_id and s.copy_code=c3.copy_code and s.check3=c3.check_type_id
+		left join acc_check_type c4 on s.group_id=c4.group_id and s.hos_id=c4.hos_id and s.copy_code=c4.copy_code and s.check4=c4.check_type_id  
+		where t1.c_money != 0
+		order by s.subj_code
+	</select>
+	
+	<!-- 现金/银行科目 现金流量标注默认标101 meta=0101-->
+	<select id="queryHisChargeVouchCashI_0101" parameterType="java.util.Map" resultType="java.util.Map">
+
+		select s.subj_id "subj_id",c.cash_item_id "cash_item_id",c.cash_item_code||' '||c.cash_item_name "cash_name",
+		#{summary} "summary"
+		from acc_subj s
+		inner join acc_cash_item c on s.group_id=c.group_id and s.hos_id=c.hos_id and s.copy_code=c.copy_code
+		where s.group_id=#{group_id} and s.hos_id=#{hos_id} and s.copy_code=#{copy_code} 
+		and s.acc_year=#{acc_year} and s.is_cash=1 and s.is_last=1
+		and c.cash_item_code='103' and s.subj_id in(${subjWhere})
+		
+	</select>
+	
+	
+	<!-- 住院结算凭证，按票据号生成辅助核算 -->
+	<select id="queryHisChargeVouchPaperCheckI" parameterType="java.util.Map" resultType="java.util.Map">
+
+		SELECT t1.subj_id "subj_id", #{summary} "summary",t1.type_code "paper_type_code",t1.paper_num "check_no",
+		t1.c_money "money"		
+		FROM (
+		
+		  SELECT b.subj_id,pt.type_code,pd.paper_num,SUM(a.charge_money) AS c_money
+		  FROM acc_bal_i a
+		  
+		  INNER JOIN acc_busi_map b ON a.group_id = b.group_id AND a.hos_id = b.hos_id AND a.copy_code = b.copy_code
+		  AND b.acc_year = #{acc_year} AND b.mod_code = #{mod_code} AND b.meta_code = #{meta_code} AND a.pay_type_code=b.sub_type_id
+		  inner join acc_paper_detail pd on a.group_id = pd.group_id AND a.hos_id = pd.hos_id and a.copy_code=pd.copy_code and  a.CHECK_NO=pd.paper_num 
+		  inner join acc_paper_type pt on pd.group_id = pt.group_id AND pd.hos_id = pt.hos_id and pd.copy_code=pt.copy_code and pd.type_code=pt.type_code
+		  
+		  where a.group_id=#{group_id} and a.hos_id=#{hos_id} and a.copy_code=#{copy_code} and a.his_type=#{io_type}
+		  and to_char(a.charge_date,'yyyy-MM-dd') between #{charge_date_b} and #{charge_date_e} and a.is_back in(0,1)
+		  and b.subj_id in (${subjWhere}) 
+		  and pt.IS_AUTO=1 and pd.is_check=0 and ((pt.paper_use_type=1 and state1=2) or (pt.paper_use_type=2 and state2=2)) 
+		  <if test="sel_code != null and sel_code != ''">
+				and a.rep_no||''||a.charge_code in(${sel_code})
+		  </if>
+		  group by b.subj_id,pt.type_code,pd.paper_num
+		  
+		) t1		
+		where t1.c_money != 0
+		ORDER BY t1.type_code,t1.paper_num
+	</select>
+	<!-- 住院结算凭证，按票据号生成辅助核算 -->
+	<insert id="saveHisChargeVouchPaperCheckI" parameterType="java.util.Map" >
+		insert into acc_auto_check
+ 		(
+  				group_id,hos_id,copy_code,subj_code,summary,paper_type_code,check_no,vouch_id,vouch_row,vouch_check_id,
+  				debit,credit,debit_w,credit_w,business_no
+   		)
+		SELECT #{group_id},#{hos_id},#{copy_code} ,t1.subj_code, #{summary},t1.type_code ,t1.paper_num ,#{vouch_id},#{vouch_row},rownum,
+		case ${direction} when 0 then t1.c_money else 0 end , 
+		case ${direction} when 1 then t1.c_money else 0 end ,0,0,${busi_no}
+		FROM (
+		
+		  SELECT b.subj_code,pt.type_code,pd.paper_num,SUM(a.charge_money) AS c_money
+		  FROM acc_bal_i a
+		  
+		  INNER JOIN acc_busi_map b ON a.group_id = b.group_id AND a.hos_id = b.hos_id AND a.copy_code = b.copy_code
+		  AND b.acc_year = #{acc_year} AND b.mod_code = #{mod_code} AND b.meta_code = #{meta_code} AND a.pay_type_code=b.sub_type_id
+		  inner join acc_paper_detail pd on a.group_id = pd.group_id AND a.hos_id = pd.hos_id and a.copy_code=pd.copy_code and  a.CHECK_NO=pd.paper_num 
+		  inner join acc_paper_type pt on pd.group_id = pt.group_id AND pd.hos_id = pt.hos_id and pd.copy_code=pt.copy_code and pd.type_code=pt.type_code
+		  
+		  where a.group_id=#{group_id} and a.hos_id=#{hos_id} and a.copy_code=#{copy_code} and a.his_type=#{io_type}
+		  and to_char(a.charge_date,'yyyy-MM-dd') between #{charge_date_b} and #{charge_date_e} and a.is_back in(0,1)
+		  and b.subj_code =#{subj_code}
+		  and pt.IS_AUTO=1 and pd.is_check=0 and ((pt.paper_use_type=1 and state1=2) or (pt.paper_use_type=2 and state2=2)) 
+		  <if test="sel_code != null and sel_code != ''">
+				and a.rep_no||''||a.charge_code in(${sel_code})
+		  </if>
+		  group by b.subj_code,pt.type_code,pd.paper_num
+		  
+		) t1		
+		where t1.c_money != 0
+		ORDER BY t1.type_code,t1.paper_num
+	</insert>
+	
+	
+	<insert id="saveHisChargeVouchPaperCashI" parameterType="java.util.Map" >
+		insert into acc_auto_cash
+ 		(
+  				group_id,hos_id,copy_code,CASH_IDvouch_id,vouch_row,cash_item_id,cash_money,summary
+   		)
+		SELECT #{group_id},#{hos_id},#{copy_code},rownum ,#{vouch_id},#{vouch_row},t2.cash_item_id,t1.c_money,#{summary}
+		FROM (
+		
+		  SELECT pt.type_code,pd.paper_num,SUM(a.charge_money) AS c_money
+		  FROM acc_bal_i a
+		  inner join acc_paper_detail pd on a.group_id = pd.group_id AND a.hos_id = pd.hos_id and a.copy_code=pd.copy_code and  a.CHECK_NO=pd.paper_num 
+		  inner join acc_paper_type pt on pd.group_id = pt.group_id AND pd.hos_id = pt.hos_id and pd.copy_code=pt.copy_code and pd.type_code=pt.type_code
+		  where a.group_id=#{group_id} and a.hos_id=#{hos_id} and a.copy_code=#{copy_code}
+		  and to_char(a.charge_date,'yyyy-MM-dd') between #{charge_date_b} and #{charge_date_e} and a.is_back in(0,1)
+		  and pd.is_check=0 and ((pt.paper_use_type=1 and state1=2) or (pt.paper_use_type=2 and state2=2)) 
+		  <if test="sel_code != null and sel_code != ''">
+				and a.rep_no||''||a.charge_code in(${sel_code})
+		  </if>
+		  group by pt.type_code,pd.paper_num
+		  
+		) t1		
+		left join acc_cash_item  t2
+			on t1.group_id=t2.group_id and t1.hos_id=t2.hos_id and t1.copy_code=t2.copy_code
+			and t2.cash_item_code='103'  
+		where t1.c_money != 0
+	</insert>
+	<!-- 查询住院预交金凭证数据 meta=0105 -->
+	<select id="queryHisPreVouchI_0105" parameterType="java.util.Map" resultType="java.util.Map">
+
+		select t1.subj_code "subj_code",#{summary} "summary",
+		case ${direction} when 0 then t1.c_money else 0 end "debit", 
+		case ${direction} when 1 then t1.c_money else 0 end "credit",
+		s.subj_code||' '||s.subj_name_all "subj_name",
+		s.subj_dire "subj_dire",s.subj_type_code "subj_type_code",s.subj_nature_code "subj_nature_code",
+		s.is_check "is_check",s.is_cash "is_cash",
+		c1.column_check "check1",c2.column_check "check2",c3.column_check "check3",c4.column_check "check4"
+		from(
+			select b.subj_code,sum(a.charge_money) c_money 
+			from  
+			<choose>  
+             <when test='meta_code == "0111"'>
+             acc_pre_detail_i a
+             </when>  
+             <otherwise>
+              acc_pre_i a
+             </otherwise>
+          </choose>
+			inner join acc_busi_map b on a.group_id=b.group_id and a.hos_id=b.hos_id and a.copy_code=b.copy_code 
+			and b.acc_year=#{acc_year} and b.mod_code=#{mod_code} and b.meta_code=#{meta_code} 
+			<if test='meta_code == "0111"'>
+				 and a.pay_type_code=b.sub_type_id
+			</if>
+			where a.group_id=#{group_id} and a.hos_id=#{hos_id} and a.copy_code=#{copy_code} and a.his_type=#{io_type}
+			and to_char(a.charge_date,'yyyy-MM-dd') between #{charge_date_b} and #{charge_date_e}
+			and a.state in(${state})
+			<if test="sel_code != null and sel_code != ''">
+				and a.rep_no||''||a.charge_code in(${sel_code})
+			</if>
+			group by b.subj_code
+			
+		) t1
+		INNER JOIN acc_subj s ON s.group_id =#{group_id} AND s.hos_id =#{hos_id} AND s.copy_code = #{copy_code}
+  		AND s.acc_year =#{acc_year} AND s.subj_code = t1.subj_code 
+  		left join acc_check_type c1 on s.group_id=c1.group_id and s.hos_id=c1.hos_id and s.copy_code=c1.copy_code and s.check1=c1.check_type_id
+		left join acc_check_type c2 on s.group_id=c2.group_id and s.hos_id=c2.hos_id and s.copy_code=c2.copy_code and s.check2=c2.check_type_id
+		left join acc_check_type c3 on s.group_id=c3.group_id and s.hos_id=c3.hos_id and s.copy_code=c3.copy_code and s.check3=c3.check_type_id
+		left join acc_check_type c4 on s.group_id=c4.group_id and s.hos_id=c4.hos_id and s.copy_code=c4.copy_code and s.check4=c4.check_type_id 
+		where t1.c_money != 0
+		order by s.subj_code
+	</select>
+	
+	
+	<!-- HIS收入凭证，查询自动核销的票据类型 -->
+	<select id="queryAccPaperTypeByAuto" parameterType="java.util.Map" resultType="String">
+		select TYPE_CODE from acc_paper_type
+        where group_id=#{group_id} and hos_id=#{hos_id} and copy_code=#{copy_code} and IS_AUTO=1 
+	</select>
+	<select id="queryVouchNo" parameterType="java.util.Map" resultType="java.util.Map">
+		select t.vouch_type_short || '-' || v.vouch_no vouch_no, v.vouch_id
+		  from acc_busi_log_0103 a
+		  left join acc_vouch v
+		    on a.group_id = v.group_id and a.hos_id = v.hos_id
+		   and a.copy_code = v.copy_code
+		   and a.vouch_id = v.vouch_id
+		  left join acc_vouch_type t
+		    on v.group_id = t.group_id
+		   and v.hos_id = t.hos_id
+		   and v.copy_code = t.copy_code
+		   and v.vouch_type_code = t.vouch_type_code
+		 where a.group_id = #{group_id}
+		   and a.hos_id = #{hos_id}
+		   and a.copy_code = #{copy_code}
+		   and a.business_no between #{charge_date_b}and #{charge_date_e}
+	</select>
+</mapper>
+

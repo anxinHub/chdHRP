@@ -1,0 +1,220 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.mat.dao.dura.query.MatDuraQueryStockMapper">
+	<select id="queryMatDuraQueryStock" parameterType="java.util.Map"  resultType="java.util.Map">
+    with inTemp as(
+        --正常入库（材料出库 ,材料退库） 数据 临时表
+      select mid.inv_id , mid.price , mid.bar_code, mim.store_id , sum(mid.amount) amount , 
+          sum(mid.amount_money) amount_money
+      from mat_out_detail mid
+      join mat_inv_dict ad
+        on
+          mid.group_id = ad.group_id
+          and mid.hos_id = ad.hos_id
+          and mid.copy_code = ad.copy_code
+          and mid.inv_id = ad.inv_id
+          and ad.is_stop =0
+          and ad.is_dura = 1
+      left join mat_out_main mim
+        on
+          mid.group_id = mim.group_id
+          and mid.hos_id = mim.hos_id
+          and mid.copy_code = mim.copy_code
+          and mid.out_id = mim.out_id
+          and mid.out_no = mim.out_no
+      where 
+         mid.group_id = #{group_id,jdbcType=INTEGER} 
+        AND mid.hos_id = #{hos_id,jdbcType=INTEGER} 
+        AND mid.copy_code = #{copy_code,jdbcType=VARCHAR} 
+        AND mim.year = #{year,jdbcType=VARCHAR} 
+        AND mim.month = #{month,jdbcType=VARCHAR} 
+        <if test="store_id != null and store_id !=''">
+        AND mim.store_id = #{store_id,jdbcType=INTEGER}
+        </if>
+        and mim.state=3
+        and exists(select 1 from sys_mod_start where group_id=#{group_id,jdbcType=INTEGER} 
+            and hos_id=#{hos_id,jdbcType=INTEGER} and copy_code=#{copy_code,jdbcType=VARCHAR} 
+            and mod_code='0413' and start_year is not null and start_month is not null 
+            and mim.confirm_date >sys_mod_start.create_date
+        )  
+      group by mid.inv_id, mid.price ,mid.bar_code,mim.store_id
+    ),
+    inStore as( 
+      --流转 耐用品(库-库 流入)  数据 临时表
+      select mdssd.inv_id , mdssd.price , mdssd.bar_code, mdss.in_store_id store_id , sum(mdssd.amount) amount , 
+          sum(mdssd.amount_money) amount_money
+      from MAT_DURA_STORE_STORE_D mdssd
+      left join MAT_DURA_STORE_STORE mdss
+        on
+          mdssd.group_id = mdss.group_id
+          and mdssd.hos_id = mdss.hos_id
+          and mdssd.copy_code = mdss.copy_code
+          and mdssd.dura_id = mdss.dura_id
+      where 
+         mdssd.group_id = #{group_id,jdbcType=INTEGER} 
+        AND mdssd.hos_id = #{hos_id,jdbcType=INTEGER} 
+        AND mdssd.copy_code = #{copy_code,jdbcType=VARCHAR} 
+        AND mdss.year = #{year,jdbcType=VARCHAR} 
+        AND mdss.month = #{month,jdbcType=VARCHAR} 
+        and mdss.state =3
+        <if test=" store_id != null and store_id !=''">
+        AND mdss.in_store_id = #{store_id,jdbcType=INTEGER}
+        </if>     
+      group by mdssd.inv_id ,mdssd.price ,mdssd.bar_code,mdss.in_store_id   
+    ),
+    outTemp as (
+    --正常出库（科室领用 3）  数据 临时表          
+        select mdssd.inv_id , mdssd.price ,mdssd.bar_code, mdss.store_id , sum(mdssd.amount) amount , 
+                sum(mdssd.amount_money) amount_money
+            from mat_dura_store_dept mdss
+            left join mat_dura_store_dept_d mdssd on mdss.group_id =mdssd.group_id 
+                and mdss.hos_id =mdssd.hos_id and mdss.copy_code=mdssd.copy_code
+                and mdss.dura_id =mdssd.dura_id
+            where mdss.group_id=#{group_id,jdbcType=INTEGER} 
+            and mdss.hos_id=#{hos_id,jdbcType=INTEGER} 
+            and mdss.copy_code=#{copy_code,jdbcType=VARCHAR} 
+            AND mdss.year = #{year,jdbcType=VARCHAR} 
+            AND mdss.month = #{month,jdbcType=VARCHAR}      
+            and mdss.state=3
+            group by mdssd.inv_id , mdssd.price , mdssd.bar_code,mdss.store_id        
+    ),
+    outStore as(
+      --流转 耐用品(库-库 流出) 数据 临时表     
+      select mdssd.inv_id , mdssd.price , mdss.store_id , sum(mdssd.amount) amount , 
+          sum(mdssd.amount_money) amount_money
+      from MAT_DURA_STORE_STORE_D mdssd
+      left join MAT_DURA_STORE_STORE mdss
+        on
+          mdssd.group_id = mdss.group_id
+          and mdssd.hos_id = mdss.hos_id
+          and mdssd.copy_code = mdss.copy_code
+          and mdssd.dura_id = mdss.dura_id
+      where 
+         mdssd.group_id = #{group_id,jdbcType=INTEGER} 
+        AND mdssd.hos_id = #{hos_id,jdbcType=INTEGER} 
+        AND mdssd.copy_code = #{copy_code,jdbcType=VARCHAR} 
+        AND mdss.year = #{year,jdbcType=VARCHAR} 
+        AND mdss.month = #{month,jdbcType=VARCHAR} 
+        <if test=" store_id != null and store_id !=''">
+        AND mdss.store_id = #{store_id,jdbcType=INTEGER}
+        </if>
+        and mdss.state=3
+      group by mdssd.inv_id , mdssd.inv_no , mdssd.price ,mdss.store_id
+      
+    ) 
+    <!--
+        流转 耐用品(库报废) 数据 临时表     
+       ,
+        scrapStore as(       
+            select mdssd.inv_id , mdssd.price ,mdssd.bar_code, mdss.store_id , sum(mdssd.amount) amount , 
+                    sum(mdssd.price * mdssd.amount) amount_money
+            from mat_dura_store_scrap_d mdssd
+            left join mat_dura_store_scrap mdss
+                on
+                    mdssd.group_id = mdss.group_id
+                    and mdssd.hos_id = mdss.hos_id
+                    and mdssd.copy_code = mdss.copy_code
+                    and mdssd.scrap_id = mdss.scrap_id
+            where 
+                 mdssd.group_id = #{group_id,jdbcType=INTEGER} 
+                AND mdssd.hos_id = #{hos_id,jdbcType=INTEGER} 
+                AND mdssd.copy_code = #{copy_code,jdbcType=VARCHAR} 
+                AND mdss.year = #{year,jdbcType=VARCHAR} 
+                AND mdss.month = #{month,jdbcType=VARCHAR}            
+                <if test=" store_id != null and store_id !=''">
+                AND mdss.store_id = #{store_id,jdbcType=INTEGER}
+                </if>
+                and mdss.state=3
+            group by mdssd.inv_id , mdssd.price ,mdssd.bar_code,mdss.store_id        
+        )
+       --> 
+    SELECT hsd.store_code,hsd.store_name, mid.inv_code, mid.inv_name, mid.inv_model, hu.unit_name, 
+      mdss.bar_code, mdss.price, mdss.begin_amount, mdss.begin_money, 
+      '0.00' dec_begin_money, 
+      mdss.begin_money add_begin_money, 
+      a.amount add_in_amount , a.amount_money add_in_money, 
+      b.amount dec_in_amount , b.amount_money dec_in_money ,
+      (a.amount_money + b.amount_money ) in_money ,
+      c.amount add_out_amount , c.amount_money add_out_money,
+      d.amount dec_out_amount , d.amount_money dec_out_money ,
+      (c.amount_money + d.amount_money) out_money ,
+      (mdss.begin_money + a.amount_money - c.amount_money) add_end_money ,
+      (b.amount_money - d.amount_money ) dec_end_money ,
+      (mdss.begin_money + a.amount_money + b.amount_money -c.amount_money - d.amount_money ) end_money 
+      
+    FROM MAT_DURA_STORE_SURPLUS mdss
+    left join hos_store_dict hsd on mdss.store_id =hsd.store_id
+      and mdss.group_id = hsd.group_id 
+      AND mdss.hos_id = hsd.hos_id 
+      AND hsd.is_stop = 0
+    
+    LEFT JOIN inTemp  a
+      on
+        mdss.store_id = a.store_id
+        and mdss.inv_id = a.inv_id
+        and mdss.price = a.price
+        and mdss.bar_code = a.bar_code
+    LEFT JOIN inStore  b
+      on
+        mdss.store_id = b.store_id
+        and mdss.inv_id = b.inv_id
+        and mdss.price = b.price
+                and mdss.bar_code = b.bar_code
+    LEFT JOIN outTemp  c
+      on
+        mdss.store_id = c.store_id
+        and mdss.inv_id = c.inv_id
+        and mdss.price = c.price
+                and mdss.bar_code = c.bar_code
+    LEFT JOIN outStore  d
+      on
+        mdss.store_id = d.store_id
+        and mdss.inv_id = d.inv_id
+        and mdss.price = d.price
+                and mdss.bar_code = c.bar_code
+     <!--LEFT JOIN scrapStore  e
+            on
+                mdss.store_id = e.store_id
+                and mdss.inv_id = e.inv_id
+                and mdss.price = e.price
+                and mdss.bar_code = e.bar_code  
+     -->
+    LEFT JOIN mat_inv_dict mid 
+      ON mdss.group_id = mid.group_id 
+      AND mdss.hos_id = mid.hos_id 
+      AND mdss.copy_code = mid.copy_code 
+      AND mdss.inv_id = mid.inv_id 
+      AND mid.is_stop = 0
+    LEFT JOIN hos_unit hu 
+      ON mid.group_id = hu.group_id 
+      AND mid.hos_id = hu.hos_id 
+      AND mid.unit_code = hu.unit_code 
+    where mdss.group_id = #{group_id,jdbcType=INTEGER} 
+      AND mdss.hos_id = #{hos_id,jdbcType=INTEGER} 
+      AND mdss.copy_code = #{copy_code,jdbcType=VARCHAR} 
+      AND mdss.year = #{year,jdbcType=VARCHAR} 
+      AND mdss.month = #{month,jdbcType=VARCHAR} 
+      <if test="store_id != null and store_id != ''">
+      AND mdss.store_id = #{store_id,jdbcType=INTEGER} 
+      </if>
+      <if test="inv_code != null and inv_code != ''">
+        AND (
+          mid.inv_code like '%' || #{inv_code,jdbcType=VARCHAR} || '%'
+          OR
+          mid.inv_name like '%' || #{inv_code,jdbcType=VARCHAR} || '%'
+          OR
+          mid.spell_code like '%' || #{inv_code,jdbcType=VARCHAR} || '%'
+          OR
+          mid.wbx_code like '%' || #{inv_code,jdbcType=VARCHAR} || '%'
+          OR
+          mid.inv_model like '%' || #{inv_code,jdbcType=VARCHAR} || '%'
+          OR
+          mid.alias like '%' || #{inv_code,jdbcType=VARCHAR} || '%'
+          OR
+          mid.alias_spell like '%' || #{inv_code,jdbcType=VARCHAR} || '%'
+        )
+      </if>
+      order by hsd.store_code,mid.inv_code
+	</select>
+</mapper>
+

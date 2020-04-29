@@ -1,0 +1,346 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.hr.dao.attendancemanagement.leave.HrCheckLeaveMapper">
+	<resultMap type="java.util.Map" id="checkLeaveMap">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="attend_xjapply_code" column="attend_xjapply_code" />
+		<result property="attend_code" column="attend_code" />
+		<result property="attend_xxjapply_code" column="attend_xxjapply_code" />
+	    <result property="emp_id" column="emp_id" />
+		<result property="emp_name" column="emp_name" />
+		<result property="attend_name" column="attend_name" />
+		<result property="dept_name" column="dept_name" />
+		<result property="attend_xjyear" column="attend_xjyear" />
+		<result property="attend_xjreg_date" column="attend_xjreg_date" />
+		<result property="attend_xjdays" column="attend_xjdays" />
+		<result property="attend_xjbegdate" column="attend_xjbegdate" />
+		<result property="attend_xjstate" column="attend_xjstate" />
+		<result property="attend_xjenddate" column="attend_xjenddate" />
+		<result property="attend_xjstate_name" column="attend_xjstate_name" />
+		<result property="attend_xjloginer_name" column="attend_xjloginer_name" />
+		<result property="attend_xjreg_operdate" column="attend_xjreg_operdate" />
+		<result property="attend_xjreviewer_name" column="attend_xjreviewer_name" />
+		<result property="attend_xjreg_reviewdate" column="attend_xjreg_reviewdate" />
+		<result property="attend_xjchecker_name" column="attend_xjchecker_name" />
+		<result property="attend_xjcheckdate" column="attend_xjcheckdate" />
+		<result property="attend_ed" column="attend_ed" />
+		<result property="residue_days" column="residue_days" />
+		<result property="xjdays" column="xjdays" />
+		<result property="attend_xxj_backtime" column="attend_xxj_backtime" />
+		<result property="attend_xxjdays" column="attend_xxjdays" />
+		<result property="xj_type" column="xj_type"/>
+	</resultMap>
+<select id="queryCompensatoryLeave" parameterType="java.util.Map" resultMap="checkLeaveMap">
+ select *
+from (
+  select hx.group_id, hx.hos_id,'' as attend_xxjapply_code, hx.attend_xjapply_code, hx.attend_xjyear
+    , hx.attend_code, hx.emp_id, he.emp_name, ha.attend_name, hd.dept_id
+    , hd.dept_name, to_date(null, 'YYYY/MM/DD') as ATTEND_XXJ_BACKTIME
+    , nvl(null, null) as ATTEND_XXJDAYS, hx.attend_xjreg_date
+    , hx.attend_xjdays, hx.attend_xjbegdate, hx.attend_xjstate, hx.attend_xjenddate
+    , case 
+      when hx.attend_xjstate = 0 then '新建'
+      when hx.attend_xjstate = 1 then '已提交'
+      when hx.attend_xjstate = 2 then '审核通过'
+      when hx.attend_xjstate = 3 then '审核未通过'
+      when hx.attend_xjstate = 4 then '已核定'
+      else ' '
+    end as attend_xjstate_name, he1.user_name as attend_xjloginer_name, hx.attend_xjreg_operdate, he2.user_name as attend_xjreviewer_name, haxj.attend_xjreg_reviewdate
+    , he3.user_name as attend_xjchecker_name, haxj.attend_xjcheckdate, haxje.attend_ed, haxje.attend_ed - hx.attend_xjdays as residue_days
+    , 0 as xj_type
+  from HR_ATTEND_XJAPPLY hx
+  left join HR_ATTEND_ITEM ha on hx.attend_code = ha.attend_code
+  and ha.group_id = hx.group_id
+  and ha.hos_id = hx.hos_id 
+  left join hr_attend_xjed hatt1 on hx.attend_code = hatt1.attend_code
+  and hx.attend_xjyear = hatt1.attend_year
+  and hx.group_id = hatt1.group_id
+  and hx.hos_id = hatt1.hos_id 
+  left join hos_emp he on hx.emp_id = he.emp_id
+  and he.group_id = hx.group_id
+  and he.hos_id = hx.hos_id 
+  left join hos_dept hd on he.dept_id = hd.dept_id
+  and he.group_id = hd.group_id
+  and he.hos_id = hd.hos_id 
+  left join sys_user he1 on he1.user_id = hx.ATTEND_XJLOGINER
+  and he1.group_id = hx.group_id
+  and he1.hos_id = hx.hos_id 
+  left join HR_ATTDENT_XJCHECK haxj on hx.attend_xjapply_code = haxj.attend_xjapply_code
+  and haxj.group_id = hx.group_id
+  and haxj.hos_id = hx.hos_id 
+  left join sys_user he2 on he2.user_id = haxj.ATTEND_XJREVIEWER
+  and he2.group_id = haxj.group_id
+  and he2.hos_id = haxj.hos_id 
+  left join sys_user he3 on he3.user_id = haxj.ATTEND_XJCHECKER
+  and he3.group_id = haxj.group_id
+  and he3.hos_id = haxj.hos_id 
+    left join HR_ATTEND_XJED haxje on hx.emp_id = haxje.emp_id
+  and hx.attend_code = haxje.attend_code
+  and hx.group_id = haxje.group_id
+  and hx.hos_id = haxje.hos_id 
+  where hx.ATTEND_XJSTATE &gt;= 0
+  group by hx.group_id, hx.hos_id, hx.attend_xjapply_code, hx.attend_code, hx.attend_xjyear, hx.attend_code, hx.emp_id, he.emp_name, ha.attend_name, hd.dept_id, hd.dept_name, hx.attend_xjreg_date, hx.attend_xjdays, hx.attend_xjbegdate, hx.attend_xjstate, hx.attend_xjenddate, he1.user_name, hx.attend_xjreg_operdate, he2.user_name, haxj.attend_xjreg_reviewdate, he3.user_name, haxj.attend_xjcheckdate, haxje.attend_ed, ha.hos_id
+  union
+  select hax.group_id, hax.hos_id, hax.attend_xxjapply_code, hax.attend_xxjapply_code as attend_xjapply_code, ha.attend_xjyear
+    , hai.attend_code, he.emp_id, he.emp_name, hai.attend_name, hd.dept_id
+    , hd.dept_name, hax.attend_xxj_backtime, hax.attend_xxjdays, hax.attend_xxjreg_date, ha.attend_xjdays
+    , ha.ATTEND_XJBEGDATE, hax.attend_xjstate, ha.attend_xjenddate
+    , case 
+      when hax.attend_xjstate = 0 then '新建'
+      when hax.attend_xjstate = 1 then '已提交'
+      when hax.attend_xjstate = 2 then '审核通过'
+      when hax.attend_xjstate = 3 then '审核未通过'
+      when hax.attend_xjstate = 4 then '已核定'
+      else ' '
+    end as attend_xxjstate_name, su.user_name as attend_xjloginer_name, hax.ATTEND_XXJREG_DATE, he2.user_name as attend_xjreviewer_name, haxj.Attend_Xjreg_Reviewdate
+    , he3.user_name as attend_xjchecker_name, haxj.Attend_Xjcheckdate, haxje.attend_ed, haxje.attend_ed - ha.ATTEND_XJDAYS as residue_days
+    , 1 as xj_type
+  from HR_ATTEND_XXJAPPLY hax
+  left join HR_ATTEND_XJAPPLY ha on hax.attend_xjapply_code = ha.attend_xjapply_code
+  and hax.group_id = ha.group_id
+  and hax.hos_id = ha.hos_id 
+  left join hr_attend_xjed hatt1 on ha.attend_code = hatt1.attend_code
+  and ha.attend_xjyear = hatt1.attend_year
+  and ha.group_id = hatt1.group_id
+  and ha.hos_id = hatt1.hos_id 
+  left join HR_ATTEND_ITEM hai on hatt1.attend_code = hai.attend_code
+  and hatt1.group_id = hai.group_id
+  and hatt1.hos_id = hai.hos_id 
+  left join hos_emp he on ha.emp_id = he.emp_id
+  and ha.group_id = he.group_id
+  and ha.hos_id = he.hos_id 
+  left join hos_dept hd on he.dept_id = hd.dept_id
+  and he.group_id = hd.group_id
+  and he.hos_id = ha.hos_id 
+  left join sys_user su on su.user_id = hax.attend_xjloginer
+  and su.group_id = hax.group_id
+  and su.hos_id = hax.hos_id 
+  left join HR_ATTDENT_XJCHECK haxj on hax.attend_xxjapply_code = haxj.ATTEND_XJAPPLY_CODE
+  and haxj.group_id = hax.group_id
+  and haxj.hos_id = hax.hos_id 
+  left join sys_user he2 on he2.user_id = haxj.ATTEND_XJREVIEWER
+  and he2.group_id = haxj.group_id
+  and he2.hos_id = haxj.hos_id 
+  left join sys_user he3 on he3.user_id = haxj.ATTEND_XJCHECKER
+  and he3.group_id = haxj.group_id
+  and he3.hos_id = haxj.hos_id 
+    left join HR_ATTEND_XJED haxje on ha.emp_id = haxje.emp_id
+  and ha.group_id = haxje.group_id
+  and ha.hos_id = haxje.hos_id
+  and ha.attend_code = haxje.attend_code 
+  where hax.ATTEND_XJSTATE &gt;= 0
+  group by hax.group_id, hax.hos_id, hax.attend_xjapply_code, ha.attend_xjapply_code, hai.attend_name, hai.attend_code, ha.attend_xjyear, hax.attend_xxjapply_code, he.emp_id, he.emp_name, ha.attend_xjdays, hd.dept_id, hd.dept_name, hax.attend_xxj_backtime, hax.attend_xxjdays, hax.attend_xxjreg_date, ha.ATTEND_XJBEGDATE, hax.attend_xjstate, ha.attend_xjenddate, su.user_name, hax.ATTEND_XXJREG_DATE, he2.user_name, haxj.Attend_Xjreg_Reviewdate, he3.user_name, haxje.attend_ed, haxj.Attend_Xjcheckdate
+)
+<where>                     
+		<if test="group_id != null and group_id != ''">
+		AND group_id = #{group_id,jdbcType=INTEGER}
+		</if>
+		<if test="hos_id != null and hos_id != ''">
+		AND hos_id = #{hos_id,jdbcType=INTEGER}
+		</if>
+		<if test="attend_xjreg_date != null and attend_xjreg_date != ''">
+		AND attend_xjreg_date =to_date(#{attend_xjreg_date},'YYYY/MM/DD')<!--  #{attend_xjreg_date,jdbcType=DATE} -->
+		</if>
+		<if test="emp_id != null and emp_id != ''">
+		AND emp_id = #{emp_id,jdbcType=INTEGER}
+		</if>
+		<if test="attend_code != null and attend_code != ''">
+		AND attend_code = #{attend_code,jdbcType=INTEGER}
+		</if>
+		<if test="dept_id != null and dept_id != ''">
+		AND dept_id = #{dept_id,jdbcType=INTEGER}
+		</if>
+		<if test="xj_type != null and xj_type != ''">
+		AND xj_type = #{xj_type,jdbcType=INTEGER}
+		</if>
+		<if test="attend_xjapply_code != null and attend_xjapply_code != ''">
+		AND attend_xjapply_code like '%${attend_xjapply_code}%'
+		</if>
+		<if test="attend_xjstate != null and attend_xjstate != ''">
+		AND attend_xjstate = #{attend_xjstate,jdbcType=INTEGER}
+		</if>
+		</where>
+
+</select>
+<insert id="auditHrCheckLeaves" parameterType="java.util.List" >
+	
+			<foreach collection="list" item="item" index="index" open="begin" close=";end;" separator=";" >
+		UPDATE HR_ATTDENT_XJCHECK SET
+		
+		attend_xjreviewer =#{item.attend_xjreviewer,jdbcType=INTEGER},
+		attend_xjreg_reviewdate=#{item.attend_xjreg_reviewdate,jdbcType=DATE}
+		where                    
+		 group_id = #{item.group_id,jdbcType=INTEGER}
+		AND hos_id = #{item.hos_id,jdbcType=INTEGER}
+	<if test="item.attend_xjapply_code != null and item.attend_xjapply_code != '' ">
+				and attend_xjapply_code = #{item.attend_xjapply_code}
+			</if>
+		 
+		</foreach>
+		
+		</insert>
+		<update id="checkHrApplyingLeaves"  parameterType="java.util.List">
+		
+			<foreach collection="list" item="item" index="index" open="begin" close=";end;" separator=";" >
+		UPDATE HR_ATTDENT_XJCHECK SET
+		
+		attend_xjchecker =#{item.attend_xjchecker,jdbcType=INTEGER},
+		attend_xjcheckdate=#{item.attend_xjcheckdate,jdbcType=DATE}
+		where                    
+		 group_id = #{item.group_id,jdbcType=INTEGER}
+		AND hos_id = #{item.hos_id,jdbcType=INTEGER}
+	<if test="item.attend_xjapply_code != null and item.attend_xjapply_code != '' ">
+				and attend_xjapply_code = #{item.attend_xjapply_code}
+			</if>
+		 
+		</foreach>
+		
+		</update>
+		
+	<!-- <insert id="addBatchCheckTer" parameterType="java.util.List" >
+	
+		INSERT INTO HR_ATTDENT_XJCHECK (
+	
+	
+		group_id,
+		hos_id,
+		attend_xjapply_code,
+		attend_xxjapply_code,
+		attend_xjreviewer,
+		attend_xjreg_reviewdate
+		
+		
+		) (
+		<foreach collection="list" item="item" index="index" separator=" union all " >
+			select 		
+			#{item.group_id,jdbcType=INTEGER},
+			#{item.hos_id,jdbcType=INTEGER},
+			#{item.attend_xjapply_code,jdbcType=VARCHAR},
+			#{item.attend_xxjapply_code,jdbcType=VARCHAR},
+			#{item.attend_xjreviewer,jdbcType=INTEGER},
+			#{item.attend_xjreg_reviewdate,jdbcType=DATE}
+		    from dual
+		</foreach>
+		)
+		</insert> -->
+		
+		<insert id="addBatchCheck" parameterType="java.util.List" >
+	
+		INSERT INTO HR_ATTDENT_XJCHECK (
+	
+	
+		group_id,
+		hos_id,
+		attend_xjapply_code,
+		attend_xjreviewer,
+		attend_xjreg_reviewdate
+		
+		
+		)(
+		<foreach collection="list" item="item" index="index" separator=" union all " >
+			SELECT 		
+			#{item.group_id,jdbcType=INTEGER},
+			#{item.hos_id,jdbcType=INTEGER},
+			#{item.attend_xjapply_code,jdbcType=VARCHAR},
+			#{item.attend_xjreviewer,jdbcType=INTEGER},
+			#{item.attend_xjreg_reviewdate,jdbcType=DATE}
+		    from dual
+		</foreach>
+		)
+		</insert>
+		<insert id="addBatch" parameterType="java.util.List" >
+	
+		INSERT INTO HR_EMP_HOLIDAY (
+		group_id,
+		hos_id,
+		emp_id,
+		attend_xjapply_code,
+		attend_code,
+		attend_xjyear,
+		attend_xjbegdate,
+		attend_xjenddate,
+		attend_xjdays,
+		attend_ed,
+		attend_left_ed
+		)(
+		<foreach collection="list" item="item" index="index" separator=" union all " >
+			SELECT 		
+			#{item.group_id,jdbcType=INTEGER},
+			#{item.hos_id,jdbcType=INTEGER},
+			#{item.emp_id,jdbcType=INTEGER},
+			#{item.attend_xjapply_code,jdbcType=VARCHAR},
+			#{item.attend_code,jdbcType=VARCHAR},
+			#{item.attend_xjyear,jdbcType=VARCHAR},
+			to_date(#{item.attend_xjbegdate},'YYYY/MM/DD'),
+			to_date(#{item.attend_xjenddate},'YYYY/MM/DD'),
+			#{item.attend_xjdays,jdbcType=INTEGER},
+			#{item.attend_ed,jdbcType=INTEGER},
+			#{item.attend_left_ed,jdbcType=INTEGER}
+		    from dual
+		</foreach>
+		)
+		</insert>
+		
+		
+		<insert id="addBatchTerminate" parameterType="java.util.List" >
+	
+		INSERT INTO HR_EMP_HOLIDAY (
+		group_id,
+		hos_id,
+		emp_id,
+		attend_xjapply_code,
+		attend_xxjapply_code,
+		attend_code,
+		attend_xjyear,
+		attend_xjbegdate,
+		attend_xjenddate,
+		attend_xjdays,
+		attend_ed,
+		attend_xxj_backtime, 
+		attend_xxjdays,
+		attend_left_ed
+		) (
+		<foreach collection="list" item="item" index="index" separator=" union all " >
+			select 	
+			#{item.group_id,jdbcType=INTEGER},
+			#{item.hos_id,jdbcType=INTEGER},
+			#{item.emp_id,jdbcType=INTEGER},
+			#{item.attend_xjapply_code,jdbcType=VARCHAR},
+			#{item.attend_xxjapply_code,jdbcType=VARCHAR},
+			#{item.attend_code,jdbcType=VARCHAR},
+			#{item.attend_xjyear,jdbcType=VARCHAR},
+			to_date(#{item.attend_xjbegdate},'YYYY/MM/DD'),
+			to_date(#{item.attend_xjenddate},'YYYY/MM/DD'),
+			#{item.attend_xjdays,jdbcType=INTEGER},
+			#{item.attend_ed,jdbcType=INTEGER},
+			to_date(#{item.attend_xxj_backtime},'YYYY/MM/DD'),
+			#{item.attend_xxjdays,jdbcType=INTEGER},
+			#{item.attend_left_ed,jdbcType=INTEGER}
+		    from dual
+		</foreach>
+		)
+		</insert>
+	<delete id="deleteBatchCheck" parameterType="java.util.List">
+	<foreach collection="list" index="index" item="item" open="begin"
+		separator=";" close=";end;">
+		DELETE FROM HR_EMP_HOLIDAY
+		where
+		group_id = #{item.group_id}
+		and hos_id = #{item.hos_id}
+		and attend_xjapply_code = #{item.attend_xjapply_code}
+
+	</foreach>
+</delete>
+<delete id="deleteCheck" parameterType="java.util.List">
+	<foreach collection="list" index="index" item="item" open="begin"
+		separator=";" close=";end;">
+		DELETE FROM HR_ATTDENT_XJCHECK
+		where
+		group_id = #{item.group_id}
+		and hos_id = #{item.hos_id}
+		and attend_xjapply_code = #{item.attend_xjapply_code}
+   
+	</foreach></delete>
+		
+</mapper>

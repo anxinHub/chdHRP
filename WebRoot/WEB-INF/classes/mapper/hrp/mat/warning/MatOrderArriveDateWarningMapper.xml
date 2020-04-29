@@ -1,0 +1,278 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.mat.dao.warning.MatOrderArriveDateWarningMapper">
+	
+	<!-- 材料证件效期预警  查询  -->
+	<select id="queryMatOrderArriveDateWarning" resultType="java.util.Map"  parameterType="java.util.Map" >
+		with order_tmp as ( <!--订单量  -->
+		      select b.sup_id,b.sup_no,b.sup_code,b.sup_name,nvl(count(0),0) counts
+		      from mat_order_main a
+		      left join hos_sup_dict b on a.group_id=b.group_id and a.hos_id=b.hos_id and a.sup_id=b.sup_id and a.sup_no=b.sup_no
+		      <where>
+		      		<if test="group_id != null and group_id != ''">
+						AND a.group_id = #{group_id,jdbcType=INTEGER}
+					</if>
+					<if test="hos_id != null and hos_id != ''">
+						AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+					</if>
+					<if test="copy_code != null and copy_code != ''">
+						AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+					</if>
+					<if test="sup_id != null and sup_id != ''">
+						AND a.sup_id = #{sup_id,jdbcType=INTEGER}
+					</if>
+					<if test="begin_date != null and begin_date != '' and end_date !=null and end_date != '' ">
+						AND to_char(a.order_date,'yyyy-MM-dd') between #{begin_date} and #{end_date}
+					</if>
+					and a.state &gt;= 2
+		      </where>
+		      group by b.sup_id,b.sup_no,b.sup_code,b.sup_name
+		), deal_tmp as ( <!--已处理数量  -->
+		      select b.sup_code,b.sup_name,nvl(count(0),0) counts
+		      from mat_order_main a
+		      left join hos_sup_dict b on a.group_id=b.group_id and a.hos_id=b.hos_id and a.sup_id=b.sup_id and a.sup_no=b.sup_no
+		      <where>
+		      		<if test="group_id != null and group_id != ''">
+						AND a.group_id = #{group_id,jdbcType=INTEGER}
+					</if>
+					<if test="hos_id != null and hos_id != ''">
+						AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+					</if>
+					<if test="copy_code != null and copy_code != ''">
+						AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+					</if>
+					<if test="sup_id != null and sup_id != ''">
+						AND a.sup_id = #{sup_id,jdbcType=INTEGER}
+					</if>
+					<if test="begin_date != null and begin_date != '' and end_date !=null and end_date != '' ">
+						AND to_char(a.order_date,'yyyy-MM-dd') between #{begin_date} and #{end_date}
+					</if>
+					and a.state = 5
+		      </where>
+		      group by b.sup_code,b.sup_name
+		),over_tmp as (<!--逾期量 -->
+		      select b.sup_code,b.sup_name,nvl(count(0),0) counts
+		      from mat_order_main a
+		      left join hos_sup_dict b on a.group_id=b.group_id and a.hos_id=b.hos_id and a.sup_id=b.sup_id and a.sup_no=b.sup_no
+		      <where>
+		      		<if test="group_id != null and group_id != ''">
+						AND a.group_id = #{group_id,jdbcType=INTEGER}
+					</if>
+					<if test="hos_id != null and hos_id != ''">
+						AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+					</if>
+					<if test="copy_code != null and copy_code != ''">
+						AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+					</if>
+					<if test="sup_id != null and sup_id != ''">
+						AND a.sup_id = #{sup_id,jdbcType=INTEGER}
+					</if>
+					<if test="begin_date != null and begin_date != '' and end_date !=null and end_date != '' ">
+						AND to_char(a.order_date,'yyyy-MM-dd') between #{begin_date} and #{end_date}
+					</if>
+					<if test="query_date != null and query_date != '' ">
+						and  ROUND(TO_NUMBER(a.arrive_date - TRUNC(to_date(#{query_date}, 'yyyy-MM-dd'), 'dd'))) &lt; 0
+					</if>
+					and a.state = 2
+		      </where>
+		      group by b.sup_code,b.sup_name
+		),due_tmp as (<!--到期量  -->
+		      select b.sup_code,b.sup_name,nvl(count(0),0) counts
+		      from mat_order_main a
+		      left join hos_sup_dict b on a.group_id=b.group_id and a.hos_id=b.hos_id and a.sup_id=b.sup_id and a.sup_no=b.sup_no
+		      <where>
+		      		<if test="group_id != null and group_id != ''">
+						AND a.group_id = #{group_id,jdbcType=INTEGER}
+					</if>
+					<if test="hos_id != null and hos_id != ''">
+						AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+					</if>
+					<if test="copy_code != null and copy_code != ''">
+						AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+					</if>
+					<if test="sup_id != null and sup_id != ''">
+						AND a.sup_id = #{sup_id,jdbcType=INTEGER}
+					</if>
+					<if test="begin_date != null and begin_date != '' and end_date !=null and end_date != '' ">
+						AND to_char(a.order_date,'yyyy-MM-dd') between #{begin_date} and #{end_date}
+					</if>
+					<if test="query_date != null and query_date != '' ">
+						and  ROUND(TO_NUMBER(a.arrive_date - TRUNC(to_date(#{query_date}, 'yyyy-MM-dd'), 'dd'))) = 0
+					</if>
+					and a.state = 2
+		      </where>
+		      group by b.sup_code,b.sup_name
+		),wdue_tmp as (<!--未到期量  -->
+		 	  select b.sup_code,b.sup_name,nvl(count(0),0) counts
+		      from mat_order_main a
+		      left join hos_sup_dict b on a.group_id=b.group_id and a.hos_id=b.hos_id and a.sup_id=b.sup_id and a.sup_no=b.sup_no
+		      <where>
+		      		<if test="group_id != null and group_id != ''">
+						AND a.group_id = #{group_id,jdbcType=INTEGER}
+					</if>
+					<if test="hos_id != null and hos_id != ''">
+						AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+					</if>
+					<if test="copy_code != null and copy_code != ''">
+						AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+					</if>
+					<if test="sup_id != null and sup_id != ''">
+						AND a.sup_id = #{sup_id,jdbcType=INTEGER}
+					</if>
+					<if test="begin_date != null and begin_date != '' and end_date !=null and end_date != '' ">
+						AND to_char(a.order_date,'yyyy-MM-dd') between #{begin_date} and #{end_date}
+					</if>
+					<if test="query_date != null and query_date != '' ">
+						and  ROUND(TO_NUMBER(a.arrive_date - TRUNC(to_date(#{query_date}, 'yyyy-MM-dd'), 'dd'))) &gt; 0
+					</if>
+					and a.state = 2
+		      </where>
+		      group by b.sup_code,b.sup_name
+		)
+		
+		select aa.sup_id,aa.sup_no,aa.sup_code,aa.sup_name,aa.counts order_num ,nvl(bb.counts,0) deal_count ,
+			nvl(cc.counts,0) over_tmp,nvl(dd.counts,0) wdue_tmp
+		from order_tmp aa
+		left join deal_tmp bb on aa.sup_code=bb.sup_code  --处理
+		left join over_tmp cc on cc.sup_code=aa.sup_code  --过期
+		left join due_tmp dd on dd.sup_code=aa.sup_code   --到期
+		left join wdue_tmp ee on aa.sup_code=ee.sup_code  --未到期
+		<where>
+			<if test="state == 1 ">
+				and ee.counts &gt; 0
+			</if>
+			<if test="state == 2 ">
+				and dd.counts &gt; 0
+			</if>
+			<if test="state == 3 ">
+				AND cc.counts &gt; 0
+			</if>
+		</where>
+		order by aa.sup_code
+		
+		<!-- select a.order_code,e.sup_code,e.sup_name,a.check_date,c.inv_code,c.inv_name,c.inv_model,
+			d.unit_name,b.amount,to_date(#{query_date}, 'yyyy-MM-dd') AS querydate,
+       		a.arrive_date,
+       		nvl(ROUND(TO_NUMBER(a.arrive_date - TRUNC(to_date(#{query_date}, 'yyyy-MM-dd'), 'dd'))), 0) AS days
+		from mat_order_main a
+		left join mat_order_detail b on a.group_id=b.group_id and a.hos_id=b.hos_id and a.copy_code=b.copy_code 
+         and a.order_id=b.order_id
+	    left join mat_inv_dict c on b.group_id=c.group_id and b.hos_id=c.hos_id and b.copy_code=c.copy_code
+	         and b.inv_id=c.inv_id and b.inv_no=c.inv_no
+	    left join hos_unit d on c.group_id=d.group_id and c.hos_id=d.hos_id and c.unit_code=d.unit_code and d.is_stop=0
+	    left join hos_sup_dict e on a.group_id=e.group_id and a.hos_id=e.hos_id and a.sup_id=e.sup_id and a.sup_no=e.sup_no
+	    <where>
+	    	and a.state = 2
+	    	<if test="group_id != null and group_id != ''">
+				AND a.group_id = #{group_id,jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			</if>
+			<if test="sup_id != null and sup_id != ''">
+				AND a.sup_id = #{sup_id,jdbcType=INTEGER}
+			</if>
+			<if test="order_code != null and order_code != ''">
+				AND a.order_code like '%${order_code}%'
+			</if>
+			<if test="check_date != null and check_date != ''">
+				AND a.check_date = to_date(#{check_date},'yyyy-MM-dd')
+			</if>
+			<if test="inv_code != null and inv_code != ''">
+				AND (
+						c.inv_code like '%${inv_code}%'
+					or upper(c.inv_name) like '%${inv_code}%'
+					or upper(c.inv_model) like '%${inv_code}%'
+					or upper(c.spell_code) like '%${inv_code}%'
+					or upper(c.wbx_code) like '%${inv_code}%'
+					or upper(c.bid_code) like '%${inv_code}%'
+					or lower(c.spell_code) like '%${inv_code}%'
+					or lower(c.bid_code) like '%${inv_code}%'
+					or lower(c.wbx_code) like '%${inv_code}%'
+					or lower(c.inv_name) like '%${inv_code}%'
+					or c.alias like '%${inv_code}%'
+				)
+			</if>
+			<if test="state == 1 ">
+				AND ROUND(TO_NUMBER(a.arrive_date - TRUNC(to_date(#{query_date}, 'yyyy-MM-dd'), 'dd'))) &gt; 0
+			</if>
+			<if test="state == 2 ">
+				AND ROUND(TO_NUMBER(a.arrive_date - TRUNC(to_date(#{query_date}, 'yyyy-MM-dd'), 'dd'))) = 0
+			</if>
+			<if test="state == 3 ">
+				AND ROUND(TO_NUMBER(a.arrive_date - TRUNC(to_date(#{query_date}, 'yyyy-MM-dd'), 'dd'))) &lt; 0
+			</if>
+	    </where> 
+	    order by a.order_id desc -->
+	</select>
+	
+	<!-- 查询订单信息 -->
+	<select id="queryMatOrderInvInfo" resultType="java.util.Map"  parameterType="java.util.Map" >
+		select a.order_code,a.brif,e.sup_code,e.sup_name,f.dept_code,f.dept_name,a.arrive_date,a.check_date,
+			c.inv_code,c.inv_name,c.inv_model,d.unit_name,b.amount,nvl(b.amount,0)-nvl(mior.amount,0) as undeal_amount
+	    from mat_order_main a
+	    left join mat_order_detail b  on a.group_id=b.group_id and a.hos_id=b.hos_id and a.copy_code=b.copy_code
+	      	and a.order_id=b.order_id
+	    left join mat_inv_dict c on b.group_id=c.group_id and b.hos_id=c.hos_id and b.copy_code=c.copy_code
+	      	and b.inv_id=c.inv_id and b.inv_no=c.inv_no
+	    left join hos_unit d on c.group_id=d.group_id and c.hos_id=d.hos_id and c.unit_code=d.unit_code and d.is_stop=0
+	    left join hos_sup_dict e on a.group_id=e.group_id and a.hos_id=e.hos_id and a.sup_id=e.sup_id and a.sup_no=e.sup_no
+	    left join hos_dept_dict f on a.group_id=f.group_id and a.hos_id=f.hos_id and a.dept_id=f.dept_id and a.dept_no=f.dept_no
+		left join (
+		     select group_id,hos_id,copy_code,order_id,order_detail_id,sum(nvl(in_amount,0)) amount
+		     from mat_in_order_rela
+		     <where>
+		     	<if test="group_id != null and group_id != ''">
+					AND group_id = #{group_id,jdbcType=INTEGER}
+				</if>
+				<if test="hos_id != null and hos_id != ''">
+					AND hos_id = #{hos_id,jdbcType=INTEGER}
+				</if>
+				<if test="copy_code != null and copy_code != ''">
+					AND copy_code = #{copy_code,jdbcType=VARCHAR}
+				</if>
+		     </where> 
+		     group by group_id,hos_id,copy_code,order_id,order_detail_id
+		) mior on b.group_id=mior.group_id and b.hos_id=mior.hos_id and b.copy_code=mior.copy_code 
+		  	and b.order_id=mior.order_id and b.order_detail_id=mior.order_detail_id
+		<where>
+			<if test="group_id != null and group_id != ''">
+				AND a.group_id = #{group_id,jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			</if>
+			<if test="sup_id != null and sup_id != ''">
+				AND a.sup_id = #{sup_id,jdbcType=INTEGER}
+			</if>
+			<if test="order_code != null and order_code != ''">
+				AND a.order_code like '%${order_code}%'
+			</if>
+			<if test="begin_date != null and begin_date != '' and end_date !=null and end_date != '' ">
+				AND to_char(a.order_date,'yyyy-MM-dd') between #{begin_date} and #{end_date}
+			</if>
+			 <if test="state == 1 ">
+				and a.state &gt;= 2
+			</if> 
+			<if test="state == 2 ">
+				and  a.state=5
+			</if>
+			<if test="state == 3 ">
+				and  ROUND(TO_NUMBER(a.arrive_date - TRUNC(to_date(#{query_date}, 'yyyy-MM-dd'), 'dd')))  &lt; 0
+				and a.state=2
+			</if>
+			<if test="state == 4 ">
+				and  ROUND(TO_NUMBER(a.arrive_date - TRUNC(to_date(#{query_date}, 'yyyy-MM-dd'), 'dd'))) &gt; 0
+				and a.state=2
+			</if>
+		</where>
+		order by  a.order_code desc 
+	</select>
+</mapper>
+

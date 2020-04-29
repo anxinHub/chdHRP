@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.acc.dao.AccMedRateMapper">
+
+	<resultMap id="medRateMap" type="java.util.Map">
+	<result property="group_id" column="group_id"/>
+	<result property="hos_id" column="hos_id"/>
+	<result property="copy_code" column="copy_code"/>
+	<result property="dept_id" column="dept_id"/>
+	<result property="dept_no" column="dept_no"/>
+	<result property="dept_code" column="dept_code"/>
+	<result property="dept_name" column="dept_name"/>
+	
+	<result property="sumIncome" column="sumIncome"/>
+	<result property="medIncome" column="medIncome"/>
+	<result property="rate" column="rate"/>
+	</resultMap>
+	
+	<!-- 科室药占比查询 -->
+	<select id="queryMedRate" parameterType="java.util.Map" resultMap="medRateMap" >
+		
+		with temp as (select c.subj_code , c.subj_name , b.acc_date , d.dept_id ,d.dept_no ,
+						d.dept_code ,d.dept_name , a.credit  
+				from ACC_VOUCH_CHECK a
+				left join acc_vouch b
+				      on
+				          a.group_id = b.group_id
+				          and a.hos_id = b.hos_id
+				          and a.copy_code = b.copy_code
+				          and a.vouch_id = b.vouch_id
+				left join acc_subj c
+				     on
+				          a.group_id = c.group_id
+				          and a.hos_id = c.hos_id
+				          and a.copy_code = c.copy_code
+				          and a.acc_year = c.acc_year
+				          and a.subj_code = c.subj_code
+				left join hos_dept_dict d
+				     on
+				          a.group_id = d.group_id
+				          and a.hos_id = d.hos_id
+				          and a.check1_id = d.dept_id
+				          and a.check1_no = d.dept_no
+				          
+				where 
+					a.group_id = #{group_id,jdbcType=INTEGER}
+					AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+					AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+					and a.check1_id is not null
+					and c.subj_code like '410101%'
+					and b.vouch_date between to_date('${startDate}','yyyy-mm-dd') and to_date('${endDate}','yyyy-mm-dd')
+		),
+		
+		sumtemp as ( select dept_id , dept_no , dept_code ,dept_name , sum(credit) sumIncome 
+					from temp group by dept_id , dept_no , dept_code ,dept_name
+		) ,
+		medtemp as ( select dept_id , dept_no , dept_code ,dept_name , nvl(sum(credit),0.00) medIncome 
+					from temp where  subj_code like '4101010108%'or subj_code like '4101010209%' 
+					group by dept_id , dept_no , dept_code ,dept_name
+		),
+		
+		basetemp as (select a.dept_id, a.dept_no ,a.dept_code, a.dept_name ,a.sumIncome , b.medIncome  
+				from sumtemp a
+		        left join medtemp b
+		            on
+		                 a.dept_id = b.dept_id
+		                 and a.dept_no = b.dept_no
+		)
+		                 
+		select a.group_id , a.hos_id ,a.dept_id , a.dept_no ,a.dept_code , a.dept_name , 
+			sum(b.sumIncome) sumIncome ,sum(b.medIncome) medIncome , case when nvl(sum(b.medIncome),0) =0 then '0.00%' 
+			when nvl(sum(b.sumIncome),0) = 0 then '0.00%' else round(sum(b.medIncome)/sum(b.sumIncome)*100,2) || '%' end rate  
+		from hos_dept_dict  a
+		      
+        left join basetemp b
+             on
+                  b.dept_code  like (a.dept_code ||'%')
+                  and a.is_stop = 0
+      	where a.dept_id = #{dept_id,jdbcType=INTEGER}
+      	group by a.group_id , a.hos_id ,a.dept_id , a.dept_no ,a.dept_code , a.dept_name
+      	order by a.dept_code
+
+	</select>
+	
+</mapper>
+

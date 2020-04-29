@@ -1,0 +1,436 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.cost.dao.director.CostRevenueAnalysisMapper">
+
+		<select id="queryCostDeptRevenueConstitute" parameterType="java.util.Map" resultType="java.util.Map">
+             
+          with dept_income as(
+							select 
+							 appl_dept.dept_code,
+							 appl_dept.dept_name,
+							 sum(ci.money) money
+							from cost_income ci
+							left join hos_dept_dict appl_dept
+							on appl_dept.group_id = ci.group_id
+							and appl_dept.hos_id = ci.hos_id
+							and appl_dept.dept_id = ci.appl_dept_id
+							and appl_dept.dept_no = ci.appl_dept_no
+							where ci.group_id = #{group_id}
+							and ci.hos_id = #{hos_id}
+							and ci.copy_code = #{copy_code}
+							
+							and to_char(ci.appl_dept_id) in (
+				                select b.perm_code
+				                from v_user_data_perm b
+				                where b.group_id = #{group_id}
+					            and b.hos_id = #{hos_id}
+					            and b.user_id = #{user_id}
+					            and b.table_code = 'HOS_DEPT_DICT'
+					            and (b.is_write = 1
+						        or b.is_read = 1)
+			                    ) 
+							
+							and ci.acc_year || ci.acc_month between #{year_month_begin} and #{year_month_end}
+							<if test="dept_code != null and dept_code != ''">
+				              and appl_dept.dept_code like #{dept_code}||'%'
+				            </if>
+							group by appl_dept.dept_code,appl_dept.dept_name
+					),income_sum as (
+					     select sum(money) money from dept_income
+					 )
+					 select 
+					  t.dept_code,
+						t.dept_name,
+						t.money t_1,
+						divide(t.money,	t1.money) t_2
+					 from dept_income t
+					 left join income_sum  t1
+					 on 1 = 1 
+					 union all
+					 select 
+					  '',
+						'合计',
+						sum(t.money),
+						sum(divide(t.money,	t1.money))
+					 from dept_income t 
+					 left join income_sum  t1
+					 on 1 = 1 
+		</select>
+		
+		
+		<select id="queryCostDeptRevenueConstitutePrint" parameterType="java.util.Map" resultType="java.util.Map">
+             
+          with dept_income as(
+							select 
+							 appl_dept.dept_code,
+							 appl_dept.dept_name,
+							 sum(ci.money) money
+							from cost_income ci
+							left join hos_dept_dict appl_dept
+							on appl_dept.group_id = ci.group_id
+							and appl_dept.hos_id = ci.hos_id
+							and appl_dept.dept_id = ci.appl_dept_id
+							and appl_dept.dept_no = ci.appl_dept_no
+							where ci.group_id = #{group_id}
+							and ci.hos_id = #{hos_id}
+							and ci.copy_code = #{copy_code}
+							
+							and to_char(ci.appl_dept_id) in (
+				                select b.perm_code
+				                from v_user_data_perm b
+				                where b.group_id = #{group_id}
+					            and b.hos_id = #{hos_id}
+					            and b.user_id = #{user_id}
+					            and b.table_code = 'HOS_DEPT_DICT'
+					            and (b.is_write = 1
+						        or b.is_read = 1)
+			                    ) 
+							
+							and ci.acc_year || ci.acc_month between #{year_month_begin} and #{year_month_end}
+							<if test="dept_code != null and dept_code != ''">
+				              and appl_dept.dept_code like #{dept_code}||'%'
+				            </if>
+							group by appl_dept.dept_code,appl_dept.dept_name
+					),income_sum as (
+					     select sum(money) money from dept_income
+					 )
+					 select 
+					  t.dept_code,
+						t.dept_name,
+						t.money t_1,
+						to_char(divide(t.money,	t1.money)*100,'fm9999990.00') || '%' t_2
+					 from dept_income t
+					 left join income_sum  t1
+					 on 1 = 1 
+					 union all
+					 select 
+					  '',
+						'合计',
+						sum(t.money),
+						to_char(sum(divide(t.money,	t1.money))*100,'fm9999990.00') || '%' t_2
+					 from dept_income t 
+					 left join income_sum  t1 
+					 on 1 = 1 
+		</select>
+		
+		<select id="queryCostDeptRevenueTrend" parameterType="java.util.Map" resultType="java.util.Map">
+              
+       with income as (
+                select 
+					 ci.acc_year || ci.acc_month year_month,
+					 appl_dept.dept_code,
+					 appl_dept.dept_name,
+					 sum(ci.money) money
+					from cost_income ci
+					left join hos_dept_dict appl_dept
+					on ci.group_id = appl_dept.group_id
+					and ci.hos_id = appl_dept.hos_id
+					and ci.appl_dept_id = appl_dept.dept_id
+					and ci.appl_dept_no = appl_dept.dept_no
+					where ci.group_id = #{group_id}
+					and ci.hos_id = #{hos_id}
+					and ci.copy_code = #{copy_code}
+					and ci.acc_year || ci.acc_month between #{year_month_begin} and #{year_month_end}
+					<if test="dept_code != null and dept_code != ''">
+				         and appl_dept.dept_code like #{dept_code}||'%'
+				    </if>
+				    and to_char(appl_dept.dept_id) in (
+					     select b.perm_code
+					     from v_user_data_perm b
+					     where b.group_id = #{group_id}
+						 and b.hos_id = #{hos_id}
+						 and b.user_id = #{user_id}
+						 and b.table_code = 'HOS_DEPT_DICT'
+						 and (b.is_write = 1
+							or b.is_read = 1) )
+					group by ci.acc_year,ci.acc_month,appl_dept.dept_code,appl_dept.dept_name
+					order by ci.acc_year || ci.acc_month
+			)select 
+				 dept_code
+				,dept_name
+				${selectHead}
+			 from income
+			 group by dept_code,dept_name
+			 union all
+			 select 
+				 ''
+				,'合计'
+				${selectHead}
+			 from income
+		</select>
+		
+		<select id="queryCostDeptRevenueTrendEcharts" parameterType="java.util.Map" resultType="java.util.Map">
+                with income as (
+			        select ci.acc_year || ci.acc_month as year_month, appl_dept.dept_code, appl_dept.dept_name
+			          , sum(ci.money) as money
+			        from cost_income ci
+			          left join hos_dept_dict appl_dept on ci.group_id = appl_dept.group_id
+			        and ci.hos_id = appl_dept.hos_id
+			        and ci.appl_dept_id = appl_dept.dept_id
+			        and ci.appl_dept_no = appl_dept.dept_no 
+			        where ci.group_id = #{group_id}
+			          and ci.hos_id = #{hos_id}
+			          and ci.copy_code = #{copy_code}
+			          and ci.acc_year || ci.acc_month between #{year_month_begin} and #{year_month_end}
+			          <if test="dept_code_str != null and dept_code_str != ''">
+				         and appl_dept.dept_code in ${dept_code_str}
+				     </if>
+			        group by ci.acc_year, ci.acc_month, appl_dept.dept_code, appl_dept.dept_name
+			        order by ci.acc_year || ci.acc_month
+			      )
+			    select dept_code,dept_name,year_month,sum(money) money
+			    from income
+				group by grouping sets ((dept_code,dept_name,year_month), dept_code)
+				order by dept_code,dept_name,year_month
+				
+		</select>
+		
+		
+		
+		<select id="queryCostDeptRevenueCompare" parameterType="java.util.Map" resultType="java.util.Map">
+                with dept as (
+				    select 
+						 hdd.dept_id,
+						 hdd.dept_no,
+						 hdd.dept_code,
+						 hdd.dept_name
+						from hos_dept_dict hdd
+						left join acc_dept_attr ada
+						on ada.group_id = hdd.group_id
+						and ada.hos_id = hdd.hos_id
+						and ada.dept_id = hdd.dept_id
+						where hdd.group_id = #{group_id}
+						and hdd.hos_id = #{hos_id}
+						and ada.natur_code in ('01','02') 
+						and hdd.is_last = 1
+						<if test="dept_code != null and dept_code != ''">
+				         and hdd.dept_code like #{dept_code}||'%'
+				       </if>
+				         and to_char(hdd.dept_id) in (
+					     select b.perm_code
+					     from v_user_data_perm b
+					     where b.group_id = #{group_id}
+						 and b.hos_id = #{hos_id}
+						 and b.user_id = #{user_id}
+						 and b.table_code = 'HOS_DEPT_DICT'
+						 and (b.is_write = 1
+							or b.is_read = 1))
+					),income as (
+					   select 
+						  ci.appl_dept_id dept_id,
+							ci.appl_dept_no dept_no,
+							sum(ci.money) money
+						 from cost_income ci
+						 where ci.group_id = #{group_id}
+						 and ci.hos_id = #{hos_id}
+						 and ci.copy_code = #{copy_code}
+						 and ci.acc_year || ci.acc_month between #{year_month_begin} and #{year_month_end}
+					   group by ci.appl_dept_id,ci.appl_dept_no
+					 ),p_income as (
+					   select 
+						  ci.appl_dept_id dept_id,
+							ci.appl_dept_no dept_no,
+							sum(ci.money) money
+						 from cost_income ci
+						 where ci.group_id = #{group_id}
+						 and ci.hos_id = #{hos_id}
+						 and ci.copy_code = #{copy_code}
+						 and ci.acc_year || ci.acc_month = to_char(add_months(trunc(to_date(#{year_month_begin}||'01','yyyy/mm/dd')),-1),'YYYYmm')
+					   group by ci.appl_dept_id,ci.appl_dept_no
+					 ),s_income as (
+					   select 
+						  ci.appl_dept_id dept_id,
+							ci.appl_dept_no dept_no,
+							sum(ci.money) money
+						 from cost_income ci
+						 where ci.group_id = #{group_id}
+						 and ci.hos_id = #{hos_id}
+						 and ci.copy_code = #{copy_code}
+						 and ci.acc_year || ci.acc_month 
+						 between to_char(add_months(trunc(to_date(#{year_month_begin}||'01','yyyy/mm/dd')),-12),'YYYYmm')
+						 and to_char(add_months(trunc(to_date(#{year_month_end}||'01','yyyy/mm/dd')),-12),'YYYYmm')
+					   group by ci.appl_dept_id,ci.appl_dept_no
+					 ) select 
+					   t.dept_id,
+						 t.dept_no,
+						 t.dept_code,
+						 t.dept_name,
+						 t1.money t_1,
+						 t2.money t_2,
+						 t1.money - t2.money t_3,
+						 divide((t1.money - t2.money),t2.money) * 100 t_4,
+						 t3.money t_5,
+						 t1.money - t3.money t_6,
+						 divide((t1.money - t3.money),t3.money) * 100 t_7,
+						 t1.money t_8
+					 from dept  t
+					 left join income t1
+					 on t.dept_id = t1.dept_id
+					 and t.dept_no = t1.dept_no
+					 left join p_income t2
+					 on t.dept_id = t2.dept_id
+					 and t.dept_no = t2.dept_no 
+					 left join s_income t3
+					 on t.dept_id = t3.dept_id
+					 and t.dept_no = t3.dept_no
+					 where nvl(t1.money,0) + nvl(t2.money,0) +  nvl(t3.money,0) != 0
+					  union all
+					 select 
+					     null,
+						 null,
+						 '',
+						 '合计',
+						 sum(t1.money),
+						 sum(t2.money) ,
+						 sum(t1.money) - sum(t2.money) ,
+						 divide((sum(t1.money) - sum(t2.money)),sum(t2.money)) * 100 ,
+						 sum(t3.money) ,
+						 sum(t1.money) - sum(t3.money) ,
+						 divide((sum(t1.money) - sum(t3.money)),sum(t3.money)) * 100,
+						 sum(t1.money)
+					 from dept  t
+					 left join income t1
+					 on t.dept_id = t1.dept_id
+					 and t.dept_no = t1.dept_no
+					 left join p_income t2
+					 on t.dept_id = t2.dept_id
+					 and t.dept_no = t2.dept_no 
+					 left join s_income t3
+					 on t.dept_id = t3.dept_id
+					 and t.dept_no = t3.dept_no 
+		</select>
+		
+		
+		<select id="queryCostDeptRevenueOpeningOrder" parameterType="java.util.Map" resultType="java.util.Map">
+			  with temp as(
+			       select 
+						     ada.natur_code,
+						     appl_hdd.dept_code appl_dept_code,
+							 decode(grouping(ada.natur_code)+grouping(appl_hdd.dept_code),2,'总计',1,'合计', appl_hdd.dept_name) appl_dept_name,
+							 exex_hdd.dept_code exec_dept_code,
+							 exex_hdd.dept_name exec_dept_name,
+							 sum(ci.money) money
+			        from cost_income ci
+							left join hos_dept_dict appl_hdd
+							on ci.group_id = appl_hdd.group_id
+							and ci.hos_id = appl_hdd.hos_id
+							and ci.appl_dept_id = appl_hdd.dept_id
+							and ci.appl_dept_no = appl_hdd.dept_no
+							left join acc_dept_attr ada
+							on ada.group_id = appl_hdd.group_id
+							and ada.hos_id = appl_hdd.hos_id
+							and ada.dept_id = appl_hdd.dept_id
+							left join hos_dept_dict exex_hdd
+							on ci.group_id = exex_hdd.group_id
+							and ci.hos_id = exex_hdd.hos_id
+							and ci.exec_dept_id = exex_hdd.dept_id
+							and ci.exec_dept_no = exex_hdd.dept_no
+			        where ci.group_id = #{group_id}
+			          and ci.hos_id = #{hos_id}
+			          and ci.copy_code = #{copy_code}
+			          and ci.acc_year || ci.acc_month between #{year_month_begin} and #{year_month_end}
+					  and ada.natur_code in ('01','02')
+					  <if test="appl_dept_code != null and appl_dept_code != ''">
+				         and appl_hdd.dept_code like #{appl_dept_code}||'%'
+				      </if>
+				      <if test="exec_dept_code != null and exec_dept_code != ''">
+				         and exex_hdd.dept_code like #{exec_dept_code}||'%'
+				      </if>
+				       <if test="state ==1 or state == '1'">
+				         and appl_hdd.dept_code = exex_hdd.dept_code
+				       </if>
+				       <if test="state ==2 or state == '2'">
+				         and appl_hdd.dept_code != exex_hdd.dept_code
+				      </if>
+				        and to_char(appl_hdd.dept_id) in (
+					     select b.perm_code
+					     from v_user_data_perm b
+					     where b.group_id =  #{group_id}
+						 and b.hos_id = #{hos_id}
+						 and b.user_id = #{user_id}
+						 and b.table_code = 'HOS_DEPT_DICT'
+						 and (b.is_write = 1
+							or b.is_read = 1))
+					  group by grouping sets ((ada.natur_code,appl_hdd.dept_code,appl_hdd.dept_name,exex_hdd.dept_code,exex_hdd.dept_name),
+					  ada.natur_code,null)
+					)select 
+					  natur_code,
+					  appl_dept_code,
+						appl_dept_name,
+						exec_dept_code,
+						exec_dept_name,
+						money,
+						to_char(divide(money,sum_money)* 100, 'fm9999990.00') || '%' t
+					 from temp
+					 left join (
+					  select money sum_money from temp where appl_dept_name = '总计'
+					 )on 1 = 1
+		</select>
+		
+		
+		<select id="queryCostDeptRevenueImplement" parameterType="java.util.Map" resultType="java.util.Map">
+               with temp as (
+				         select 
+							exex_hdd.dept_code exec_dept_code,
+						    exex_hdd.dept_name exec_dept_name, 
+						    appl_hdd.dept_code appl_dept_code,
+				            appl_hdd.dept_name appl_dept_name,
+							sum(ci.money) as money
+				        from cost_income ci
+				        left join hos_dept_dict appl_hdd on ci.group_id = appl_hdd.group_id
+				        and ci.hos_id = appl_hdd.hos_id
+				        and ci.appl_dept_id = appl_hdd.dept_id
+				        and ci.appl_dept_no = appl_hdd.dept_no 
+				        left join acc_dept_attr ada on ada.group_id = appl_hdd.group_id
+				        and ada.hos_id = appl_hdd.hos_id
+				        and ada.dept_id = appl_hdd.dept_id 
+				          left join hos_dept_dict exex_hdd on ci.group_id = exex_hdd.group_id
+				        and ci.hos_id = exex_hdd.hos_id
+				        and ci.exec_dept_id = exex_hdd.dept_id
+				        and ci.exec_dept_no = exex_hdd.dept_no 
+				        where ci.group_id = #{group_id}
+				          and ci.hos_id = #{hos_id}
+				          and ci.copy_code = #{copy_code}
+				          and ci.acc_year || ci.acc_month between #{year_month_begin} and #{year_month_end}
+				          <if test="exec_dept_code != null and exec_dept_code != ''">
+					         and exex_hdd.dept_code like #{exec_dept_code}||'%'
+					      </if>
+				          	  <if test="appl_dept_code != null and appl_dept_code != ''">
+				            and appl_hdd.dept_code like #{appl_dept_code}||'%'
+					      </if>
+					       <if test="state ==1 or state == '1'">
+				          and appl_hdd.dept_code = exex_hdd.dept_code
+				         </if>
+				            <if test="state ==2 or state == '2'">
+					         and appl_hdd.dept_code != exex_hdd.dept_code
+					      </if>
+				          and ada.natur_code in ('01', '02')
+				             and to_char(exex_hdd.dept_id) in (
+						     select b.perm_code
+						     from v_user_data_perm b
+						     where b.group_id = #{group_id}
+							 and b.hos_id = #{hos_id}
+							 and b.user_id = #{user_id}
+							 and b.table_code = 'HOS_DEPT_DICT'
+							 and (b.is_write = 1
+								or b.is_read = 1))
+				        group by grouping sets ((appl_hdd.dept_code, appl_hdd.dept_name, exex_hdd.dept_code, exex_hdd.dept_name),null)
+				      ),temp_sum as(
+							  select sum(money) sum_money from temp where exec_dept_code is not null
+								and appl_dept_code is not null
+							)
+							select  
+								exec_dept_code,
+								exec_dept_name,
+								appl_dept_code,
+								appl_dept_name,
+								money,
+								to_char(divide(money,sum_money)* 100, 'fm9999990.00') || '%' t
+							from temp 
+							left join temp_sum
+							on 1 = 1
+		</select>
+		
+
+</mapper>
+

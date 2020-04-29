@@ -1,0 +1,265 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.hpm.dao.AphiDeptAvgBonusDataMapper">
+
+	<resultMap id="deptAvgBonusData" type="com.chd.hrp.hpm.entity.AphiDeptAvgBonusData">
+        <result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+        <result property="copy_code" column="copy_code"/>
+        <result property="dept_id" column="dept_id"/>
+		<result property="dept_no" column="dept_no"/>
+        <result property="acct_year" column="acct_year"/>
+        <result property="acct_month" column="acct_month"/>
+        <result property="dept_name" column="dept_name"/>
+        <result property="dept_bonus" column="dept_bonus"/>
+        <result property="emp_count" column="emp_count"/>
+        <result property="dept_avg_bonus" column="dept_avg_bonus"/>
+        <result property="clinc_avg_bonus" column="clinc_avg_bonus"/>
+        
+        <result property="scheme_seq_no" column="scheme_seq_no"/>
+		<result property="item_code" column="item_code"/>
+		<result property="item_name" column="item_name"/>
+		<result property="formula_code" column="formula_code"/>
+		<result property="method_code" column="method_code"/>
+	</resultMap>
+	
+        <!-- useGeneratedKeys="true" keyProperty="xxx" for sqlserver and mysql -->
+    <insert id="addDeptAvgBonusData" useGeneratedKeys="true" >
+    
+        INSERT INTO aphi_dept_avg_bonus_data (
+            group_id ,
+			hos_id ,
+            copy_code ,
+            dept_id,
+			dept_no ,
+            acct_year ,
+            acct_month ,
+            dept_bonus ,
+            emp_count ,
+            dept_avg_bonus ,
+            clinc_avg_bonus 
+        ) VALUES (
+            #{group_id} ,
+			#{hos_id} ,
+            #{copy_code} ,
+            #{dept_id} ,
+			#{dept_no} ,
+            #{acct_year} ,
+            #{acct_month} ,
+            #{dept_bonus} ,
+            #{emp_count} ,
+            #{dept_avg_bonus} ,
+            #{clinc_avg_bonus} 
+        )
+    
+    </insert>
+	<insert id="initDeptAvgBonusData" useGeneratedKeys="true">
+	
+	select adbd.group_id,adbd.hos_id,
+	adbd.copy_code,adbd.acct_year,adbd.acct_month,adbd.dept_id,
+sum(adbd.bonus_money) as dept_bonus, count(ae.dept_id) as emp_count
+from aphi_dept_bonus_data adbd 
+left join aphi_item ai 
+on 
+	adbd.group_id= ai.group_id and
+	adbd.hos_id= ai.hos_id and 
+	adbd.copy_code = ai.copy_code and adbd.item_code = ai.item_code 
+left join aphi_dept ad on adbd.comp_code = ad.comp_code and adbd.copy_code =ad.copy_code and adbd.dept_id=ad.dept_id
+left join aphi_emp ae on adbd.comp_code = ae.comp_code and adbd.copy_code = ae.copy_code and adbd.dept_id = ae.dept_id
+where adbd.acct_year =#{acct_year}  and adbd.acct_month = #{acct_month} 
+and ai.is_avg='1' and ad.is_avg = '1' and adbd.comp_code=#{comp_code}  and adbd.copy_code=#{copy_code} 
+group by adbd.comp_code,adbd.copy_code,adbd.acct_year,adbd.acct_month,adbd.dept_id
+	<!--  
+	按照指标中的值 取数据
+	insert into aphi_dept_avg_bonus_data
+(
+comp_code,
+copy_code,
+acct_year,
+acct_month,
+dept_code,
+dept_bonus,
+emp_count
+)
+select adbd.comp_code,adbd.copy_code,adbd.acct_year,adbd.acct_month,adbd.dept_code,
+sum(adbd.bonus_money) as dept_bonus, adtd.target_value as emp_count
+from aphi_dept_bonus_data adbd 
+left join aphi_item ai on adbd.comp_code= ai.comp_code and adbd.copy_code = ai.copy_code and adbd.item_code = ai.item_code 
+left join aphi_dept ad on adbd.comp_code = ad.comp_code and adbd.copy_code =ad.copy_code and adbd.dept_code=ad.dept_code
+left join aphi_dept_target_data adtd on adbd.comp_code= adtd.comp_code and adbd.copy_code = adtd.copy_code 
+and adbd.dept_code = adtd.dept_code  and adbd.acct_year = adtd.acct_year and adbd.acct_month = adtd.acct_month
+//left join aphi_emp ae on adbd.comp_code = ae.comp_code and adbd.copy_code = ae.copy_code and adbd.dept_code = ae.dept_code
+
+where adbd.acct_year =#{acct_year}  and adbd.acct_month = #{acct_month} 
+and ai.is_avg='1' and ad.is_avg = '1' and  adtd.target_code='k003' and adbd.comp_code=#{comp_code}  and adbd.copy_code=#{copy_code} 
+group by adbd.comp_code,adbd.copy_code,adbd.acct_year,adbd.acct_month,adbd.dept_code,adtd.target_value ;
+-->
+	</insert>
+	<update id="updateDeptAvgBonusData" parameterType="java.util.Map">
+    
+        UPDATE aphi_dept_avg_bonus_data SET 
+	        dept_avg_bonus = #{dept_avg_bonus}   , 
+	        clinc_avg_bonus = #{clinc_avg_bonus} 
+        WHERE 
+	        comp_code = #{comp_code}   and 
+	        copy_code = #{copy_code}   and 
+	        acct_year = #{acct_year}   and 
+	        acct_month = #{acct_month}   and 
+	         dept_id = #{dept_id}
+	        <if test="dept_no != null and dept_no != ''">
+                  AND dept_no = #{dept_no}
+            </if>
+   
+	</update>
+
+    <delete id="deleteDeptAvgBonusData" parameterType="java.util.Map">
+   
+        DELETE FROM aphi_dept_avg_bonus_data 
+        <where>                     
+			    <if test="comp_code != null and comp_code != ''">
+                    AND comp_code = #{comp_code}
+               </if>
+               <if test="copy_code != null and copy_code != ''">
+                    AND copy_code = #{copy_code}
+               </if>
+               <if test="acct_year != null and acct_year != ''">
+                    AND acct_year = #{acct_year}
+               </if>
+               <if test="acct_month != null and acct_month != ''">
+                    AND acct_month = #{acct_month}
+               </if>
+               <if test="dept_id != null and dept_id != ''">
+                  AND dept_id = #{dept_id}
+            </if>
+            <if test="dept_no != null and dept_no != ''">
+                  AND dept_no = #{dept_no}
+            </if>
+        </where>
+
+    </delete>
+
+    <delete id="deleteDeptAvgBonusDataById" parameterType="String">
+   
+        DELETE FROM aphi_dept_avg_bonus_data WHERE id=id
+   
+    </delete>
+    
+    <select id="queryDeptAvgBonusDataByCode" resultType="com.chd.hrp.hpm.entity.AphiDeptAvgBonusData" parameterType="string" >
+	  
+        SELECT 
+            comp_code,
+            copy_code,
+            acct_year,
+            acct_month,
+            dept_id,
+            dept_no,
+            dept_bonus,
+            emp_count,
+            dept_avg_bonus,
+            clinc_avg_bonus
+		FROM aphi_dept_avg_bonus_data 
+	        WHERE 
+		        comp_code = #{comp_code}   and 
+		        copy_code = #{copy_code}   and 
+		        acct_year = #{acct_year}   and 
+		        acct_month = #{acct_month}  
+		        AND dept_id = #{dept_id}
+	        <if test="dept_no != null and dept_no != ''">
+                  AND dept_no = #{dept_no}
+            </if>
+        
+	</select>
+	<select id="queryDeptAvgBonusData"  resultType="java.util.TreeMap" >
+      
+SELECT
+		adss.scheme_seq_no,
+		adabd.comp_code,
+		adabd.copy_code,
+		adabd.acct_year,
+		adabd.acct_month,
+		adbd.item_code,
+		ai.item_name,
+		<if test="sql != null and sql != ''">
+			${sql}
+		</if>
+		adabd.dept_bonus,
+		adabd.dept_avg_bonus,
+		adabd.clinc_avg_bonus,
+		adabd.emp_count,
+		adabd.dept_id,
+		ad.dept_name,
+		adss.formula_code,
+		adss.method_code
+FROM aphi_dept_avg_bonus_data adabd 
+left join aphi_scheme_conf scheme on adabd.comp_code = scheme.comp_code and adabd.copy_code = scheme.copy_code and adabd.acct_year = scheme.acct_year and adabd.acct_month = scheme.acct_month
+left join aphi_dept_bonus_data adbd on adabd.comp_code = adbd.comp_code and adabd.copy_code = adbd.copy_code and adabd.dept_id = adbd.dept_id and
+			adabd.acct_year = adbd.acct_year and adabd.acct_month = adbd.acct_month
+left join aphi_dept ad on adabd.comp_code = ad.comp_code and adabd.copy_code = ad.copy_code and adabd.dept_id = ad.dept_id
+left join aphi_item ai on adbd.comp_code = ai.comp_code and adbd.copy_code = ai.copy_code and adbd.item_code = ai.item_code
+left join aphi_dept_scheme_Seq adss on adbd.comp_code = adss.comp_code and adbd.copy_code = adss.copy_code and 
+			adbd.dept_id= adss.dept_id and adbd.item_code= adss.item_code  and scheme.scheme_seq_no= adss.scheme_seq_no
+            <where>                     
+			    <if test="comp_code != null and comp_code != ''">
+                    AND adabd.comp_code = #{comp_code}
+               </if>
+			    <if test="copy_code != null and copy_code != ''">
+                    AND adabd.copy_code = #{copy_code}
+               </if>
+			    <if test="acct_year != null and acct_year != ''">
+                    AND adabd.acct_year = #{acct_year}
+               </if>
+			    <if test="acct_month != null and acct_month != ''">
+                    AND adabd.acct_month = #{acct_month}
+               </if>
+			    <if test="dept_id != null and dept_id != ''">
+	                  AND adabd.dept_id = #{dept_id}
+	            </if>
+	            <if test="dept_no != null and dept_no != ''">
+	                  AND adabd.dept_no = #{dept_no}
+	            </if>
+        </where>   
+group by
+		adss.scheme_seq_no,adabd.comp_code,adabd.copy_code,adabd.acct_year,adabd.acct_month,adbd.item_code,ai.item_name,adabd.dept_code,ad.dept_name,
+		adss.formula_code,adss.method_code,adbd.bonus_money,adabd.dept_bonus,adabd.dept_avg_bonus,adabd.emp_count,adabd.clinc_avg_bonus
+				order by adabd.dept_id asc
+    </select>
+    
+    	<select id="queryDeptAvgBonusDataByCollect"   parameterType="java.util.Map"  resultMap="deptAvgBonusData" >
+      
+SELECT
+		adabd.comp_code,
+		adabd.copy_code,
+		adabd.acct_year,
+		adabd.acct_month,
+		adabd.dept_bonus,
+		adabd.dept_avg_bonus,
+		adabd.clinc_avg_bonus,
+		adabd.emp_count,
+		adabd.dept_id
+FROM aphi_dept_avg_bonus_data adabd 
+            <where>                     
+			    <if test="comp_code != null and comp_code != ''">
+                    AND adabd.comp_code = #{comp_code}
+               </if>
+			    <if test="copy_code != null and copy_code != ''">
+                    AND adabd.copy_code = #{copy_code}
+               </if>
+			    <if test="acct_year != null and acct_year != ''">
+                    AND adabd.acct_year = #{acct_year}
+               </if>
+			    <if test="acct_month != null and acct_month != ''">
+                    AND adabd.acct_month = #{acct_month}
+               </if>
+			    <if test="dept_id != null and dept_id != ''">
+                  AND adabd.dept_id = #{dept_id}
+            </if>
+            <if test="dept_no != null and dept_no != ''">
+                  AND adabd.dept_no = #{dept_no}
+            </if>
+        </where>   
+
+				order by adabd.dept_id asc
+    </select>
+	
+</mapper>
+

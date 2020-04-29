@@ -1,0 +1,72 @@
+﻿<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.acc.dao.autovouch.accamortize.AccAmortizeDeptMapper">
+	<resultMap id="result" type="java.util.Map">
+        <result property="apply_code" column="apply_code"/>
+        <result property="dept_id" column="dept_id"/>
+        <result property="dept_name" column="dept_name"/>
+        <result property="dept_code" column="dept_code"/>
+        <result property="amortize_coefficient" column="amortize_coefficient"/>
+	</resultMap>
+
+	<select id="query" parameterType="java.util.Map" resultMap="result">
+		select a.apply_code,a.dept_id,a.AMORTIZE_COEFFICIENT,c.dept_name,c.dept_code
+		from ACC_AMORTIZE_DEPT a 
+		left join HOS_DEPT_DICT c on a.group_id = c.group_id and a.hos_id = c.hos_id and a.dept_id = c.dept_id and c.is_stop = 0
+		<where>
+			a.group_id = #{group_id}
+			and a.hos_id = #{hos_id}
+			and a.copy_code = #{copy_code}
+			and a.apply_code = #{apply_code}
+			<if test="dept_id != null and dept_id != ''">
+				and a.dept_id = #{dept_id}
+			</if>
+			<if test="dept_name != null and dept_name != ''">
+				and a.dept_name like '%'||#{dept_name}||'%'
+			</if>
+		</where>
+	</select>
+
+
+	<insert id="addBatch" parameterType="java.util.Map">
+		insert into ACC_AMORTIZE_DEPT (
+			group_id, hos_id, copy_code, apply_code, dept_id, AMORTIZE_COEFFICIENT
+		) select t.* from(
+		<foreach collection="list" item="item" index="index"
+			separator=" union all ">
+			select
+			#{item.group_id,jdbcType=INTEGER},
+			#{item.hos_id,jdbcType=INTEGER},
+			#{item.copy_code,jdbcType=VARCHAR},
+			#{item.apply_code,jdbcType=VARCHAR},
+			#{item.dept_id,jdbcType=INTEGER},
+			#{item.amortize_coefficient,jdbcType=NUMERIC}
+			from dual
+		</foreach>
+		)t
+	</insert>
+	
+	<delete id="deleteAmortizeDeptList" parameterType="java.util.List">
+		DELETE FROM ACC_AMORTIZE_DEPT WHERE
+		<foreach collection="list" index="index" item="item" open="("
+			separator="or" close=")">
+			apply_code = #{item.apply_code}
+			and group_id = #{item.group_id}
+			and hos_id = #{item.hos_id}
+			and copy_code = #{item.copy_code}
+			and dept_id = #{item.dept_id}
+		</foreach>
+	</delete>
+	
+	<delete id="deleteBatch" parameterType="java.util.List">
+		DELETE FROM ACC_AMORTIZE_DEPT WHERE
+		<foreach collection="list" index="index" item="item" open="("
+			separator="or" close=")">
+			apply_code = #{item.apply_code}
+			and group_id = #{item.group_id}
+			and hos_id = #{item.hos_id}
+			and copy_code = #{item.copy_code}
+		</foreach>
+	</delete>
+	
+</mapper>

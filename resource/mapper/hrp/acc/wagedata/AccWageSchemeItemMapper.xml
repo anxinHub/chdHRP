@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.acc.dao.wagedata.AccWageSchemeItemMapper">
+	<resultMap id="accWageSchemeItem" type="com.chd.hrp.acc.entity.AccWageSchemeItem">
+        <result property="detail_id" column="detail_id"/>
+        <result property="scheme_id" column="scheme_id"/>
+        <result property="column_item" column="column_item"/>
+        <result property="item_code" column="item_code"/>
+        <result property="item_name" column="item_name"/>
+	</resultMap>
+	
+    <insert id="addAccWageSchemeItem" useGeneratedKeys="true" >
+        INSERT INTO ACC_WAGE_SCHEME_ITEM (
+                   
+                    detail_id
+			 ,
+                    scheme_id
+			 ,
+			 		column_item
+        ) VALUES (
+
+					ACC_WAGE_SCHEME_ITEM_SEQ.nextval
+			 ,
+                    #{scheme_id}
+			 ,
+			 		#{column_item}
+        )
+    </insert>
+    
+	<insert id="addBatchAccWageSchemeItem" parameterType="java.util.List" >
+    
+        INSERT INTO ACC_WAGE_SCHEME_ITEM (
+        
+                    detail_id
+			 ,
+                    scheme_id
+			 ,
+			 		column_item
+			 
+        ) 
+        select ACC_WAGE_SCHEME_ITEM_SEQ.nextval,a.* from (
+		 <foreach collection="list" item="item" index="index" separator=" union all " >
+        select
+         		
+					#{item.scheme_id, jdbcType=INTEGER}
+			 ,
+			 		#{item.column_item, jdbcType=VARCHAR}	
+		
+		 from dual 
+		</foreach>
+    	) a
+    </insert>
+
+	<update id="updateAccWageSchemeItem" parameterType="java.util.Map">
+    
+        UPDATE ACC_WAGE_SCHEME_ITEM SET
+        
+        	column_item = #{column_item}
+        	
+        WHERE 
+        
+		 detail_id = #{detail_id}
+			  and 
+		 scheme_id = #{scheme_id}
+		     
+   
+	</update>
+	<update id="updateBatchAccWageSchemeItem" parameterType="java.util.List">
+     
+	<foreach collection="list" item="item" index="index" open="begin" close="end;" separator=";" >
+        UPDATE ACC_WAGE_SCHEME SET
+			 
+			column_item = #{item.column_item}
+        	
+        WHERE 
+		 scheme_id = #{item.scheme_id}
+			  and 
+		 detail_id = #{item.detail_id}
+			 
+    </foreach>
+	</update>
+
+    <delete id="deleteAccWageSchemeItem" parameterType="java.util.Map">
+   
+        DELETE FROM ACC_WAGE_SCHEME_ITEM WHERE
+	        <!-- detail_id = #{detail_id} -->  
+	        scheme_id = #{scheme_id}
+   
+    </delete>
+    <delete id="deleteBatchAccWageSchemeItem" parameterType="java.util.List">
+        DELETE FROM ACC_WAGE_SCHEME_ITEM WHERE
+		<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+	            
+                     scheme_id = #{item.scheme_id}
+               
+                   and  column_item = #{item.column_item}
+                
+		</foreach>
+        
+   
+    </delete>
+    
+    <select id="queryAccWageSchemeItemByCode" resultType="com.chd.hrp.acc.entity.AccWageSchemeItem" parameterType="string" >
+	  
+        SELECT 
+            		detail_id
+			 ,
+                    scheme_id
+			 ,
+                    column_item
+			 
+			 
+		FROM ACC_WAGE_SCHEME_ITEM
+	        WHERE
+	        detail_id = #{detail_id}  
+        
+	</select>
+      
+	<select id="queryAccWageSchemeItem" parameterType="java.util.Map" resultMap="accWageSchemeItem" >
+        select awi.item_code,
+        	   awi.item_name,
+        	   awsi.column_item,
+        	   awsi.scheme_id
+        from ACC_WAGE_SCHEME_ITEM awsi
+		left join acc_wage_item awi 
+			   on awsi.column_item=awi.column_item
+        <where>                     
+			<if test="detail_id != null and detail_id != ''">
+                AND awsi.detail_id = #{detail_id}
+            </if>
+			<if test="scheme_id != null and scheme_id != ''">
+                AND awsi.scheme_id = #{scheme_id}
+            </if>
+			<if test="emp_id != null and emp_id != ''">
+                AND awsi.emp_id = #{emp_id}
+            </if>
+            <if test="group_id != null and group_id != ''">
+                AND awi.group_id = #{group_id}
+            </if>
+            <if test="hos_id != null and hos_id != ''">
+                AND awi.hos_id = #{hos_id}
+            </if>
+            <if test="copy_code != null and copy_code != ''">
+                AND awi.copy_code = #{copy_code}
+            </if>
+            <if test="acc_year != null and acc_year != ''">
+                AND awi.acc_year = #{acc_year}
+            </if>
+            <if test="wage_code != null and wage_code != ''">
+                AND awi.wage_code = #{wage_code}
+            </if>
+            <if test="item_code != null and item_code != ''">
+                AND (
+                       awi.item_code like '%${item_code}%'
+                    or awi.item_name like '%${item_code}%'
+                    or awi.WBX_CODE like upper('%${item_code}%')
+                    or awi.SPELL_CODE like upper('%${item_code}%')
+                )
+            </if>
+        </where>   
+		order by awi.sort_code,awi.item_code
+    </select>
+    
+    <select id="queryAccWageSchemeItemList" parameterType="java.util.Map" resultMap="accWageSchemeItem" >
+      
+        select  #{scheme_id} scheme_id,column_item 
+        from acc_wage_item where group_id = #{group_id} and hos_id=#{hos_id}
+        and copy_code = #{copy_code} and acc_year=#{acc_year} and wage_code =#{wage_code}
+    </select>
+    
+	
+</mapper>
+

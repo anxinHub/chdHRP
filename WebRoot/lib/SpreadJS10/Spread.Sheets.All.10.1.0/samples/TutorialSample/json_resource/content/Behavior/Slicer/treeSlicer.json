@@ -1,0 +1,112 @@
+﻿{
+  "title": "树形切片器用例",
+  "segments": [
+    [
+      { "description": "你可以使用表格切片器数据构建自己的切片器数据。下面展示如何构建一个树形切片器：" },
+      { "description": "(1) 构建自定义的表格切片器数据。" },
+      {
+        "code": [
+          "function TreeSlicerData(table, treeColumns) {",
+          "    GC.Spread.Sheets.Slicers.TableSlicerData.call(this, table);",
+          "    this.listeners = [];",
+          "    this.suspended = false;",
+          "    ...",
+          "}",
+          "TreeSlicerData.prototype = GC.Spread.Sheets.Slicers.TableSlicerData.prototype;",
+          "TreeSlicerData.prototype.constructor = TreeSlicerData;"
+        ]
+      },
+      { "description": "(2) 重写表格切片器数据的接口来满足自定义需求。" },
+      {
+        "code": [
+          "// inherit attachListener function of TableSlicerData",
+          "TreeSlicerData.prototype.attachListener = function (listener) {",
+          "    // Some code omitted here, you can see it on the right.",
+          "    ...",
+          "};",
+          "// inherit dettachListener function of TableSlicerData",
+          "TreeSlicerData.prototype.dettachListener = function (listener) {",
+          "    ...",
+          "};"
+        ]
+      },
+      { "description": "(3) 实现调用表格切片器接口的函数。" },
+      {
+        "code": [
+          "TreeSlicerData.prototype.filter = function (path) {",
+          "    this.suspended = true;",
+          "    if (this.lastFilterPath) {",
+          "        for (var i = 0; i < this._lastFilterPath.length; i++) {",
+          "            // invoke TableSlicerData API function",
+          "            this.doUnfilter(this.treeColumns[i]);",
+          "        }",
+          "    }",
+          "    this.lastFilterPath = path;",
+          "    var current = this.treeData;",
+          "    for (var i = 0; i < path.length; i++) {",
+          "        ...",
+          "        // invoke TableSlicerData API function",
+          "        this.doFilter(this.treeColumns[i], { exclusiveRowIndexes: [exclusiveIndex] });",
+          "    }",
+          "};"
+        ]
+      },
+      { "description": "(4) 构建基于自定义表格切片器数据的切片器。" },
+      {
+        "code": [
+          "function TreeSlicer(slicerData, treeColumns) {",
+          "  slicerData.buildDataTree();",
+          "  this.data = slicerData;",
+          "  this.slicerData = slicerData;",
+          "  this.treeColumns = treeColumns;",
+          "  this.treeDatas = slicerData.treeData;",
+          "  this.slicerData.attachListener(this);",
+          "  this.onDataLoaded();",
+          "}",
+          "TreeSlicer.prototype.constructor = TreeSlicer;"
+        ]
+      },
+      { "description": "(5) 构建切片器界面并在恰当的时机调用筛选方法。" },
+      {
+        "code": [
+          "TreeSlicer.prototype.onDataLoaded = function () {",
+          "    ...",
+          "    $(treeItems.allDoms).addClass('treeSlicer_Item').mousedown(function (obj) {",
+          "        ...",
+          "        if (treeItem === treeItems) {",
+          "            self.data.clearFilter();    // invoke TableSlicerData function",
+          "        }",
+          "        else if (treeItem) {",
+          "        if (treeItem === treeItems) {",
+          "            ...",
+          "            self.data.filter(path);    // invoke TableSlicerData function",
+          "        }",
+          "    });",
+          "    ...",
+          "};"
+        ]
+      },
+      { "description": "(6) 构建Spread并添加一个表格。" },
+      {
+        "code": [
+          "spread = new GC.Spread.Sheets.Workbook($('#ss')[0]);",
+          "var sheet = spread.getActiveSheet();",
+          "sheet.suspendPaint();",
+			    "// add data to sheet",
+			    "...",
+          "sheet.tables.add('table1', 0, 0, 6, 5);",
+          "sheet.resumePaint();"
+        ]
+      },
+      { "description": "(7) 构建自定义表格切片器数据实例并附加在自定义切片器上，将切片器至于页面的DOM树上。" },
+      {
+        "code": [
+          "var table = sheet.tables.find(0, 0);",
+          "var dataSource = new TreeSlicerData(table, ['Continent', 'Country', 'City']);",
+          "var treeSlicer = new TreeSlicer(dataSource, ['Continent', 'Country', 'City']);",
+          "$('#slicer_Tree').append(treeSlicer.getDOMElement());"
+        ]
+      }
+    ]
+  ]
+}

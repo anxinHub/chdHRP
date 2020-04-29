@@ -1,0 +1,426 @@
+﻿<!doctype html>
+<html>
+<head>
+    <title>Spread.Sheets - Data Aggregation Slicer User Case</title>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+    
+    <link href="../../../external/spreadjs/css/gc.spread.sheets.excel2013white.10.1.0.css" rel="stylesheet" type="text/css" />
+
+    <script src="../../../external/external/jquery-1.8.2.min.js" type="text/javascript"></script>
+
+    <script type="text/javascript" src="../../../external/spreadjs/gc.spread.sheets.all.10.1.0.min.js"></script>
+    
+    <script id="scriptInit" type="text/javascript">
+        /*code_begin*/
+        $(document).ready(function () {
+            var spread = new GC.Spread.Sheets.Workbook(document.getElementById("ss"));
+            initSpread(spread);            
+        });
+
+        function initSpread(spread) {
+            $.ajax({
+                url: "AggregateData_json.txt",
+                datatype: "text",
+                success: function (data) {
+                    try {
+                        var sd = JSON.parse(data);
+                        if (sd && sd.sheets) {
+                            if (!spread) {
+                                return;
+                            }
+                            spread.suspendPaint();
+                            spread.fromJSON(sd);
+                            spread.resumePaint();
+                            addAggregationSlicer(spread);
+                        }
+                    } catch (ex) {
+                        alert("init spread with exception: " + ex);
+                    }
+                },
+                error: function (ex) {
+                    alert(ex);
+                }
+            });
+        }
+
+        function addAggregationSlicer(spread) {
+            var sheet = spread.getActiveSheet();
+            var table = sheet.tables.find(0, 0);
+            var dataSource = new AggregationSlicerData(sheet, table, 1, 5);
+            var timeSlicer = new TimelineSlicer(dataSource, "Date");
+            $("#slicer_Timeline").append(timeSlicer.getHeader());
+            $("#slicer_Timeline").append(timeSlicer.getDOMElement());
+            timeSlicer.attachEventsToHeader();
+        }
+        
+        var AggregationSlicerData_YEAR = 0, AggregationSlicerData_MONTH = 1, AggregationSlicerData_OTHER = 2;
+        function AggregationSlicerData(sheet, table, dataStartIndex, dataEndIndex) {
+            GC.Spread.Sheets.Slicers.TableSlicerData.call(this, table);
+            this.dateGroup = { years: [] };
+            this.listeners = [];
+            this.dataStartIndex = dataStartIndex;
+            this.dataEndIndex = dataEndIndex;
+            this.sheet = sheet;
+        }
+        AggregationSlicerData.prototype = GC.Spread.Sheets.Slicers.TableSlicerData.prototype;
+        AggregationSlicerData.prototype.constructor = AggregationSlicerData;
+        AggregationSlicerData.prototype.buildDateGroups = function (columnName) {
+            var allDates = this.getExclusiveData(columnName);
+            var dateGroup = this.dateGroup;
+            for (var dateIndex = 0; dateIndex < allDates.length; dateIndex++) {
+                var value = this.getOneRecordValue(columnName, dateIndex);
+                var date = new Date(allDates[dateIndex]);
+                var year = date.getFullYear(), month = date.getMonth(), day = date.getDate();
+                var yearGroup = dateGroup[year];
+                if (!yearGroup) {
+                    yearGroup = dateGroup[year] = { value: 0, monthes: [], indexes: [] };
+                    dateGroup.years.push(year);
+                }
+                var monthGroup = yearGroup[month];
+                if (!monthGroup) {
+                    monthGroup = yearGroup[month] = { value: 0, days: [], indexes: [] };
+                    yearGroup.monthes.push(month);
+                }
+                var dayGroup = monthGroup[day];
+                if (!dayGroup) {
+                    dayGroup = monthGroup[day] = { value: 0 };
+                    monthGroup.days.push(day);
+                }
+                yearGroup.value += value;
+                monthGroup.value += value;
+                dayGroup.value += value;
+                yearGroup.indexes.push(dateIndex);
+                monthGroup.indexes.push(dateIndex);
+            }
+        };
+        AggregationSlicerData.prototype.getOneRecordValue = function (columnName, exclusiveIndex) {
+            var columnIndexes = this.getRowIndexes(columnName, exclusiveIndex);
+            var sheet = this.sheet, table = this.getTable(), dataRangeInSheet = table.dataRange(), startRow = dataRangeInSheet.row, startCol = dataRangeInSheet.col, result = 0;
+            for (var r = 0; r < columnIndexes.length; r++) {
+                for (var c = this.dataStartIndex; c <= this.dataEndIndex; c++) {
+                    var value = sheet.getValue(columnIndexes[r] + startRow, c + startCol);
+                    result += value;
+                }
+            }
+            return result;
+        };
+        AggregationSlicerData.prototype.getDatasByYear = function () {
+            var dateGroup = this.dateGroup;
+            var years = dateGroup.years;
+            var result = [];
+            for (var i = 0; i < years.length; i++) {
+                var year = years[i];
+                result.push({ title: year, value: dateGroup[year].value });
+            }
+            return result;
+        };
+        AggregationSlicerData.prototype.getMonthDatasByYear = function (year) {
+            var dateGroup = this.dateGroup;
+            var yearGroup = dateGroup[year], monthes = yearGroup.monthes;
+            var result = [];
+            for (var i = 0; i < monthes.length; i++) {
+                var month = monthes[i];
+                result.push({ title: month, value: yearGroup[month].value });
+            }
+            return result;
+        };
+        AggregationSlicerData.prototype.getDayDatasByMonth = function (year, month) {
+            var dateGroup = this.dateGroup;
+            var yearGroup = dateGroup[year], monthGroup = yearGroup[month], days = monthGroup.days;
+            var result = [];
+            for (var i = 0; i < days.length; i++) {
+                var day = days[i];
+                result.push({ title: day, value: monthGroup[day].value });
+            }
+            return result;
+        };
+        AggregationSlicerData.prototype.filterOnYear = function (columnName, year) {
+            var yearGroup = this.dateGroup[year];
+            var indexes = yearGroup.indexes;
+            this.mode = AggregationSlicerData_YEAR;
+            this.doFilter(columnName, { exclusiveRowIndexes: indexes });
+            this.mode = AggregationSlicerData_OTHER;
+        };
+        AggregationSlicerData.prototype.filterOnMonth = function (columnName, year, month) {
+            var yearGroup = this.dateGroup[year];
+            var monthGroup = yearGroup[month];
+            var indexes = monthGroup.indexes;
+            this.mode = AggregationSlicerData_MONTH;
+            this.doFilter(columnName, { exclusiveRowIndexes: indexes });
+            this.mode = AggregationSlicerData_OTHER;
+        };
+        AggregationSlicerData.prototype.onFiltered = function (filteredIndexes, isPreview) {
+            for (var i = 0; i < this.listeners.length; i++) {
+                this.listeners[i].onFiltered({ columnIndexes: filteredIndexes, isPreview: isPreview, mode: this.mode });
+            }
+        };
+        AggregationSlicerData.prototype.attachListener = function (listener) {
+            this.listeners.push(listener);
+        };
+        AggregationSlicerData.prototype.dettachListener = function (listener) {
+            for (var i = 0; i < this.listeners.length; i++) {
+                if (this.listeners[i] === listener) {
+                    this.listeners.splice(i);
+                    break;
+                }
+            }
+        };
+        AggregationSlicerData.prototype.clearFilter = function (columnName) {
+            this.doUnfilter(columnName);
+        };
+
+        var Bar = (function () {
+            function Bar(title, value, x, width, disable) {
+                if (disable === void 0) { disable = false; }
+                this.disable = false;
+                this.title = title;
+                this.value = value;
+                this.disable = disable;
+                this.x = x;
+                this.width = width;
+            }
+            return Bar;
+        })();
+
+        var root = null;
+        var header = null;
+        function TimelineSlicer(slicerData, columnName) {
+            this._canExpand = true;
+            this.mode = AggregationSlicerData_YEAR;
+            slicerData.buildDateGroups(columnName);
+            this.aggregationData = slicerData;
+            this.slicerData = slicerData;
+            this.columnName = columnName;
+            this.data = slicerData.getData(columnName);
+            this.exclusiveDatas = slicerData.getExclusiveData(columnName);
+            this.slicerData.attachListener(this);
+            this.onDataLoaded();
+        }
+        TimelineSlicer.prototype.constructor = TimelineSlicer;
+        TimelineSlicer.prototype.getDOMElement = function () {
+            return root;
+        }
+        TimelineSlicer.prototype.getHeader = function () {
+            return header;
+        }
+        TimelineSlicer.prototype.onDataLoaded = function () {
+            var self = this;
+            self.initHeader();
+            var content = $("<div style=\"width:100%;height:100%\"><canvas style=\"width:400px;height:200px\"> </canvas></div>");
+            self.canvas = content[0].firstChild;
+            root = content;
+            var canvas = $(self.canvas);
+            var width = canvas.css("width");
+            var height = canvas.css("height");
+            width = width.substring(0, width.length - 2);
+            height = height.substring(0, height.length - 2);
+            this.canvas.width = (parseInt(width, 10));
+            this.canvas.height = (parseInt(height, 10));
+            canvas.mousemove(function (event) {
+                var bar = self.hitTest(event.offsetX, event.offsetY);
+                if (bar !== self.hoverBar) {
+                    self.hoverBar = bar;
+                    self.paint();
+                }
+            });
+            canvas.mouseout(function () {
+                self.hoverBar = null;
+                self.paint();
+            });
+            canvas.click(function (event) {
+                var bar = self.hitTest(event.offsetX, event.offsetY);
+                if (!bar) {
+                    return;
+                }
+                if (bar !== self.selectedBar) {
+                    if (!self.canExpand()) {
+                        self.selectedBar = bar;
+                        if (self.mode === AggregationSlicerData_YEAR) {
+                            self.selectedYear = parseInt(bar.title, 10);
+                            self.aggregationData.filterOnYear(self.columnName, self.selectedYear);
+                        }
+                        else if (self.mode === AggregationSlicerData_MONTH) {
+                            self.selectedMonth = parseInt(bar.title, 10);
+                            self.aggregationData.filterOnMonth(self.columnName, self.selectedYear, self.selectedMonth);
+                        }
+                    }
+                    else {
+                        if (self.mode === AggregationSlicerData_YEAR) {
+                            self.selectedBar = null;
+                            self.selectedYear = parseInt(bar.title, 10);
+                            self.mode = AggregationSlicerData_MONTH;
+                            self.bars = self.getBars();
+                            self.aggregationData.filterOnYear(self.columnName, self.selectedYear);
+                        }
+                    }
+                    self.paint();
+                }
+            });
+            this.bars = this.getBars();
+            self.paint();
+        };
+        TimelineSlicer.prototype.initHeader = function () {
+            header = $("<input id=\"canExpand\" type=\"checkbox\"/><label for=\"canExpand\">Can Expand</label> <input id=\"return\" type=\"button\" value=\"return\">");
+        };
+        TimelineSlicer.prototype.attachEventsToHeader = function () {
+            var canExpand = $("#canExpand");
+            canExpand.attr("checked", this._canExpand);
+            canExpand.change(function (sender, args) {
+                self._canExpand = canExpand[0].checked;
+            });
+            var returnButton = $("#return");
+            returnButton.css("width:100%");
+            var self = this;
+            returnButton.click(function () {
+                if (self.mode === AggregationSlicerData_YEAR) {
+                    return;
+                }
+                self.mode = AggregationSlicerData_YEAR;
+                self.selectedBar = null;
+                self.bars = self.getBars();
+                self.paint();
+                self.aggregationData.doUnfilter(self.columnName);
+            });
+        };
+        TimelineSlicer.prototype.hitTest = function (x, y) {
+            var bars = this.bars;
+            for (var i = 0; i < bars.length; i++) {
+                var bar = bars[i];
+                if (x >= bar.x && x < bar.x + bar.width) {
+                    return bar;
+                }
+            }
+            return null;
+        };
+        TimelineSlicer.prototype.paint = function () {
+            var context = this.canvas.getContext("2d");
+            var bars = this.bars;
+            var topValue = this.getTopValue(bars);
+            var width = this.canvas.width;
+            var height = this.canvas.height;
+            var ruleHeight = 20, borderWidth = 2;
+            var maxBarHeight = height - ruleHeight;
+            context.clearRect(0, 0, width, height);
+            for (var i = 0; i < bars.length; i++) {
+                var bar = bars[i];
+                if (bar === this.selectedBar) {
+                    context.fillStyle = "#1b1b1b";
+                    context.fillRect(bar.x - borderWidth * 2, 0, bar.width + 4 * borderWidth, height);
+                    context.fillStyle = "#E1E1E1";
+                    context.fillRect(bar.x - borderWidth, 0 + borderWidth, bar.width + 2 * borderWidth, height - 2 * borderWidth);
+                }
+                else if (bar === this.hoverBar) {
+                    context.fillStyle = "#C1C1C1";
+                    context.fillRect(bar.x - borderWidth, 0 + borderWidth, bar.width + 2 * borderWidth, height - 2 * borderWidth);
+                }
+                if (this.selectedBar && bar !== this.selectedBar) {
+                    context.fillStyle = "#003c4d";
+                }
+                else {
+                    context.fillStyle = "#0096c0";
+                }
+                context.fillText(this.getTitle(bar.title), bar.x + borderWidth * 2, height - borderWidth * 4);
+                var barHeight = maxBarHeight * bar.value / topValue;
+                context.fillRect(bar.x, maxBarHeight - barHeight, bar.width, barHeight);
+            }
+        };
+        TimelineSlicer.prototype.getTitle = function (title) {
+            var monthes = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            if (this.mode === AggregationSlicerData_MONTH) {
+                return monthes[parseInt(title, 10)];
+            }
+            return title;
+        };
+        TimelineSlicer.prototype.getTopValue = function (bars) {
+            var max = bars[0].value;
+            for (var i = 1; i < bars.length; i++) {
+                max = max < bars[i].value ? bars[i].value : max;
+            }
+            var base = 1;
+            while (max / base >= 10) {
+                base *= 10;
+            }
+            var head = max / base;
+            return Math.ceil(head) * base;
+        };
+        TimelineSlicer.prototype.currentSelection = function () {
+            if (this.canExpand()) {
+                return -1;
+            }
+            switch (this.mode) {
+                case AggregationSlicerData_YEAR:
+                    return this.selectedYear;
+                case AggregationSlicerData_MONTH:
+                    return this.selectedMonth;
+            }
+            return -1;
+        };
+        TimelineSlicer.prototype.getBars = function () {
+            var result = [];
+            var datas;
+            if (this.mode === AggregationSlicerData_YEAR) {
+                datas = this.aggregationData.getDatasByYear();
+            }
+            else if (this.mode === AggregationSlicerData_MONTH) {
+                datas = this.aggregationData.getMonthDatasByYear(this.selectedYear);
+            }
+            else {
+                datas = this.aggregationData.getDayDatasByMonth(this.selectedYear, this.selectedMonth);
+            }
+            var length = datas.length;
+            var barLayout = this.getBarLayout(length);
+            var current = this.currentSelection();
+            for (var i = 0; i < length; i++) {
+                result.push(new Bar(datas[i].title + "", datas[i].value, this.getX(barLayout, length, i), barLayout.width, false));
+            }
+            return result;
+        };
+        TimelineSlicer.prototype.getX = function (layout, count, index) {
+            if (count <= 12) {
+                return layout.margin * (index + 1) + layout.width * index;
+            }
+            else {
+                var current = this.currentSelection();
+                if (current < 5) {
+                    return layout.margin * (index + 1) + layout.width * index;
+                }
+                else {
+                    var displayIndex = index - 5;
+                    if (displayIndex < 0) {
+                        return -100;
+                    }
+                    return layout.margin * (displayIndex + 1) + layout.width * displayIndex - layout.width / 2;
+                }
+            }
+        };
+        TimelineSlicer.prototype.canExpand = function () {
+            return this._canExpand && this.mode !== AggregationSlicerData_MONTH;
+        };
+        TimelineSlicer.prototype.getBarLayout = function (count) {
+                        var fullWidth = this.canvas.width, margin, width;
+                        var fold = 5;
+                        if (count <= 12) {
+                            margin = fullWidth / ((fold + 1) * count + 1);
+                            width = fold * margin;
+                        }
+                        else {
+                            margin = fullWidth / ((fold + 1) * 10 + 1);
+                            width = fold * margin;
+                        }
+                        return { margin: margin, width: width };
+                    };
+        TimelineSlicer.prototype.onFiltered = function(data) {
+
+        };
+        /*code_end*/
+    </script>
+
+</head>
+<body>
+    <div class="sample-turtorial">
+        <div id="slicer_Timeline"></div>
+        <div id="ss" style="width: 100%; height: 300px; border: 1px solid gray;"></div>
+    </div>
+</body>
+</html>

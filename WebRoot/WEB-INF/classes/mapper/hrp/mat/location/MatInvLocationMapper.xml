@@ -1,0 +1,528 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.mat.dao.invlocation.MatInvLocationMapper">
+	<!-- 构建材料与货位信息映射 -->
+	<resultMap id="queryInvLocationMap" type="com.chd.hrp.mat.entity.DzbqView">
+		<result property="GoodsCode" column="inv_code" />
+		<result property="GoodsName" column="inv_name" />
+		<result property="GoodsType" column="goods_type" />
+		<result property="GoodsStatus" column="goods_status" />
+		<result property="Specification" column="inv_model" />
+		<result property="Manufactuer" column="fac_name" />
+		<result property="BrandName" column="brand_name" />
+		<result property="Barcode" column="bar_code" />
+		<result property="MemberPrice" column="plan_price" />
+		<result property="OffPirce" column="plan_price" />
+		<result property="SalePrice" column="plan_price" />
+		<result property="AreaCode" column="location_code" />
+		<result property="Remark" column="remark" />
+		<result property="Flag0" column="cur_amount" />
+		<result property="Flag1" column="Flag1" />
+		<result property="Flag2" column="Flag2" />
+		<result property="Flag3" column="Flag3" />
+		<result property="Flag4" column="Flag4" />
+		<result property="Flag5" column="Flag5" />
+		<result property="Flag6" column="Flag6" />
+		<result property="Flag7" column="Flag7" />
+		<result property="Flag8" column="Flag8" />
+		<result property="Flag9" column="Flag9" />
+
+	</resultMap>
+	<resultMap id="queryInvHrpMap" type="com.chd.task.mat.MatBean">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="store_id" column="store_id" />
+		<result property="inv_id" column="inv_id" />
+		<result property="cur_amount" column="cur_amount" />
+	</resultMap>
+	<!-- 构建出库单材料信息 -->
+	<resultMap id="queryOutInvMap" type="com.chd.hrp.mat.entity.DzbqShanDeng">
+		<result property="GoodsCode" column="inv_code" />
+		<result property="R" column="r" />
+		<result property="G" column="g" />
+		<result property="B" column="b" />
+		<result property="Times" column="times" />
+
+	</resultMap>
+
+	<select id="queryInvLocation" resultMap="queryInvLocationMap"
+		parameterType="java.util.Map">
+
+		select
+		a.inv_code,a.inv_name,a.inv_model,a.unit_name
+		,a.fac_name,a.plan_price
+		,1 goods_type
+		,0 goods_status
+		,'' bar_code
+		,a.cur_amount Flag0
+		,'' Flag1
+		,'' Flag2
+		,''
+		Flag3
+		,'' Flag4
+		,'' Flag5
+		,'' Flag6
+		,'' Flag7
+		,'' Flag8
+		,'' Flag9
+		,'' remark
+		,group_id
+		,hos_id
+		,copy_code
+		,store_id
+		,inv_id
+		from
+		V_MAT_INV_DZBQ a WHERE a.group_id
+		=
+		#{group_id,jdbcType=INTEGER}
+		AND a.hos_id
+		=#{hos_id,jdbcType=INTEGER}
+		AND a.copy_code
+		=#{copy_code,jdbcType=VARCHAR}
+
+
+	</select>
+	<select id="queryInvHrp" resultMap="queryInvHrpMap"
+		parameterType="java.util.Map">
+
+		select
+		group_id
+		,hos_id
+		,copy_code
+		,store_id
+		,inv_id
+		,a.cur_amount
+		from
+		V_MAT_INV_DZBQ a WHERE a.group_id =
+		#{group_id,jdbcType=INTEGER}
+		AND a.hos_id
+		=#{hos_id,jdbcType=INTEGER}
+		AND a.copy_code
+		=#{copy_code,jdbcType=VARCHAR}
+
+
+	</select>
+
+	<select id="queryInInv" resultMap="queryOutInvMap"
+		parameterType="java.util.Map">
+
+		SELECT distinct t2.inv_code, 0 r, 1 g, 0 b, 3600 times,
+		location_code
+		FROM mat_in_main t3
+		LEFT JOIN mat_in_detail t1
+		ON
+		t1.group_id = t3.group_id
+		AND t1.hos_id = t3.hos_id
+		AND t1.copy_code =
+		t3.copy_code
+		AND t1.in_id = t3.in_id
+		LEFT JOIN mat_inv_dict t2
+		ON
+		t1.group_id = t2.group_id
+		AND t1.hos_id = t2.hos_id
+		AND t1.copy_code =
+		t2.copy_code
+		AND t1.inv_id = t2.inv_id
+		AND t1.inv_no = t2.inv_no
+		LEFT
+		JOIN (SELECT t4.group_id
+		,t4.hos_id
+		,t4.copy_code
+		,t4.store_id
+		,t4.inv_id
+		,mld.location_code
+		FROM mat_store_inv t4
+		LEFT JOIN mat_location_dict mld
+		ON t4.group_id = mld.group_id
+		AND t4.hos_id = mld.hos_id
+		AND
+		t4.copy_code = mld.copy_code
+		AND t4.location_id = mld.location_id
+		WHERE
+		mld.is_stop = 0
+		AND nvl(t4.location_id, 999999) != 999999) t5
+		ON
+		t5.group_id = t3.group_id
+		AND t5.hos_id = t3.hos_id
+		AND t5.copy_code =
+		t3.copy_code
+		AND t5.store_id = t3.store_id
+		AND t5.inv_id = t1.inv_id
+		WHERE t3.group_id =
+		#{group_id,jdbcType=INTEGER}
+		AND t3.hos_id
+		=#{hos_id,jdbcType=INTEGER}
+		AND t3.copy_code
+		=#{copy_code,jdbcType=VARCHAR}
+		AND t3.in_id IN
+		(${in_ids})
+
+	</select>
+	<select id="queryOutInv" resultMap="queryOutInvMap"
+		parameterType="java.util.Map">
+
+		SELECT distinct t2.inv_code, 1 r, 0 g, 0 b, 3600 times,
+		location_code
+		FROM mat_out_main t3
+		LEFT JOIN mat_out_detail t1
+		ON
+		t1.group_id =
+		t3.group_id
+		AND t1.hos_id = t3.hos_id
+		AND t1.copy_code =
+		t3.copy_code
+		AND t1.out_id = t3.out_id
+		LEFT JOIN mat_inv_dict t2
+		ON
+		t1.group_id =
+		t2.group_id
+		AND t1.hos_id = t2.hos_id
+		AND t1.copy_code =
+		t2.copy_code
+		AND t1.inv_id = t2.inv_id
+		AND t1.inv_no = t2.inv_no
+		LEFT
+		JOIN (SELECT
+		t4.group_id
+		,t4.hos_id
+		,t4.copy_code
+		,t4.store_id
+		,t4.inv_id
+		,mld.location_code
+		FROM mat_store_inv t4
+		LEFT JOIN mat_location_dict mld
+		ON t4.group_id = mld.group_id
+		AND t4.hos_id = mld.hos_id
+		AND
+		t4.copy_code = mld.copy_code
+		AND t4.location_id = mld.location_id
+		WHERE
+		mld.is_stop = 0
+		AND nvl(t4.location_id, 999999) != 999999) t5
+		ON
+		t5.group_id = t3.group_id
+		AND t5.hos_id = t3.hos_id
+		AND t5.copy_code =
+		t3.copy_code
+		AND t5.store_id = t3.store_id
+		AND t5.inv_id = t1.inv_id
+
+		WHERE t3.group_id =
+		#{group_id,jdbcType=INTEGER}
+		AND t3.hos_id
+		=#{hos_id,jdbcType=INTEGER}
+		AND t3.copy_code
+		=#{copy_code,jdbcType=VARCHAR}
+		AND t3.out_id IN
+		(${out_ids})
+
+	</select>
+	<select id="queryInvlocationShanDeng" resultMap="queryOutInvMap"
+		parameterType="java.util.Map">
+		<if test="flag=='01'">
+			SELECT distinct location_code inv_code, 0 r, 1 g, 0 b, 60
+			times,
+			location_code
+			FROM mat_in_main t3
+			LEFT JOIN mat_in_detail t1
+			ON
+			t1.group_id = t3.group_id
+			AND t1.hos_id = t3.hos_id
+			AND t1.copy_code =
+			t3.copy_code
+			AND t1.in_id = t3.in_id
+			LEFT JOIN mat_inv_dict t2
+			ON
+			t1.group_id = t2.group_id
+			AND t1.hos_id = t2.hos_id
+			AND t1.copy_code =
+			t2.copy_code
+			AND t1.inv_id = t2.inv_id
+			AND t1.inv_no = t2.inv_no
+			LEFT
+			JOIN (SELECT t4.group_id
+			,t4.hos_id
+			,t4.copy_code
+			,t4.store_id
+			,t4.inv_id
+			,mld.location_code
+			FROM mat_store_inv t4
+			LEFT JOIN
+			mat_location_dict mld
+			ON t4.group_id = mld.group_id
+			AND t4.hos_id =
+			mld.hos_id
+			AND
+			t4.copy_code = mld.copy_code
+			AND t4.location_id =
+			mld.location_id
+			WHERE
+			mld.is_stop = 0
+			AND nvl(t4.location_id, 999999) !=
+			999999) t5
+			ON
+			t5.group_id = t3.group_id
+			AND t5.hos_id = t3.hos_id
+			AND
+			t5.copy_code =
+			t3.copy_code
+			AND t5.store_id = t3.store_id
+			AND t5.inv_id
+			= t1.inv_id
+			WHERE t3.group_id =
+			#{group_id,jdbcType=INTEGER}
+			AND
+			t3.hos_id
+			=#{hos_id,jdbcType=INTEGER}
+			AND t3.copy_code
+			=#{copy_code,jdbcType=VARCHAR}
+			AND t3.in_id IN
+			(${in_ids})
+		</if>
+		<if test="flag=='02'">
+			SELECT distinct location_code inv_code, 1 r, 0 g, 0 b, 60
+			times
+			FROM mat_out_main t3
+			LEFT JOIN mat_out_detail t1
+			ON
+			t1.group_id =
+			t3.group_id
+			AND t1.hos_id = t3.hos_id
+			AND t1.copy_code =
+			t3.copy_code
+			AND t1.out_id = t3.out_id
+			LEFT JOIN mat_inv_dict t2
+			ON
+			t1.group_id =
+			t2.group_id
+			AND t1.hos_id = t2.hos_id
+			AND t1.copy_code =
+			t2.copy_code
+			AND t1.inv_id = t2.inv_id
+			AND t1.inv_no = t2.inv_no
+			LEFT
+			JOIN (SELECT
+			t4.group_id
+			,t4.hos_id
+			,t4.copy_code
+			,t4.store_id
+			,t4.inv_id
+			,mld.location_code
+			FROM mat_store_inv t4
+			LEFT JOIN mat_location_dict
+			mld
+			ON t4.group_id = mld.group_id
+			AND t4.hos_id = mld.hos_id
+			AND
+			t4.copy_code = mld.copy_code
+			AND t4.location_id = mld.location_id
+			WHERE
+			mld.is_stop = 0
+			AND nvl(t4.location_id, 999999) != 999999) t5
+			ON
+			t5.group_id = t3.group_id
+			AND t5.hos_id = t3.hos_id
+			AND t5.copy_code =
+			t3.copy_code
+			AND t5.store_id = t3.store_id
+			AND t5.inv_id = t1.inv_id
+
+			WHERE t3.group_id =
+			#{group_id,jdbcType=INTEGER}
+			AND t3.hos_id
+			=#{hos_id,jdbcType=INTEGER}
+			AND t3.copy_code
+			=#{copy_code,jdbcType=VARCHAR}
+			AND t3.out_id IN
+			(${out_ids})
+		</if>
+	</select>
+	<!-- 出入库发送材料信息到电子标签设备上 -->
+	<select id="querySendData" resultMap="queryInvLocationMap"
+		parameterType="java.util.Map">
+		<if test="flag=='01'">
+			SELECT DISTINCT t2.inv_code
+			,t2.inv_name
+			,t2.inv_model
+			,t6.unit_name
+			,t7.fac_name
+			,t1.price plan_price
+			,1 goods_type
+			,0
+			goods_status
+			,location_code
+			,nvl(t8.cur_amount, 0) Flag0
+			,'' Flag1
+			,''
+			Flag2
+			,'' Flag3
+			,'' Flag4
+			,'' Flag5
+			,'' Flag6
+			,'' Flag7
+			,'' Flag8
+			,'' Flag9
+			,'' remark
+
+			FROM mat_in_main t3
+			LEFT JOIN mat_in_detail t1
+			ON t1.group_id = t3.group_id
+			AND t1.hos_id = t3.hos_id
+			AND t1.copy_code = t3.copy_code
+			AND t1.in_id
+			= t3.in_id
+			LEFT JOIN mat_inv_dict t2
+			ON t1.group_id = t2.group_id
+			AND
+			t1.hos_id = t2.hos_id
+			AND t1.copy_code = t2.copy_code
+			AND t1.inv_id =
+			t2.inv_id
+			AND t1.inv_no = t2.inv_no
+			LEFT JOIN (SELECT t4.group_id
+			,t4.hos_id
+			,t4.copy_code
+			,t4.store_id
+			,t4.inv_id
+			,mld.location_code
+			FROM
+			mat_store_inv t4
+			LEFT JOIN mat_location_dict mld
+			ON t4.group_id =
+			mld.group_id
+			AND t4.hos_id = mld.hos_id
+			AND t4.copy_code =
+			mld.copy_code
+			AND t4.location_id = mld.location_id
+			WHERE mld.is_stop =
+			0
+			AND nvl(t4.location_id, 999999) != 999999) t5
+			ON t5.group_id =
+			t3.group_id
+			AND t5.hos_id = t3.hos_id
+			AND t5.copy_code = t3.copy_code
+			AND t5.store_id = t3.store_id
+			AND t5.inv_id = t1.inv_id
+			LEFT JOIN
+			hos_unit t6
+			ON t6.group_id = t2.group_id
+			AND t6.hos_id = t2.hos_id
+			AND
+			t6.unit_code = t2.unit_code
+			LEFT JOIN hos_fac t7
+			ON t7.group_id =
+			t2.group_id
+			AND t7.hos_id = t2.hos_id
+			AND t7.fac_id = t2.fac_id
+			LEFT
+			JOIN mat_inv_hold t8
+			ON t8.group_id = t2.group_id
+			AND t8.hos_id =
+			t2.hos_id
+			AND t8.copy_code = t2.copy_code
+			AND t8.inv_id = t2.inv_id
+
+			WHERE t3.group_id =
+			#{group_id,jdbcType=INTEGER}
+			AND t3.hos_id
+			=#{hos_id,jdbcType=INTEGER}
+			AND t3.copy_code
+			=#{copy_code,jdbcType=VARCHAR}
+			AND t3.in_id IN
+			(${in_ids})
+		</if>
+		<if test="flag=='02'">
+			SELECT DISTINCT t2.inv_code
+			,t2.inv_name
+			,t2.inv_model
+			,t6.unit_name
+			,t7.fac_name
+			,t1.price plan_price
+			,1 goods_type
+			,0
+			goods_status
+			,location_code
+			,nvl(t8.cur_amount, 0) Flag0
+			,'' Flag1
+			,''
+			Flag2
+			,'' Flag3
+			,'' Flag4
+			,'' Flag5
+			,'' Flag6
+			,'' Flag7
+			,'' Flag8
+			,'' Flag9
+			,'' remark
+			FROM mat_out_main t3
+			LEFT JOIN mat_out_detail t1
+			ON
+			t1.group_id = t3.group_id
+			AND t1.hos_id = t3.hos_id
+			AND t1.copy_code =
+			t3.copy_code
+			AND t1.out_id = t3.out_id
+			LEFT JOIN mat_inv_dict t2
+			ON
+			t1.group_id = t2.group_id
+			AND t1.hos_id = t2.hos_id
+			AND t1.copy_code =
+			t2.copy_code
+			AND t1.inv_id = t2.inv_id
+			AND t1.inv_no = t2.inv_no
+			LEFT
+			JOIN (SELECT t4.group_id
+			,t4.hos_id
+			,t4.copy_code
+			,t4.store_id
+			,t4.inv_id
+			,mld.location_code
+			FROM mat_store_inv t4
+			LEFT JOIN
+			mat_location_dict mld
+			ON t4.group_id = mld.group_id
+			AND t4.hos_id =
+			mld.hos_id
+			AND t4.copy_code = mld.copy_code
+			AND t4.location_id =
+			mld.location_id
+			WHERE mld.is_stop = 0
+			AND nvl(t4.location_id, 999999)
+			!= 999999) t5
+			ON t5.group_id = t3.group_id
+			AND t5.hos_id = t3.hos_id
+			AND t5.copy_code = t3.copy_code
+			AND t5.store_id = t3.store_id
+			AND
+			t5.inv_id = t1.inv_id
+			LEFT JOIN hos_unit t6
+			ON t6.group_id =
+			t2.group_id
+			AND t6.hos_id = t2.hos_id
+			AND t6.unit_code = t2.unit_code
+			LEFT JOIN hos_fac t7
+			ON t7.group_id = t2.group_id
+			AND t7.hos_id =
+			t2.hos_id
+			AND t7.fac_id = t2.fac_id
+			LEFT JOIN mat_inv_hold t8
+			ON
+			t8.group_id = t2.group_id
+			AND t8.hos_id = t2.hos_id
+			AND t8.copy_code =
+			t2.copy_code
+			AND t8.inv_id = t2.inv_id
+			WHERE t3.group_id =
+			#{group_id,jdbcType=INTEGER}
+			AND t3.hos_id
+			=#{hos_id,jdbcType=INTEGER}
+			AND t3.copy_code
+			=#{copy_code,jdbcType=VARCHAR}
+			AND t3.out_id IN
+			(${out_ids})
+		</if>
+	</select>
+
+</mapper>
+

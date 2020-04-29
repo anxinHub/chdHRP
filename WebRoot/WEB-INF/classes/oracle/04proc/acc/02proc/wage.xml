@@ -1,0 +1,223 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+
+	<sql id="act_wagepay_alter" type="proc"><![CDATA[
+	CREATE OR REPLACE PROCEDURE act_wagepay_alter
+
+	/*添加工资项目时，动态增加acc_wage_pay表工资项目字段*/
+	(	
+   v_group_id number,
+	 v_hos_id number,
+	 v_copy_code varchar2,
+	 v_wage_code varchar2,
+   p_item_code varchar2
+	 )
+	IS
+	   v_column_item varchar2(20);
+	   v_num number;
+	   v_count number;
+	   v_loop_count number;	 
+	BEGIN
+
+	    --select group_id,hos_id,copy_code,wage_code into v_group_id,v_hos_id,v_copy_code,v_wage_code from acc_wage_item where item_id=p_item_id; 
+
+	    v_num:=1;
+	    select count(1) into v_count from acc_wage_item where group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code and wage_code=v_wage_code;
+
+	    while v_num<=v_count loop
+	        --dbms_output.put_line(v_num);
+	        v_column_item:='ITEM'||v_num;
+	        --考虑多集团多医院多账套，检查是否使用
+	        select count(1) into v_loop_count from acc_wage_item where column_item=v_column_item and group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code and wage_code=v_wage_code;
+	        IF v_loop_count = 0 THEN
+	           exit;
+	        END IF;
+
+	        v_num:=v_num+1;
+	    end loop;
+
+	    --dbms_output.put_line(v_column_item);
+
+	   if v_column_item is not null then
+	    --添加辅助核算表核算类型字段
+	     v_count:=0;
+	     SELECT COUNT(1) INTO v_count from user_tab_cols  where table_name='ACC_WAGE_PAY' and column_name=v_column_item;
+	     IF v_count = 0 THEN
+	           execute immediate 'alter table ACC_WAGE_PAY add '||v_column_item||' VARCHAR(30) NULL';
+	     END IF;
+
+	     --绑定业务表核算类型字段
+	     update acc_wage_item set column_item=v_column_item where group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code and wage_code=v_wage_code and item_code=p_item_code;
+	     commit;
+	   end if;
+	END act_wagepay_alter;
+
+
+	]]></sql>
+	
+	<sql id="acc_wage_banknetwage" type="proc"><![CDATA[
+	
+	CREATE OR REPLACE PROCEDURE acc_wage_banknetwage(p_group_id  number, --集团ID
+                                                 p_hos_id    number, --医院ID
+                                                 p_copy_code varchar2, --单位帐套编码
+                                                 p_acc_year  varchar2, --会计年度
+                                                 p_emp_id    number, --职工ID
+                                                 wagedata    OUT ACT_BOOKS.zcheckledercursor) is
+  ddl_sql varchar2(4000); --执行的建表语句
+  num     NUMBER;
+begin
+  /**
+  创建工资发放表(银企互联)临时表
+  */
+  SELECT COUNT(1)
+    INTO num
+    FROM USER_TABLES
+   WHERE TABLE_NAME = UPPER('t_accbannetwage_result');
+  IF num = 0 THEN
+    ddl_sql := 'Create Global Temporary Table t_accbannetwage_result(
+            wage_date date,
+            wage_name varchar2(200),
+            yf_item varchar2(30),
+            kk_item varchar2(30),
+            sf_item varchar2(30),
+            pay_type varchar2(50),
+            note varchar2(2000)
+	          )On COMMIT Delete ROWS';
+    /*
+    On COMMIT PRESERVE ROWS 会话性临时表
+    On Commit Delete Rows 事务性临时表
+    */
+    execute immediate ddl_sql;
+  END IF;
+
+  declare
+    yf_column_item varchar2(30);
+    kk_column_item varchar2(30);
+    sf_column_item varchar2(30);
+    sum_count      number(10);
+  begin
+  
+    yf_column_item := '';
+    kk_column_item := '';
+    sf_column_item := '';
+  
+    for cr in (/*
+                select wage_code
+                 from acc_wage_emp
+                where group_id = p_group_id
+                  and hos_id = p_hos_id
+                  and copy_code = p_copy_code
+                  and emp_id = p_emp_id
+                group by wage_code
+                */
+                select t1.wage_code 
+                from acc_wage_emp_kind t1
+                inner join hos_emp_dict t2
+                        on t2.group_id = t1.group_id
+                       and t2.hos_id = t1.hos_id
+                       and t2.kind_code = t1.kind_code
+                       and t2.emp_id = p_emp_id
+                       and t2.is_stop = 0 and t2.is_disable = 0
+                where t1.group_id = p_group_id
+                  and t1.hos_id = p_hos_id
+                  and t1.copy_code = p_copy_code
+                group by t1.wage_code
+                ) loop
+    
+      select count(*)
+        into sum_count
+        from acc_wage_item
+       where group_id = p_group_id
+         and hos_id = p_hos_id
+         and copy_code = p_copy_code
+         and acc_year = p_acc_year
+         and wage_code = cr.wage_code
+         and item_name in ('应发合计', '扣款合计', '实发合计');
+    
+      if sum_count >= 3 then
+      
+        select column_item
+          into yf_column_item
+          from acc_wage_item
+         where group_id = p_group_id
+           and hos_id = p_hos_id
+           and copy_code = p_copy_code
+           and acc_year = p_acc_year
+           and wage_code = cr.wage_code
+           and item_name = '应发合计';
+      
+        select column_item
+          into kk_column_item
+          from acc_wage_item
+         where group_id = p_group_id
+           and hos_id = p_hos_id
+           and copy_code = p_copy_code
+           and acc_year = p_acc_year
+           and wage_code = cr.wage_code
+           and item_name = '扣款合计';
+      
+        select column_item
+          into sf_column_item
+          from acc_wage_item
+         where group_id = p_group_id
+           and hos_id = p_hos_id
+           and copy_code = p_copy_code
+           and acc_year = p_acc_year
+           and wage_code = cr.wage_code
+           and item_name = '实发合计';
+      
+      end if;
+    
+      if yf_column_item is not null and kk_column_item is not null and
+         sf_column_item is not null then
+
+        execute immediate 'insert into t_accbannetwage_result(wage_date,wage_name,yf_item,kk_item,sf_item,pay_type,note)
+			                           select abnw.trandate, aw.wage_name, sum(nvl(' ||
+                          yf_column_item || ',0)) as yf_item, sum(nvl(' ||
+                          kk_column_item ||
+                          ',0)) as kk_item,
+                                  sum(nvl(' ||
+                          sf_column_item ||
+                          ',0)) as sf_item,'''',''''
+                                    from acc_bank_net_wage_rd abnwr
+                                    left join ACC_WAGE_PAY awp on abnwr.erpsqn = awp.emp_id
+                                    and abnwr.buscode = awp.emp_no
+                                    and abnwr.oref = awp.wage_code
+                                    and abnwr.acc_year = awp.acc_year
+                                    and abnwr.acc_month = awp.acc_month
+                                    and abnwr.group_id = awp.group_id
+                                    and abnwr.hos_id = awp.hos_id
+                                    and abnwr.copy_code = awp.copy_code
+                                    left join ACC_WAGE aw on  aw.wage_code = awp.wage_code
+                                    and aw.group_id = awp.group_id
+                                    and aw.hos_id = awp.hos_id
+                                    and aw.copy_code = awp.copy_code
+                                      left join acc_bank_net_wage abnw on abnwr.fseqno = abnw.fseqno
+                                    and abnw.group_id = abnwr.group_id 
+                                    and abnw.hos_id = abnwr.hos_id
+                                    and abnw.copy_code = abnwr.copy_code
+                                    where abnwr.group_id = '||p_group_id||'
+                                      and abnwr.hos_id = '||p_hos_id||'
+                                      and abnwr.copy_code = '||p_copy_code||'
+                                      and abnwr.acc_year = '||p_acc_year||'
+                                      and abnwr.erpsqn='||p_emp_id||'
+                                      and awp.wage_code=' ||
+                          cr.wage_code || '
+                                    group by abnw.trandate,aw.wage_name
+                                    order by  aw.wage_name ';
+      
+        
+      
+      end if;
+    
+    end loop;
+  
+  end;
+  ddl_sql := 'select * from t_accbannetwage_result where yf_item >0 or kk_item>0 or sf_item>0';
+  open wagedata for ddl_sql;
+end acc_wage_banknetwage;
+	
+	
+	]]></sql>
+</root>
+

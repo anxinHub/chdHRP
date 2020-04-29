@@ -1,0 +1,741 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.mat.dao.eva.MatEvaSupMapper">
+	
+	<resultMap id="matEvaSupInfo" type="java.util.Map">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="sup_code" column="sup_code"/>
+		<result property="sup_name" column="sup_name"/>
+		<result property="is_disable" column="is_disable"/>
+		<result property="sup_id" column="sup_id"/>
+		<result property="sup_no" column="sup_no"/>
+	</resultMap>
+	
+	<resultMap id="matEvaSupMain" type="java.util.Map">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="eva_code" column="eva_code"/>
+		<result property="eva_emp" column="eva_emp"/>
+		<result property="user_name" column="user_name"/>
+		<result property="eva_date" column="eva_date"/>
+		<result property="full_score" column="full_score"/>
+		<result property="get_score" column="get_score"/>
+		<result property="eva_content" column="eva_content"/>
+		<result property="state" column="state"/>
+		<result property="eva_method" column="eva_method"/>
+		<result property="sup_name" column="sup_name"/>
+	</resultMap>
+	
+	<resultMap id="matEvaTarget" type="java.util.Map">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="target_code" column="target_code"/>
+		<result property="target_name" column="target_name"/>
+		<result property="eva_content" column="eva_content"/>
+		<result property="weight" column="weight"/>
+		<result property="full_score" column="full_score"/>
+		<result property="eva_content" column="eva_content"/>
+		<result property="eva_method" column="eva_method"/>
+		<result property="get_score" column="get_score"/>
+		<result property="scale_code" column="scale_code"/>
+		<result property="scale_point" column="scale_point"/>
+		<result property="deduct_text" column="deduct_text"/>
+		<result property="is_show" column="is_show"/>
+	</resultMap>
+	
+	<!-- 评价方案查询 -->
+	<select id="queryMatEvaSupInfoLeft" resultMap="matEvaSupInfo" parameterType="java.util.Map">
+		select group_id, hos_id, sup_id, sup_no, sup_code, sup_name, is_disable
+		  from hos_sup_dict hsd
+		<where>
+				is_mat = 1
+		   	and is_stop = 0
+		   	and is_disable = 0
+			<if test="group_id != null and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="sup_id != null and sup_id != ''">
+				and sup_id = #{sup_id}
+			</if>
+			<if test="is_evaluate == 1">
+				and exists (
+					select 1 from MAT_EVA_SUP_MAIN mesm
+					where hsd.group_id = mesm.group_id
+					  and hsd.hos_id = mesm.hos_id
+					  and hsd.sup_id = mesm.sup_id
+					  and hsd.sup_no = mesm.sup_no 
+				)
+			</if>
+		</where>
+		order by sup_code
+	</select>
+	
+	<select id="queryMatEvaSupMainRight" resultMap="matEvaSupMain" parameterType="java.util.Map">
+		select group_id, hos_id, copy_code, eva_code, eva_emp, user_name, eva_date, full_score, get_score, eva_content, state, sup_name
+		from (
+		select mesm.group_id,
+		       mesm.hos_id,
+		       mesm.copy_code,
+		       mesm.eva_code,
+		       mesm.eva_emp,
+		       su.user_name,
+		       mesm.eva_date,
+		       mesm.full_score,
+		       mesm.get_score,
+		       mesm.eva_content,
+		       mesm.state,
+		       hs.sup_code || ' ' || hs.sup_name sup_name
+		  from MAT_EVA_SUP_MAIN mesm
+		  left join sys_user su
+		    on mesm.group_id = su.group_id
+		   and mesm.hos_id = su.hos_id
+		   and mesm.eva_emp = su.user_id
+		  left join hos_sup hs
+		    on mesm.group_id = hs.group_id
+		   and mesm.hos_id = hs.hos_id
+		   and mesm.sup_id = hs.sup_id 
+		<where>
+			<if test="group_id != null and group_id != ''">
+				and mesm.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and mesm.hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				and mesm.copy_code = #{copy_code}
+			</if>
+			<if test="scheme_code != null and scheme_code != ''">
+				and mesm.scheme_code = #{scheme_code}
+			</if>
+			<if test="sup_id != null and sup_id != ''">
+				and mesm.sup_id = #{sup_id}
+			</if>
+			<if test="sup_no != null and sup_no != ''">
+				and mesm.sup_no = #{sup_no}
+			</if>
+			<if test="eva_code != null and eva_code != ''">
+				and mesm.eva_code = #{eva_code}
+			</if>
+			<if test="begin_date != null and begin_date != ''">
+				and to_char(mesm.eva_date, 'yyyy-MM-dd') &gt;= #{begin_date}
+			</if>
+			<if test="end_date != null and end_date != ''">
+				and to_char(mesm.eva_date, 'yyyy-MM-dd') &lt;= #{end_date}
+			</if>
+		</where>
+		union all 
+		select null group_id,
+		       null hos_id,
+		       null copy_code,
+		       null eva_code,
+		       null eva_emp,
+		       '平均分' user_name,
+		       null eva_date,
+		       null full_score,
+		       ROUND(sum(mesm.get_score)/count(1), 2) get_score,
+		       null eva_content,
+		       null state,
+		       null sup_name
+		  from MAT_EVA_SUP_MAIN mesm
+		  left join sys_user su
+		    on mesm.group_id = su.group_id
+		   and mesm.hos_id = su.hos_id
+		   and mesm.eva_emp = su.user_id
+		  left join hos_sup hs
+		    on mesm.group_id = hs.group_id
+		   and mesm.hos_id = hs.hos_id
+		   and mesm.sup_id = hs.sup_id 
+		<where>
+			<if test="group_id != null and group_id != ''">
+				and mesm.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and mesm.hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				and mesm.copy_code = #{copy_code}
+			</if>
+			<if test="scheme_code != null and scheme_code != ''">
+				and mesm.scheme_code = #{scheme_code}
+			</if>
+			<if test="sup_id != null and sup_id != ''">
+				and mesm.sup_id = #{sup_id}
+			</if>
+			<if test="sup_no != null and sup_no != ''">
+				and mesm.sup_no = #{sup_no}
+			</if>
+			<if test="eva_code != null and eva_code != ''">
+				and mesm.eva_code = #{eva_code}
+			</if>
+			<if test="begin_date != null and begin_date != ''">
+				and to_char(mesm.eva_date, 'yyyy-MM-dd') &gt;= #{begin_date}
+			</if>
+			<if test="end_date != null and end_date != ''">
+				and to_char(mesm.eva_date, 'yyyy-MM-dd') &lt;= #{end_date}
+			</if>
+		</where>
+		)
+		order by eva_date
+	</select>
+	
+	<select id="queryMatEvaSupTargetForAdd" resultMap="matEvaTarget" parameterType="java.util.Map">
+		
+		select mes.group_id,
+		       mes.hos_id,
+		       mes.copy_code,
+		       mes.scheme_code,
+		       mest.target_code,
+		       met.target_name,
+		       met.eva_content,
+		       mest.weight,
+		       mest.full_score,
+		       met.eva_method,
+		       '0' get_score,
+		       show.is_show
+		  from MAT_EVA_SCHEME mes -- 供应商评价方案表
+		 right join MAT_EVA_SCHEME_TARGET mest -- 供应商评价方案指标明细表
+		    on mes.group_id = mest.group_id
+		   and mes.hos_id = mest.hos_id
+		   and mes.copy_code = mest.copy_code
+		   and mes.scheme_code = mest.scheme_code
+		  left join MAT_EVA_TARGET met --指标表
+		    on mest.group_id = met.group_id
+		   and mest.hos_id = met.hos_id
+		   and mest.copy_code = met.copy_code
+		   and mest.target_code = met.target_code
+		  left join (
+			  select group_id, hos_id, copy_code, target_code, count(1) is_show
+				 from MAT_EVA_TARGET_DEDUCT
+			 group by group_id, hos_id, copy_code, target_code
+		  ) show 
+		    on met.group_id = show.group_id
+		   and met.hos_id = show.hos_id
+		   and met.copy_code = show.copy_code
+		   and met.target_code = show.target_code 
+		<where>
+			<if test="group_id != null and group_id != ''">
+				and mes.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and mes.hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				and mes.copy_code = #{copy_code}
+			</if>
+			<if test="scheme_code != null and scheme_code != ''">
+				and mes.scheme_code = #{scheme_code}
+			</if>
+		</where>
+		order by mest.target_code
+	</select>
+	
+	<select id="queryMatEvaSupTarget" resultMap="matEvaTarget" parameterType="java.util.Map">
+		select mest.group_id,
+		       mest.hos_id,
+		       mest.copy_code,
+		       mest.target_code,
+		       met.target_name,
+		       met.eva_content, -- 考核内容
+		       mest.weight,
+		       mest.full_score,
+		       mest.scale_code,
+		       mest.scale_no,
+		       mest.scale_point,
+		       nvl(mets.scale_name, mest.get_score) get_score,
+		       mest.eva_content, -- 评价
+		       met.eva_method,
+		       to_char(deduct.deduct_text) deduct_text,
+		       show.is_show
+		  from MAT_EVA_SUP_TARGET mest
+		  left join MAT_EVA_SUP_MAIN mesm
+		    on mest.group_id = mesm.group_id
+		   and mest.hos_id = mesm.hos_id
+		   and mest.copy_code = mesm.copy_code
+		   and mest.eva_code = mesm.eva_code
+		  left join mat_eva_target met
+		    on mest.group_id = met.group_id
+		   and mest.hos_id = met.hos_id
+		   and mest.copy_code = met.copy_code
+		   and mest.target_code = met.target_code
+		  left join mat_eva_scheme_target mestt
+		    on mesm.group_id = mestt.group_id
+		   and mesm.hos_id = mestt.hos_id
+		   and mesm.copy_code = mestt.copy_code
+		   and mesm.scheme_code = mestt.scheme_code
+		   and mest.target_code = mestt.target_code
+		  left join mat_eva_target_scale_d mets
+		    on met.group_id = mets.group_id
+		   and met.hos_id = mets.hos_id
+		   and met.copy_code = mets.copy_code
+		   and met.target_code = mets.target_code
+		   and mest.scale_code = mets.scale_code 
+		   and mest.scale_no = mets.scale_no
+		  left join (
+		       select mesd.group_id, mesd.hos_id, mesd.copy_code, mesd.eva_code, mesd.target_code, wm_concat(metd.deduct_name || '-' || mesd.deduct_score) deduct_text
+		        from MAT_EVA_SUP_DEDUCT mesd
+		        left join MAT_EVA_TARGET_DEDUCT metd
+		          on mesd.group_id = metd.group_id
+		         and mesd.hos_id = metd.hos_id
+		         and mesd.copy_code = metd.copy_code
+		         and mesd.deduct_code = metd.deduct_code
+		         and mesd.target_code = metd.target_code
+		       group by mesd.group_id, mesd.hos_id, mesd.copy_code, mesd.eva_code, mesd.eva_code, mesd.target_code 
+		  ) deduct 
+		    on mest.group_id = deduct.group_id
+		   and mest.hos_id = deduct.hos_id
+		   and mest.copy_code = deduct.copy_code
+		   and mest.eva_code = deduct.eva_code
+		   and mest.target_code = deduct.target_code
+		  left join (
+			  select group_id, hos_id, copy_code, target_code, count(1) is_show
+				 from MAT_EVA_TARGET_DEDUCT
+			 group by group_id, hos_id, copy_code, target_code
+		  ) show 
+		    on met.group_id = show.group_id
+		   and met.hos_id = show.hos_id
+		   and met.copy_code = show.copy_code
+		   and met.target_code = show.target_code 
+		<where>
+			<if test="group_id != null and group_id != ''">
+				and mest.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and mest.hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				and mest.copy_code = #{copy_code}
+			</if>
+			<if test="eva_code != null and eva_code != ''">
+				and mesm.eva_code = #{eva_code}
+			</if>
+			<if test="sup_id != null and sup_id != ''">
+				and mesm.sup_id = #{sup_id}
+			</if>
+			<if test="sup_no != null and sup_no != ''">
+				and mesm.sup_no = #{sup_no}
+			</if>
+		</where>
+		order by mest.target_code
+	</select>
+	
+	<resultMap id="matEvaTargetDeduct" type="java.util.Map">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="eva_code" column="eva_code"/>
+		<result property="target_code" column="target_code"/>
+		<result property="deduct_id" column="deduct_id"/>
+		<result property="deduct_code" column="deduct_code"/>
+		<result property="deduct_name" column="deduct_name"/>
+		<result property="high_point" column="high_point"/>
+		<result property="deduct_score" column="deduct_score"/>
+		<result property="deduct_desc" column="deduct_desc"/>
+		<result property="note" column="note"/>
+	</resultMap>
+	
+	<select id="queryMatEvaSupTargetDeduct" resultMap="matEvaTargetDeduct" parameterType="java.util.Map">
+		select mesd.group_id,
+		       mesd.hos_id,
+		       mesd.copy_code,
+		       mesd.eva_code,
+		       mesd.target_code,
+		       mesd.deduct_code || '-' || mesd.deduct_desc || '-' || metd.high_point deduct_id,
+		       mesd.deduct_code,
+		       metd.deduct_name,
+		       metd.high_point,
+		       mesd.deduct_score,
+		       mesd.deduct_desc,
+		       mesd.note
+		  from MAT_EVA_SUP_DEDUCT mesd
+		  left join MAT_EVA_TARGET_DEDUCT metd
+		    on mesd.group_id = metd.group_id
+		   and mesd.hos_id = metd.hos_id
+		   and mesd.copy_code = metd.copy_code
+		   and mesd.deduct_code = metd.deduct_code
+		   and mesd.target_code = metd.target_code
+		<where>
+			<if test="group_id != null and group_id != ''">
+				and mesd.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and mesd.hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				and mesd.copy_code = #{copy_code}
+			</if>
+			<if test="eva_code != null and eva_code != ''">
+				and mesd.eva_code = #{eva_code}
+			</if>
+			<if test="target_code != null and target_code != ''">
+				and mesd.target_code = #{target_code}
+			</if>
+		</where>
+		order by mesd.deduct_code
+	</select>
+	
+	<update id="changeMatEvaSupState" parameterType="java.util.Map">
+		update MAT_EVA_SUP_MAIN 
+		<set>
+			<if test="state != null and state != ''">
+				state = #{state},
+			</if>
+			<if test="submit_emp != null and submit_emp != ''">
+				submit_emp = #{submit_emp},
+			</if>
+			<if test="submit_date != null and submit_date != ''">
+				submit_date = #{submit_date},
+			</if>
+		</set>
+		<where>
+			<if test="group_id != null and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				and copy_code = #{copy_code}
+			</if>
+			<if test="eva_codes != null and eva_codes != ''">
+				and eva_code in (${eva_codes})
+			</if>
+		</where>
+	</update>
+	
+	<delete id="deleteMatEvaSup" parameterType="java.util.Map">
+		delete from MAT_EVA_SUP_MAIN
+		<where>
+			<if test="group_id != null and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				and copy_code = #{copy_code}
+			</if>
+			<if test="eva_codes != null and eva_codes != ''">
+				and eva_code in (${eva_codes})
+			</if>
+		</where>
+	</delete>
+	
+	<delete id="deleteMatEvaSupTarget" parameterType="java.util.Map">
+		delete from MAT_EVA_SUP_TARGET
+		<where>
+			<if test="group_id != null and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				and copy_code = #{copy_code}
+			</if>
+			<if test="eva_codes != null and eva_codes != ''">
+				and eva_code in (${eva_codes})
+			</if>
+		</where>
+	</delete>
+	
+	<!-- 添加主表 -->
+	<insert id="addMatEvaSupMain" parameterType="java.util.Map">
+		INSERT INTO MAT_EVA_SUP_MAIN (
+			group_id, hos_id, copy_code, eva_code, sup_id, sup_no, scheme_code, full_score, get_score, eva_content, state, 
+			eva_emp, eva_date, note
+		) VALUES (
+			#{group_id,jdbcType=INTEGER},
+			#{hos_id,jdbcType=INTEGER},
+			#{copy_code,jdbcType=VARCHAR},
+			#{eva_code,jdbcType=VARCHAR},
+			#{sup_id,jdbcType=INTEGER},
+			#{sup_no,jdbcType=INTEGER},
+			#{scheme_code,jdbcType=VARCHAR},
+			#{full_score,jdbcType=INTEGER},
+			#{get_score,jdbcType=VARCHAR},
+			#{eva_content,jdbcType=VARCHAR},
+			#{state,jdbcType=INTEGER},
+			#{eva_emp,jdbcType=INTEGER},
+			#{eva_date,jdbcType=VARCHAR},
+			#{note,jdbcType=INTEGER}
+		)
+	</insert>
+	
+	<!-- 更新主表 -->
+	<update id="updateMatEvaSupMain" parameterType="java.util.Map" >
+		UPDATE MAT_EVA_SUP_MAIN
+		<set>
+			<if test="get_score != null and get_score != ''">
+				get_score = #{get_score},
+			</if>
+			<if test="eva_content != null and eva_content != ''">
+				eva_content = #{eva_content},
+			</if>
+		</set>
+		<where>
+			<if test="group_id != null and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				and copy_code = #{copy_code}
+			</if>
+			<if test="eva_code != null and eva_code != ''">
+				and eva_code = #{eva_code}
+			</if>
+		</where>
+	</update>
+	
+	<!--新增评价明细表  -->
+	<insert id="addMatEvaSupTarget" parameterType="java.util.List" >
+		insert into MAT_EVA_SUP_TARGET(
+			group_id, 
+			hos_id, 
+			copy_code, 
+			eva_code, 
+			target_code, 
+			full_score, 
+			weight, 
+			scale_code, 
+			scale_no,
+			scale_point,
+			get_score,
+			eva_content,
+			sort_code,
+			note
+		) select group_id,
+		         hos_id,
+		         copy_code,
+		         eva_code,
+		         target_code,
+		         full_score,
+		         weight,
+		         scale_code,
+		         scale_no,
+		         scale_point,
+		         get_score,
+		         eva_content,
+		         sort_code,
+		         note
+		    from (
+				<foreach collection="list" item="item" index="index" separator=" union all " >
+					select 		
+						#{item.group_id,jdbcType=INTEGER} group_id,
+						#{item.hos_id,jdbcType=INTEGER} hos_id,
+						#{item.copy_code,jdbcType=VARCHAR} copy_code,
+						#{item.eva_code,jdbcType=INTEGER} eva_code,
+						#{item.target_code,jdbcType=VARCHAR} target_code,
+						#{item.full_score,jdbcType=FLOAT} full_score,
+						#{item.weight,jdbcType=FLOAT} weight,
+						#{item.scale_code,jdbcType=VARCHAR} scale_code,
+						#{item.scale_no,jdbcType=INTEGER} scale_no,
+						#{item.scale_point,jdbcType=FLOAT} scale_point,
+						#{item.get_score,jdbcType=FLOAT} get_score,
+						#{item.eva_content,jdbcType=VARCHAR} eva_content,
+						#{item.sort_code,jdbcType=VARCHAR} sort_code,
+						#{item.note,jdbcType=VARCHAR} note
+					from dual
+				</foreach>
+			)
+	</insert>
+	
+	<!-- 更新明细表 -->
+	<update id="updateMatEvaSupTarget" parameterType="java.util.List" >
+		<foreach collection="list" item="item" index="index" open="begin" close=";end;" separator=";" >
+			UPDATE MAT_EVA_SUP_TARGET
+			<set>
+				<if test="item.scale_code != null and item.scale_code != ''">
+					scale_code = #{item.scale_code},
+				</if>
+				<if test="item.scale_no != null and item.scale_no != ''">
+					scale_no = #{item.scale_no},
+				</if>
+				<if test="item.scale_point != null and item.scale_point != ''">
+					scale_point = #{item.scale_point},
+				</if>
+				<if test="item.eva_content != null and item.eva_content != ''">
+					eva_content = #{item.eva_content},
+				</if>
+				<if test="item.get_score != null and item.get_score != ''">
+					get_score = #{item.get_score},
+				</if>
+			</set>
+			<where>
+				<if test="item.group_id != null and item.group_id != ''">
+					and group_id = #{item.group_id}
+				</if>
+				<if test="item.hos_id != null and item.hos_id != ''">
+					and hos_id = #{item.hos_id}
+				</if>
+				<if test="item.copy_code != null and item.copy_code != ''">
+					and copy_code = #{item.copy_code}
+				</if>
+				<if test="item.eva_code != null and item.eva_code != ''">
+					and eva_code = #{item.eva_code}
+				</if>
+				<if test="item.target_code != null and item.target_code != ''">
+					and target_code = #{item.target_code}
+				</if>
+			</where>
+		</foreach>
+	</update>
+	
+	<resultMap id="matEvaTargetScale" type="java.util.Map">
+		<result property="id" column="id"/>
+		<result property="text" column="text"/>
+	</resultMap>
+	
+	<select id="queryMatEvaTargetScale" resultMap="matEvaTargetScale" parameterType="java.util.Map">
+		select scale_point || '-' || scale_code || '-' || scale_no id,
+		       scale_name text
+		  from MAT_EVA_TARGET_SCALE_D
+		<where>
+			is_stop = 0 and is_new = 1
+			<if test="group_id != null and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				and copy_code = #{copy_code}
+			</if>
+			<if test="target_code != null and target_code != ''">
+				and target_code = #{target_code}
+			</if>
+		</where>
+		order by scale_code
+	</select>
+	
+	<resultMap id="matEvaTargetDeductSelect" type="java.util.Map">
+		<result property="deduct_id" column="deduct_id"/>
+		<result property="deduct_name" column="deduct_name"/>
+	</resultMap>
+	
+	<select id="queryMatEvaTargetDeduct" resultMap="matEvaTargetDeductSelect" parameterType="java.util.Map">
+		select deduct_code || '-' || deduct_desc || '-' || high_point deduct_id,
+		       deduct_name
+		  from MAT_EVA_TARGET_DEDUCT
+		<where>
+			is_stop = 0
+			<if test="group_id != null and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				and copy_code = #{copy_code}
+			</if>
+			<if test="target_code != null and target_code != ''">
+				and target_code = #{target_code}
+			</if>
+		</where>
+		order by deduct_code
+	</select>
+	
+	<delete id="deleteMatEvaTargetDudect" parameterType="java.util.Map">
+		delete from MAT_EVA_SUP_DEDUCT
+		<where>
+			<if test="group_id != null and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				and copy_code = #{copy_code}
+			</if>
+			<if test="eva_code != null and eva_code != ''">
+				and eva_code = #{eva_code}
+			</if>
+			<if test="target_code != null and target_code != ''">
+				and target_code = #{target_code}
+			</if>
+			<if test="eva_codes != null and eva_codes != ''">
+				and eva_code in (${eva_codes})
+			</if>
+		</where>
+	</delete>
+	
+	<!--新增评价明细表  -->
+	<insert id="addMatEvaTargetDudect" parameterType="java.util.List" >
+		insert into MAT_EVA_SUP_DEDUCT(
+			group_id, 
+			hos_id, 
+			copy_code, 
+			eva_code, 
+			target_code, 
+			deduct_code, 
+			deduct_score, 
+			deduct_desc, 
+			note
+		) select group_id,
+		         hos_id,
+		         copy_code,
+		         eva_code, 
+				 target_code, 
+				 deduct_code, 
+				 deduct_score, 
+				 deduct_desc, 
+				 note
+		    from (
+				<foreach collection="list" item="item" index="index" separator=" union all " >
+					select 		
+						#{item.group_id,jdbcType=INTEGER} group_id,
+						#{item.hos_id,jdbcType=INTEGER} hos_id,
+						#{item.copy_code,jdbcType=VARCHAR} copy_code,
+						#{item.eva_code,jdbcType=INTEGER} eva_code,
+						#{item.target_code,jdbcType=VARCHAR} target_code,
+						#{item.deduct_code,jdbcType=VARCHAR} deduct_code,
+						#{item.deduct_score,jdbcType=FLOAT} deduct_score,
+						#{item.deduct_desc,jdbcType=VARCHAR} deduct_desc,
+						#{item.note,jdbcType=VARCHAR} note
+					from dual
+				</foreach>
+			)
+	</insert>
+	
+	<!--新增评价明细与订单对应关系表  -->
+	<insert id="addMatEvaSupBillRela" parameterType="java.util.Map" >
+		insert into MAT_EVA_SUP_BILL_RELA(
+			group_id, 
+			hos_id, 
+			copy_code, 
+			eva_code, 
+			bill_type, 
+			bill_id, 
+			note
+		) select #{group_id},
+		         #{hos_id},
+		         #{copy_code},
+		         #{eva_code}, 
+		         '订单', 
+		         mom.order_id, 
+				 #{note}
+		    from MAT_ORDER_MAIN mom
+			<where>
+				<if test="group_id != null and group_id != ''">
+					and mom.group_id = #{group_id}
+				</if>
+				<if test="hos_id != null and hos_id != ''">
+					and mom.hos_id = #{hos_id}
+				</if>
+				<if test="copy_code != null and copy_code != ''">
+					and mom.copy_code = #{copy_code}
+				</if>
+				<if test="order_ids != null and order_ids != ''">
+					and mom.order_id in (${order_ids})
+				</if>
+			</where>
+	</insert>
+</mapper>
+		    

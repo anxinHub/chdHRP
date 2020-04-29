@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.hr.dao.scientificresearch.HrPersonalAcademicCreditMapper">
+
+	 <resultMap id="hrSelectMap" type="java.util.Map">
+        <result property="id" column="id" />
+		<result property="text" column="text" />
+	 </resultMap>
+	<resultMap id="HrPersonalAcademicCredit" type="com.chd.hrp.hr.entity.scientificresearch.HrPersonalAcademicCredit">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="year" column="year" />
+		<result property="honor_code" column="honor_code" />
+		<result property="score" column="score" />
+		<result property="note" column="note" />
+		<result property="field_col_code" column="field_col_code" />
+		<result property="field_col_name" column="field_col_name" />
+		<result property="acade_honor" column="acade_honor" />
+	</resultMap>
+	<resultMap id="hrAcadeHonorMap" type="java.util.Map">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="year" column="year" />
+		<result property="acade_honor" column="acade_honor" />
+		<result property="acade_status" column="acade_status" />
+		<result property="proj" column="proj" />
+		<result property="paper" column="paper" />
+		<result property="note" column="note" />
+	</resultMap>
+	<!-- 批量删除数据 -->
+	<delete id="deletePersonalAcademicCredit" parameterType="java.util.List">
+		delete from HR_ACADE_HONOR_SET
+		<where>
+			<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+					group_id = #{item.group_id,jdbcType=INTEGER}
+					and hos_id = #{item.hos_id,jdbcType=INTEGER}
+					and year = #{item.year,jdbcType=VARCHAR}
+					and HONOR_CODE = #{item.honor_code,jdbcType=VARCHAR}
+			</foreach>
+		</where>
+	</delete>
+	<!-- 继承时先删除 -->
+	<delete id="deleteHonorCode" parameterType="java.util.Map">
+
+		DELETE FROM HR_ACADE_HONOR_SET
+		<where>
+			<if test="group_id != null and group_id != ''">
+				 group_id = #{group_id,jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND hos_id = #{hos_id,jdbcType=VARCHAR}
+			</if>
+			<if test="year != null and year != ''">
+				AND year = #{year,jdbcType=INTEGER}
+			</if>
+			<if test="honor_code != null and honor_code != ''">
+				AND honor_code = #{honor_code,jdbcType=VARCHAR}
+			</if>
+		</where>
+	</delete>
+	<!-- 批量保存数据 -->
+	<insert id="addBatch" parameterType="java.util.List">
+		insert into HR_ACADE_HONOR_SET
+		(group_id,hos_id,year,honor_code,score,note)
+		(
+		<foreach collection="list" item="item" index="index" separator="union all">
+			select
+			#{item.group_id,jdbcType=INTEGER},
+			#{item.hos_id,jdbcType=INTEGER},
+			#{item.year,jdbcType=VARCHAR},
+			#{item.honor_code,jdbcType=VARCHAR},
+			#{item.score,jdbcType=DOUBLE},
+			#{item.note,jdbcType=VARCHAR}
+			from dual
+		</foreach>)
+	</insert>
+	
+	<!-- 查询学术荣誉名称 -->
+	<select id="queryHonorsName" resultMap="hrSelectMap">
+		select
+		group_id,
+		hos_id,
+		field_col_code id,
+		field_col_name text
+		from hr_fiied_data 
+		where field_tab_code='DIC_ACADE_HONOR'
+			AND group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+	</select>
+	<!-- 查询数据 -->
+	<select id="query" parameterType="java.util.Map" resultMap="HrPersonalAcademicCredit">
+		select ha.group_id, ha.hos_id, ha.year, ha.honor_code, ha.score
+	, ha.note, hf.field_col_code, hf.field_col_name, hr.acade_honor
+from HR_ACADE_HONOR_SET ha
+left join hr_fiied_data hf on ha.group_id = hf.group_id
+and ha.hos_id = hf.hos_id
+and field_tab_code = 'DIC_ACADE_HONOR'
+and ha.honor_code = hf.field_col_code 
+and ha.group_id=hf.group_id
+and ha.hos_id=hf.hos_id
+	left join HR_RESEARCH_TOT_SET hr on ha.year = hr.year 
+  and ha.group_id=hr.group_id and ha.hos_id=hr.hos_id
+		<where>
+			ha.group_id=#{group_id} and ha.hos_id=#{hos_id}
+			<if test="year!=null and year!=''">
+				and ha.year=#{year}
+			</if>
+			<if test="glory_name!=null and glory_name!=''">
+				and hf.field_col_name like '%${glory_name}%'
+			</if>
+		</where>
+			order by ha.honor_code asc
+	</select>
+	<!-- 查询科研满分标准表 -->
+	<select id="queryAcadeHonor" parameterType="java.util.Map" resultMap="hrAcadeHonorMap">
+
+		SELECT
+		acade_honor
+		FROM
+		HR_RESEARCH_TOT_SET
+		<where>
+			<if test="group_id != null and group_id != ''">
+				AND group_id = #{group_id,jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND hos_id = #{hos_id,jdbcType=INTEGER}
+			</if>
+			<if test="year != null and year != ''">
+				AND year = #{year,jdbcType=VARCHAR}
+			</if>
+		</where>
+		order by group_id asc
+	</select>
+	
+	<!-- 更新学术荣誉满分数值 -->
+	<update id="updateAcadeHonor" parameterType="java.util.Map">
+		update HR_RESEARCH_TOT_SET
+		<trim prefix="SET" suffixOverrides=",">
+			acade_honor = #{acade_honor,jdbcType=INTEGER},
+			note = #{note,jdbcType=VARCHAR},
+		</trim>
+		<where>
+			AND group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND year = #{year,jdbcType=VARCHAR}
+		</where>
+	</update>
+	<!-- 添加学术荣誉满分数值 -->
+	<insert id="addAcadeHonor" useGeneratedKeys="true">
+		INSERT INTO HR_RESEARCH_TOT_SET (
+		<trim suffix="" suffixOverrides=",">
+			group_id,
+			hos_id,
+			year,
+			acade_honor
+		</trim>
+		) VALUES (
+		<trim suffix="" suffixOverrides=",">
+			#{group_id,jdbcType=INTEGER},
+			#{hos_id,jdbcType=INTEGER},
+			#{year,jdbcType=VARCHAR},
+			#{acade_honor,jdbcType=INTEGER}
+		</trim>
+		)
+	</insert>
+	<!-- 继承时后插入 -->
+	<insert id="inheritAcademicCredit" parameterType="java.util.List">
+		insert into HR_ACADE_HONOR_SET( select hah.group_id, hah.hos_id,
+		(
+		select
+		extract(year from sysdate)from dual
+		) as year, hah.honor_code,hah.score,hah.note
+		from HR_ACADE_HONOR_SET hah
+		WHERE
+		hah.group_id = #{group_id,jdbcType=INTEGER}
+		AND hah.hos_id = #{hos_id,jdbcType=INTEGER}
+		AND hah.year =(select extract(year from sysdate)-1 from dual)
+		)
+	</insert>
+	
+	<!-- 查询去年的记录 -->
+	<select id="queryHonorByLastYear" resultType="java.lang.Integer">
+		select 
+		    count(*) 
+		from 
+		    hr_acade_honor_set 
+		where 
+		    group_id = #{group_id} 
+		    and hos_id = #{hos_id} 
+		    and year = extract(year from sysdate) - 1
+	</select>
+</mapper>

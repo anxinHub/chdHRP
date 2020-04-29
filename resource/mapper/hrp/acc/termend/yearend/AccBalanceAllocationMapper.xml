@@ -1,0 +1,243 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.acc.dao.termend.yearend.AccBalanceAllocationMapper">
+	<select id="addAccBalanceAllocationVouch" statementType="CALLABLE" parameterType="java.util.Map" resultType="String"> 
+		<![CDATA[
+			{call acc_yearend_balanceallocation(#{group_id,jdbcType=INTEGER}, #{hos_id,jdbcType=INTEGER}, 
+				#{copy_code,jdbcType=VARCHAR}, #{user_id,jdbcType=INTEGER}, #{acc_year,jdbcType=VARCHAR}, 
+				#{acc_month,jdbcType=VARCHAR}, #{template_id,jdbcType=INTEGER}, #{vouch_id,jdbcType=INTEGER}, 
+				#{vouch_no,jdbcType=VARCHAR}, #{msg, mode=OUT, jdbcType=VARCHAR})}
+		]]>
+	</select>
+	
+	<!-- 根据科目获取年末余额 -->
+	<select id="queryEndMoneyBySubj" parameterType="java.util.Map" resultType="java.lang.Double"> 
+		WITH vouch_tmp as (
+			SELECT 
+				case d.subj_dire 
+					when 0 then sum(b.debit - b.credit) 
+					when 1 then sum(b.credit - b.debit) 
+				end end_os  
+			FROM acc_vouch a 
+			LEFT JOIN acc_vouch_detail b 
+				ON a.group_id = b.group_id 
+				AND a.hos_id = b.hos_id 
+				AND a.copy_code = b.copy_code 
+				AND a.vouch_id = b.vouch_id 
+			LEFT JOIN acc_busi_type c 
+				ON a.group_id = c.group_id 
+				AND a.hos_id = c.hos_id 
+				AND a.copy_code = c.copy_code 
+				AND a.busi_type_code = c.busi_type_code 
+			LEFT JOIN acc_subj d 
+				ON a.group_id = d.group_id 
+				AND a.hos_id = d.hos_id 
+				AND a.copy_code = d.copy_code 
+				AND a.acc_year = d.acc_year 
+				AND b.subj_code = d.subj_code 
+			WHERE a.group_id = #{group_id,jdbcType=INTEGER} 
+				AND a.hos_id = #{hos_id,jdbcType=INTEGER} 
+				AND a.copy_code = #{copy_code,jdbcType=VARCHAR} 
+				AND a.acc_year = #{acc_year,jdbcType=VARCHAR} 
+				AND a.state &gt;= 1 AND a.state &lt; 99 
+				AND c.mod_code = 'ZZ' 
+				AND b.subj_code = #{subj_code,jdbcType=VARCHAR} 
+			GROUP BY b.subj_code, d.subj_dire
+		)
+		SELECT sum(nvl(end_os, 0)) end_os
+		FROM (
+			SELECT end_os
+			FROM acc_leder
+			WHERE group_id = #{group_id,jdbcType=INTEGER} 
+				AND hos_id = #{hos_id,jdbcType=INTEGER}
+				AND copy_code = #{copy_code,jdbcType=VARCHAR}
+				AND acc_year = #{acc_year,jdbcType=VARCHAR}
+				AND acc_month = #{acc_month,jdbcType=VARCHAR}
+				AND subj_code = #{subj_code,jdbcType=INTEGER}
+			UNION ALL 
+			SELECT end_os FROM vouch_tmp
+		) tmp
+	</select>
+	
+	<!-- 获取科目本年未记账借方发生额 -->
+	<select id="queryVouchDebitMoneyBySubj" parameterType="java.util.Map" resultType="java.lang.Double">
+		SELECT sum(b.debit - b.credit) money
+		FROM acc_vouch a 
+		LEFT JOIN acc_vouch_detail b 
+			ON a.group_id = b.group_id 
+			AND a.hos_id = b.hos_id 
+			AND a.copy_code = b.copy_code 
+			AND a.vouch_id = b.vouch_id 
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND a.acc_year = #{copy_code,jdbcType=VARCHAR}
+			<if test="acc_month != null and acc_month != ''">
+			AND a.acc_month = #{acc_month,jdbcType=VARCHAR}
+			</if>
+			AND a.state &gt;= 1 AND a.state &lt; 99 
+			AND b.subj_code = #{subj_code,jdbcType=VARCHAR}
+	</select>
+	
+	<!-- 根据科目和余额方向获取辅助核算余额（返回自动凭证格式） -->
+	<select id="queryCheckEndMoneyBySubjDire" parameterType="java.util.Map" resultType="java.util.TreeMap"> 
+		with check_tmp as (
+			select leder.subj_code, 
+				case subj.subj_dire 
+					when 0 then sum(leder.debit - leder.credit) 
+					else sum(leder.credit - leder.debit) 
+				end as money,
+				case subj.subj_dire 
+					when 0 then sum(leder.debit_w - leder.credit_w) 
+					else sum(leder.credit_w - leder.debit_w) 
+				end as money_w,
+				${columns}
+			from acc_vouch vouch
+			left join acc_vouch_check leder<!-- 表别名不可更改与servicesImpl文件有关联 -->
+				on vouch.group_id = leder.group_id 
+				and vouch.hos_id = leder.hos_id 
+				and vouch.copy_code = leder.copy_code 
+				and vouch.vouch_id = leder.vouch_id 
+			left join acc_subj subj
+				on leder.group_id = subj.group_id 
+				and leder.hos_id = subj.hos_id
+				and leder.copy_code = subj.copy_code 
+				and leder.acc_year = subj.acc_year 
+				and leder.subj_code = subj.subj_code
+			LEFT JOIN acc_busi_type abt 
+				ON vouch.group_id = abt.group_id 
+				AND vouch.hos_id = abt.hos_id 
+				AND vouch.copy_code = abt.copy_code 
+				AND vouch.busi_type_code = abt.busi_type_code 
+			where vouch.group_id = #{group_id,jdbcType=INTEGER} 
+				and vouch.hos_id = #{hos_id,jdbcType=INTEGER} 
+				and vouch.copy_code = #{copy_code,jdbcType=VARCHAR} 
+				and vouch.acc_year = #{acc_year,jdbcType=VARCHAR} 
+				and vouch.acc_month = #{acc_month,jdbcType=VARCHAR} 
+				and leder.subj_code = #{subj_code,jdbcType=VARCHAR} 
+				AND vouch.state &gt;= 1 AND vouch.state &lt; 99 
+				AND abt.mod_code = 'ZZ' 
+				<if test="source_id != null and source_id != ''">
+				and leder.check7_id = #{source_id,jdbcType=INTEGER}
+				</if>
+			group by leder.subj_code, subj.subj_dire, ${columns}
+		)
+		select subj_code, sum(money) money, sum(money_w) 
+		from(
+			select leder.subj_code, 
+				case subj.subj_dire 
+					when 0 then sum(leder.this_od - leder.this_oc) 
+					else sum(leder.this_oc - leder.this_od) 
+				end as money,
+				case subj.subj_dire 
+					when 0 then sum(leder.this_od_w - leder.this_oc_w) 
+					else sum(leder.this_oc_w - leder.this_od_w) 
+				end as money_w,
+				${columns}
+			from acc_leder_check leder<!-- 表别名不可更改与servicesImpl文件有关联 -->
+			left join acc_subj subj
+				on leder.group_id = subj.group_id and leder.hos_id = subj.hos_id
+				and leder.copy_code = subj.copy_code and leder.acc_year = subj.acc_year 
+				and leder.subj_code = subj.subj_code
+			where leder.group_id = #{group_id,jdbcType=INTEGER} 
+				and leder.hos_id = #{hos_id,jdbcType=INTEGER} 
+				and leder.copy_code = #{copy_code,jdbcType=VARCHAR} 
+				and leder.acc_year = #{acc_year,jdbcType=VARCHAR} 
+				and leder.acc_month = #{acc_month,jdbcType=VARCHAR} 
+				and leder.subj_code = #{subj_code,jdbcType=VARCHAR} 
+				and subj.is_stop = 0 and subj.is_last = 1 
+				<if test="source_id != null and source_id != ''">
+				and leder.check7_id = #{source_id,jdbcType=INTEGER}
+				</if>
+			group by leder.subj_code, subj.subj_dire, ${columns}
+			union all 
+			select subj_code, money, money_w, ${columns} from check_tmp
+		) tmp 
+		group by subj_code, ${columns}
+	</select>
+	
+	<!-- 获取科目年末余额 -->
+	<select id="querySubjEndMoneyList" parameterType="java.util.Map" resultType="java.util.Map">
+		WITH vouch_tmp as (
+			SELECT a.subj_code, e.is_check, 
+				case e.subj_dire 
+					when 0 then b.debit - b.credit
+					when 1 then b.credit - b.debit
+				end end_os, 
+				case e.subj_dire 
+					when 0 then b.debit_w - b.credit_w
+					when 1 then b.credit_w - b.debit_w
+				end end_os_w 
+			FROM acc_termend_template_detail a 
+			LEFT JOIN acc_vouch_detail b 
+				ON a.group_id = b.group_id 
+				AND a.hos_id = b.hos_id 
+				AND a.copy_code = b.copy_code 
+				AND a.subj_code = b.subj_code 
+			LEFT JOIN acc_vouch c 
+				ON b.group_id = c.group_id 
+				AND b.hos_id = c.hos_id 
+				AND b.copy_code = c.copy_code 
+				AND b.acc_year = c.acc_year 
+				AND b.vouch_id = c.vouch_id 
+			LEFT JOIN acc_busi_type d 
+				ON c.group_id = d.group_id 
+				AND c.hos_id = d.hos_id 
+				AND c.copy_code = d.copy_code 
+				AND c.busi_type_code = d.busi_type_code 
+			LEFT JOIN acc_subj e 
+				ON a.group_id = e.group_id 
+				AND a.hos_id = e.hos_id 
+				AND a.copy_code = e.copy_code 
+				AND a.acc_year = e.acc_year 
+				AND a.subj_code = e.subj_code 
+			WHERE a.group_id = #{group_id,jdbcType=INTEGER} 
+				AND a.hos_id = #{hos_id,jdbcType=INTEGER} 
+				AND a.copy_code = #{copy_code,jdbcType=VARCHAR} 
+				AND a.acc_year = #{acc_year,jdbcType=VARCHAR} 
+				AND a.template_id = #{template_id,jdbcType=INTEGER}
+				<if test="kind_code != null and kind_code != ''">
+				AND e.kind_code = #{kind_code,jdbcType=VARCHAR}
+				</if>
+				AND c.state &gt;= 1 AND c.state &lt; 99 
+				AND d.mod_code = 'ZZ' 
+		)
+		SELECT subj_code, is_check, sum(nvl(end_os, 0)) end_os, sum(nvl(end_os_w, 0)) end_os_w
+		FROM (
+			SELECT a.subj_code, c.is_check, 
+				case c.subj_dire 
+					when 0 then b.this_od - b.this_oc
+					when 1 then b.this_oc - b.this_od
+				end end_os, 
+				case c.subj_dire 
+					when 0 then b.this_od_w - b.this_oc_w
+					when 1 then b.this_oc_w - b.this_od_w
+				end end_os_w 
+			FROM acc_termend_template_detail a 
+			LEFT JOIN acc_leder b 
+				ON a.group_id = b.group_id 
+				AND a.hos_id = b.hos_id 
+				AND a.copy_code = b.copy_code 
+				AND a.subj_code = b.subj_code 
+				AND b.acc_month = #{acc_month,jdbcType=VARCHAR}
+			LEFT JOIN acc_subj c 
+				ON a.group_id = c.group_id 
+				AND a.hos_id = c.hos_id 
+				AND a.copy_code = c.copy_code 
+				AND a.acc_year = c.acc_year 
+				AND a.subj_code = c.subj_code 
+			WHERE a.group_id = #{group_id,jdbcType=INTEGER} 
+				AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+				AND a.acc_year = #{acc_year,jdbcType=VARCHAR}
+				AND a.template_id = #{template_id,jdbcType=INTEGER}
+				<if test="kind_code != null and kind_code != ''">
+				AND c.kind_code = #{kind_code,jdbcType=VARCHAR}
+				</if>
+			UNION ALL 
+			SELECT subj_code, is_check, end_os, end_os_w FROM vouch_tmp
+		) tmp
+		GROUP BY subj_code, is_check
+	</select>
+</mapper>
+

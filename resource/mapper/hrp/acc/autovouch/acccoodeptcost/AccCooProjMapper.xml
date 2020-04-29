@@ -1,0 +1,253 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.acc.dao.autovouch.acccoodeptcost.AccCooProjMapper">
+ 
+	<resultMap id="result" type="java.util.Map">
+        <result property="group_id" column="group_id"/>
+        <result property="hos_id" column="hos_id"/>
+        <result property="copy_code" column="copy_code"/>
+        <result property="proj_code" column="proj_code"/>
+        <result property="proj_name" column="proj_name"/>
+        <result property="coop_type" column="coop_type"/>
+        <result property="coop_obj" column="coop_obj"/>
+        <result property="coop_obj_name" column="coop_obj_name"/>
+        <result property="ft_bl" column="ft_bl"/>
+        <result property="is_stop" column="is_stop"/>
+        <result property="note" column="note"/>
+		<result property="dept_id" column="dept_id"/>
+		<result property="dept_no" column="dept_no"/>
+		<result property="dept_name" column="dept_name"/>
+		<result property="cus_id" column="cus_id"/>
+		<result property="cus_no" column="cus_no"/>
+		<result property="sup_id" column="sup_id"/>
+		<result property="sup_no" column="sup_no"/>
+		<result property="coop_obj_name" column="coop_obj_name"/>
+		<result property="obj_name" column="obj_name"/>
+		<result property="text" column="text"/>
+		<result property="id" column="id"/>
+	</resultMap>
+	
+	<resultMap id="accdeptMap" type="java.util.Map">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="year_month" column="year_month" />
+		<result property="dept_id" column="dept_id" />
+		<result property="dept_code" column="dept_code" />
+		<result property="dept_name" column="dept_name" />
+		<result property="kind_name" column="kind_name" />
+		<result property="type_name" column="type_name" />
+		<result property="natur_name" column="natur_name" />
+		<result property="out_name" column="out_name" />
+		<result property="emp_count" column="emp_count" />
+		<result property="total_num" column="total_num" />
+		<result property="ft_bl" column="ft_bl" />
+		<result property="state" column="state" />
+		<result property="dept_no" column="dept_no" />
+	</resultMap>
+	
+	<insert id="addAccCooProj" useGeneratedKeys="true">
+
+		insert into
+		acc_coop_proj(
+		group_id,
+		hos_id,
+		copy_code,
+		proj_code,
+		proj_name,
+		coop_type,
+		is_stop,
+		note
+		) values (
+		#{group_id,jdbcType=INTEGER}
+		,
+		#{hos_id,jdbcType=INTEGER}
+		,
+		#{copy_code,jdbcType=VARCHAR}
+		,
+		#{proj_code,jdbcType=VARCHAR}
+		,
+		#{proj_name,jdbcType=VARCHAR}
+		,
+		#{coop_type,jdbcType=INTEGER}
+		,
+		#{is_stop,jdbcType=INTEGER}
+		,
+		#{note,jdbcType=VARCHAR}
+		)
+
+	</insert>
+	
+	<insert id="insertAccProjMainByImport" parameterType="java.util.List" useGeneratedKeys="false">
+		insert into acc_coop_proj(
+			group_id,
+			hos_id,
+			copy_code,
+			proj_code,
+			proj_name,
+			coop_type,
+			is_stop,
+			note
+		)
+		select A.*
+		from (
+			<foreach collection="list" item="item" index="index" separator="UNION ALL">
+				select
+				#{item.group_id},#{item.hos_id},#{item.copy_code},#{item.proj_code},
+				#{item.proj_name},#{item.coop_type},#{item.is_stop},#{item.note}
+				from dual
+			</foreach>
+		)A
+	</insert>
+	
+	<delete id="deleteAccCooProj" parameterType="java.util.List">
+
+		delete from ACC_COOP_PROJ
+		<where>
+			<foreach collection="list" index="index" item="item" open="("
+				separator="or" close=")">
+				group_id = #{item.group_id}
+				and
+				hos_id = #{item.hos_id}
+				and
+				copy_code = #{item.copy_code}
+				and
+				proj_code = #{item.proj_code}
+
+			</foreach>
+		</where>
+	</delete>
+	
+	<select id="queryAccProjByCode" parameterType="java.util.Map" resultMap="result">
+		SELECT
+		group_id,
+		hos_id,
+		copy_code,
+		proj_code,
+		proj_name,
+		coop_type,
+		is_stop,
+		note
+		FROM acc_coop_proj
+		where   group_id = #{group_id,jdbcType=INTEGER}
+			
+				AND hos_id = #{hos_id,jdbcType=INTEGER}
+			
+				AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			
+				AND proj_code = #{proj_code,jdbcType=VARCHAR}
+	</select>
+	
+	<select id="queryAccCooProj" parameterType="java.util.Map" resultMap="result">
+		SELECT
+		group_id,
+		hos_id,
+		copy_code,
+		proj_code,
+		proj_name,
+		(case when coop_type=1 then '院内'
+				else '院外' end) coop_type,
+		(case when is_stop=0 then '启用'
+				else '停用' end) is_stop,
+		note
+		FROM acc_coop_proj
+		where group_id = #{group_id,jdbcType=INTEGER}
+			
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			
+			<if test="coop_type != null and coop_type != ''">
+				AND coop_type = #{coop_type,jdbcType=VARCHAR}
+			</if>
+			<if test="project != null and project != ''">
+				AND 
+				(proj_name like '%'||#{project,jdbcType=VARCHAR}||'%'
+				OR
+				proj_code like '%'||#{project,jdbcType=VARCHAR}||'%')
+			</if>
+		order by proj_code
+	</select>
+	
+	<select id="queryAccProjUse" parameterType="java.util.List" resultMap="result">
+		SELECT
+		group_id,
+		hos_id,
+		copy_code,
+		proj_code
+		FROM acc_coop_cost
+		where   group_id = #{map.group_id,jdbcType=INTEGER}
+			
+				AND hos_id = #{map.hos_id,jdbcType=INTEGER}
+			
+				AND copy_code = #{map.copy_code,jdbcType=VARCHAR}
+			
+				AND proj_code in
+				<foreach collection="list" index="index" item="item" open="("
+				separator="," close=")">
+					#{item.proj_code}
+				</foreach>
+	</select>
+	
+	<select id="queryAccProjByList" parameterType="java.util.List" resultMap="result">
+		SELECT
+		group_id,
+		hos_id,
+		copy_code,
+		proj_code
+		FROM acc_coop_proj
+		where   group_id = #{map.group_id,jdbcType=INTEGER}
+			
+				AND hos_id = #{map.hos_id,jdbcType=INTEGER}
+			
+				AND copy_code = #{map.copy_code,jdbcType=VARCHAR}
+			
+				AND proj_code in
+				<foreach collection="list" index="index" item="item" open="("
+				separator="," close=")">
+					#{item.proj_code}
+				</foreach>
+	</select>
+	
+	<select id="queryDeptAllInfoDict" parameterType="java.util.Map" resultMap="accdeptMap">
+		SELECT a.DEPT_ID ,a.DEPT_CODE,a.DEPT_NAME ,a.dept_no,b.KIND_NAME,d.TYPE_NAME,e.OUT_NAME ,f.NATUR_NAME FROM 
+		HOS_DEPT_DICT a 
+		LEFT JOIN HOS_DEPT_KIND b ON a.GROUP_ID = b.GROUP_ID AND a.HOS_ID = b.HOS_ID AND a.KIND_CODE = b.KIND_CODE 
+		LEFT JOIN ACC_DEPT_ATTR c ON a.GROUP_ID = c.GROUP_ID AND a.HOS_ID = c.HOS_ID AND a.DEPT_ID  = c.DEPT_ID 
+		LEFT JOIN ACC_DEPT_TYPE d ON c.TYPE_CODE = d.TYPE_CODE
+		LEFT JOIN ACC_DEPT_OUT e ON c.OUT_CODE = e.OUT_CODE
+		LEFT JOIN ACC_DEPT_NATUR f ON c.NATUR_CODE = f.NATUR_CODE
+		<where>
+			a.group_id = #{group_id}
+			and a.hos_id = #{hos_id}
+			<if test="key != null and key != ''">
+				and a.dept_code like '${key}%'
+			</if>	
+			<if test="dept_code != null and dept_code != ''">
+				and a.dept_code = #{dept_code}
+			</if>	
+			and a.is_stop = 0
+			and a.is_last = 1
+		</where>
+		ORDER BY DEPT_CODE
+	</select>
+	
+	<update id="updateAccCooProj" parameterType="java.util.Map">
+
+		update acc_coop_proj set
+		proj_name = #{proj_name,jdbcType=VARCHAR},
+		coop_type = #{coop_type,jdbcType=INTEGER},
+		is_stop = #{is_stop,jdbcType=INTEGER},
+		note = #{note,jdbcType=VARCHAR}
+		WHERE
+		group_id = #{group_id,jdbcType=INTEGER}
+		and
+		hos_id = #{hos_id,jdbcType=INTEGER}
+		and
+		copy_code = #{copy_code,jdbcType=VARCHAR}
+		and
+		proj_code = #{proj_code,jdbcType=VARCHAR}
+
+	</update>
+</mapper>
+

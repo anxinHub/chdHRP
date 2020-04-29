@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.ass.dao.dict.AssNatursMapper">
+	
+	<resultMap id="assNaturs" type="com.chd.hrp.ass.entity.dict.AssNaturs">
+	<result property="naturs_code" column="naturs_code"/>
+	<result property="naturs_name" column="naturs_name"/>
+	</resultMap>
+	<resultMap type="java.util.Map" id="hrpAssSelect">
+		<result property="store_id" column="store_id" />
+		<result property="text" column="text" />
+		<result property="naturs_code" column="naturs_code"/>
+		
+	</resultMap>
+	<insert id="addAssNaturs" useGeneratedKeys="true" >
+	
+		INSERT INTO ASS_NATURS (
+		naturs_code
+		,
+		naturs_name
+		
+		) VALUES (
+#{naturs_code}		,
+#{naturs_name}		
+		)
+	
+	</insert>
+	<insert id="addBatchAssNaturs" parameterType="java.util.List" >
+	
+		INSERT INTO ASS_NATURS (
+		naturs_code
+		,
+		naturs_name
+		
+		) select ASS_NATURS_SEQ.nextval , t.* from(
+		<foreach collection="list" item="item" index="index" separator=" union all " >
+			select 		
+#{item.naturs_code}			,
+#{item.naturs_name}			
+		
+		</foreach>
+		)t
+	</insert>
+	
+	<update id="updateAssNaturs" parameterType="java.util.Map">
+	
+		UPDATE ass_naturs SET
+		naturs_name = #{naturs_name}
+		
+		WHERE 
+		naturs_code = #{naturs_code}
+		
+	
+	</update>
+	<update id="updateBatchAssNaturs" parameterType="java.util.List">
+	
+		<foreach collection="list" item="item" index="index" open="begin" close="end;" separator=";" >
+			UPDATE ass_naturs SET
+			naturs_name = #{naturs_name}
+			
+			WHERE 
+			naturs_code = #{item.naturs_code}
+			
+		</foreach>
+	</update>
+	
+	<delete id="deleteAssNaturs" parameterType="java.util.Map">
+	
+		DELETE FROM ass_naturs WHERE
+		naturs_code = #{naturs_code} 
+	
+	</delete>
+	<delete id="deleteBatchAssNaturs" parameterType="java.util.List">
+		DELETE FROM ass_naturs WHERE
+			<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+				naturs_code = #{item.naturs_code}
+				
+			</foreach>
+	
+	</delete>
+	<select id="queryAssNaturs" parameterType="java.util.Map" resultMap="assNaturs" >
+	
+		SELECT 
+		naturs_code,
+		naturs_name
+		FROM ASS_NATURS a
+		<where>                     
+		<if test="naturs_code != null and naturs_code != ''">
+		AND naturs_code = #{naturs_code}
+		</if>
+		<if test="naturs_name != null and naturs_name != ''">
+		AND naturs_name like '%${naturs_name}%'
+		</if>
+		
+		and exists (
+								select 1 from v_user_data_perm b 
+								where
+									b.group_id=#{group_id}
+									and b.hos_id=#{hos_id}
+									and a.naturs_code=b.perm_code
+									and user_id=#{user_id}
+									and (b.is_read = 1
+				          				or b.is_write = 1 )
+									)
+		
+		</where>   
+		order by naturs_code asc
+	</select>
+	<select id="queryAssNatursByCode" resultType="com.chd.hrp.ass.entity.dict.AssNaturs" parameterType="string" >
+	
+		SELECT 
+		naturs_code,
+		naturs_name
+		FROM ass_naturs 
+		WHERE 
+		naturs_code = #{naturs_code} 
+	
+	</select>
+	<select id="queryHosStoreDict" resultMap="hrpAssSelect">
+	
+	
+	select t.store_id store_id,
+		t.store_code||' '|| t.store_name text  from HOS_STORE_DICT t<!--  t1.naturs_code 
+left join ass_naturs_store_map t1 on
+ t.hos_id=t1.hos_id
+and t.group_id=t1.group_id
+and t.store_id=t1.store_id -->
+where t.is_stop=0 and t.is_ass=1
+and exists (
+								select 1 from v_user_data_perm b 
+								where
+									t.group_id=b.group_id 
+									and t.hos_id=b.hos_id 
+									and to_char(t.store_id)=b.perm_code
+									and user_id=#{user_id}
+									and (b.is_read = 1
+				          				or b.is_write = 1 )
+									)
+
+	</select>
+	
+<select id="queryHosStoreDictByNaturs" resultMap="hrpAssSelect">
+select t.store_id store_id ,t.naturs_code  naturs_code
+from ass_naturs_store_map t
+where
+	t.group_id = #{group_id} 
+	and t.hos_id = #{hos_id}
+	and t.copy_code =#{copy_code}
+	and t.naturs_code=#{naturs_code}
+</select>	
+	<select id="queryHosStoreDictAll" resultMap="hrpAssSelect">
+	with san as(select  st.store_id,st.store_name ,an.naturs_code from hos_store_dict st left join
+				ass_naturs_store_map an on an.store_id=st.store_id
+				where st.is_stop=0 and st.is_ass=1
+				 and an.naturs_code=#{naturs_code}
+				 
+				 and exists (
+								select 1 from v_user_data_perm b 
+								where
+									st.group_id=b.group_id 
+									and st.hos_id=b.hos_id 
+									and to_char(st.store_id)=b.perm_code
+									and user_id=#{user_id}
+									and (b.is_read = 1
+				          				or b.is_write = 1 )
+									)
+				 
+				 )
+
+			select distinct sto.store_id store_id,sto.store_code||' '|| sto.store_name text ,san.naturs_code naturs_code from hos_store_dict sto 
+			left join san on san.store_id =sto.store_id
+			where sto.is_stop=0 and sto.is_ass=1  
+			
+			and exists (
+								select 1 from v_user_data_perm b 
+								where
+									sto.group_id=b.group_id 
+									and sto.hos_id=b.hos_id 
+									and to_char(sto.store_id)=b.perm_code
+									and user_id=#{user_id}
+									and (b.is_read = 1
+				          				or b.is_write = 1 )
+									)
+			
+			order by sto.store_id asc
+	
+	
+	
+	</select>
+	<delete id="deleteAssNatursStore"   parameterType="java.util.List">
+	DELETE FROM ass_naturs_store_map where
+
+		<foreach collection="list" index="index" item="item" open="("
+			separator="or" close=")">
+				<if test="item.group_id != null and item.group_id != ''">
+			group_id = #{item.group_id,jdbcType=INTEGER}
+			</if>
+			<if test="item.hos_id != null and item.hos_id != ''">
+			and hos_id = #{item.hos_id,jdbcType=INTEGER}
+			</if>
+			<if test="item.copy_code != null and item.copy_code != ''">
+			and copy_code =#{item.copy_code,jdbcType=VARCHAR}
+			</if>
+			<if test="item.naturs_code != null and item.naturs_code!= ''">
+			and
+			naturs_code =#{item.naturs_code,jdbcType=VARCHAR}
+			</if>
+			<!-- <if test="item.store_id != null  and item.store_id != ''">
+			and
+             store_id =#{item.store_id,jdbcType=VARCHAR}</if> -->
+		</foreach>
+	
+	</delete>
+	<insert id="updateAssNatursStore" parameterType="java.util.List" >
+	
+	
+	
+	
+		INSERT INTO ass_naturs_store_map (
+		GROUP_ID,
+		HOS_ID,
+		COPY_CODE,
+		naturs_code,
+		store_id
+		
+		) select  t.* from(
+		<foreach collection="list" item="item" index="index" separator=" union all " >
+			select 		
+				#{item.group_id},
+				#{item.hos_id},
+				#{item.copy_code},
+				#{item.naturs_code},
+				#{item.store_id}
+				from dual
+		</foreach>
+		)t
+	</insert>
+</mapper>
+

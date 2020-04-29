@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.mat.dao.warning.MatBatchWarningMapper">
+	
+	<!-- 多表联合查询材料效期预警  返回结果Map -->
+	<resultMap id="unitMap" type="java.util.Map">
+	<result property="group_id" column="group_id"/>
+	<result property="hos_id" column="hos_id"/>
+	<result property="copy_code" column="copy_code"/>
+	<result property="inv_id" column="inv_id"/>
+	<result property="inv_code" column="inv_code"/>
+	<result property="inv_name" column="inv_name"/>
+	<result property="inv_model" column="inv_model"/>
+	<result property="unit_code" column="unit_code"/>
+	<result property="unit_name" column="unit_name"/>
+	<result property="store_id" column="store_id"/>
+	<result property="store_code" column="store_code"/>
+	<result property="store_name" column="store_name"/>
+	<result property="batch_no" column="batch_no"/>
+	<result property="bar_code" column="bar_code"/>
+	<result property="left_amount" column="left_amount"/>
+	<result property="inva_date" column="inva_date"/>
+	<result property="warn_days" column="warn_days"/>
+	<result property="queryDate" column="queryDate"/>
+	<result property="days" column="days"/>
+	<result property="state_name" column="state_name"/>
+	</resultMap>
+	
+	<!-- 查询材料效期预警 -->
+	<select id="queryMatBatchWarning" resultMap="unitMap" parameterType="java.util.Map" >
+		SELECT 
+		mbv.group_id ,
+		mbv.hos_id ,
+		mbv.copy_code ,
+		mbv.inv_id ,
+		t.inv_code ,
+		t.inv_name ,
+		t.inv_model ,
+		t.unit_code ,
+		t.unit_name ,
+		a.store_id ,
+		a.store_code ,
+		a.store_name ,
+		a.batch_no ,
+		a.bar_code ,
+		nvl(a.left_amount,0) as left_amount,
+		mbv.inva_date ,
+		 para.para_value as warn_days ,
+		to_date(#{queryDate},'yyyy-MM-dd') queryDate ,
+		nvl(ROUND(TO_NUMBER(mbv.inva_date - to_date(#{queryDate,jdbcType=DATE},'yyyy-MM-dd'))), 0)  days,
+      case when nvl(ROUND(TO_NUMBER(mbv.inva_date - to_date(#{queryDate,jdbcType=DATE},'yyyy-MM-dd'))), 0) &lt; 0 then '过期' 
+           when nvl(ROUND(TO_NUMBER(mbv.inva_date - to_date(#{queryDate,jdbcType=DATE},'yyyy-MM-dd'))), 0) = 0 then '到期'
+           when nvl(ROUND(TO_NUMBER(mbv.inva_date - to_date(#{queryDate,jdbcType=DATE},'yyyy-MM-dd'))), 0) &lt;   para.para_value then '临近'  
+           else '安全' end as state_name
+		FROM MAT_BATCH_VALIDITY  mbv
+		left join ( select mfb.group_id , mfb.hos_id , mfb.copy_code , mfb.inv_id , mfb.batch_no , mfb.store_id ,
+					hsd.store_code , hsd.store_name , mfb.bar_code , mfb.left_amount from MAT_FIFO_BALANCE mfb
+					left join HOS_STORE_DICT hsd
+						on	
+							mfb.group_id = hsd.group_id and
+							mfb.hos_id = hsd.hos_id and 
+							mfb.store_id = hsd.store_id and 
+							hsd.is_stop = 0
+				  )a
+			ON 
+				mbv.group_id = a.group_id  and 
+				mbv.hos_id = a.hos_id  and 
+				mbv.copy_code = a.copy_code  and 
+				mbv.inv_id = a.inv_id 	and 
+				mbv.batch_no = a.batch_no 
+		left join ( select mid.group_id , mid.hos_id , mid.copy_code , mid.inv_id , mid.inv_code , mid.inv_name, 
+					mid.inv_model , mid.unit_code , hu.unit_name , mid.use_state , mid.mat_type_id , mid.is_com 
+					,mid.is_stop
+					from MAT_INV_DICT mid  
+					left join HOS_UNIT hu
+						on 
+							mid.group_id = hu.group_id and 
+							mid.hos_id = hu.hos_id  and 
+							mid.unit_code = hu.unit_code 	
+							and mid.use_state = 1			
+					) t
+			ON 
+				mbv.group_id = t.group_id  and 
+				mbv.hos_id = t.hos_id  and 
+				mbv.copy_code = t.copy_code and 
+				mbv.inv_id = t.inv_id and 
+				t.use_state = 1 
+				 and t.is_stop=0
+		left join acc_para para
+			ON 
+				mbv.group_id = para.group_id  and 
+				mbv.hos_id = para.hos_id  and 
+				mbv.copy_code = para.copy_code and 
+				para.para_code = '04003'
+		<where>                     
+			<if test="group_id != null and group_id != ''">
+			AND mbv.group_id = #{group_id,jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+			AND mbv.hos_id = #{hos_id,jdbcType=INTEGER}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+			AND mbv.copy_code = #{copy_code,jdbcType=VARCHAR}
+			</if>
+			<if test="inv_name != null and inv_name != ''">
+			AND (
+				(t.inv_name like '%${inv_name}%')
+				or (t.inv_code like '%${inv_name}%')
+			)
+			</if>
+			<if test="inv_model != null and inv_model != ''">
+			AND t.inv_model like '%${inv_model}%'
+			</if>
+			<if test=" type_id != null and type_id != '' ">
+			AND t.mat_type_id = #{type_id,jdbcType=INTEGER}
+			</if>
+			<if test=" store_id != null and store_id != '' ">
+			AND a.store_id = #{store_id,jdbcType=INTEGER}
+			</if>
+			<if test=" is_com != null and is_com != '' ">
+			AND t.is_com = #{is_com,jdbcType=INTEGER}
+			</if>
+			<if test="state == 1 ">
+			AND ROUND(TO_NUMBER(mbv.inva_date - to_date(#{queryDate,jdbcType=DATE},'yyyy-MM-dd'))) &gt; 0
+			AND ROUND(TO_NUMBER(mbv.inva_date - to_date(#{queryDate,jdbcType=DATE},'yyyy-MM-dd'))) &lt;  
+				(select  para_value from acc_para where group_id = #{group_id} and hos_id = #{hos_id} 
+				and copy_code = #{copy_code} and para_code = '04003')
+			</if>
+			<if test="state == 2 ">
+			AND ROUND(TO_NUMBER(mbv.inva_date - to_date(#{queryDate,jdbcType=DATE},'yyyy-MM-dd'))) = 0
+			</if>
+			<if test="state == 3 ">
+			AND ROUND(TO_NUMBER(mbv.inva_date - to_date(#{queryDate,jdbcType=DATE},'yyyy-MM-dd'))) &lt; 0
+			</if>
+			
+			<!-- 2017/03/06 过滤结存为0的数据 -->
+			AND a.left_amount &lt;&gt; 0  
+		</where>
+			ORDER BY mbv.inva_date,a.store_id,t.inv_code
+	</select>
+</mapper>
+

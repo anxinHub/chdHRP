@@ -1,0 +1,633 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.hpm.dao.AphiHosPerfWageRatioReportMapper">
+
+	<resultMap id="queryHpmHosPerfWageRatioReportByCollectMap" type="java.util.TreeMap">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="acct_year" column="acct_year"/>
+		<result property="acct_month" column="acct_month"/>
+		<result property="report_code" column="report_code"/>
+		<result property="kind_code" column="kind_code"/>
+		<result property="perf_wages" column="perf_wages"/>
+		<result property="perf_pers" column="perf_pers"/>
+		<result property="perf_bonus" column="perf_bonus"/>
+		<result property="perf_income" column="perf_income"/>
+		<result property="is_audit" column="is_audit"/>
+		<result property="perf_income_ratio" column="perf_income_ratio"/>
+	</resultMap>
+
+
+	<select id="queryHpmHosPerfWageRatioReport" parameterType="java.util.Map"
+		resultType="java.util.TreeMap">
+		select group_id, hos_id, copy_code, acct_year, acct_month,
+		report_code, kind_code, 
+		round(perf_wages,2) as perf_wages, 
+		round(perf_pers,2) as perf_pers, 
+		round(perf_bonus,2) as perf_bonus,
+		round(perf_income,2) as perf_income, 
+		round(perf_income_ratio,2) as perf_income_ratio
+		,is_audit
+		from aphi_hosp_perf_report
+		where group_id = #{group_id}
+		and hos_id = #{hos_id}
+		and copy_code = #{copy_code}
+		and acct_year = #{acct_year}
+		and acct_month = #{acct_month}
+		order by report_code
+	</select>
+	
+	<select id="queryHpmHosPerfWageRatioReportPrint" parameterType="java.util.Map"
+		resultType="java.util.TreeMap">
+		select group_id, hos_id, copy_code, acct_year, acct_month,
+		report_code, kind_code, 
+		round(perf_wages,2) as perf_wages, 
+		round(perf_pers,2) as perf_pers, 
+		round(perf_bonus,2) as perf_bonus,
+		round(perf_income,2) as perf_income, 
+		round(perf_income_ratio,2) as perf_income_ratio
+		,is_audit
+		from aphi_hosp_perf_report
+		where group_id = #{group_id}
+		and hos_id = #{hos_id}
+		and copy_code = #{copy_code}
+		and acct_year = #{acct_year}
+		and acct_month = #{acct_month}
+		order by report_code
+	</select>
+
+
+	<select id="queryisaudit" parameterType="java.util.Map"
+		resultType="Integer">
+		
+		select count(*) from APHI_HOSP_PERF_REPORT
+where 
+		group_id = #{group_id}
+		and hos_id = #{hos_id}
+		and copy_code = #{copy_code}
+		and acct_year = #{acct_year}
+		and acct_month = #{acct_month}
+	    and is_audit=1
+		</select>
+	<update id="shenhe" parameterType="java.util.Map"
+	>
+
+		UPDATE APHI_HOSP_PERF_REPORT SET
+		is_audit = #{is_audit,jdbcType=INTEGER}
+		where
+		group_id = #{group_id,jdbcType=INTEGER}
+		and hos_id = #{hos_id,jdbcType=INTEGER}
+		and copy_code = #{copy_code,jdbcType=VARCHAR}
+		and acct_year = #{acct_year,jdbcType=VARCHAR}
+		and acct_month = #{acct_month,jdbcType=VARCHAR}
+	
+	</update>
+	
+
+	<select id="queryHpmHosPerfWageRatioReportByCollect"
+		parameterType="java.util.Map" resultMap="queryHpmHosPerfWageRatioReportByCollectMap">
+
+
+
+select '01' as report_code,
+       '病区：医'  as kind_code,
+       nvl(round(sum(adbg.bonus_money),2), 0) as perf_wages,
+       nvl(round(sum(adtd.target_value),2), 0) as perf_pers,
+       case when nvl(round(sum(adtd.target_value),2), 0) = 0 then  0 else  round(nvl(sum(adbg.bonus_money), 0) / nvl(sum(adtd.target_value), 0),2) end as perf_bonus,
+       0 as perf_income,
+       0 as perf_income_ratio
+  from aphi_dept_bonus_data adbg
+  left join aphi_dept_target_data adtd
+    on adbg.group_id = adtd.group_id
+   and adbg.hos_id = adtd.hos_id
+   and adbg.copy_code = adtd.copy_code
+   and adbg.dept_id = adtd.dept_id
+   and adbg.dept_no = adtd.dept_no
+   and adbg.acct_year = adtd.acct_year
+   and adbg.acct_month = adtd.acct_month
+   and adtd.target_code = 'JX99001'
+  left join aphi_dept_dict ad
+    on adbg.group_id = ad.group_id
+   and adbg.hos_id = ad.hos_id
+   and adbg.copy_code = ad.copy_code
+   and adbg.dept_id = ad.dept_id
+   and adbg.dept_no = ad.dept_no
+ where adbg.item_code = 'j002'
+   and adbg.group_id = #{group_id}
+   and adbg.hos_id = #{hos_id}
+   and adbg.copy_code = #{copy_code}
+   
+   and ad.dept_kind_code = '01'
+   and adbg.acct_year || adbg.acct_month = #{acct_yearm}
+
+union all
+
+select '02',
+       '门急诊：医',
+       nvl(round(sum(adbg.bonus_money),2), 0) as perf_wages,
+       nvl(round(sum(adtd.target_value),2), 0) as perf_pers,
+       case when nvl(round(sum(adtd.target_value),2), 0) = 0 then  0 else  round(nvl(sum(adbg.bonus_money), 0) / nvl(sum(adtd.target_value), 0),2) end as perf_bonus,
+       0 as perf_income,
+       0 as perf_income_ratio
+  from aphi_dept_bonus_data adbg
+  left join aphi_dept_target_data adtd
+    on adbg.group_id = adtd.group_id
+   and adbg.hos_id = adtd.hos_id
+   and adbg.copy_code = adtd.copy_code
+   and adbg.dept_id = adtd.dept_id
+   and adbg.dept_no = adtd.dept_no
+   and adbg.acct_year = adtd.acct_year
+   and adbg.acct_month = adtd.acct_month
+   and adtd.target_code = 'JX99001'
+  left join aphi_dept_dict ad
+    on adbg.group_id = ad.group_id
+   and adbg.hos_id = ad.hos_id
+   and adbg.copy_code = ad.copy_code
+   and adbg.dept_id = ad.dept_id
+   and adbg.dept_no = ad.dept_no
+ where adbg.item_code = 'j002'
+   and adbg.group_id = #{group_id}
+   and adbg.hos_id = #{hos_id}
+   and adbg.copy_code = #{copy_code}
+   
+   and ad.dept_kind_code in ('07', '08')
+   and ad.dept_code not in ('100102', '100108', '100116', '10011706','10011707')
+   and adbg.acct_year || adbg.acct_month = #{acct_yearm}
+
+union all
+
+select '03',
+       '合计(1)',
+       nvl(round(sum(adbg.bonus_money),2), 0) as perf_wages,
+       nvl(round(sum(adtd.target_value),2), 0) as perf_pers,
+       case when nvl(round(sum(adtd.target_value),2), 0) = 0 then  0 else  round(nvl(sum(adbg.bonus_money), 0) / nvl(sum(adtd.target_value), 0),2) end as perf_bonus,
+       0 as perf_income,
+       0 as perf_income_ratio
+  from aphi_dept_bonus_data adbg
+  left join aphi_dept_target_data adtd
+    on adbg.group_id = adtd.group_id
+   and adbg.hos_id = adtd.hos_id
+   and adbg.copy_code = adtd.copy_code
+   and adbg.dept_id = adtd.dept_id
+   and adbg.dept_no = adtd.dept_no
+   and adbg.acct_year = adtd.acct_year
+   and adbg.acct_month = adtd.acct_month
+   and adtd.target_code = 'JX99001'
+  left join aphi_dept_dict ad
+    on adbg.group_id = ad.group_id
+   and adbg.hos_id = ad.hos_id
+   and adbg.copy_code = ad.copy_code
+   and adbg.dept_id = ad.dept_id
+   and adbg.dept_no = ad.dept_no
+ where adbg.item_code = 'j002'
+   and adbg.group_id = #{group_id}
+   and adbg.hos_id = #{hos_id}
+   and adbg.copy_code = #{copy_code}
+   
+   and ad.dept_kind_code in ('01', '07', '08')
+   and ad.dept_code not in ('100102', '100108', '100116', '10011706','10011707')
+   and adbg.acct_year || adbg.acct_month = #{acct_yearm}
+union all
+select '04',
+       '病区：护',
+       nvl(round(sum(adbg.bonus_money),2), 0) as perf_wages,
+       nvl(round(sum(adtd.target_value),2), 0) as perf_pers,
+       case when nvl(round(sum(adtd.target_value),2), 0) = 0 then  0 else  round(nvl(sum(adbg.bonus_money), 0) / nvl(sum(adtd.target_value), 0),2) end as perf_bonus,
+       0 as perf_income,
+       0 as perf_income_ratio
+  from aphi_dept_bonus_data adbg
+  left join aphi_dept_target_data adtd
+    on adbg.group_id = adtd.group_id
+   and adbg.hos_id = adtd.hos_id
+   and adbg.copy_code = adtd.copy_code
+   and adbg.dept_id = adtd.dept_id
+   and adbg.dept_no = adtd.dept_no
+   and adbg.acct_year = adtd.acct_year
+   and adbg.acct_month = adtd.acct_month
+   and adtd.target_code = 'JX99001'
+  left join aphi_dept_dict ad
+    on adbg.group_id = ad.group_id
+   and adbg.hos_id = ad.hos_id
+   and adbg.copy_code = ad.copy_code
+   and adbg.dept_id = ad.dept_id
+   and adbg.dept_no = ad.dept_no
+ where adbg.item_code = 'j002'
+   and adbg.group_id = #{group_id}
+   and adbg.hos_id = #{hos_id}
+   and adbg.copy_code = #{copy_code}
+   
+   and ad.dept_kind_code = '05'
+   and adbg.acct_year || adbg.acct_month = #{acct_yearm}
+
+union all
+select '05',
+       '门急诊：护',
+       nvl(round(sum(adbg.bonus_money),2), 0) as perf_wages,
+       nvl(round(sum(adtd.target_value),2), 0) as perf_pers,
+       case when nvl(round(sum(adtd.target_value),2), 0) = 0 then  0 else  round(nvl(sum(adbg.bonus_money), 0) / nvl(sum(adtd.target_value), 0),2) end as perf_bonus,
+       0 as perf_income,
+       0 as perf_income_ratio
+  from aphi_dept_bonus_data adbg
+  left join aphi_dept_target_data adtd
+    on adbg.group_id = adtd.group_id
+   and adbg.hos_id = adtd.hos_id
+   and adbg.copy_code = adtd.copy_code
+   and adbg.dept_id = adtd.dept_id
+   and adbg.dept_no = adtd.dept_no
+   and adbg.acct_year = adtd.acct_year
+   and adbg.acct_month = adtd.acct_month
+   and adtd.target_code = 'JX99001'
+  left join aphi_dept_dict ad
+    on adbg.group_id = ad.group_id
+   and adbg.hos_id = ad.hos_id
+   and adbg.copy_code = ad.copy_code
+   and adbg.dept_id = ad.dept_id
+   and adbg.dept_no = ad.dept_no
+ where adbg.item_code = 'j002'
+   and adbg.group_id = #{group_id}
+   and adbg.hos_id = #{hos_id}
+   and adbg.copy_code = #{copy_code}
+   
+   and (ad.dept_kind_code = '06' or
+       ad.dept_code in ('100102', '100108', '100116', '10011706','10011707'))
+   and adbg.acct_year || adbg.acct_month = #{acct_yearm}
+
+union all
+select '06',
+       '合计(2)',
+       nvl(round(sum(adbg.bonus_money),2), 0) as perf_wages,
+       nvl(round(sum(adtd.target_value),2), 0) as perf_pers,
+       case when nvl(round(sum(adtd.target_value),2), 0) = 0 then  0 else  round(nvl(sum(adbg.bonus_money), 0) / nvl(sum(adtd.target_value), 0),2) end as perf_bonus,
+       0 as perf_income,
+       0 as perf_income_ratio
+  from aphi_dept_bonus_data adbg
+  left join aphi_dept_target_data adtd
+    on adbg.group_id = adtd.group_id
+   and adbg.hos_id = adtd.hos_id
+   and adbg.copy_code = adtd.copy_code
+   and adbg.dept_id = adtd.dept_id
+   and adbg.dept_no = adtd.dept_no
+   and adbg.acct_year = adtd.acct_year
+   and adbg.acct_month = adtd.acct_month
+   and adtd.target_code = 'JX99001'
+  left join aphi_dept_dict ad
+    on adbg.group_id = ad.group_id
+   and adbg.hos_id = ad.hos_id
+   and adbg.copy_code = ad.copy_code
+   and adbg.dept_id = ad.dept_id
+   and adbg.dept_no = ad.dept_no
+ where adbg.item_code = 'j002'
+   and adbg.group_id = #{group_id}
+   and adbg.hos_id = #{hos_id}
+   and adbg.copy_code = #{copy_code}
+   
+   and (ad.dept_kind_code in ('05', '06') or
+       ad.dept_code in ('100102', '100108', '100116', '10011706','10011707'))
+   and adbg.acct_year || adbg.acct_month = #{acct_yearm}
+
+union all
+
+select '07',
+       '医技',
+       nvl(round(sum(adbg.bonus_money),2), 0) as perf_wages,
+       nvl(round(sum(adtd.target_value),2), 0) as perf_pers,
+       case when nvl(round(sum(adtd.target_value),2), 0) = 0 then  0 else  round(nvl(sum(adbg.bonus_money), 0) / nvl(sum(adtd.target_value), 0),2) end as perf_bonus,
+       0 as perf_income,
+       0 as perf_income_ratio
+  from aphi_dept_bonus_data adbg
+  left join aphi_dept_target_data adtd
+    on adbg.group_id = adtd.group_id
+   and adbg.hos_id = adtd.hos_id
+   and adbg.copy_code = adtd.copy_code
+   and adbg.dept_id = adtd.dept_id
+   and adbg.dept_no = adtd.dept_no
+   and adbg.acct_year = adtd.acct_year
+   and adbg.acct_month = adtd.acct_month
+   and adtd.target_code = 'JX99001'
+  left join aphi_dept_dict ad
+    on adbg.group_id = ad.group_id
+   and adbg.hos_id = ad.hos_id
+   and adbg.copy_code = ad.copy_code
+   and adbg.dept_id = ad.dept_id
+   and adbg.dept_no = ad.dept_no
+ where adbg.item_code = 'j002'
+   and adbg.group_id = #{group_id}
+   and adbg.hos_id = #{hos_id}
+   and adbg.copy_code = #{copy_code}
+   
+   and ad.dept_kind_code = '02'
+   and adbg.acct_year || adbg.acct_month = #{acct_yearm}
+
+union all
+
+select '08',
+       '药品',
+       nvl(round(sum(adbg.bonus_money),2), 0) as perf_wages,
+       nvl(round(sum(adtd.target_value),2), 0) as perf_pers,
+       case when nvl(round(sum(adtd.target_value),2), 0) = 0 then  0 else  round(nvl(sum(adbg.bonus_money), 0) / nvl(sum(adtd.target_value), 0),2) end as perf_bonus,
+       0 as perf_income,
+       0 as perf_income_ratio
+  from aphi_dept_bonus_data adbg
+  left join aphi_dept_target_data adtd
+    on adbg.group_id = adtd.group_id
+   and adbg.hos_id = adtd.hos_id
+   and adbg.copy_code = adtd.copy_code
+   and adbg.dept_id = adtd.dept_id
+   and adbg.dept_no = adtd.dept_no
+   and adbg.acct_year = adtd.acct_year
+   and adbg.acct_month = adtd.acct_month
+   and adtd.target_code = 'JX99001'
+  left join aphi_dept_dict ad
+    on adbg.group_id = ad.group_id
+   and adbg.hos_id = ad.hos_id
+   and adbg.copy_code = ad.copy_code
+   and adbg.dept_id = ad.dept_id
+   and adbg.dept_no = ad.dept_no
+ where adbg.item_code = 'j002'
+   and adbg.group_id = #{group_id}
+   and adbg.hos_id = #{hos_id}
+   and adbg.copy_code = #{copy_code}
+   
+   and ad.dept_kind_code = '03'
+   and adbg.acct_year || adbg.acct_month = #{acct_yearm}
+
+union all
+
+select '09',
+       '医技合计(3)',
+       nvl(round(sum(adbg.bonus_money),2), 0) as perf_wages,
+       nvl(round(sum(adtd.target_value),2), 0) as perf_pers,
+       case when nvl(round(sum(adtd.target_value),2), 0) = 0 then  0 else  round(nvl(sum(adbg.bonus_money), 0) / nvl(sum(adtd.target_value), 0),2) end as perf_bonus,
+       0 as perf_income,
+       0 as perf_income_ratio
+  from aphi_dept_bonus_data adbg
+  left join aphi_dept_target_data adtd
+    on adbg.group_id = adtd.group_id
+   and adbg.hos_id = adtd.hos_id
+   and adbg.copy_code = adtd.copy_code
+   and adbg.dept_id = adtd.dept_id
+   and adbg.dept_no = adtd.dept_no
+   and adbg.acct_year = adtd.acct_year
+   and adbg.acct_month = adtd.acct_month
+   and adtd.target_code = 'JX99001'
+  left join aphi_dept_dict ad
+    on adbg.group_id = ad.group_id
+   and adbg.hos_id = ad.hos_id
+   and adbg.copy_code = ad.copy_code
+   and adbg.dept_id = ad.dept_id
+   and adbg.dept_no = ad.dept_no
+ where adbg.item_code = 'j002'
+   and adbg.group_id = #{group_id}
+   and adbg.hos_id = #{hos_id}
+   and adbg.copy_code = #{copy_code}
+   
+   and ad.dept_kind_code in ('02', '03')
+   and adbg.acct_year || adbg.acct_month = #{acct_yearm}
+
+union all
+
+select '10',
+       '医+护+技总计',
+       nvl(round(sum(adbg.bonus_money),2), 0) as perf_wages,
+       nvl(round(sum(adtd.target_value),2), 0) as perf_pers,
+       case when nvl(round(sum(adtd.target_value),2), 0) = 0 then  0 else  round(nvl(sum(adbg.bonus_money), 0) / nvl(sum(adtd.target_value), 0),2) end as perf_bonus,
+       0 as perf_income,
+       0 as perf_income_ratio
+  from aphi_dept_bonus_data adbg
+  left join aphi_dept_target_data adtd
+    on adbg.group_id = adtd.group_id
+   and adbg.hos_id = adtd.hos_id
+   and adbg.copy_code = adtd.copy_code
+   and adbg.dept_id = adtd.dept_id
+   and adbg.dept_no = adtd.dept_no
+   and adbg.acct_year = adtd.acct_year
+   and adbg.acct_month = adtd.acct_month
+   and adtd.target_code = 'JX99001'
+  left join aphi_dept_dict ad
+    on adbg.group_id = ad.group_id
+   and adbg.hos_id = ad.hos_id
+   and adbg.copy_code = ad.copy_code
+   and adbg.dept_id = ad.dept_id
+   and adbg.dept_no = ad.dept_no
+ where adbg.item_code = 'j002'
+   and adbg.group_id = #{group_id}
+   and adbg.hos_id = #{hos_id}
+   and adbg.copy_code = #{copy_code}
+   
+   and ad.dept_kind_code != '04'
+   and adbg.acct_year || adbg.acct_month = #{acct_yearm}
+union all
+select '11',
+       '行政人员',
+       nvl(round(sum(adbg.bonus_money),2), 0) as perf_wages,
+       nvl(round(sum(adtd.target_value),2), 0) as perf_pers,
+       case when nvl(round(sum(adtd.target_value),2), 0) = 0 then  0 else  round(nvl(sum(adbg.bonus_money), 0) / nvl(sum(adtd.target_value), 0),2) end as perf_bonus,
+       0 as perf_income,
+       0 as perf_income_ratio
+  from aphi_dept_bonus_data adbg
+  left join aphi_dept_target_data adtd
+    on adbg.group_id = adtd.group_id
+   and adbg.hos_id = adtd.hos_id
+   and adbg.copy_code = adtd.copy_code
+   and adbg.dept_id = adtd.dept_id
+   and adbg.dept_no = adtd.dept_no
+   and adbg.acct_year = adtd.acct_year
+   and adbg.acct_month = adtd.acct_month
+   and adtd.target_code = 'JX99001'
+  left join aphi_dept_dict ad
+    on adbg.group_id = ad.group_id
+   and adbg.hos_id = ad.hos_id
+   and adbg.copy_code = ad.copy_code
+   and adbg.dept_id = ad.dept_id
+   and adbg.dept_no = ad.dept_no
+ where adbg.item_code = 'j002'
+   and adbg.group_id = #{group_id}
+   and adbg.hos_id = #{hos_id}
+   and adbg.copy_code = #{copy_code}
+   and ad.dept_kind_code = '04'
+   and adbg.acct_year || adbg.acct_month = #{acct_yearm}
+
+union all
+select '12',
+       '合发绩效工资',
+       nvl(round(sum(adbg.bonus_money),2), 0) as perf_wages,
+       nvl(round(sum(adtd.target_value),2), 0) as perf_pers,
+       case when nvl(round(sum(adtd.target_value),2), 0) = 0 then  0 else  round(nvl(sum(adbg.bonus_money), 0) / nvl(sum(adtd.target_value), 0),2) end as perf_bonus,
+       0 as perf_income,
+       0 as perf_income_ratio
+  from aphi_dept_bonus_data adbg
+  left join aphi_dept_target_data adtd
+    on adbg.group_id = adtd.group_id
+   and adbg.hos_id = adtd.hos_id
+   and adbg.copy_code = adtd.copy_code
+   and adbg.dept_id = adtd.dept_id
+   and adbg.dept_no = adtd.dept_no
+   and adbg.acct_year = adtd.acct_year
+   and adbg.acct_month = adtd.acct_month
+   and adtd.target_code = 'JX99001'
+  left join aphi_dept_dict ad
+    on adbg.group_id = ad.group_id
+   and adbg.hos_id = ad.hos_id
+   and adbg.copy_code = ad.copy_code
+   and adbg.dept_id = ad.dept_id
+   and adbg.dept_no = ad.dept_no
+ where adbg.item_code = 'j002'
+   and adbg.group_id = #{group_id}
+   and adbg.hos_id = #{hos_id}
+   and adbg.copy_code = #{copy_code}
+   
+   and adbg.acct_year || adbg.acct_month = #{acct_yearm}
+union all
+
+select '13',
+       '应发绩效工资',
+       nvl(round(sum(adbg.bonus_money),2), 0) as perf_wages,
+       0 as perf_pers,
+       case when nvl(round(sum(adtd.target_value),2), 0) = 0 then  0 else  round(nvl(sum(adbg.bonus_money), 0) / nvl(sum(adtd.target_value), 0),2) end as perf_bonus,
+       0 as perf_income,
+       0 as perf_income_ratio
+  from aphi_dept_bonus_data adbg
+  left join aphi_dept_target_data adtd
+    on adbg.group_id = adtd.group_id
+   and adbg.hos_id = adtd.hos_id
+   and adbg.copy_code = adtd.copy_code
+   and adbg.dept_id = adtd.dept_id
+   and adbg.dept_no = adtd.dept_no
+   and adbg.acct_year = adtd.acct_year
+   and adbg.acct_month = adtd.acct_month
+   and adtd.target_code = 'JX99001'
+  left join aphi_dept_dict ad
+    on adbg.group_id = ad.group_id
+   and adbg.hos_id = ad.hos_id
+   and adbg.copy_code = ad.copy_code
+   and adbg.dept_id = ad.dept_id
+   and adbg.dept_no = ad.dept_no
+ where adbg.item_code in ('j002', 'j003')
+   and adbg.group_id = #{group_id}
+   and adbg.hos_id = #{hos_id}
+   and adbg.copy_code = #{copy_code}
+   
+   and adbg.acct_year || adbg.acct_month = #{acct_yearm}
+   
+union all
+
+select '14', '财务其他考核奖', 
+       nvl(round(sum(adbg.bonus_money),2), 0) as perf_wages,
+       0 as perf_pers,
+       0 as perf_bonus,
+       0 as perf_income,
+       0 as perf_income_ratio
+  from aphi_dept_bonus_data adbg
+  left join aphi_dept_dict ad
+    on adbg.group_id = ad.group_id
+   and adbg.hos_id = ad.hos_id
+   and adbg.copy_code = ad.copy_code
+   and adbg.dept_id = ad.dept_id
+   and adbg.dept_no = ad.dept_no
+ where adbg.item_code = 'j003'
+   and adbg.group_id = #{group_id}
+   and adbg.hos_id = #{hos_id}
+   and adbg.copy_code = #{copy_code}
+   and adbg.acct_year || adbg.acct_month = #{acct_yearm}
+
+
+union all
+
+select '15',
+       '职能科室考核奖', 
+       nvl(round(sum(adbg.bonus_money),2), 0) as perf_wages,
+       0 as perf_pers,
+       0 as perf_bonus,
+       0 as perf_income,
+       0 as perf_income_ratio
+        from aphi_dept_bonus_data adbg
+  left join aphi_dept_dict ad
+    on adbg.group_id = ad.group_id
+   and adbg.hos_id = ad.hos_id
+   and adbg.copy_code = ad.copy_code
+   and adbg.dept_id = ad.dept_id
+   and adbg.dept_no = ad.dept_no
+ where adbg.item_code = 'j004'
+   and adbg.group_id = #{group_id}
+   and adbg.hos_id = #{hos_id}
+   and adbg.copy_code = #{copy_code}
+   and adbg.acct_year || adbg.acct_month = #{acct_yearm}
+
+union all
+
+select '16',
+       '实发绩效工资',
+       nvl(round(sum(adbg.bonus_money),2), 0) as perf_wages,
+       0 as perf_pers,
+       case when nvl(round(sum(adtd.target_value),2), 0) = 0 then  0 else  round(nvl(sum(adbg.bonus_money), 0) / nvl(sum(adtd.target_value), 0),2) end as perf_bonus,
+       0 as perf_income,
+       0 as perf_income_ratio
+  from aphi_dept_bonus_data adbg
+  left join aphi_dept_target_data adtd
+    on adbg.group_id = adtd.group_id
+   and adbg.hos_id = adtd.hos_id
+   and adbg.copy_code = adtd.copy_code
+   and adbg.dept_id = adtd.dept_id
+   and adbg.dept_no = adtd.dept_no
+   and adbg.acct_year = adtd.acct_year
+   and adbg.acct_month = adtd.acct_month
+   and adtd.target_code = 'JX99001'
+  left join aphi_dept_dict ad
+    on adbg.group_id = ad.group_id
+   and adbg.hos_id = ad.hos_id
+   and adbg.copy_code = ad.copy_code
+   and adbg.dept_id = ad.dept_id
+   and adbg.dept_no = ad.dept_no
+ where adbg.item_code in ('j002', 'j003', 'j004')
+   and adbg.group_id = #{group_id}
+   and adbg.hos_id = #{hos_id}
+   and adbg.copy_code = #{copy_code}
+   
+   and adbg.acct_year || adbg.acct_month = #{acct_yearm}
+
+	</select>
+
+	<update id="updateHpmHosPerfWageRatioReport" parameterType="java.util.Map">
+		update aphi_hosp_perf_report set
+		perf_wages = #{perf_wages},
+		perf_pers = #{perf_pers},
+		perf_bonus = #{perf_bonus},
+		perf_income = #{perf_income},
+		perf_income_ratio = #{perf_income_ratio}
+		where group_id = #{group_id}
+		and hos_id = #{hos_id}
+		and copy_code = #{copy_code}
+		and acct_year = #{acct_year}
+		and acct_month = #{acct_month}
+		and report_code = #{report_code}
+	</update>
+
+	<insert id="addHpmHosPerfWageRatioReport" parameterType="java.util.Map">
+		insert into  aphi_hosp_perf_report (group_id, hos_id, copy_code, acct_year, acct_month,
+		report_code, kind_code, perf_wages, perf_pers, perf_bonus,
+		perf_income, perf_income_ratio) values(
+		#{group_id},
+		#{hos_id},
+		#{copy_code},
+		#{acct_year},
+		#{acct_month},
+		#{report_code},
+		#{kind_code},
+		#{perf_wages},
+		#{perf_pers},
+		#{perf_bonus},
+		#{perf_income},
+		#{perf_income_ratio}
+		)
+	</insert>
+
+	<update id="deleteHpmHosPerfWageRatioReport" parameterType="java.util.Map">
+		delete from aphi_hosp_perf_report
+		where group_id = #{group_id}
+		and hos_id = #{hos_id}
+		and copy_code = #{copy_code}
+		and acct_year = #{acct_year}
+		and acct_month = #{acct_month}
+	</update>
+</mapper>

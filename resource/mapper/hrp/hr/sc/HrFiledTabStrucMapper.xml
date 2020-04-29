@@ -1,0 +1,967 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.hr.dao.sc.HrFiledTabStrucMapper">
+	
+	<resultMap id="hrFiledTabStruc" type="com.chd.hrp.hr.entity.sc.HrFiledTabStruc">
+	<result property="group_id" column="group_id"/>
+	<result property="hos_id" column="hos_id"/>
+	<result property="field_tab_code" column="field_tab_code"/>
+	<result property="type_tab_code" column="type_tab_code"/>
+	<result property="field_tab_name" column="field_tab_name"/>
+	<result property="is_innr" column="is_innr"/>
+	<result property="is_cite" column="is_cite"/>
+	<result property="is_stop" column="is_stop"/>
+	<result property="cite_json" column="cite_json"/>
+	<result property="query_sql" column="query_sql"/>
+	<result property="related_sql" column="related_sql"/>
+	<result property="note" column="note"/>
+	</resultMap>
+		
+	<resultMap id="hrFiledTabStrucMap" type="java.util.Map">
+	<result property="group_id" column="group_id"/>
+	<result property="hos_id" column="hos_id"/>
+	<result property="field_tab_code" column="field_tab_code"/>
+	<result property="type_tab_code" column="type_tab_code"/>
+	<result property="field_tab_name" column="field_tab_name"/>
+	<result property="is_innr" column="is_innr"/>
+	<result property="is_cite" column="is_cite"/>
+	<result property="is_stop" column="is_stop"/>
+	<result property="note" column="note"/>
+	<result property="cite_json" column="cite_json"/>
+	<result property="query_sql" column="query_sql"/>
+	<result property="related_sql" column="related_sql"/>
+	<result property="pId" column="pId"/>
+	<result property="id" column="id"/>
+	<result property="name" column="name"/>
+	</resultMap>
+	
+	<resultMap id="hrFiledDataMap" type="java.util.Map">
+		<result property="group_id"  column="group_id" />
+		<result property="hos_id"  column="hos_id" />
+		<result property="field_tab_code"  column="field_tab_code" />
+		<result property="field_col_code"  column="field_col_code" />
+		<result property="field_col_name"  column="field_col_name" />
+		<result property="super_col_code"  column="super_col_code" />
+		<result property="super_col_name"  column="super_col_name" />
+		<result property="spell_code"  column="spell_code" />
+		<result property="wbx_code"  column="wbx_code" />
+		<result property="is_innr"  column="is_innr" />
+		<result property="is_stop"  column="is_stop" />
+		<result property="is_last"  column="is_last" />
+		<result property="is_innr_text"  column="is_innr_text" />
+		<result property="is_stop_text"  column="is_stop_text" />
+		<result property="is_last_text"  column="is_last_text" />
+		<result property="note"  column="note" />
+	</resultMap>
+
+	<resultMap type="java.util.Map" id="hrColStrucMap">
+		<result property="group_id"  column="group_id" />
+		<result property="hos_id"  column="hos_id" />
+		<result property="tab_name"  column="tab_name" />
+		<result property="col_name"  column="col_name" />
+	</resultMap>
+	<select id="queryColAndTabName" resultMap="hrColStrucMap" parameterType="java.util.Map" useCache="false" flushCache="true">
+	select b.tab_name,a.col_name from HR_COL_STRUC a
+	  left join HR_TAB_STRUC b
+		on a.tab_code = b.tab_code
+		and a.group_id = b.group_id
+		and a.hos_id = b.hos_id
+	where a.group_id = #{group_id}
+		and a.hos_id =#{hos_id}
+		and a.field_tab_code = #{field_tab_code}
+	</select>
+	<select id="queryHrFiledTabStrucTree" resultMap="hrFiledTabStrucMap" parameterType="java.util.Map" useCache="false" flushCache="true">
+		select * from (
+			select t.type_tab_code as id, t.type_tab_name as name, null as pId, null as is_cite, null as is_innr,0 as is_stop, t.type_tab_code as sort
+			  from HR_TABLE_TYPE t
+			  where exists (
+                select 1 from HR_FILED_TABLE_STRUC td where td.type_tab_code = t.type_tab_code
+             )
+			union all
+			select ts.field_tab_code as id, ts.field_tab_name||'【'||ts.field_tab_code||'】' as name, ts.type_tab_code as pId,
+			       ts.is_cite, ts.is_innr, ts.is_stop,ts.field_tab_code as sort
+			  from HR_FILED_TABLE_STRUC ts
+			 where ts.group_id = #{group_id}
+			   and ts.hos_id = #{hos_id}
+	     ) t
+	      <where>
+		     <if test="id !=null and id != ''">
+		     	 t.id = #{id}
+		     </if>
+		     <if test="is_stop ==null and is_stop == 0">
+		     and t.is_stop = 0
+		     </if>
+		     <if test="key != null and key != ''">
+	     		and t.name like '%'||#{key}||'%' 
+	     		or t.id like '%'||#{key}||'%' 
+	     	</if>
+	     </where>
+		 order by t.sort asc nulls last
+	</select>
+	
+	
+	<select id="queryHrFiledTabStrucExport" parameterType="java.util.Map" resultMap="hrFiledTabStruc"  useCache="false" flushCache="true">
+		SELECT 
+		group_id,
+		hos_id,
+		field_tab_code,
+		type_tab_code,
+		field_tab_name,
+		is_innr,
+		is_stop,
+		is_cite,
+		cite_json     ,
+  		query_sql       , 
+  		related_sql          ,
+		note
+		FROM HR_FILED_TABLE_STRUC 
+		<where>                     
+		<if test="group_id != null and group_id != ''">
+		AND group_id = #{group_id,jdbcType=INTEGER}
+		</if>
+		<if test="hos_id != null and hos_id != ''">
+		AND hos_id = #{hos_id,jdbcType=INTEGER}
+		</if>
+		<if test="field_tab_code != null and field_tab_code != ''">
+		AND field_tab_code = #{field_tab_code,jdbcType=VARCHAR}
+		</if>
+		<if test="type_tab_code != null and type_tab_code != ''">
+		AND type_tab_code = #{type_tab_code,jdbcType=VARCHAR}
+		</if>
+		<if test="field_tab_name != null and field_tab_name != ''">
+		AND field_tab_name = #{field_tab_name,jdbcType=VARCHAR}
+		</if>
+		<if test="is_innr != null and is_innr != ''">
+		AND is_innr = #{is_innr,jdbcType=INTEGER}
+		</if>
+		<if test="is_stop != null and is_stop != ''">
+		AND is_stop = #{is_stop,jdbcType=INTEGER}
+		</if>
+		<if test="is_cite != null and is_cite != ''">
+		AND is_cite = #{is_cite,jdbcType=INTEGER}
+		</if>
+		<if test="note != null and note != ''">
+		AND note = #{note,jdbcType=VARCHAR}
+		</if>
+		</where>   
+		order by group_id asc
+	</select>
+	
+	<select id="queryHrFiledData" resultMap="hrFiledDataMap" parameterType="java.util.Map" useCache="false" flushCache="true">
+		
+		select fd.group_id,
+		       fd.hos_id,
+		       fd.field_tab_code,
+		       fd.field_col_code,
+		       fd.field_col_name,
+		       fd.super_col_code,
+		       case when fd.super_col_code is null then 'TOP' when fd.super_col_code = 'TOP' then 'TOP'  else sfd.field_col_name end super_col_name,
+		       fd.spell_code,
+		       fd.wbx_code,
+		       fd.is_innr,
+		       case fd.is_innr when 1 then '是' when 0 then '否' else '' end is_innr_text,
+		       fd.is_stop,
+		       case fd.is_stop when 1 then '是' when 0 then '否' else '' end is_stop_text,
+		       fd.is_last,
+		       case fd.is_last when 1 then '是' when 0 then '否' else '' end is_last_text,
+		       fd.note
+		  from HR_FILED_DATA fd
+		  left join HR_FILED_DATA sfd
+		    on fd.group_id = sfd.group_id
+		   and fd.hos_id = sfd.hos_id
+		   and fd.field_tab_code = sfd.field_tab_code
+		   and fd.super_col_code = sfd.field_col_code
+		  where fd.group_id=#{group_id}
+		   and  fd.hos_id=#{hos_id}
+		   and fd.field_tab_code = #{field_tab_code}
+		   
+		   <if test="field_col_code != null and field_col_code != '' ">
+		   		and fd.field_col_code like '%${field_col_code}%'
+		   </if> 
+		   
+<!-- 		   <if test="field_col_code != null or field_col_code != '' "> -->
+<!-- 		   		and ( -->
+<!-- 		   			fd.field_col_code like '%${field_col_code}%' -->
+<!-- 		   		 or fd.field_col_name like '%${field_col_code}%' -->
+<!-- 		   		)  -->
+<!-- 		   </if>  -->
+		   <if test="field_col_name != null and field_col_name != '' ">
+		   	and fd.field_col_name like '%${field_col_name}%' 
+		   </if>
+		   <if test="is_last != null and is_last != '' ">
+		   	and fd.is_last = #{is_last}
+		   </if>
+		   <if test="is_stop != null and is_stop != '' ">
+		   	and fd.is_stop = #{is_stop}
+		   </if>
+		  order by fd.field_col_code
+	</select>
+	
+	<select id="queryOldFiledTabStruc" parameterType="map" resultType="map">
+		select group_id,
+		       hos_id,
+		       field_tab_code,
+		       type_filed_code,
+		       field_tab_name,
+		       is_innr,
+		       is_cite,
+		       note
+	 	from hr_fiied_tab_struc t
+		where group_id = #{group_id, jdbcType = INTEGER}
+	 	 and hos_id = #{hos_id, jdbcType = INTEGER}
+	  	 and not exists (select 1
+	         from HR_FILED_TABLE_STRUC t2
+	        where t.group_id = t2.group_id
+	          and t.hos_id = t2.hos_id
+	          and t.FIELD_TAB_CODE = t2.FIELD_TAB_CODE)
+
+	</select>
+	
+	<insert id="add" useGeneratedKeys="true" >
+	
+		INSERT INTO HR_FILED_TABLE_STRUC (
+		<trim suffix="" suffixOverrides=",">
+		group_id
+		,
+		hos_id
+		,
+		field_tab_code
+		,
+		type_tab_code
+		,
+		<if test="field_tab_name != null and field_tab_name != ''">
+		field_tab_name
+		,
+		</if>
+		<if test="is_innr != null and is_innr != ''">
+		is_innr
+		,
+		</if>
+		<if test="is_cite != null and is_cite != ''">
+		is_cite
+		,
+		</if>
+		<if test="is_stop != null and is_stop != ''">
+		is_stop
+		,
+		</if>
+			<if test="cite_json != null and cite_json != ''">
+		cite_json
+		,
+		</if>
+			<if test="query_sql != null and query_sql != ''">
+		query_sql
+		,
+		</if>
+			<if test="related_sql != null and related_sql != ''">
+		related_sql
+		,
+		</if>
+		<if test="note != null and note != ''">
+		note
+		,
+		</if>
+	</trim>
+		) VALUES (
+	<trim suffix="" suffixOverrides=",">
+		#{group_id,jdbcType=INTEGER}
+		,
+		#{hos_id,jdbcType=INTEGER}
+		,
+		#{field_tab_code,jdbcType=VARCHAR}
+		,
+		#{type_tab_code,jdbcType=VARCHAR}
+		,
+		<if test="field_tab_name != null and field_tab_name != ''">
+		#{field_tab_name,jdbcType=VARCHAR}
+		,
+		</if>
+		<if test="is_innr != null and is_innr != ''">
+		#{is_innr,jdbcType=INTEGER}
+		,
+		</if>
+		<if test="is_cite != null and is_cite != ''">
+		#{is_cite,jdbcType=INTEGER}
+		,
+		</if><if test="is_stop != null and is_stop != ''">
+		#{is_stop,jdbcType=INTEGER}
+		,
+		</if>
+		<if test="cite_json != null and cite_json != ''">
+		#{cite_json,jdbcType=VARCHAR}
+		,
+		</if>
+		<if test="query_sql != null and query_sql != ''">
+		#{query_sql,jdbcType=VARCHAR}
+		,
+		</if>
+		<if test="related_sql != null and related_sql != ''">
+		#{related_sql,jdbcType=VARCHAR}
+		,
+		</if>
+	
+		<if test="note != null and note != ''">
+		#{note,jdbcType=VARCHAR}
+		
+		</if>
+	</trim>		
+		)
+	
+	</insert>
+	<insert id="addBatch" parameterType="java.util.List" >
+		<foreach collection="list" item="item" index="index" open="begin" close=";end;" separator=";" >
+			INSERT INTO HR_FILED_TABLE_STRUC (
+			group_id
+			,
+			hos_id
+			,
+			field_tab_code
+			,
+			type_tab_code
+			
+			<if test="item.field_tab_name != null">,field_tab_name</if>
+			
+			<if test="item.is_innr != null">,is_innr</if>
+			<if test="item.is_cite != null">,is_cite</if>
+			<if test="item.is_stop != null">,is_stop</if>
+			<if test="item.cite_json != null">,cite_json</if>  
+			
+	  		<if test="item.query_sql != null">,query_sql</if>       
+	  		
+	 		<if test="item.related_sql != null">,related_sql</if>        
+	 		
+			<if test="item.note != null">,note</if>
+			
+			) VALUES(
+			
+				#{item.group_id,jdbcType=INTEGER}
+				,
+				#{item.hos_id,jdbcType=INTEGER}
+				,
+				#{item.field_tab_code,jdbcType=VARCHAR}
+				,
+				#{item.type_tab_code,jdbcType=VARCHAR}
+				
+				<if test="item.field_tab_name != null">,#{item.field_tab_name,jdbcType=VARCHAR}</if>
+				<if test="item.is_innr != null">,#{item.is_innr,jdbcType=INTEGER}</if>
+				<if test="item.is_cite != null">,#{item.is_cite,jdbcType=INTEGER}</if>
+				<if test="item.is_stop != null">,#{item.is_stop,jdbcType=INTEGER}</if>
+				<if test="item.cite_json != null">,#{item.cite_json,jdbcType=VARCHAR}</if>
+				<if test="item.query_sql != null">,#{item.query_sql,jdbcType=VARCHAR}</if>
+				<if test="item.related_sql != null">,#{item.related_sql,jdbcType=VARCHAR}</if>
+				<if test="item.note != null">,#{item.note,jdbcType=VARCHAR}</if>
+			)
+		</foreach>
+	</insert>
+	
+	<update id="update" parameterType="java.util.Map">
+	
+		UPDATE HR_FILED_TABLE_STRUC 
+		<trim prefix="SET"  suffixOverrides=","> 
+		<if test="type_tab_code != null and type_tab_code != ''">
+		type_tab_code = #{type_tab_code,jdbcType=VARCHAR}
+		,
+		</if>
+		<if test="field_tab_name != null and field_tab_name != ''">
+		field_tab_name = #{field_tab_name,jdbcType=VARCHAR}
+		,
+		</if>
+		<if test="is_innr != null and is_innr != ''">
+		is_innr = #{is_innr,jdbcType=INTEGER}
+		,
+		</if>
+		<if test="is_stop != null and is_stop != ''">
+		is_stop = #{is_stop,jdbcType=INTEGER}
+		,
+		</if>
+		<if test="is_cite != null and is_cite != ''">
+		is_cite = #{is_cite,jdbcType=INTEGER}
+		,
+		</if>
+		<if test="cite_json != null ">
+		cite_json = #{cite_json,jdbcType=VARCHAR}
+		,
+		</if>
+		<if test="query_sql != null ">
+		query_sql = #{query_sql,jdbcType=VARCHAR}
+		,
+		</if>
+		<if test="related_sql != null ">
+		related_sql = #{related_sql,jdbcType=VARCHAR}
+		,
+		</if>
+		
+		<if test="note != null ">
+		note = #{note,jdbcType=VARCHAR}
+		,
+		</if>
+		</trim>
+		where                  
+		 	group_id = #{group_id,jdbcType=INTEGER}
+		AND hos_id = #{hos_id,jdbcType=INTEGER}
+		AND field_tab_code = #{field_tab_code,jdbcType=VARCHAR}
+	</update>
+	<update id="updateHrfiledView" parameterType="java.util.Map">
+	UPDATE HR_FILED_TABLE_STRUC 
+		<trim prefix="SET"  suffixOverrides=","> 
+	<if test="cite_json != null ">
+		cite_json = #{cite_json,jdbcType=VARCHAR}
+		,
+		</if>
+		<if test="query_sql != null ">
+		query_sql = #{query_sql,jdbcType=VARCHAR}
+		,
+		</if>
+		<if test="related_sql != null ">
+		related_sql = #{related_sql,jdbcType=VARCHAR}
+		,
+		</if></trim>
+	where                  
+		 	group_id = #{group_id,jdbcType=INTEGER}
+		AND hos_id = #{hos_id,jdbcType=INTEGER}
+		AND field_tab_code = #{field_tab_code,jdbcType=VARCHAR}
+	</update>
+	<update id="updateBatch" parameterType="java.util.List">
+	
+		<foreach collection="list" item="item" index="index" open="begin" close=";end;" separator=";" >
+			UPDATE HR_FILED_TABLE_STRUC 
+			<trim prefix="SET"  suffixOverrides=","> 
+			<if test="item.type_tab_code != null and item.type_tab_code != ''">
+			type_tab_code = #{item.type_tab_code,jdbcType=VARCHAR}
+			,
+			</if>
+			<if test="item.field_tab_name != null and item.field_tab_name != ''">
+			field_tab_name = #{item.field_tab_name,jdbcType=VARCHAR}
+			,
+			</if>
+			<if test="item.is_innr != null and item.is_innr != ''">
+			is_innr = #{item.is_innr,jdbcType=INTEGER}
+			,
+			</if>
+			<if test="item.is_stop != null and item.is_stop != ''">
+			is_stop = #{item.is_stop,jdbcType=INTEGER}
+			,
+			</if>
+			<if test="item.is_cite != null and item.is_cite != ''">
+			is_cite = #{item.is_cite,jdbcType=INTEGER}
+			,
+			</if>
+				<if test="item.cite_json != null ">
+			cite_json = #{item.cite_json,jdbcType=VARCHAR}
+			,
+			</if>
+				
+				<if test="item.query_sql != null ">
+			query_sql = #{item.query_sql,jdbcType=VARCHAR}
+			,
+			</if>
+			<if test="item.related_sql != null ">
+			related_sql = #{item.related_sql,jdbcType=VARCHAR}
+			,
+			</if>
+			
+			<if test="item.note != null ">
+			note = #{item.note,jdbcType=VARCHAR}
+			,
+			</if>
+			</trim>
+			<where>                     
+			<if test="item.group_id != null and item.group_id != ''">
+			AND group_id = #{item.group_id,jdbcType=INTEGER}
+			</if>  
+			<if test="item.hos_id != null and item.hos_id != ''">
+			AND hos_id = #{item.hos_id,jdbcType=INTEGER}
+			</if>  
+			<if test="item.field_tab_code != null and item.field_tab_code != ''">
+			AND field_tab_code = #{item.field_tab_code,jdbcType=VARCHAR}
+			</if>  
+			<if test="item.type_tab_code != null and item.type_tab_code != ''">
+			AND type_tab_code = #{item.type_tab_code,jdbcType=VARCHAR}
+			</if>  
+			<if test="item.field_tab_name != null and item.field_tab_name != ''">
+			AND field_tab_name = #{item.field_tab_name,jdbcType=VARCHAR}
+			</if>  
+			<if test="item.is_innr != null and item.is_innr != ''">
+			AND is_innr = #{item.is_innr,jdbcType=INTEGER}
+			</if> 
+			<if test="item.is_stop != null and item.is_stop != ''">
+			AND is_stop = #{item.is_stop,jdbcType=INTEGER}
+			</if>  
+			<if test="item.is_cite != null and item.is_cite != ''">
+			AND is_cite = #{item.is_cite,jdbcType=INTEGER}
+			</if>  
+			<if test="item.note != null and item.note != ''">
+			AND note = #{item.note,jdbcType=VARCHAR}
+			</if>  
+			</where>  			
+		</foreach>
+	</update>
+	
+	<delete id="delete" parameterType="java.util.Map">
+	
+		DELETE FROM HR_FILED_TABLE_STRUC 
+		where                    
+			group_id = #{group_id,jdbcType=INTEGER}
+		AND hos_id = #{hos_id,jdbcType=INTEGER}
+		AND field_tab_code = #{field_tab_code,jdbcType=VARCHAR}
+	</delete>
+	<delete id="deleteBatch" parameterType="java.util.List">
+		DELETE FROM HR_FILED_TABLE_STRUC 
+		<where>
+			<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+				<if test="item.group_id != null and item.group_id != ''">
+				AND group_id = #{item.group_id,jdbcType=INTEGER}
+				</if>
+				<if test="item.hos_id != null and item.hos_id != ''">
+				AND hos_id = #{item.hos_id,jdbcType=INTEGER}
+				</if>
+				<if test="item.field_tab_code != null and item.field_tab_code != ''">
+				AND field_tab_code = #{item.field_tab_code,jdbcType=VARCHAR}
+				</if>
+				<if test="item.type_tab_code != null and item.type_tab_code != ''">
+				AND type_tab_code = #{item.type_tab_code,jdbcType=VARCHAR}
+				</if>
+				<if test="item.field_tab_name != null and item.field_tab_name != ''">
+				AND field_tab_name = #{item.field_tab_name,jdbcType=VARCHAR}
+				</if>
+				<if test="item.is_innr != null and item.is_innr != ''">
+				AND is_innr = #{item.is_innr,jdbcType=INTEGER}
+				</if>
+				<if test="item.is_stop != null and item.is_stop != ''">
+				AND is_stop = #{item.is_stop,jdbcType=INTEGER}
+				</if>
+				<if test="item.is_cite != null and item.is_cite != ''">
+				AND is_cite = #{item.is_cite,jdbcType=INTEGER}
+				</if>
+				<if test="item.note != null and item.note != ''">
+				AND note = #{item.note,jdbcType=VARCHAR}
+				</if>
+			</foreach>
+	    </where>  
+	</delete>
+	<select id="query" parameterType="java.util.Map" resultMap="hrFiledTabStruc"  useCache="false" flushCache="true">
+	
+		SELECT 
+		group_id,
+		hos_id,
+		field_tab_code,
+		type_tab_code,
+		field_tab_name,
+		is_innr,
+		is_stop,
+		is_cite,
+		cite_json     ,
+ 	 	query_sql       , 
+  		related_sql          ,
+		note
+		FROM HR_FILED_TABLE_STRUC 
+		<where>                     
+		<if test="group_id != null and group_id != ''">
+		AND group_id = #{group_id,jdbcType=INTEGER}
+		</if>
+		<if test="hos_id != null and hos_id != ''">
+		AND hos_id = #{hos_id,jdbcType=INTEGER}
+		</if>
+		<if test="field_tab_code != null and field_tab_code != ''">
+		AND field_tab_code = #{field_tab_code,jdbcType=VARCHAR}
+		</if>
+		<if test="type_tab_code != null and type_tab_code != ''">
+		AND type_tab_code = #{type_tab_code,jdbcType=VARCHAR}
+		</if>
+		<if test="field_tab_name != null and field_tab_name != ''">
+		AND field_tab_name = #{field_tab_name,jdbcType=VARCHAR}
+		</if>
+		<if test="is_innr != null and is_innr != ''">
+		AND is_innr = #{is_innr,jdbcType=INTEGER}
+		</if>
+		<if test="is_stop != null and is_stop != ''">
+		AND is_stop = #{is_stop,jdbcType=INTEGER}
+		</if>
+		<if test="is_cite != null and is_cite != ''">
+		AND is_cite = #{is_cite,jdbcType=INTEGER}
+		</if>
+		<if test="note != null and note != ''">
+		AND note = #{note,jdbcType=VARCHAR}
+		</if>
+		<if test="ids != null and ids != ''">
+         and filed_tab_code in (
+             <foreach collection="ids.split(',')" item="item" separator=",">
+                 #{item, jdbcType=VARCHAR}
+             </foreach>
+            ) 
+         </if>
+		</where>   
+		order by group_id asc
+	</select>
+	<select id="queryHrFiledTabStruc" parameterType="java.util.Map" resultMap="hrFiledTabStruc"  useCache="false" flushCache="true">
+	
+		SELECT 
+		group_id,
+		hos_id,
+		field_tab_code,
+		type_tab_code,
+		field_tab_name,
+		is_innr,
+		is_stop,
+		is_cite,
+			cite_json     ,
+  query_sql       , 
+  related_sql          ,
+		note
+		FROM HR_FILED_TABLE_STRUC 
+		<where>                     
+		<if test="group_id != null and group_id != ''">
+		AND group_id = #{group_id,jdbcType=INTEGER}
+		</if>
+		<if test="hos_id != null and hos_id != ''">
+		AND hos_id = #{hos_id,jdbcType=INTEGER}
+		</if>
+		<if test="field_tab_code != null and field_tab_code != ''">
+		AND field_tab_code = #{field_tab_code,jdbcType=VARCHAR}
+		</if>
+		<if test="type_tab_code != null and type_tab_code != ''">
+		AND type_tab_code = #{type_tab_code,jdbcType=VARCHAR}
+		</if>
+		<if test="field_tab_name != null and field_tab_name != ''">
+		AND field_tab_name = #{field_tab_name,jdbcType=VARCHAR}
+		</if>
+		<if test="is_innr != null and is_innr != ''">
+		AND is_innr = #{is_innr,jdbcType=INTEGER}
+		</if>
+		<if test="is_cite != null and is_cite != ''">
+		AND is_cite = #{is_cite,jdbcType=INTEGER}
+		</if>
+		<if test="is_stop != null and is_stop != ''">
+		AND is_stop = #{is_stop,jdbcType=INTEGER}
+		</if>
+		<if test="note != null and note != ''">
+		AND note = #{note,jdbcType=VARCHAR}
+		</if>
+		</where>   
+		order by group_id asc
+		</select>
+	<select id="queryByCode" resultMap="hrFiledTabStruc"  parameterType="java.util.Map"  useCache="false" flushCache="true">
+	
+		SELECT 
+		group_id,
+		hos_id,
+		field_tab_code,
+		type_tab_code,
+		field_tab_name,
+		is_innr,
+		is_stop,
+		is_cite,
+		cite_json       , 
+ 		query_sql       , 
+  		related_sql          ,
+		note
+		FROM HR_FILED_TABLE_STRUC 
+		WHERE 
+		group_id = #{group_id,jdbcType=INTEGER}   and 
+		hos_id = #{hos_id,jdbcType=INTEGER}   and 
+		field_tab_code = #{field_tab_code,jdbcType=VARCHAR} 
+	
+	</select>
+	
+	<select id="queryByCodePrint" resultMap="hrFiledTabStruc"  parameterType="java.util.Map"  useCache="false" flushCache="true">
+	
+		SELECT 
+		group_id,
+		hos_id,
+		field_tab_code,
+		type_tab_code,
+		field_tab_name,
+		is_innr,
+		is_stop,
+		is_cite,
+		cite_json       , 
+ 		query_sql       , 
+  		related_sql          ,
+		note
+		FROM HR_FILED_TABLE_STRUC 
+		WHERE 
+		field_tab_code = #{field_tab_code,jdbcType=VARCHAR} 
+	
+	</select>
+	
+	<select id="queryByCodeByName" resultMap="hrFiledTabStruc"  parameterType="java.util.Map"  useCache="false" flushCache="true">
+	
+		SELECT 
+		group_id,
+		hos_id,
+		field_tab_code,
+		type_tab_code,
+		field_tab_name,
+		is_innr,
+		is_stop
+		is_cite,
+			cite_json       , 
+  query_sql       , 
+  related_sql          ,
+		note
+		FROM HR_FILED_TABLE_STRUC 
+		WHERE 
+		group_id = #{group_id,jdbcType=INTEGER}   and 
+		hos_id = #{hos_id,jdbcType=INTEGER}   and 
+		field_tab_code = #{field_tab_code,jdbcType=VARCHAR} 
+	    or field_tab_name = #{field_tab_name,jdbcType=VARCHAR} 
+	</select>
+	<select id="queryByCodeTab" resultMap="hrFiledTabStruc"  parameterType="java.util.Map"  useCache="false" flushCache="true">
+	
+		SELECT 
+		group_id,
+		hos_id,
+		field_tab_code,
+		type_tab_code,
+		field_tab_name,
+		is_innr,
+		is_stop
+		is_cite,
+			cite_json       , 
+  query_sql       ,
+  related_sql          ,
+		note
+		FROM HR_FILED_TABLE_STRUC 
+		WHERE 
+		group_id = #{group_id,jdbcType=INTEGER}   and 
+		hos_id = #{hos_id,jdbcType=INTEGER}   and 
+		field_tab_code = #{field_tab_code,jdbcType=VARCHAR} 
+	
+	</select>
+	<insert id="saveHrFiledData" parameterType="java.util.Map"  >
+	<foreach collection="list" item="item" index="index" open="begin" close=";end;" separator=";" >
+		insert into HR_FILED_DATA
+		  (
+		   group_id,
+		   hos_id,
+		   field_tab_code,
+		   field_col_code,
+		   field_col_name,
+		   super_col_code,
+		   spell_code,
+		   wbx_code,
+		   is_innr,
+		   is_stop,
+		   is_last,
+		   note
+		   )
+		   select  
+		   #{item.group_id},
+		   #{item.hos_id},
+		   #{item.field_tab_code,jdbcType=VARCHAR},
+		   #{item.field_col_code,jdbcType=VARCHAR},
+		   #{item.field_col_name,jdbcType=VARCHAR},
+		   #{item.super_col_code,jdbcType=VARCHAR},
+		   #{item.spell_code,jdbcType=VARCHAR},
+		   #{item.wbx_code,jdbcType=VARCHAR},
+		   #{item.is_innr,jdbcType=INTEGER},
+		   #{item.is_stop,jdbcType=INTEGER},
+		   #{item.is_last,jdbcType=INTEGER},
+		   #{item.note,jdbcType=VARCHAR} 
+		   from  dual
+		  
+		   </foreach>
+	</insert>
+	<update id="updateHrFiledData" parameterType="java.util.List" >
+		<foreach collection="list" item="item" index="index" open="begin" close=";end;" separator=";" >
+			<trim suffix="" suffixOverrides=",">
+				update HR_FILED_DATA
+				   set 
+				       field_col_name = #{item.field_col_name},
+				       super_col_code = #{item.super_col_code},
+				       spell_code     = #{item.spell_code},
+				       wbx_code       = #{item.wbx_code},
+				       is_innr        = #{item.is_innr},
+				       is_stop        = #{item.is_stop},
+				       is_last        = #{item.is_last},
+				       note           = #{item.note}
+				 where group_id = #{item.group_id}
+				   and hos_id = #{item.hos_id}
+				   and field_tab_code = #{item.field_tab_code}
+				   and field_col_code = #{item.field_col_code}
+			</trim>
+		</foreach>
+	</update>
+	
+	<delete id="deleteHrFiledDataByTabCode" parameterType="java.util.Map">
+	
+		DELETE FROM HR_FILED_DATA 
+		WHERE group_id = #{vo.group_id,jdbcType=INTEGER}
+			AND hos_id = #{vo.hos_id,jdbcType=INTEGER}
+			AND field_tab_code = #{vo.field_tab_code,jdbcType=VARCHAR}
+			AND field_col_code in
+				<if test="list.size gt 1000">
+					<foreach collection="list" item="item" close=" ) " open=" ( " separator=" union all ">
+						select
+							#{item.field_col_code,jdbcType=VARCHAR}
+						from
+							dual
+					</foreach>
+				</if>
+				<if test="list.size lt 1001">
+					<foreach collection="list" item="item" close=" ) " open=" ( " separator=",">
+						#{item.field_col_code,jdbcType=VARCHAR}
+					</foreach>
+				</if>
+				
+	</delete>
+	
+	<delete id="deleteHrFiledData" parameterType="java.util.List" >
+		<foreach collection="list" item="item" index="index" open="begin" close=";end;" separator=";" >
+				delete HR_FILED_DATA
+				 where group_id = #{item.group_id}
+				   and hos_id = #{item.hos_id}
+				   and field_tab_code = #{item.field_tab_code}
+				   and field_col_code = #{item.field_col_code}
+		</foreach>
+	</delete>
+	<select id="queryByUniqueness" resultMap="hrFiledTabStruc"  parameterType="java.util.Map"  useCache="false" flushCache="true">
+	
+		SELECT 
+		group_id,
+		hos_id,
+		field_tab_code,
+		type_tab_code,
+		field_tab_name,
+		is_innr,
+		is_stop,
+		is_cite,
+		note
+		FROM HR_FILED_TABLE_STRUC 
+		<where>                     
+		<if test="group_id != null and group_id != ''">
+		AND group_id = #{group_id,jdbcType=INTEGER}
+		</if>
+		<if test="hos_id != null and hos_id != ''">
+		AND hos_id = #{hos_id,jdbcType=INTEGER}
+		</if>
+		<if test="field_tab_code != null and field_tab_code != ''">
+		AND field_tab_code = #{field_tab_code,jdbcType=VARCHAR}
+		</if>
+		<if test="type_tab_code != null and type_tab_code != ''">
+		AND type_tab_code = #{type_tab_code,jdbcType=VARCHAR}
+		</if>
+		<if test="field_tab_name != null and field_tab_name != ''">
+		AND field_tab_name = #{field_tab_name,jdbcType=VARCHAR}
+		</if>
+		<if test="is_innr != null and is_innr != ''">
+		AND is_innr = #{is_innr,jdbcType=INTEGER}
+		</if>
+		<if test="is_stop != null and is_stop != ''">
+		AND is_stop = #{is_stop,jdbcType=INTEGER}
+		</if>
+		<if test="is_cite != null and is_cite != ''">
+		AND is_cite = #{is_cite,jdbcType=INTEGER}
+		</if>
+		<if test="note != null and note != ''">
+		AND note = #{note,jdbcType=VARCHAR}
+		</if>
+		</where>   
+		order by group_id asc
+	</select>
+	<select id="queryExists" resultMap="hrFiledTabStruc"  parameterType="java.util.Map"  useCache="false" flushCache="true">
+	
+		SELECT 
+		group_id,
+		hos_id,
+		field_tab_code,
+		type_tab_code,
+		field_tab_name,
+		is_innr,
+		is_stop,
+		is_cite,
+		note
+		FROM HR_FILED_TABLE_STRUC 
+		<where>                     
+		<if test="group_id != null and group_id != ''">
+		AND group_id = #{group_id,jdbcType=INTEGER}
+		</if>
+		<if test="hos_id != null and hos_id != ''">
+		AND hos_id = #{hos_id,jdbcType=INTEGER}
+		</if>
+		<if test="field_tab_code != null and field_tab_code != ''">
+		AND field_tab_code = #{field_tab_code,jdbcType=VARCHAR}
+		</if>
+		<if test="type_tab_code != null and type_tab_code != ''">
+		AND type_tab_code = #{type_tab_code,jdbcType=VARCHAR}
+		</if>
+		<if test="field_tab_name != null and field_tab_name != ''">
+		AND field_tab_name = #{field_tab_name,jdbcType=VARCHAR}
+		</if>
+		<if test="is_innr != null and is_innr != ''">
+		AND is_innr = #{is_innr,jdbcType=INTEGER}
+		</if>
+		<if test="is_stop != null and is_stop != ''">
+		AND is_stop = #{is_stop,jdbcType=INTEGER}
+		</if>
+		<if test="is_cite != null and is_cite != ''">
+		AND is_cite = #{is_cite,jdbcType=INTEGER}
+		</if>
+		<if test="note != null and note != ''">
+		AND note = #{note,jdbcType=VARCHAR}
+		</if>
+		</where>   
+		order by group_id asc
+	</select>
+	
+	<select id="queryHrFiledDataByPrint" resultType="java.util.Map"  parameterType="java.util.Map"  useCache="false" flushCache="true">
+		select fd.group_id,
+		       fd.hos_id,
+		       fd.field_tab_code,
+		       fd.field_col_code,
+		       fd.field_col_name,
+		       fd.super_col_code,
+		       case when fd.super_col_code is null then 'TOP' else sfd.field_col_name end super_col_name,
+		       fd.spell_code,
+		       fd.wbx_code,
+		       fd.is_innr,
+		       case fd.is_innr when 1 then '是' when 0 then '否' else '' end is_innr_text,
+		       fd.is_stop,
+		       case fd.is_stop when 1 then '是' when 0 then '否' else '' end is_stop_text,
+		       fd.is_last,
+		       case fd.is_last when 1 then '是' when 0 then '否' else '' end is_last_text,
+		       fd.note
+		  from HR_FILED_DATA fd
+		  left join HR_FILED_DATA sfd
+		    on fd.group_id = sfd.group_id
+		   and fd.hos_id = sfd.hos_id
+		   and fd.field_tab_code = sfd.field_tab_code
+		   and fd.super_col_code = sfd.field_col_code
+		  where fd.group_id=#{group_id}
+		   and  fd.hos_id=#{hos_id}
+		   and fd.field_tab_code = #{field_tab_code}
+		   <if test="field_col_code != null and field_col_code != '' ">
+		   		and (
+		   			fd.field_col_code like '%${field_col_code}%'
+		   		 or fd.field_col_name like '%${field_col_code}%'
+		   		) 
+		   </if>
+		   <if test="field_col_name != null and field_col_name != '' ">
+		   	and fd.field_col_name like '%${field_col_name}%' 
+		   </if>
+		   <if test="is_last != null and is_last != '' ">
+		   	and fd.is_last = #{is_last}
+		   </if>
+		   <if test="is_stop != null and is_stop != '' ">
+		   	and fd.is_stop = #{is_stop}
+		   </if>
+		  order by fd.field_col_code
+	</select>
+	<resultMap type="java.util.Map" id="hrSelectMap">
+		<result property="id" column="id" />
+		<result property="text" column="text" />
+	</resultMap>
+	<select id="queryFiledTypeSelect" parameterType="java.util.Map"
+		resultMap="hrSelectMap">
+		select t.type_filed_code as id, t.type_filed_name as text
+		from HR_FILED_TABLE_TYPE t
+		where t.group_id = #{group_id}
+		and t.hos_id = #{hos_id}
+		order by t.type_filed_code
+	</select>
+	<!-- 自定义SQL查询 -->
+	<select id="queryHrFiledDataSql" parameterType="java.util.Map" resultType="java.util.Map">
+		${sql}
+	</select>
+</mapper>
+

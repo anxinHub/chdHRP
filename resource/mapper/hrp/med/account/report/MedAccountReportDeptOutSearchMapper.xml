@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.med.dao.account.report.MedAccountReportDeptOutSearchMapper">
+	<resultMap id="medAccountReportDeptOutSearchMap" type="java.util.Map" >
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="year_month" column="year_month"/>
+		<result property="inv_code" column="inv_code"/>
+		<result property="inv_name" column="inv_name"/>
+		<result property="med_type_code" column="med_type_code"/>
+		<result property="med_type_name" column="med_type_name"/>
+		<result property="store_name" column="store_name"/>
+		<result property="inv_model" column="inv_model"/>
+		<result property="unit_name" column="unit_name"/>
+		<result property="amount" column="amount"/>
+		<result property="price" column="price"/>
+		<result property="amount_money" column="amount_money"/>
+		<result property="confirmer" column="confirmer"/>
+		<result property="confirm_date" column="confirm_date"/>
+		<result property="dept_name" column="dept_name"/>
+		<result property="dept_emp" column="dept_emp"/>
+		<result property="note" column="note"/>
+		<result property="bus_type_code" column="bus_type_code"/>
+		<result property="bus_type_name" column="bus_type_name"/>
+	</resultMap>
+	
+	<!-- 科室库存查询表 -->
+	<select id="queryMedAccountReportDeptOutSearch" parameterType="java.util.Map" resultMap="medAccountReportDeptOutSearchMap">
+		with temp as(
+			select
+				t.group_id, t.hos_id, t.copy_code, to_char(t.year_month) year_month, t.inv_code, t.inv_name, 
+				mtdd.med_type_code, mtdd.med_type_name,t.store_name,t.inv_model, t.unit_name,
+				t.amount,t.price,t.amount_money,t.confirmer,
+				t.confirm_date,t.dept_name,t.dept_emp,t.note,t.out_no,mtdd.super_code,
+				t.bus_type_code,t.bus_type_name
+			from(
+				select
+				     mod.group_id,mod.hos_id,mod.copy_code,
+				     mom.year||mom.month as year_month,
+				     mid.inv_code,mid.inv_name,
+				     mtd.med_type_code,mtd.med_type_name,
+				     hsd.store_name,mid.inv_model,hu.unit_name,
+				     mod.amount,mod.price,mod.amount_money,
+				     hed.emp_name as confirmer,mom.confirm_date,
+				     hdd.dept_name,hed2.emp_name as dept_emp,mod.note,mom.out_no,mbt.bus_type_code,mbt.bus_type_name
+				from med_out_detail mod
+				left join med_out_main mom
+				on
+				     mod.group_id = mom.group_id and mod.hos_id = mom.hos_id and mod.copy_code = mom.copy_code  
+				     and mod.out_id = mom.out_id 
+				left join med_inv_dict mid
+				on
+				     mod.group_id = mid.group_id and mod.hos_id = mid.hos_id and mod.copy_code = mid.copy_code
+				     and mod.inv_id = mid.inv_id 
+				     <if test="show_history == '1'">
+						and mod.inv_no = mid.inv_no
+					 </if>
+					 <if test="show_history != '1'">
+						and mid.is_stop = 0
+					 </if>
+				     
+				left join med_type_dict mtd
+				on
+				     mid.group_id = mtd.group_id and mid.hos_id = mtd.hos_id and mid.copy_code = mtd.copy_code
+				     and mid.med_type_id = mtd.med_type_id and mid.med_type_no = mtd.med_type_no
+				left join hos_unit hu
+				on
+				     mid.group_id = hu.group_id and mid.hos_id = hu.hos_id and mid.unit_code = hu.unit_code and hu.is_stop = 0
+				left join hos_store_dict hsd
+				on
+				     mom.group_id = hsd.group_id and mom.hos_id = hsd.hos_id
+				     and mom.store_id = hsd.store_id 
+				     <if test="show_history == 1">
+						and mom.store_no = hsd.store_no
+					 </if>
+					 <if test="show_history == 0">
+						and hsd.is_stop = 0
+					 </if>
+				left join med_store ms on hsd.group_id=ms.group_id and hsd.hos_id=ms.hos_id
+               		and hsd.store_id=ms.store_id    
+				left join hos_emp_dict hed
+				on
+				     mom.group_id = hed.group_id and mom.hos_id = hed.hos_id and ms.manager = hed.emp_id 
+					 <if test="show_history == 0">
+						and hed.is_stop = 0
+					 </if>
+					 
+				left join hos_dept_dict hdd
+				on
+				     mom.group_id = hdd.group_id and mom.hos_id = hdd.hos_id
+				     and mom.dept_id = hdd.dept_id 
+				     <if test="show_history == 1">
+						and mom.dept_no = hdd.dept_no
+					 </if>
+					 <if test="show_history == 0">
+						and hdd.is_stop = 0
+					 </if>
+				left join hos_emp_dict hed2
+				on
+				     mom.group_id = hed2.group_id and mom.hos_id = hed2.hos_id and mom.dept_emp = hed2.emp_id 
+				     <if test="show_history == 0">
+						and hed2.is_stop = 0
+					 </if>
+				     
+				left join med_bus_type mbt
+				on
+				     mom.bus_type_code = mbt.bus_type_code and mbt.is_stop = 0 
+				where
+				     mod.group_id = #{group_id} and mod.hos_id = #{hos_id} and mod.copy_code = #{copy_code}
+				     and mom.state = 3 
+				     <!-- and mbt.sel_flag = 'out' -->
+				     <!-- 2017/03/22 将制单日期改为确认日期 -->
+				     and to_char(mom.confirm_date,'yyyy-MM-dd') between #{begin_date} and #{end_date}
+				     <if test="bus_type_code != null and bus_type_code != '' and bus_type_code != '()' ">
+					     and mom.bus_type_code in ${bus_type_code}
+				     </if>
+				     <if test="bus_type_code == null or bus_type_code == '' or bus_type_code == '()' ">
+					     and mom.bus_type_code IN (3, 21, 9,11,13,23,49,50)
+				     </if>
+				     
+				     <!-- <if test="begin_date != null and begin_date != '' and end_date != null and end_date != '' ">
+					     and to_char(mom.out_date,'yyyy-MM-dd') between #{begin_date} and #{end_date}
+				     </if> -->
+				     
+				     <if test="dept_id != null and dept_id != '' ">
+					     and mom.dept_id = #{dept_id}
+				     </if>
+				     <if test="med_type_code != null and med_type_code != ''">
+					and mtd.med_type_code like '%${med_type_code}%'
+					</if>
+				     
+				     <if test="inv_id != null and inv_id != '' ">
+					     and mod.inv_id = #{inv_id}
+				     </if>
+					<!-- 只显示有权限的库房信息 -->
+					and mom.store_id in (
+						select perm_code from v_user_data_perm  
+						where group_id = #{group_id,jdbcType=INTEGER}
+							and hos_id = #{hos_id,jdbcType=INTEGER}
+							and table_code = 'HOS_STORE_DICT'
+							and user_id = #{user_id,jdbcType=INTEGER}
+							and is_read = 1 and is_write = 1 
+					)
+				     <if test="store_id != null and store_id != '' ">
+					     and mom.store_id = #{store_id}
+				     </if>
+				     <if test="set_code != null and set_code != '' ">
+					     and mom.store_id in(select store_id from MED_STORE_DETAIL where set_id=#{set_code}) 
+				     </if>
+				     
+				     <if test="is_charge != null and is_charge != '' ">
+					     and mid.is_charge = #{is_charge}
+				     </if>
+				     
+				     <if test="is_highvalue != null and is_highvalue != '' ">
+					     and mid.is_highvalue = #{is_highvalue}
+				     </if>
+				     
+				     <if test="out_no != null and out_no != '' ">
+					     and mod.out_no like '${out_no}%'
+				     </if>
+				     <if test="inv_model != null and inv_model != ''">
+					and (mid.inv_model like '%${inv_model}%'
+					 or mid.inv_name like '%${inv_model}%'
+				         or mid.inv_code like '%${inv_model}%'
+					     or upper(mid.spell_code) like '%${inv_model}%'
+					     or upper(mid.wbx_code) like '%${inv_model}%'
+					     or lower(mid.spell_code) like '%${inv_model}%'
+					     or lower(mid.wbx_code) like '%${inv_model}%'
+					     )
+					</if>  
+					 <if test="inv_code != null and inv_code != ''">
+					and (mid.inv_code like '%${inv_code}%'
+					 or mid.inv_name like '%${inv_code}%'
+				         or mid.inv_code like '%${inv_code}%'
+					     or upper(mid.spell_code) like '%${inv_code}%'
+					     or upper(mid.wbx_code) like '%${inv_code}%'
+					     or lower(mid.spell_code) like '%${inv_code}%'
+					     or lower(mid.wbx_code) like '%${inv_code}%'
+					     )
+					</if>  
+			) 	t LEFT JOIN MED_TYPE_DICT mtdd
+		        ON t.group_id = mtdd.group_id
+		        AND t.hos_id = mtdd.hos_id
+		        AND t.copy_code = mtdd.copy_code
+		        AND t.med_type_code like (mtdd.med_type_code || '%')
+		        <where>
+		             <if test="med_type_id != null and med_type_id != '' ">
+					 	mtdd.med_type_id = #{med_type_id}
+				     </if>
+				     
+				     <if test="is_last == 1 ">
+				     	and mtdd.is_last = '1'
+				     </if>
+		        </where>
+		        ORDER BY t.year_month, t.inv_code, mtdd.med_type_code
+		)
+		select a.* from temp a
+		union all
+		select
+		       NULL AS group_id,NULL AS hos_id,NULL AS copy_code,to_char('合计') AS  year_month,NULL AS inv_code,
+		       NULL AS inv_name,NULL AS med_type_code,NULL AS med_type_name,NULL AS store_name,NULL AS inv_model,
+		       NULL AS unit_name,sum(b.amount) AS amount,NULL AS price,sum(b.amount_money) AS amount_money,NULL AS confirmer,
+		       NULL AS confirm_date,NULL AS dept_name,NULL AS dept_emp,NULL AS note,NULL AS out_no,NULL AS super_code ,NULL AS bus_type_code,NULL AS bus_type_name
+		from temp b
+		<where>
+			<if test="is_last == 0 ">
+				b.super_code = '0'
+			</if>
+		</where>
+	</select>
+</mapper>

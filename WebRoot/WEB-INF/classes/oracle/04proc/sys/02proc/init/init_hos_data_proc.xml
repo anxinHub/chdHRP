@@ -1,0 +1,342 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+
+	<sql id="init_hos_data_proc" type="proc"><![CDATA[
+	create or replace procedure init_hos_data_proc(GROUP_ID IN number,
+                                                 HOS_ID   IN number)
+  ------------------------------------------
+    --初始化数据
+    ------------------------------------------
+   is
+    V_GROUP_ID number(18, 0);
+    V_HOS_ID   number(18, 0);
+  begin
+    V_GROUP_ID := GROUP_ID;
+    V_HOS_ID   := HOS_ID;
+
+    begin
+    
+      -----------------------------------------------
+      --添加医院的时候需要初始化的数据
+      -----------------------------------------------
+    
+      insert into ACC_EMP_PAY
+        (GROUP_ID, HOS_ID, PAY_TYPE_CODE, PAY_TYPE_NAME, IS_STOP)
+        SELECT V_GROUP_ID, V_HOS_ID, PAY_TYPE_CODE, PAY_TYPE_NAME, IS_STOP
+          FROM INIT_ACC_EMP_PAY a
+         where not exists (select 1
+                  from acc_emp_pay b
+                 where b.group_id = V_GROUP_ID
+                   and b.hos_id = V_HOS_ID
+                   and a.pay_type_code = b.pay_type_code);
+      -----------------------------------------------
+      --添加医院的时候需要初始化的数据 参数表HOS_DICT_PARA
+      -----------------------------------------------
+    
+      insert into hos_dict_para
+        (GROUP_ID, HOS_ID, MOD_CODE, TABLE_CODE, TABLE_NAME, IS_NEW)
+        SELECT V_GROUP_ID, V_HOS_ID, MOD_CODE, TABLE_CODE, TABLE_NAME, IS_NEW
+          FROM init_hos_dict_para a
+         where not exists (select 1
+                  from hos_dict_para b
+                 where b.group_id = V_GROUP_ID
+                   and b.hos_id = V_HOS_ID
+                   and a.mod_code = b.mod_code
+                   and a.table_code = b.table_code);
+    
+      ----------------------------------------------
+      --添加医院的时候需要初始化的数据 财政补助内容
+      -----------------------------------------------
+    
+      insert into acc_fina_content
+        (GROUP_ID, HOS_ID, CONTENT_CODE, CONTENT_NAME)
+        SELECT V_GROUP_ID, V_HOS_ID, CONTENT_CODE, CONTENT_NAME
+          FROM init_acc_fina_content a
+         where not exists (select 1
+                  from acc_fina_content b
+                 where b.group_id = V_GROUP_ID
+                   and b.hos_id = V_HOS_ID
+                   and a.content_code = b.content_code);
+      --添加计量单位初始化
+      insert into hos_unit
+        (GROUP_ID, HOS_ID, UNIT_CODE, UNIT_NAME, IS_STOP,spell_code,wbx_code)
+        SELECT V_GROUP_ID, V_HOS_ID, UNIT_CODE, UNIT_NAME, IS_STOP,spell_code,wbx_code
+          FROM init_hos_unit a
+         where not exists (select 1
+                  from hos_unit b
+                 where b.group_id = V_GROUP_ID
+                   and b.hos_id = V_HOS_ID
+                   and a.unit_code = b.unit_code);
+    --系统编码规则表HOS_RULES
+      insert into HOS_RULES
+        (GROUP_ID,
+         HOS_ID,
+         MOD_CODE,
+         PROJ_CODE,
+         PROJ_NAME,
+         MAX_LEVEL,
+         MAX_LENGTH,
+         IS_AUTO,
+         LEVEL1,
+         LEVEL2,
+         LEVEL3,
+         LEVEL4,
+         LEVEL5,
+         LEVEL6,
+         LEVEL7,
+         LEVEL8,
+         LEVEL9,
+         LEVEL10)
+        SELECT V_GROUP_ID,
+               V_HOS_ID,
+               MOD_CODE,
+               PROJ_CODE,
+               PROJ_NAME,
+               MAX_LEVEL,
+               MAX_LENGTH,
+               IS_AUTO,
+               LEVEL1,
+               LEVEL2,
+               LEVEL3,
+               LEVEL4,
+               LEVEL5,
+               LEVEL6,
+               LEVEL7,
+               LEVEL8,
+               LEVEL9,
+               LEVEL10
+          FROM INIT_HOS_RULES a
+         where not exists (select 1
+                  from hos_rules b
+                 where b.GROUP_ID = V_GROUP_ID
+                   AND b.HOS_ID = V_HOS_ID
+                   AND a.MOD_CODE = b.MOD_CODE
+                   and a.proj_code = b.proj_code)
+                   and a.is_copy=0;
+      --系统资金来源表
+      insert into hos_source
+      (group_id, hos_id, source_id, source_code, source_name, source_attr, spell_code, wbx_code, is_stop, note)
+        SELECT V_GROUP_ID,
+               V_HOS_ID,
+               source_id, source_code, source_name, source_attr, spell_code, wbx_code, is_stop, note 
+          FROM INIT_HOS_SOURCE a
+         where not exists (select 1
+                  from hos_source b
+                 where b.GROUP_ID = V_GROUP_ID
+                   AND b.HOS_ID = V_HOS_ID
+                   AND a.source_id = b.source_id);
+                     
+                   
+/*人力资源数据复制*/
+
+/* 代码表分类 */
+INSERT INTO HR_FIIED_TAB_TYPE(GROUP_ID,HOS_ID,TYPE_FILED_CODE,TYPE_FILED_NAME,IS_CITE,NOTE)
+  SELECT V_GROUP_ID,
+         V_HOS_ID,
+         t.TYPE_FILED_CODE,
+         t.TYPE_FILED_NAME,
+         t.IS_CITE,
+         t.NOTE
+    FROM DIC_FIIED_TAB_TYPE t
+where not exists (select 1
+                  from HR_FIIED_TAB_TYPE b
+                 where b.GROUP_ID = V_GROUP_ID
+                   AND b.HOS_ID = V_HOS_ID
+                   AND t.TYPE_FILED_CODE = b.TYPE_FILED_CODE);
+/* 代码结构表 */
+insert into hr_fiied_tab_struc(GROUP_ID,HOS_ID,FIELD_TAB_CODE,TYPE_FILED_CODE,FIELD_TAB_NAME,IS_INNR,IS_CITE,NOTE)
+  select V_GROUP_ID,
+         V_HOS_ID,
+         t.FIELD_TAB_CODE,
+         t.TYPE_FILED_CODE,
+         t.FIELD_TAB_NAME,
+         t.IS_INNR,
+         t.IS_CITE,
+         t.NOTE
+    from DIC_FIIED_TAB_STRUC t
+where not exists (select 1
+                  from hr_fiied_tab_struc b
+                 where b.GROUP_ID = V_GROUP_ID
+                   AND b.HOS_ID = V_HOS_ID
+                   AND t.FIELD_TAB_CODE = b.FIELD_TAB_CODE);
+/* 代码项数据表 */
+insert into hr_fiied_data(GROUP_ID,HOS_ID,FIELD_TAB_CODE,FIELD_COL_CODE,FIELD_COL_NAME,SUPER_COL_CODE,SPELL_CODE,WBX_CODE,IS_INNR,IS_STOP,IS_LAST,NOTE)
+  select V_GROUP_ID,
+         V_HOS_ID,
+         t.field_tab_code,
+         t.field_col_code,
+         t.field_col_name,
+         t.super_col_code,
+         t.spell_code,
+         t.wbx_code,
+         t.is_innr,
+         t.is_stop,
+         t.is_last,
+         t.note
+    from DIC_FIIED_DATA t
+where not exists (select 1
+                  from hr_fiied_data b
+                 where b.GROUP_ID = V_GROUP_ID
+                   AND b.HOS_ID = V_HOS_ID
+                   AND t.FIELD_TAB_CODE = b.FIELD_TAB_CODE
+                   and t.Field_Col_Code = b.Field_Col_Code);
+/* 代码项外部引用列视图 */
+insert into hr_fiied_view(GROUP_ID,HOS_ID,FIELD_TAB_CODE,CITE_SQL, query_sql,NOTE)
+  select V_GROUP_ID,
+         V_HOS_ID,
+         t.field_tab_code,
+         t.cite_sql,
+         t.query_sql, 
+         t.note
+    from DIC_FIIED_VIEW t
+where not exists (select 1
+                  from hr_fiied_view b
+                 where b.GROUP_ID = V_GROUP_ID
+                   AND b.HOS_ID = V_HOS_ID
+                   AND t.FIELD_TAB_CODE = b.FIELD_TAB_CODE);
+
+
+/* 系统结构分类 */
+INSERT INTO HR_TAB_TYPE
+  (GROUP_ID, HOS_ID, TYPE_TAB_CODE, TYPE_TAB_NAME, NOTE)
+  SELECT V_GROUP_ID,
+         V_HOS_ID,
+         t.TYPE_TAB_CODE,
+         t.TYPE_TAB_NAME,
+         t.NOTE
+    FROM DIC_TAB_TYPE t
+where not exists (select 1
+                  from HR_TAB_TYPE b
+                 where b.GROUP_ID = V_GROUP_ID
+                   AND b.HOS_ID = V_HOS_ID
+                   AND t.type_tab_code = b.type_tab_code);
+
+/* 系统结构表 */
+INSERT INTO HR_TAB_STRUC
+  (GROUP_ID,
+   HOS_ID,
+   TAB_CODE,
+   TAB_NAME,
+   TYPE_TAB_CODE,
+   IS_INNR,
+   NOTE,SORT)
+  SELECT V_GROUP_ID,
+         V_HOS_ID,
+         t.TAB_CODE,
+         t.TAB_NAME,
+         t.TYPE_TAB_CODE,
+         t.IS_INNR,
+         t.NOTE,t.SORT_CODE
+    FROM DIC_TAB_STRUC t
+where not exists (select 1
+                  from HR_TAB_STRUC b
+                 where b.GROUP_ID = V_GROUP_ID
+                   AND b.HOS_ID = V_HOS_ID
+                   AND t.TAB_CODE = b.TAB_CODE);
+/* 系统结构列名 */
+INSERT INTO HR_COL_STRUC
+  (GROUP_ID,
+   HOS_ID,
+   TAB_CODE,
+   COL_CODE,
+   COL_NAME,
+   DATA_TYPE,
+   LENGTH,
+   PREC,
+   IS_PK,
+   IS_M,
+   IS_INNR,
+   FIELD_TAB_CODE,
+   NOTE,SORT)
+  SELECT V_GROUP_ID,
+         V_HOS_ID,
+         TAB_CODE,
+         COL_CODE,
+         COL_NAME,
+         DATA_TYPE,
+         LENGTH,
+         PREC,
+         IS_PK,
+         IS_M,
+         IS_INNR,
+         FIELD_TAB_CODE,
+         t.NOTE,t.SORT_CODE
+    FROM DIC_COL_STRUC t
+where not exists (select 1
+                  from HR_COL_STRUC b
+                 where b.GROUP_ID = V_GROUP_ID
+                   AND b.HOS_ID = V_HOS_ID
+                   AND t.TAB_CODE = b.TAB_CODE
+                   and t.col_code = b.col_code);
+                   
+
+/* 人员档案库分类 */
+insert into hr_store_type(GROUP_ID,HOS_ID,STORE_TYPE_CODE,STORE_TYPE_NAME,SPELL_CODE,WBX_CODE,NOTE)
+  select V_GROUP_ID,
+         V_HOS_ID,
+         t.store_type_code,
+         t.store_type_name,
+         t.spell_code,
+         t.wbx_code,
+         t.note
+    from DIC_STORE_TYPE t
+where not exists (select 1
+                  from hr_store_type b
+                 where b.GROUP_ID = V_GROUP_ID
+                   AND b.HOS_ID = V_HOS_ID
+                   AND t.STORE_TYPE_CODE = b.STORE_TYPE_CODE);
+/* 人员档案库数据集表 */
+insert into hr_store_tab_struc(GROUP_ID,HOS_ID,STORE_TYPE_CODE,TAB_CODE)
+  select V_GROUP_ID,
+         V_HOS_ID,
+         t.store_type_code,
+         t.tab_code
+    from DIC_STORE_TAB_STRUC t
+where not exists (select 1
+                  from hr_store_tab_struc b
+                 where b.GROUP_ID = V_GROUP_ID
+                   AND b.HOS_ID = V_HOS_ID
+                   AND t.STORE_TYPE_CODE = b.STORE_TYPE_CODE
+                   and t.Tab_Code = b.Tab_Code);
+/* 人员档案库数据列设置 */
+insert into hr_store_col_set(GROUP_ID,HOS_ID,STORE_TYPE_CODE,TAB_CODE,COL_CODE,COL_NAME_SHOW,COM_TYPE_CODE,SEQ_NO,COL_WIDTH,IS_VIEW,
+IS_VIEW_TAB,TEXT_ALIGN,FIELD_WIDTH,IS_VERIFY,IS_PK,IS_AUTO,IS_READ,IS_DEFAULT,DEFAULT_VALUE,DEFAULT_TEXT,IS_CHANGE,CHANGE_COL_CODE)
+  select V_GROUP_ID,
+         V_HOS_ID,
+         t.store_type_code,
+         t.tab_code,
+         t.col_code,
+         t.col_name_show,
+         t.com_type_code,
+         t.seq_no,
+         t.col_width,
+         t.is_view,
+         t.is_view_tab,
+         t.text_align,
+         t.field_width,
+         t.is_verify,
+         t.is_pk,
+         t.is_auto,
+         t.is_read,
+         t.is_default,
+         t.default_value,
+         t.default_text,
+         t.is_change,
+         t.change_col_code
+    from DIC_STORE_COL_SET t
+where not exists (select 1
+                  from hr_store_col_set b
+                 where b.GROUP_ID = V_GROUP_ID
+                   AND b.HOS_ID = V_HOS_ID
+                   AND t.STORE_TYPE_CODE = b.STORE_TYPE_CODE
+                   and t.Tab_Code = b.Tab_Code
+                   and t.Col_Code = b.Col_Code);
+               
+    end;
+
+  end init_hos_data_proc;
+
+	]]></sql>
+	
+</root>
+

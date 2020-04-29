@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "XYtp://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper
+	namespace="com.chd.hrp.pac.dao.basicset.warning.PactWarnSetSKXYMapper">
+	<resultMap id="pactWarnSetSKXYEntity"
+		type="com.chd.hrp.pac.entity.basicset.warning.BaseWarnEntity">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="pact_type_code" column="pact_type_code" />
+		<result property="pact_end_w" column="pact_end_w" />
+		<result property="type_name" column="type_name" />
+	</resultMap>
+
+	<select id="query" parameterType="java.util.Map"
+		resultMap="pactWarnSetSKXYEntity">
+		select
+		t.type_code as pact_type_code,w.pact_end_w,t.type_name
+		from PACT_WARN_SET_SKXY w
+		RIGHT JOIN PACT_TYPE_SKXY t ON w.PACT_TYPE = t.TYPE_CODE
+		AND w.GROUP_ID = t.GROUP_ID AND w.HOS_ID = t.HOS_ID AND w.COPY_CODE=t.COPY_CODE
+		where t.group_id=#{group_id,jdbcType=NUMERIC}
+		and t.hos_id=#{hos_id,jdbcType=NUMERIC}
+		and t.copy_code=#{copy_code,jdbcType=VARCHAR}
+		<if test="type_name != null and type_name != ''">
+			and (
+			t.type_name like '%'||#{type_name}||'%' or
+			t.type_code like '%'||#{type_name}||'%'
+			)
+		</if>
+		and exists (
+				select 1 from v_user_data_perm c where
+				t.group_id=c.group_id 
+				and t.hos_id=c.hos_id 
+				and t.type_code = c.perm_code
+				and user_id=#{user_id}
+				AND TABLE_CODE = 'PACT_TYPE_SKXY'
+				and  c.is_write = 1
+				
+	          	union all
+	          	
+	          	select 1 from v_user_data_perm d where
+				t.group_id=d.group_id 
+				and t.hos_id=d.hos_id 
+				and t.type_code = d.perm_code
+				and user_id=#{user_id}
+				AND TABLE_CODE = 'PACT_TYPE_SKXY'
+				and d.is_read = 1
+          	)
+		and t.is_stop = 0
+	</select>
+	
+	<select id="queryByCode" parameterType="java.util.Map"
+		resultType="java.lang.Integer">
+		SELECT
+		count(1)
+		FROM
+		PACT_WARN_SET_SKXY
+		where group_id=#{group_id,jdbcType=NUMERIC}
+		and hos_id=#{hos_id,jdbcType=NUMERIC}
+		and copy_code=#{copy_code,jdbcType=VARCHAR}
+		and pact_type = #{pact_type_code,jdbcType=VARCHAR}
+	</select>
+
+	<update id="update" parameterType="java.util.Map">
+		UPDATE PACT_WARN_SET_SKXY SET
+		pact_end_w = #{pact_end_w,jdbcType=NUMERIC}
+		WHERE group_id=#{group_id,jdbcType=NUMERIC}
+		and hos_id=#{hos_id,jdbcType=NUMERIC}
+		and copy_code=#{copy_code,jdbcType=VARCHAR}
+		and pact_type = #{pact_type_code,jdbcType=VARCHAR}
+	</update>
+	
+	<insert id="add" parameterType="java.util.Map">
+		INSERT INTO PACT_WARN_SET_SKXY
+		(GROUP_ID,HOS_ID,COPY_CODE,PACT_TYPE,PACT_END_W)
+		VALUES(
+		#{group_id,jdbcType=NUMERIC},
+		#{hos_id,jdbcType=NUMERIC},
+		#{copy_code,jdbcType=VARCHAR},
+		#{pact_type_code,jdbcType=VARCHAR},
+		#{pact_end_w,jdbcType=NUMERIC}
+		)
+	</insert>
+	
+	<delete id="deleteAllBatch" parameterType="java.util.List">
+		DELETE FROM PACT_WARN_SET_SKXY
+		<where>
+			<foreach collection="list" index="index" item="item" open="("
+				separator="or" close=")">
+				GROUP_ID = #{item.group_id,jdbcType=NUMERIC}
+				and HOS_ID =#{item.hos_id,jdbcType=NUMERIC}
+				AND COPY_CODE = #{item.copy_code,jdbcType=VARCHAR}
+				AND pact_type = #{item.pact_type_code,jdbcType=VARCHAR}
+			</foreach>
+		</where>
+	</delete>
+</mapper>

@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.budg.dao.control.BudgControlPaymentMapper">
+
+
+	<select id="queryBudgValueForExpenseApply" parameterType="java.util.Map" resultType="java.lang.Double">
+		select sum(amount) from  budg_exp_apply_det d left join BUDG_EXPENSE_APPLY a
+			on d.apply_id=a.apply_id
+			and d.hos_id=a.hos_id
+			and d.group_id=a.group_id
+			and d.copy_code=a.copy_code
+			and d.budg_year=a.budg_year
+		<where>                     
+			AND d.group_id = #{group_id}
+			AND d.hos_id = #{hos_id}
+			AND d.copy_code = #{copy_code}
+			AND d.budg_year = #{budg_year}
+			AND a.PAYMENT_ITEM_ID = #{payment_item_id}
+			<if test="dept_id != null and dept_id != ''">
+				a.dept_id=#{dept_id} 
+			</if>
+			<if test="month != null and month != ''">
+				d.month=#{month} 
+			</if> 	
+		</where>  
+	</select>
+	<select id="queryBudgValueForMedCost" parameterType="java.util.Map" resultType="java.lang.Double">
+		select sum(cost_budg) from budg_med_cost
+			<where>
+				and group_id = #{group_id}
+				and hos_id = #{hos_id}
+				and copy_code = #{copy_code}
+				and copy_code = #{copy_code}
+				
+			</where>
+	</select>
+	<select id="queryExeDataValueForMedCost" parameterType="java.util.Map" resultType="java.lang.Double">
+		select sum(amount) from budg_med_cost_execute
+			<where>
+				and group_id = #{group_id}
+				and hos_id = #{hos_id}
+				and copy_code = #{copy_code}
+				and subj_code = #{copy_code}		
+				<if test="cont_l != null and cont_l != '01'">
+					and dept_id=#{dept_id} 
+				</if>
+				<if test="cont_p != null and cont_p != '01'">
+					and month=#{month}
+				</if>		
+			</where>
+	</select>
+	<select id="queryBudgValueForProjYear" parameterType="java.util.Map" resultType="java.lang.Double">
+		select nvl(sum(USABLE_AMOUNT),0) from  BUDG_PROJ_YEAR d
+		<where>                     
+			AND d.group_id = #{group_id}
+			AND d.hos_id = #{hos_id}
+			AND d.copy_code = #{copy_code}
+			AND d.budg_year = #{budg_year}
+			AND d.proj_id= #{proj_id}	
+		</where>  
+	</select>
+	
+	<select id="queryUserDataValueForMain" parameterType="java.util.Map" resultType="java.util.Map">
+		select  d.group_id as "group_id",d.hos_id as "hos_id",d.copy_code as "copy_code",d.proj_id as "proj_id",sum(d.PAYMENT_AMOUNT) as "amount"
+		from BUDG_PAYMENT_APPLY  d
+		<where>                     
+			AND d.group_id = #{group_id}
+			AND d.hos_id = #{hos_id}
+			AND d.copy_code = #{copy_code}
+			AND d.apply_code in 
+			<foreach collection="applyCodes" item="id" index="index" open="(" close=")" separator=",">
+	 	 		#{id}
+			</foreach>
+		</where>  
+		group by d.group_id,d.hos_id,d.copy_code,d.proj_id 
+	</select>
+	
+	<select id="queryUserDataValueForDetail" parameterType="java.util.Map" resultType="java.util.Map">
+		select  d.PAYMENT_ITEM_ID as "payment_item_id",sum(d.PAYMENT_AMOUNT) as "amount"
+		<if test="cont_l != null and cont_l != '01'">
+			,a.dept_id as "dept_id" 
+		</if>
+		<if test="cont_p != null and cont_p != '01'">
+			,to_char(a.APPLY_DATE, 'mm') as "month"
+		</if>
+		from BUDG_PAYMENT_APPLY_DET d left join BUDG_PAYMENT_APPLY a
+			on d.apply_code=a.apply_code
+			and d.hos_id=a.hos_id
+			and d.group_id=a.group_id
+			and d.copy_code=a.copy_code
+		<where>                     
+			AND d.group_id = #{group_id}
+			AND d.hos_id = #{hos_id}
+			AND d.copy_code = #{copy_code}
+			AND d.apply_code in 
+			<foreach collection="applyCodes" item="id" index="index" open="(" close=")" separator=",">
+	 	 		#{id}
+			</foreach>
+		</where>  
+		group by d.PAYMENT_ITEM_ID 
+		<if test="cont_l != null and cont_l != '03'">
+			,a.dept_id
+		</if>
+		<if test="cont_p != null and cont_p != '03'">
+			,to_char(a.APPLY_DATE, 'mm') 
+		</if>
+	</select>
+	
+	<select id="queryExeDataValueMain"  parameterType="java.util.Map" resultType="java.lang.Double">
+	select USABLE_AMOUNT from BUDG_PROJ_YEAR
+	<where>                     
+			AND group_id = #{group_id}
+			AND hos_id = #{hos_id}
+			AND copy_code = #{copy_code}
+			AND budg_year = #{budg_year}
+			AND state=#{state}
+		</where>  
+	</select>
+	<select id="queryExeDataValueForDetail" parameterType="java.util.Map" resultType="java.lang.Double">
+		select  sum(d.borrow_amount) amount 
+		from BUDG_PAYMENT_APPLY_DET d left join BUDG_PAYMENT_APPLY a
+			on d.apply_id=a.apply_id
+			and d.hos_id=a.hos_id
+			and d.group_id=a.group_id
+			and d.copy_code=a.copy_code
+		<where>                     
+			AND d.group_id = #{group_id}
+			AND d.hos_id = #{hos_id}
+			AND d.copy_code = #{copy_code}
+			AND d.budg_year = #{budg_year}
+			AND a.state=#{state}
+			<if test="cont_l != null and cont_l != '03'">
+				AND d.dept_id=#{dept_id}
+			</if>
+			<if test="cont_p != null and cont_p != '03'">
+				AND a.apply_date=#{apply_date}
+			</if>
+		</where>  
+	</select>
+</mapper>

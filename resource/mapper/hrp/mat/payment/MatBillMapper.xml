@@ -1,0 +1,1248 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.mat.dao.payment.MatBillMapper">
+	
+	<resultMap type="java.util.Map" id="matBillMain"> 
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="bill_id" column="bill_id"/>
+		<result property="bill_code" column="bill_code"/>
+		<result property="bill_no" column="bill_no"/>
+		<result property="ori_no" column="ori_no"/> 
+		<result property="bill_type" column="bill_type"/>
+		<result property="stock_type_code" column="stock_type_code"/>
+		<result property="bill_date" column="bill_date"/>
+		<result property="store_id" column="store_id"/>
+		<result property="store_no" column="store_no"/>
+		<result property="store_code" column="store_code"/>
+		<result property="store_name" column="store_name"/>
+		<result property="sup_id" column="sup_id"/>
+		<result property="sup_no" column="sup_no"/>
+		<result property="sup_code" column="sup_code"/>
+		<result property="sup_name" column="sup_name"/>
+		<result property="pay_code" column="pay_code"/>
+		<result property="pay_term_code" column="pay_term_code"/>
+		<result property="pay_term_name" column="pay_term_name"/>
+		<result property="payable_money" column="payable_money"/>
+		<result property="bill_money" column="bill_money"/>
+		<result property="fav_money" column="fav_money"/>
+		<result property="is_init" column="is_init"/>
+		<result property="note" column="note"/>
+		<result property="bill_state" column="bill_state"/>
+		<result property="bill_state_name" column="bill_state_name"/>
+		<result property="state" column="state"/>
+		<result property="state_name" column="state_name"/>
+		<result property="maker" column="maker"/>
+		<result property="maker_name" column="maker_name"/>
+		<result property="make_date" column="make_date"/>
+		<result property="checker" column="checker"/>
+		<result property="checker_name" column="checker_name"/>
+		<result property="chk_date" column="chk_date"/>
+	</resultMap>
+	
+	<resultMap type="java.util.Map" id="matBillDetail">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="in_id" column="in_id"/>
+		<result property="in_no" column="in_no"/>
+		<result property="bus_type_name" column="bus_type_name"/>
+		<result property="in_date" column="in_date"/>
+		<result property="confirm_date" column="confirm_date"/>
+		<result property="store_id" column="store_id"/>
+		<result property="store_name" column="store_name"/>
+		<result property="sup_name" column="sup_name"/>
+		<result property="dept_name" column="dept_name"/>
+		<result property="bill_date" column="bill_date"/>
+		<result property="main_bill_no" column="main_bill_no"/>
+		<result property="bill_state" column="bill_state"/>
+		<result property="bill_state_name" column="bill_state_name"/>
+		<result property="maker_name" column="maker_name"/>
+		<result property="confirmer_name" column="confirmer_name"/>
+		<result property="in_detail_id" column="in_detail_id"/>
+		<result property="inv_id" column="inv_id"/>
+		<result property="inv_no" column="inv_no"/>
+		<result property="inv_code" column="inv_code"/>
+		<result property="inv_name" column="inv_name"/>
+		<result property="inv_model" column="inv_model"/>
+		<result property="unit_name" column="unit_name"/>
+		<result property="batch_no" column="batch_no"/>
+		<result property="bar_code" column="bar_code"/>
+		<result property="price" column="price"/>
+		<result property="amount" column="amount"/>
+		<result property="amount_money" column="amount_money"/>
+		<result property="out_amount" column="out_amount"/>
+		<result property="bill_id" column="bill_id"/>
+		<result property="bill_detail_id" column="bill_detail_id"/>
+		<result property="bill_no" column="bill_no"/>
+		<result property="not_bill_money" column="not_bill_money"/>
+		<result property="had_bill_money" column="had_bill_money"/>
+		<result property="bill_money" column="bill_money"/>
+		<result property="payable_money" column="payable_money"/>
+		<result property="check_row" column="check_row"/>
+	</resultMap>
+	
+	<!-- 获取发票ID -->
+	<select id="queryBillMainSeq" resultType="java.lang.Long" useCache="false" flushCache="true">
+		select MAT_BILL_MAIN_SEQ.nextval from dual
+	</select>
+	<!-- 获取发票明细ID -->
+	<select id="queryBillDetailSeq" resultType="java.lang.Long" useCache="false" flushCache="true">
+		select MAT_BILL_DETAIL_SEQ.nextval from dual
+	</select>
+	
+	<!-- 主查询 -->
+	<select id="queryMatBillList" parameterType="java.util.Map" resultMap="matBillMain">
+		WITH tmp_bill AS(
+			SELECT a.group_id, a.hos_id, a.copy_code, a.bill_code, a.bill_id, a.bill_no, 
+				a.bill_date, a.sup_id, a.sup_no, b.sup_name, a.bill_money, a.note, 
+				a.bill_type, a.is_init, a.bill_state, a.store_id, f.store_code, f.store_name, 
+				c.user_name as maker_name, a.make_date, d.user_name as checker_name, a.chk_date, 
+				case 
+					when nvl(e.bill_id,0) =0 then a.state 
+					else 4
+				end as state, 
+				case 
+					when nvl(e.bill_id,0) =0 then 
+						case 
+							when a.state = 1 then '未审核' 
+							when a.state = 2 then '已审核' 
+							else '记账' 
+						end 
+					else '已付款' 
+				end as state_name, 
+				case a.bill_state when 0 then '货到票未到' when 1 then '货票同到' else '未维护' end bill_state_name 
+			FROM mat_bill_main a 
+			LEFT JOIN hos_sup_dict b 
+				ON a.group_id=b.group_id 
+				AND a.hos_id=b.hos_id 
+				AND a.sup_id=b.sup_id 
+				AND a.sup_no=b.sup_no 
+			LEFT JOIN sys_user c 
+				ON a.group_id=c.group_id 
+				AND a.hos_id=c.hos_id 
+				AND a.maker=c.user_id 
+			LEFT JOIN sys_user d 
+				ON a.group_id=d.group_id 
+				AND a.hos_id=d.hos_id 
+				AND a.checker=d.user_id 
+			LEFT JOIN (
+				SELECT distinct group_id, hos_id, copy_code, bill_id 
+				FROM MAT_PAY_DETAIL
+			) e 
+				ON a.group_id = e.group_id 
+				AND a.hos_id = e.hos_id 
+				AND a.copy_code = e.copy_code 
+				AND a.bill_id = e.bill_id 
+			LEFT JOIN hos_store_dict f 
+				ON a.group_id = f.group_id 
+				AND a.hos_id = f.hos_id 
+				AND a.store_id = f.store_id 
+				AND f.is_stop = 0
+			WHERE a.group_id = #{group_id,jdbcType=INTEGER} 
+				AND a.hos_id = #{hos_id,jdbcType=INTEGER} 
+				AND a.copy_code = #{copy_code,jdbcType=VARCHAR} 
+				<if test="bill_no != null and bill_no != ''">
+				AND a.bill_no like '%${bill_no}%'
+				</if>
+				<if test="bill_type != null and bill_type != ''">
+				AND a.bill_type = #{bill_type,jdbcType=VARCHAR}
+				</if>
+				<if test="bill_date_begin != null and bill_date_begin != '' ">
+				AND a.bill_date &gt;= #{bill_date_begin,jdbcType=DATE}
+				</if>
+				<if test="bill_date_end != null and bill_date_end != ''">
+				AND a.bill_date &lt;= #{bill_date_end,jdbcType=DATE}
+				</if>
+				<if test="make_date_begin != null and make_date_begin != '' ">
+				AND a.make_date &gt;= #{make_date_begin,jdbcType=DATE} 
+				</if>
+				<if test="make_date_end !=null and make_date_end !=''">
+				AND a.make_date &lt;= #{make_date_end,jdbcType=DATE}
+				</if>
+				<if test="sup_id != null and sup_id != ''">
+				AND a.sup_id = #{sup_id,jdbcType=INTEGER}
+				</if>
+				<if test="pay_code != null and pay_code != ''">
+				AND a.pay_code = #{pay_code,jdbcType=VARCHAR}
+				</if>
+				<if test="note != null and note != ''">
+				AND a.note = #{note,jdbcType=VARCHAR}
+				</if>
+				<if test="maker != null and maker != ''">
+				AND a.maker = #{maker,jdbcType=INTEGER}
+				</if>
+				<if test="checker != null and checker != ''">
+				AND a.checker = #{checker,jdbcType=INTEGER}
+				</if>
+				<if test="is_init != null and is_init != ''">
+				AND a.is_init = #{is_init,jdbcType=INTEGER}
+				</if>
+				<if test="state != null and state != ''">
+				AND (
+					(#{state,jdbcType=INTEGER} &lt;&gt; 4 AND a.state = #{state,jdbcType=INTEGER})
+					OR
+					(#{state,jdbcType=INTEGER} = 4 AND e.bill_id is not null)
+				)
+				</if>
+				<if test="bill_state != null and bill_state != ''">
+					AND a.bill_state = #{bill_state,jdbcType=INTEGER}
+				</if>
+				<if test="store_id != null and store_id != ''">
+					AND a.store_id = #{store_id,jdbcType=INTEGER}
+				</if>
+				<if test="store_id == null or store_id == ''">
+					AND (exists (
+						select vudp.perm_code
+						from v_user_data_perm vudp
+						where vudp.group_id = #{group_id,jdbcType=INTEGER}
+							and vudp.hos_id = #{hos_id,jdbcType=INTEGER}
+							and vudp.table_code = 'HOS_STORE_DICT'
+							and vudp.is_write = 1
+							and vudp.user_id = #{user_id,jdbcType=INTEGER}
+							and a.store_id = vudp.perm_code
+					) or a.store_id is null)
+				</if>
+				<if test="set_id != null and set_id != ''">
+					AND a.store_id in (
+						SELECT store_id
+						FROM mat_store_detail msd
+						WHERE msd.group_id = #{group_id,jdbcType=INTEGER}
+						and msd.hos_id = #{hos_id,jdbcType=INTEGER}
+						and msd.set_id = #{set_id,jdbcType=INTEGER}
+					)
+				</if>
+				<if test="((in_date_begin != null and in_date_begin != '') or (in_date_end != null and in_date_end != ''))">
+					AND a.bill_id in(
+						SELECT tmp2.bill_id 
+						FROM mat_in_main tmp1 
+						LEFT JOIN mat_bill_detail tmp2 
+							ON tmp1.group_id = tmp2.group_id 
+							AND tmp1.hos_id = tmp2.hos_id 
+							AND tmp1.copy_code = tmp2.copy_code 
+							AND tmp1.in_id = tmp2.in_id 
+						WHERE tmp1.group_id = #{group_id,jdbcType=INTEGER} 
+							AND tmp1.hos_id = #{hos_id,jdbcType=INTEGER}
+							AND tmp1.copy_code = #{copy_code,jdbcType=VARCHAR}
+							<if test="store_id != null and store_id != ''">
+								AND tmp1.store_id = #{store_id,jdbcType=INTEGER}
+							</if>
+							<if test="in_date_begin != null and in_date_begin != ''">
+								AND tmp1.in_date &gt;= #{in_date_begin,jdbcType=DATE}
+							</if>
+							<if test="in_date_end != null and in_date_end != ''">
+								AND tmp1.in_date &lt;= #{in_date_end,jdbcType=DATE}
+							</if>
+					)
+				</if>
+		)
+		SELECT null group_id, null hos_id, null copy_code, '合计' bill_code, null bill_id, null bill_no, 
+			null bill_date, null sup_id, null sup_no, null sup_name, null store_id, null store_name, 
+			sum(bill_money) bill_money, null note, null bill_type, null is_init, null maker_name, 
+			null make_date, null checker_name, null chk_date, null state, null state_name, 
+			null bill_state, null bill_state_name
+		FROM tmp_bill
+		UNION ALL
+		SELECT group_id, hos_id, copy_code, bill_code, bill_id, bill_no, bill_date, 
+			sup_id, sup_no, sup_name, store_id, store_name, bill_money, note, 
+			bill_type, is_init, maker_name, make_date, checker_name, chk_date, 
+			state, state_name, bill_state, bill_state_name
+		FROM tmp_bill
+		ORDER BY bill_code desc
+	</select>
+	
+	<!-- 加载主表 -->
+	<select id="queryMatBillMainById" parameterType="java.util.Map" resultMap="matBillMain">
+		SELECT mbm.group_id, mbm.hos_id, mbm.copy_code, mbm.bill_id, 
+			mbm.bill_no, mbm.bill_code, mbm.ori_no, mbm.bill_type, 
+			mbm.stock_type_code, mbm.bill_date, mbm.bill_state, mbm.is_init, 
+			mbm.pay_code, mpt.pay_term_code, mpt.pay_term_name,  
+			mbm.sup_id, mbm.sup_no, hsd.sup_code, hsd.sup_name, 
+			mbm.store_id, hstd.store_no, hstd.store_code, hstd.store_name, 
+			mbm.payable_money, mbm.bill_money, mbm.note, mbm.state, 
+			mbm.maker, mbm.make_date, mk.user_name maker_name, 
+			mbm.checker, mbm.chk_date, ck.user_name checker_name
+		FROM mat_bill_main mbm
+		LEFT JOIN hos_sup_dict  hsd
+			ON mbm.group_id = hsd.group_id 
+			AND mbm.hos_id = hsd.hos_id 
+			AND mbm.sup_id = hsd.sup_id
+			AND hsd.is_stop = 0
+		LEFT JOIN hos_store_dict hstd 
+			ON mbm.group_id = hstd.group_id 
+			AND mbm.hos_id = hstd.hos_id 
+			AND mbm.store_id = hstd.store_id 
+			AND hstd.is_stop = 0
+		LEFT JOIN mat_pay_term mpt
+			ON mbm.group_id = mpt.group_id
+			AND mbm.hos_id = mpt.hos_id
+			AND mbm.copy_code = mpt.copy_code
+			AND mbm.pay_code = mpt.pay_term_id
+			AND mpt.is_stop = 0
+		LEFT JOIN sys_user mk 
+			ON mbm.group_id = mk.group_id 
+			AND mbm.hos_id = mk.hos_id 
+			AND mbm.maker = mk.user_id 
+		LEFT JOIN sys_user ck 
+			ON mbm.group_id = ck.group_id 
+			AND mbm.hos_id = ck.hos_id 
+			AND mbm.checker = ck.user_id 
+		WHERE mbm.group_id = #{group_id,jdbcType=INTEGER} 
+			AND mbm.hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND mbm.copy_code = #{copy_code,jdbcType=VARCHAR} 
+			AND mbm.bill_id = #{bill_id,jdbcType=INTEGER} 
+	</select>
+	
+	<!-- 根据发票号获取主表数据（一般用于判断） -->
+	<select id="queryMatBillMainByBillNo" parameterType="java.util.Map" resultMap="matBillMain">
+		SELECT group_id, hos_id, copy_code, bill_id, bill_no, bill_code, ori_no, bill_type, 
+			stock_type_code, bill_date, bill_state, is_init, pay_code, sup_id, sup_no, store_id,  
+			payable_money, bill_money, note, state, maker, make_date, checker, chk_date
+		FROM mat_bill_main 
+		WHERE group_id = #{group_id,jdbcType=INTEGER} 
+			AND hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND copy_code = #{copy_code,jdbcType=VARCHAR} 
+			AND bill_no = #{bill_no,jdbcType=VARCHAR} 
+	</select>
+	
+	<!-- 加载明细表，查询结果与方法（queryMatBillDetailByIn）保持一致 -->
+	<select id="queryMatBillDetailById" parameterType="java.util.Map" resultMap="matBillDetail">
+		WITH tmp_check_detail AS(
+			<!-- 获取发票涉及到的入库单据已付款金额（刨除本单据的付款金额） -->
+			SELECT tmp1.${id_col} in_id, tmp1.${detail_id_col} in_detail_id, sum(nvl(tmp2.bill_money, 0)) bill_money
+			FROM ${table_detail} tmp1
+			LEFT JOIN mat_bill_detail tmp2
+				ON tmp1.group_id = tmp2.group_id 
+				AND tmp1.hos_id = tmp2.hos_id 
+				AND tmp1.copy_code = tmp2.copy_code 
+				AND tmp1.${id_col} = tmp2.in_id 
+				AND tmp1.${detail_id_col} = tmp2.in_detail_id 
+				AND tmp2.bill_id &lt;&gt; #{bill_id,jdbcType=INTEGER}
+			WHERE tmp1.group_id = #{group_id,jdbcType=INTEGER}
+				AND tmp1.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND tmp1.copy_code = #{copy_code,jdbcType=VARCHAR}
+				AND tmp1.${id_col} in (
+					SELECT in_id 
+					FROM mat_bill_detail 
+					WHERE group_id = #{group_id,jdbcType=INTEGER}
+						AND hos_id = #{hos_id,jdbcType=INTEGER}
+						AND copy_code = #{copy_code,jdbcType=VARCHAR}
+						AND bill_id = #{bill_id,jdbcType=INTEGER}
+				)
+			GROUP BY tmp1.${id_col}, tmp1.${detail_id_col}
+		)
+		SELECT 
+			mim.group_id, mim.hos_id, mim.copy_code, mim.${id_col} in_id, mim.${no_col} in_no, 
+			mbt.bus_type_name, mim.confirm_date, mim.in_date, 
+			hsd.store_code || ' ' || hsd.store_name store_name, mim.store_id, 
+			hspd.sup_code || ' ' || hspd.sup_name sup_name, 
+			hdd.dept_code || ' ' || hdd.dept_name dept_name, 
+			mim.bill_no main_bill_no, mim.bill_date, mim.bill_state, 
+			case mim.bill_state when 0 then '货到票未到' when 1 then '货票同到' else '未维护' end bill_state_name, 
+			mk.user_name maker_name, ck.user_name confirmer_name, 
+			mid.${detail_id_col} in_detail_id, mid.inv_id, mid.inv_no, mivd.inv_code, 
+			mivd.inv_name, mivd.inv_model, hu.unit_name, mid.batch_no, 
+			mid.bar_code, mid.price, mid.amount, mid.amount_money, 
+			<if test="is_init == 0">mfb.out_amount, </if>
+			<if test="is_init == 1">mid.amount out_amount,</if>
+			mbd.bill_id, mbd.bill_detail_id, 
+			case when mbd.bill_no is null then mim.bill_no else mbd.bill_no end bill_no, 
+			nvl(mbd.bill_money, 0) bill_money, 
+			nvl(mbd.payable_money, 0) payable_money, 
+			mid.amount_money - nvl(tcd.bill_money, 0) not_bill_money, 
+			nvl(tcd.bill_money, 0) had_bill_money, 
+			case when mbd.bill_id = #{bill_id,jdbcType=INTEGER} then 1 else 0 end check_row
+		FROM ${table_main} mim 
+		LEFT JOIN ${table_detail} mid 
+			ON mim.group_id = mid.group_id 
+			AND mim.hos_id = mid.hos_id 
+			AND mim.copy_code = mid.copy_code 
+			AND mim.${id_col} = mid.${id_col} 
+		LEFT JOIN mat_bill_detail mbd 
+			ON mid.group_id = mbd.group_id 
+			AND mid.hos_id = mbd.hos_id 
+			AND mid.copy_code = mbd.copy_code 
+			AND mid.${id_col} = mbd.in_id 
+			AND mid.${detail_id_col} = mbd.in_detail_id 
+			AND mbd.bill_id = #{bill_id,jdbcType=INTEGER}
+		<if test="is_init == 0">
+		LEFT JOIN mat_fifo_balance mfb 
+			ON mim.group_id = mfb.group_id 
+			AND mim.hos_id = mfb.hos_id 
+			AND mim.copy_code = mfb.copy_code 
+			AND mim.store_id = mfb.store_id 
+			AND mid.inv_id = mfb.inv_id 
+			AND mid.batch_no = mfb.batch_no 
+			AND mid.batch_sn = mfb.batch_sn 
+			AND mid.bar_code = mfb.bar_code 
+			AND mid.price = mfb.price 
+		</if>
+		LEFT JOIN mat_inv_dict mivd 
+			ON mid.group_id = mivd.group_id 
+			AND mid.hos_id = mivd.hos_id 
+			AND mid.copy_code = mivd.copy_code 
+			AND mid.inv_id = mivd.inv_id 
+			AND mid.inv_no = mivd.inv_no 
+		LEFT JOIN hos_unit hu 
+			ON mid.group_id = hu.group_id 
+			AND mid.hos_id = hu.hos_id 
+			AND mivd.unit_code = hu.unit_code 
+		LEFT JOIN mat_bus_type mbt 
+			ON mim.bus_type_code = mbt.bus_type_code 
+		LEFT JOIN hos_store_dict hsd 
+			ON mim.group_id = hsd.group_id 
+			AND mim.hos_id = hsd.hos_id 
+			AND mim.store_id = hsd.store_id 
+			AND hsd.is_stop = 0
+		LEFT JOIN hos_sup_dict hspd
+			ON mim.group_id = hspd.group_id 
+			AND mim.hos_id = hspd.hos_id 
+			AND mim.sup_id = hspd.sup_id 
+			AND hspd.is_stop = 0
+		LEFT JOIN hos_dept_dict hdd 
+			ON mim.group_id = hdd.group_id 
+			AND mim.hos_id = hdd.hos_id 
+			AND mim.app_dept = hdd.dept_id 
+			AND hdd.is_stop = 0
+		LEFT JOIN hos_emp_dict hed 
+			ON mim.group_id = hed.group_id 
+			AND mim.hos_id = hed.hos_id 
+			AND mim.stocker = hed.emp_id 
+			AND hed.is_stop = 0
+		LEFT JOIN sys_user mk 
+			ON mim.group_id = mk.group_id 
+			AND mim.hos_id = mk.hos_id 
+			AND mim.maker = mk.user_id 
+		LEFT JOIN sys_user ck 
+			ON mim.group_id = ck.group_id 
+			AND mim.hos_id = ck.hos_id 
+			AND mim.confirmer = ck.user_id 
+		LEFT JOIN tmp_check_detail tcd 
+			ON mim.${id_col} = tcd.in_id 
+			AND mid.${detail_id_col} = tcd.in_detail_id 
+		WHERE mim.group_id = #{group_id,jdbcType=INTEGER}
+			AND mim.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND mim.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND mim.${id_col} in (
+				SELECT in_id 
+				FROM mat_bill_detail 
+				WHERE group_id = #{group_id,jdbcType=INTEGER}
+					AND hos_id = #{hos_id,jdbcType=INTEGER}
+					AND copy_code = #{copy_code,jdbcType=VARCHAR}
+					AND bill_id = #{bill_id,jdbcType=INTEGER}
+			)
+		ORDER BY mim.${no_col}, mid.${detail_id_col}
+	</select>
+	
+	<!-- 查询发票号是否重复 -->
+	<select id="queryBillNoExists" parameterType="java.util.Map" resultType="java.lang.Integer">
+		SELECT count(1) 
+		FROM mat_bill_main 
+		WHERE group_id = #{group_id,jdbcType=INTEGER} 
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND bill_no = #{bill_no,jdbcType=VARCHAR}
+			<if test="bill_id != null and bill_id != ''">
+			AND bill_id &lt;&gt; #{bill_id,jdbcType=INTEGER}
+			</if>
+	</select>
+	
+	<!-- 保存主表 -->
+	<insert id="addMatBillMain" parameterType="java.util.Map">
+		INSERT INTO mat_bill_main(
+			group_id, hos_id, copy_code, bill_id, bill_no, bill_code, 
+			bill_date, bill_state, store_id, sup_id, sup_no, ori_no, 
+			bill_type, stock_type_code, pay_code, note, is_init, 
+			payable_money, bill_money, maker, make_date, state
+		) 
+		VALUES (
+			#{group_id,jdbcType=INTEGER},
+			#{hos_id,jdbcType=INTEGER},
+			#{copy_code,jdbcType=VARCHAR},
+			#{bill_id,jdbcType=INTEGER},
+			#{bill_no,jdbcType=VARCHAR},
+			#{bill_code,jdbcType=VARCHAR},
+			#{bill_date,jdbcType=DATE},
+			#{bill_state,jdbcType=INTEGER},
+			#{store_id,jdbcType=INTEGER},
+			#{sup_id,jdbcType=INTEGER},
+			#{sup_no,jdbcType=INTEGER},
+			#{ori_no,jdbcType=VARCHAR},
+			#{bill_type,jdbcType=VARCHAR},
+			#{stock_type_code,jdbcType=VARCHAR},
+			#{pay_code,jdbcType=VARCHAR},
+			#{note,jdbcType=VARCHAR},
+			#{is_init,jdbcType=INTEGER},
+			0, <!-- 新增时已付款金额为0 -->
+			#{bill_money,jdbcType=NUMERIC},
+			#{maker,jdbcType=INTEGER},
+			#{make_date,jdbcType=DATE},
+			#{state,jdbcType=INTEGER}
+		)
+	</insert>
+	
+	<!-- 修改主表 -->
+	<update id="updateMatBillMainById" parameterType="java.util.Map">
+		UPDATE mat_bill_main 
+		SET 
+			bill_no = #{bill_no,jdbcType=VARCHAR}, 
+			bill_date = #{bill_date,jdbcType=DATE}, 
+			bill_state = #{bill_state,jdbcType=INTEGER},
+			store_id = #{store_id,jdbcType=INTEGER}, 
+			sup_id = #{sup_id,jdbcType=INTEGER}, 
+			sup_no = #{sup_no,jdbcType=INTEGER}, 
+			ori_no = #{ori_no,jdbcType=VARCHAR}, 
+			bill_type = #{bill_type,jdbcType=VARCHAR}, 
+			stock_type_code = #{stock_type_code,jdbcType=VARCHAR}, 
+			pay_code = #{pay_code,jdbcType=VARCHAR}, 
+			note = #{note,jdbcType=VARCHAR}, 
+			maker = #{maker,jdbcType=INTEGER}, 
+			make_date = #{make_date,jdbcType=DATE}, 
+			is_init = #{is_init,jdbcType=INTEGER}, 
+			payable_money = 0,  <!-- 付款单审核时回写该字段 -->
+			bill_money = #{bill_money,jdbcType=NUMERIC}
+		WHERE group_id =#{group_id,jdbcType=INTEGER} 
+			and hos_id =#{hos_id,jdbcType=INTEGER} 
+			and copy_code =#{copy_code,jdbcType=VARCHAR} 
+			and bill_id =#{bill_id,jdbcType=INTEGER}
+	</update>
+	
+	<!-- 保存明细表 -->
+	<insert id="addMatBillDetail" parameterType="java.util.Map">
+		INSERT INTO mat_bill_detail (
+			group_id, hos_id, copy_code, bill_id, bill_detail_id, bill_no, 
+			in_id, in_detail_id, payable_money, bill_money
+		) 
+		SELECT #{map.group_id,jdbcType=INTEGER} group_id, 
+			#{map.hos_id,jdbcType=INTEGER} hos_id, 
+			#{map.copy_code,jdbcType=VARCHAR} copy_code, 
+			#{map.bill_id,jdbcType=INTEGER} bill_id, 
+			bill_detail_id, bill_no, in_id, in_detail_id, payable_money, bill_money 
+		FROM(
+		<foreach collection="list" item="item" index="index" separator=" union all " >
+			SELECT 
+				#{item.bill_detail_id,jdbcType=INTEGER} bill_detail_id, 
+				#{item.bill_no,jdbcType=VARCHAR} bill_no, 
+				#{item.in_id,jdbcType=INTEGER} in_id, 
+				#{item.in_detail_id,jdbcType=INTEGER} in_detail_id, 
+				0 payable_money, <!-- 新增时已付款金额为0 --> 
+				#{item.bill_money,jdbcType=NUMERIC} bill_money
+			FROM DUAL
+		</foreach>
+		) t
+	</insert>
+	
+	<!-- 根据发票ID修改发票主表金额（入库单生成发票使用） -->
+	<update id="updateMatBillMoneyById" parameterType="java.util.Map">
+		UPDATE mat_bill_main 
+		SET
+			bill_money = bill_money + #{bill_money,jdbcType=NUMERIC}
+		WHERE group_id = #{group_id,jdbcType=INTEGER} 
+			AND hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND copy_code = #{copy_code,jdbcType=VARCHAR} 
+			AND bill_id = #{bill_id,jdbcType=INTEGER} 
+	</update>
+	
+	<select id="existsMatBillState" parameterType="java.util.Map" resultType="java.lang.Integer">
+		SELECT count(1) 
+		FROM mat_bill_main 
+		WHERE group_id = #{group_id,jdbcType=INTEGER} 
+			AND hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND copy_code = #{copy_code,jdbcType=VARCHAR} 
+			AND bill_id = #{bill_id,jdbcType=INTEGER} 
+			AND state = #{exists_state,jdbcType=INTEGER} 
+	</select>
+	
+	<select id="existsMatBillStateBatch" parameterType="java.util.Map" resultType="java.lang.Integer">
+		SELECT count(1) 
+		FROM mat_bill_main 
+		WHERE group_id = #{map.group_id,jdbcType=INTEGER} 
+			AND hos_id = #{map.hos_id,jdbcType=INTEGER} 
+			AND copy_code = #{map.copy_code,jdbcType=VARCHAR} 
+			AND state = #{map.exists_state,jdbcType=INTEGER} 
+			AND bill_id in (
+				<foreach collection="list" item="item" index="index" separator="union all" >
+				SELECT #{item.bill_id,jdbcType=INTEGER} bill_id FROM DUAL
+				</foreach>
+			)
+	</select>
+	
+	<!-- 删除发票 -->
+	<delete id="deleteMatBill" parameterType="java.util.Map">
+		BEGIN 
+			DELETE FROM mat_bill_detail 
+			WHERE group_id = #{map.group_id,jdbcType=INTEGER} 
+				AND hos_id = #{map.hos_id,jdbcType=INTEGER} 
+				AND copy_code = #{map.copy_code,jdbcType=VARCHAR} 
+				AND bill_id in (
+					<foreach collection="list" item="item" index="index" separator="union all" >
+					SELECT #{item.bill_id,jdbcType=INTEGER} bill_id FROM DUAL
+					</foreach>
+				);
+			
+			DELETE FROM mat_bill_main 
+			WHERE group_id = #{map.group_id,jdbcType=INTEGER} 
+			AND hos_id = #{map.hos_id,jdbcType=INTEGER} 
+			AND copy_code = #{map.copy_code,jdbcType=VARCHAR} 
+			AND bill_id in (
+				<foreach collection="list" item="item" index="index" separator="union all" >
+				SELECT #{item.bill_id,jdbcType=INTEGER} bill_id FROM DUAL
+				</foreach>
+			);
+		END; 
+	</delete>
+	
+	<!-- 删除发票明细（保存时使用） -->
+	<delete id="deleteMatBillDetailById" parameterType="java.util.Map">
+		DELETE FROM mat_bill_detail 
+		WHERE group_id = #{group_id,jdbcType=INTEGER} 
+		AND hos_id = #{hos_id,jdbcType=INTEGER} 
+		AND copy_code = #{copy_code,jdbcType=VARCHAR} 
+		AND bill_id = #{bill_id,jdbcType=INTEGER} 
+	</delete>
+	
+	<resultMap type="java.util.Map" id="matInByBillMap">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="in_id" column="in_id"/>
+		<result property="in_no" column="in_no"/>
+		<result property="bus_type_name" column="bus_type_name"/>
+		<result property="in_date" column="in_date"/>
+		<result property="confirm_date" column="confirm_date"/>
+		<result property="store_id" column="store_id"/>
+		<result property="store_name" column="store_name"/>
+		<result property="sup_name" column="sup_name"/>
+		<result property="dept_name" column="dept_name"/>
+		<result property="bill_date" column="bill_date"/>
+		<result property="main_bill_no" column="main_bill_no"/>
+		<result property="bill_state" column="bill_state"/>
+		<result property="bill_state_name" column="bill_state_name"/>
+		<result property="amount_money" column="amount_money"/>
+		<result property="not_bill_money" column="not_bill_money"/>
+		<result property="had_bill_money" column="had_bill_money"/>
+		<result property="maker_name" column="maker_name"/>
+		<result property="confirmer_name" column="confirmer_name"/>
+	</resultMap>
+	<resultMap type="java.util.Map" id="matInByBillDetailMap">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="in_id" column="in_id"/>
+		<result property="in_no" column="in_no"/>
+		<result property="in_detail_id" column="in_detail_id"/>
+		<result property="inv_id" column="inv_id"/>
+		<result property="inv_no" column="inv_no"/>
+		<result property="inv_code" column="inv_code"/>
+		<result property="inv_name" column="inv_name"/>
+		<result property="inv_model" column="inv_model"/>
+		<result property="unit_name" column="unit_name"/>
+		<result property="batch_no" column="batch_no"/>
+		<result property="bar_code" column="bar_code"/>
+		<result property="price" column="price"/>
+		<result property="amount" column="amount"/>
+		<result property="amount_money" column="amount_money"/>
+		<result property="out_amount" column="out_amount"/>
+		<result property="bill_id" column="bill_id"/>
+		<result property="bill_detail_id" column="bill_detail_id"/>
+		<result property="bill_no" column="bill_no"/>
+		<result property="not_bill_money" column="not_bill_money"/>
+		<result property="had_bill_money" column="had_bill_money"/>
+	</resultMap>
+	<!-- 查询入库单用于添加发票明细 -->
+	<select id="queryMatInByBill" parameterType="java.util.Map" resultMap="matInByBillMap">
+		SELECT mim.group_id, mim.hos_id, mim.copy_code, mim.${id_col} in_id, mim.${no_col} in_no, 
+			mbt.bus_type_name, mim.confirm_date, mim.in_date, 
+			hsd.store_code || ' ' || hsd.store_name store_name, hsd.store_id, 
+			hspd.sup_code || ' ' || hspd.sup_name sup_name, 
+			hdd.dept_code || ' ' || hdd.dept_name dept_name, 
+			mim.amount_money, 
+			mim.bill_no main_bill_no, mim.bill_date, mim.bill_state,
+			case mim.bill_state when 0 then '货到票未到' when 1 then '货票同到' else '未维护' end bill_state_name, 
+			mim.amount_money - nvl(mbm.bill_money, 0) not_bill_money, 
+			nvl(mbm.bill_money, 0) had_bill_money, 
+			mk.user_name maker_name, ck.user_name confirmer_name
+		FROM ${table_main} mim 
+		LEFT JOIN (
+			SELECT tmp2.in_id, sum(tmp2.bill_money) bill_money
+			FROM mat_bill_main tmp1
+			LEFT JOIN mat_bill_detail tmp2 
+				ON tmp1.group_id = tmp2.group_id 
+				AND tmp1.hos_id = tmp2.hos_id 
+				AND tmp1.copy_code = tmp2.copy_code 
+				AND tmp1.bill_id = tmp2.bill_id 
+			WHERE tmp1.group_id = #{group_id,jdbcType=INTEGER}
+				AND tmp1.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND tmp1.copy_code = #{copy_code,jdbcType=VARCHAR}
+				AND tmp1.sup_id = #{sup_id,jdbcType=INTEGER}
+				<if test="store_id != null and store_id != ''">
+				AND (tmp1.store_id is null or tmp1.store_id = #{store_id,jdbcType=INTEGER})
+				</if>
+				AND tmp1.is_init = #{is_init,jdbcType=INTEGER}
+			GROUP BY tmp2.in_id
+		) mbm
+			ON mim.${id_col} = mbm.in_id 
+		LEFT JOIN mat_bus_type mbt 
+			ON mim.bus_type_code = mbt.bus_type_code
+		LEFT JOIN hos_store_dict hsd 
+			ON mim.group_id = hsd.group_id 
+			AND mim.hos_id = hsd.hos_id 
+			AND mim.store_id = hsd.store_id 
+			AND hsd.is_stop = 0
+		LEFT JOIN hos_sup_dict hspd
+			ON mim.group_id = hspd.group_id 
+			AND mim.hos_id = hspd.hos_id 
+			AND mim.sup_id = hspd.sup_id 
+			AND hspd.is_stop = 0
+		LEFT JOIN hos_dept_dict hdd 
+			ON mim.group_id = hdd.group_id 
+			AND mim.hos_id = hdd.hos_id 
+			AND mim.app_dept = hdd.dept_id 
+			AND hdd.is_stop = 0
+		LEFT JOIN hos_emp_dict hed 
+			ON mim.group_id = hed.group_id 
+			AND mim.hos_id = hed.hos_id 
+			AND mim.stocker = hed.emp_id 
+			AND hed.is_stop = 0
+		LEFT JOIN sys_user mk 
+			ON mim.group_id = mk.group_id 
+			AND mim.hos_id = mk.hos_id 
+			AND mim.maker = mk.user_id 
+		LEFT JOIN sys_user ck 
+			ON mim.group_id = ck.group_id 
+			AND mim.hos_id = ck.hos_id 
+			AND mim.confirmer = ck.user_id 
+		WHERE mim.group_id = #{group_id,jdbcType=INTEGER}
+			AND mim.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND mim.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND mim.sup_id = #{sup_id,jdbcType=INTEGER}
+			AND mim.state = 3
+			<if test="in_date_begin != null and in_date_begin != ''">
+			AND mim.in_date &gt;= #{in_date_begin,jdbcType=DATE}
+			</if>
+			<if test="in_date_end != null and in_date_end != ''">
+			AND mim.in_date &lt;= #{in_date_end,jdbcType=DATE}
+			</if>
+			<if test="bus_type_code != null and bus_type_code != '' and bus_type_code != '0'">
+			AND mim.bus_type_code = #{bus_type_code,jdbcType=VARCHAR}
+			</if>
+			<if test="store_id != null and store_id != ''">
+			AND mim.store_id = #{store_id,jdbcType=INTEGER}
+			</if>
+			<if test="store_id == null or store_id == ''">
+			AND exists(
+				select vudp.perm_code
+				from v_user_data_perm vudp
+				where vudp.group_id = #{group_id,jdbcType=INTEGER}
+					and vudp.hos_id = #{hos_id,jdbcType=INTEGER}
+					and vudp.table_code = 'HOS_STORE_DICT'
+					and vudp.is_write = 1
+					and vudp.user_id = #{user_id,jdbcType=INTEGER}
+					and mim.store_id = vudp.perm_code
+			)
+			</if>
+			<if test="dept_id != null and dept_id != ''">
+			AND mim.app_dept = #{dept_id,jdbcType=INTEGER}
+			</if>
+			<if test="stocker != null and stocker != ''">
+			AND mim.stocker = #{stocker,jdbcType=INTEGER}
+			</if>
+			<if test="in_no != null and in_no != ''">
+			AND mim.${no_col} like #{in_no,jdbcType=VARCHAR}||'%'
+			</if>
+			<if test="brief != null and brief != ''">
+			AND mim.brief like '%'||#{brief,jdbcType=VARCHAR}||'%'
+			</if>
+			<if test="bill_state != null and bill_state != ''">
+			AND mim.bill_state = #{bill_state,jdbcType=INTEGER}
+			</if>
+			<!-- 过滤单据已有(已选)的入库单 -->
+			<if test="exists_ids != null and exists_ids != ''">
+			AND mim.${id_col} not in(${exists_ids})
+			</if>
+			<!-- 只查询未开票金额不等于0的单据（以防出现重复发票） -->
+			AND mim.amount_money - nvl(mbm.bill_money, 0) &lt;&gt; 0 
+	</select>
+	<!-- 查询入库单明细 -->
+	<select id="queryMatInDetailByBill" parameterType="java.util.Map" resultMap="matInByBillDetailMap">
+		WITH tmp_check_detail AS(
+			<!-- 获取入库单据已付款金额 -->
+			SELECT tmp1.${id_col} in_id, tmp1.${detail_id_col} in_detail_id, sum(nvl(tmp2.bill_money, 0)) bill_money
+			FROM ${table_detail} tmp1
+			LEFT JOIN mat_bill_detail tmp2
+				ON tmp1.group_id = tmp2.group_id 
+				AND tmp1.hos_id = tmp2.hos_id 
+				AND tmp1.copy_code = tmp2.copy_code 
+				AND tmp1.${id_col} = tmp2.in_id 
+				AND tmp1.${detail_id_col} = tmp2.in_detail_id 
+			WHERE tmp1.group_id = #{group_id,jdbcType=INTEGER}
+				AND tmp1.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND tmp1.copy_code = #{copy_code,jdbcType=VARCHAR}
+				AND tmp1.${id_col} = #{in_id,jdbcType=INTEGER} 
+			GROUP BY tmp1.${id_col}, tmp1.${detail_id_col}
+		)
+		SELECT mid.group_id, mid.hos_id, mid.copy_code, mid.${id_col} in_id, mid.${no_col} in_no, 
+			mid.${detail_id_col} in_detail_id, mid.inv_id, mid.inv_no, mivd.inv_code, mivd.inv_name, 
+			mivd.inv_model, hu.unit_name, mid.batch_no, mid.bar_code, mid.price, 
+			mid.amount, mid.amount_money, mim.bill_no, 
+			<if test="is_init == 0">mfb.out_amount, </if>
+			<if test="is_init == 1">mid.amount out_amount,</if>
+			mid.amount_money - nvl(tcd.bill_money, 0) not_bill_money, 
+			nvl(tcd.bill_money, 0) had_bill_money 
+		FROM ${table_main} mim 
+		LEFT JOIN ${table_detail} mid 
+			ON mim.group_id = mid.group_id 
+			AND mim.hos_id = mid.hos_id 
+			AND mim.copy_code = mid.copy_code 
+			AND mim.${id_col} = mid.${id_col} 
+		LEFT JOIN tmp_check_detail tcd 
+			ON mid.${id_col} = tcd.in_id 
+			AND mid.${detail_id_col} = tcd.in_detail_id 
+		<if test="is_init == 0">
+		LEFT JOIN mat_fifo_balance mfb 
+			ON mim.group_id = mfb.group_id 
+			AND mim.hos_id = mfb.hos_id 
+			AND mim.copy_code = mfb.copy_code 
+			AND mim.store_id = mfb.store_id 
+			AND mid.inv_id = mfb.inv_id 
+			AND mid.batch_no = mfb.batch_no 
+			AND mid.batch_sn = mfb.batch_sn 
+			AND mid.bar_code = mfb.bar_code 
+			AND mid.price = mfb.price 
+		</if>
+		LEFT JOIN mat_inv_dict mivd 
+			ON mid.group_id = mivd.group_id 
+			AND mid.hos_id = mivd.hos_id 
+			AND mid.copy_code = mivd.copy_code 
+			AND mid.inv_id = mivd.inv_id 
+			AND mid.inv_no = mivd.inv_no 
+		LEFT JOIN hos_unit hu 
+			ON mid.group_id = hu.group_id 
+			AND mid.hos_id = hu.hos_id 
+			AND mivd.unit_code = hu.unit_code 
+		WHERE mim.group_id = #{group_id,jdbcType=INTEGER}
+			AND mim.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND mim.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND mim.${id_col} = #{in_id,jdbcType=INTEGER}
+		ORDER BY mid.${detail_id_col} 
+	</select>
+	
+	<!-- 根据所选入库单生成采购发票明细，查询结果与方法（queryMatBillDetailById）保持一致 -->
+	<select id="queryMatBillDetailByIn" parameterType="java.util.Map" resultMap="matBillDetail">
+		WITH tmp_check_detail AS(
+			<!-- 获取入库单据已付款金额 -->
+			SELECT tmp1.${map.col_id} in_id, tmp1.${map.detail_id_col} in_detail_id, sum(nvl(tmp2.bill_money, 0)) bill_money
+			FROM ${map.table_detail} tmp1
+			LEFT JOIN mat_bill_detail tmp2
+				ON tmp1.group_id = tmp2.group_id 
+				AND tmp1.hos_id = tmp2.hos_id 
+				AND tmp1.copy_code = tmp2.copy_code 
+				AND tmp1.${map.id_col} = tmp2.in_id 
+				AND tmp1.${map.detail_id_col} = tmp2.in_detail_id 
+			WHERE tmp1.group_id = #{map.group_id,jdbcType=INTEGER}
+				AND tmp1.hos_id = #{map.hos_id,jdbcType=INTEGER}
+				AND tmp1.copy_code = #{map.copy_code,jdbcType=VARCHAR}
+				AND tmp1.${map.id_col} in (
+					<foreach collection="list" item="item" index="index" separator="union all" >
+					SELECT #{item.in_id,jdbcType=INTEGER} in_id FROM DUAL
+					</foreach>
+				)
+			GROUP BY tmp1.${map.id_col}, tmp1.${map.detail_id_col}
+		)
+		SELECT 
+			mim.group_id, mim.hos_id, mim.copy_code, mim.${map.id_col} in_id, mim.${map.no_col} in_no, 
+			mbt.bus_type_name, mim.confirm_date, mim.in_date, 
+			hsd.store_code || ' ' || hsd.store_name store_name, mim.store_id, 
+			hspd.sup_code || ' ' || hspd.sup_name sup_name, 
+			hdd.dept_code || ' ' || hdd.dept_name dept_name, 
+			mim.bill_no main_bill_no, mim.bill_date, mim.bill_state, 
+			case mim.bill_state when 0 then '货到票未到' when 1 then '货票同到' else '未维护' end bill_state_name, 
+			mk.user_name maker_name, ck.user_name confirmer_name, 
+			mid.${map.detail_id_col} in_detail_id, mid.inv_id, mid.inv_no, mivd.inv_code, 
+			mivd.inv_name, mivd.inv_model, hu.unit_name, mid.batch_no, 
+			mid.bar_code, mid.price, mid.amount, mid.amount_money, mim.bill_no,  
+			<if test="map.is_init == 0">mfb.out_amount, </if>
+			<if test="map.is_init == 1">mid.amount out_amount,</if>
+			case when mid.amount_money - nvl(tcd.bill_money, 0) > 0 then 1 else 0 end check_row, 
+			case 
+				when mid.amount_money - nvl(tcd.bill_money, 0) > 0 
+					then mid.amount_money - nvl(tcd.bill_money, 0)
+				else 0 
+			end bill_money, 
+			mid.amount_money - nvl(tcd.bill_money, 0) not_bill_money, 
+			nvl(tcd.bill_money, 0) had_bill_money 
+		FROM ${map.table_main} mim 
+		LEFT JOIN ${map.table_detail} mid 
+			ON mim.group_id = mid.group_id 
+			AND mim.hos_id = mid.hos_id 
+			AND mim.copy_code = mid.copy_code 
+			AND mim.${map.id_col} = mid.${map.id_col} 
+		LEFT JOIN tmp_check_detail tcd 
+			ON mid.${map.id_col} = tcd.in_id 
+			AND mid.${map.detail_id_col} = tcd.in_detail_id 
+		<if test="map.is_init == 0">
+		LEFT JOIN mat_fifo_balance mfb 
+			ON mim.group_id = mfb.group_id 
+			AND mim.hos_id = mfb.hos_id 
+			AND mim.copy_code = mfb.copy_code 
+			AND mim.store_id = mfb.store_id 
+			AND mid.inv_id = mfb.inv_id 
+			AND mid.batch_no = mfb.batch_no 
+			AND mid.batch_sn = mfb.batch_sn 
+			AND mid.bar_code = mfb.bar_code 
+			AND mid.price = mfb.price 
+		</if>
+		LEFT JOIN mat_inv_dict mivd 
+			ON mid.group_id = mivd.group_id 
+			AND mid.hos_id = mivd.hos_id 
+			AND mid.copy_code = mivd.copy_code 
+			AND mid.inv_id = mivd.inv_id 
+			AND mid.inv_no = mivd.inv_no 
+		LEFT JOIN hos_unit hu 
+			ON mid.group_id = hu.group_id 
+			AND mid.hos_id = hu.hos_id 
+			AND mivd.unit_code = hu.unit_code 
+		LEFT JOIN mat_bus_type mbt 
+			ON mim.bus_type_code = mbt.bus_type_code 
+		LEFT JOIN hos_store_dict hsd 
+			ON mim.group_id = hsd.group_id 
+			AND mim.hos_id = hsd.hos_id 
+			AND mim.store_id = hsd.store_id 
+			AND hsd.is_stop = 0
+		LEFT JOIN hos_sup_dict hspd
+			ON mim.group_id = hspd.group_id 
+			AND mim.hos_id = hspd.hos_id 
+			AND mim.sup_id = hspd.sup_id 
+			AND hspd.is_stop = 0
+		LEFT JOIN hos_dept_dict hdd 
+			ON mim.group_id = hdd.group_id 
+			AND mim.hos_id = hdd.hos_id 
+			AND mim.app_dept = hdd.dept_id 
+			AND hdd.is_stop = 0
+		LEFT JOIN hos_emp_dict hed 
+			ON mim.group_id = hed.group_id 
+			AND mim.hos_id = hed.hos_id 
+			AND mim.stocker = hed.emp_id 
+			AND hed.is_stop = 0
+		LEFT JOIN sys_user mk 
+			ON mim.group_id = mk.group_id 
+			AND mim.hos_id = mk.hos_id 
+			AND mim.maker = mk.user_id 
+		LEFT JOIN sys_user ck 
+			ON mim.group_id = ck.group_id 
+			AND mim.hos_id = ck.hos_id 
+			AND mim.confirmer = ck.user_id 
+		WHERE mim.group_id = #{map.group_id,jdbcType=INTEGER}
+			AND mim.hos_id = #{map.hos_id,jdbcType=INTEGER}
+			AND mim.copy_code = #{map.copy_code,jdbcType=VARCHAR}
+			AND mim.${map.id_col} in (
+				<foreach collection="list" item="item" index="index" separator="union all" >
+				SELECT #{item.in_id,jdbcType=INTEGER} in_id FROM DUAL
+				</foreach>
+			)
+		ORDER BY mid.${map.detail_id_col} 
+	</select>
+	
+	<!-- 审核、消审 -->
+	<update id="updateMatBillState" parameterType="java.util.Map">
+		UPDATE mat_bill_main 
+		SET 
+			checker = #{map.checker,jdbcType=INTEGER},
+			chk_date = #{map.chk_date,jdbcType=DATE},
+			state = #{map.state,jdbcType=INTEGER}
+		WHERE group_id = #{map.group_id,jdbcType=INTEGER} 
+			AND hos_id = #{map.hos_id,jdbcType=INTEGER} 
+			AND copy_code = #{map.copy_code,jdbcType=VARCHAR} 
+			AND bill_id in (
+				<foreach collection="list" item="item" index="index" separator="union all" >
+				SELECT #{item.bill_id,jdbcType=INTEGER} bill_id FROM DUAL
+				</foreach>
+			)
+	</update>
+	
+	<!-- 批量修改备注 -->
+	<update id="updateMatBillNote" parameterType="java.util.Map">
+		UPDATE mat_bill_main 
+		SET 
+			note = #{map.note,jdbcType=VARCHAR}
+		WHERE group_id = #{map.group_id,jdbcType=INTEGER} 
+			AND hos_id = #{map.hos_id,jdbcType=INTEGER} 
+			AND copy_code = #{map.copy_code,jdbcType=VARCHAR} 
+			AND bill_id in (
+				<foreach collection="list" item="item" index="index" separator="union all" >
+				SELECT #{item.bill_id,jdbcType=INTEGER} bill_id FROM DUAL
+				</foreach>
+			)
+	</update>
+	
+	<!-- 判断发票是否已生成凭证 -->
+	<select id="existsVouchByMatBill" parameterType="java.util.Map" resultType="java.lang.String">
+		SELECT to_char(wm_concat(a.bill_no)) 
+		FROM mat_bill_main a 
+		LEFT JOIN acc_busi_log_0406 b 
+			ON a.group_id = b.group_id 
+			AND a.hos_id = b.hos_id 
+			AND a.copy_code = b.copy_code 
+			AND a.bill_id = b.business_no
+		WHERE a.group_id = #{map.group_id,jdbcType=INTEGER} 
+			AND a.hos_id = #{map.hos_id,jdbcType=INTEGER} 
+			AND a.copy_code = #{map.copy_code,jdbcType=VARCHAR} 
+			AND a.bill_id in (
+				<foreach collection="list" item="item" index="index" separator="union all" >
+				SELECT #{item.bill_id,jdbcType=INTEGER} bill_id FROM DUAL
+				</foreach>
+			)
+			AND b.vouch_id is not null 
+			AND rownum &lt; 50
+	</select>
+	
+	<!-- 判断入库单是否已生成凭证 -->
+	<select id="existsVouchByMatIn" parameterType="java.util.Map" resultType="java.lang.String">
+		SELECT to_char(wm_concat(a.in_no)) 
+		FROM mat_in_main a 
+		LEFT JOIN acc_busi_log_0401 b 
+			ON a.group_id = b.group_id 
+			AND a.hos_id = b.hos_id 
+			AND a.copy_code = b.copy_code 
+			AND a.in_id = b.business_no
+		WHERE a.group_id = #{map.group_id,jdbcType=INTEGER} 
+			AND a.hos_id = #{map.hos_id,jdbcType=INTEGER} 
+			AND a.copy_code = #{map.copy_code,jdbcType=VARCHAR} 
+			AND a.bill_state &lt;&gt; #{map.bill_state,jdbcType=INTEGER} 
+			AND a.in_id in (
+				<foreach collection="list" item="item" index="index" separator="union all" >
+				SELECT #{item.in_id,jdbcType=INTEGER} in_id FROM DUAL
+				</foreach>
+			)
+			AND b.vouch_id is not null 
+			AND rownum &lt; 50
+	</select>
+	
+	<!-- 根据主表主键查询发票所设计到的入库单 -->
+	<select id="queryMatInIdByBillId" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT DISTINCT in_id "in_id"
+		FROM mat_bill_detail 
+		WHERE group_id = #{map.group_id,jdbcType=INTEGER} 
+			AND hos_id = #{map.hos_id,jdbcType=INTEGER} 
+			AND copy_code = #{map.copy_code,jdbcType=VARCHAR} 
+			AND bill_id in (
+				<foreach collection="list" item="item" index="index" separator="union all" >
+				SELECT #{item.bill_id,jdbcType=INTEGER} bill_id FROM DUAL
+				</foreach>
+			)
+	</select>
+	
+	<!-- 发票号和发票日期更新到对应入库单 -->
+	<update id="updateMatInMainInvoiceBatch" parameterType="java.util.Map">
+		UPDATE ${map.table_main} 
+		SET <!-- 采购发票回写入库单规则：不更改入库单原有的发票号 -->
+			<if test="map.updateMatIn == null or map.updateMatIn != 1">
+			bill_no = case when bill_no is null then #{map.bill_no,jdbcType=VARCHAR} else bill_no end, 
+			bill_date = case when bill_date is null then #{map.bill_date,jdbcType=DATE} else bill_date end, 
+			</if>
+			<if test="map.updateMatIn != null and map.updateMatIn == 1">
+			bill_no = #{map.bill_no,jdbcType=VARCHAR}, 
+			bill_date = #{map.bill_date,jdbcType=DATE}, 
+			</if>
+			bill_state = #{map.bill_state,jdbcType=INTEGER}
+		WHERE  group_id = #{map.group_id,jdbcType=INTEGER}
+			AND hos_id = #{map.hos_id,jdbcType=INTEGER}
+			AND copy_code = #{map.copy_code,jdbcType=VARCHAR}
+			AND ${map.id_col} in (
+				<foreach collection="list" item="item" index="index" separator="union all" >
+				SELECT #{item.in_id,jdbcType=INTEGER} in_id FROM DUAL
+				</foreach>
+			)
+	</update>
+	
+	<!-- 发票号和发票日期更新到对应专购品 -->
+	<update id="updateMatSpecialMainInvoiceBatch" parameterType="java.util.Map">
+		UPDATE mat_special_main 
+		SET 
+			<if test="map.updateMatIn == null or map.updateMatIn != 1">
+			bill_no = case when bill_no is null then #{map.bill_no,jdbcType=VARCHAR} else bill_no end, 
+			bill_date = case when bill_date is null then #{map.bill_date,jdbcType=DATE} else bill_date end
+			</if>
+			<if test="map.updateMatIn != null and map.updateMatIn == 1">
+			bill_no = #{map.bill_no,jdbcType=VARCHAR}, 
+			bill_date = #{map.bill_date,jdbcType=DATE}
+			</if>
+			<!-- , bill_state = #{map.bill_state,jdbcType=INTEGER} -->
+		WHERE  group_id = #{map.group_id,jdbcType=INTEGER}
+			AND hos_id = #{map.hos_id,jdbcType=INTEGER}
+			AND copy_code = #{map.copy_code,jdbcType=VARCHAR}
+			AND special_id in ( 
+				SELECT special_id 
+				FROM mat_special_rela 
+				WHERE group_id = #{map.group_id,jdbcType=INTEGER}
+					AND hos_id = #{map.hos_id,jdbcType=INTEGER}
+					AND copy_code = #{map.copy_code,jdbcType=VARCHAR}
+					AND in_id in (
+						<foreach collection="list" item="item" index="index" separator="union all" >
+						SELECT #{item.in_id,jdbcType=INTEGER} in_id FROM DUAL
+						</foreach>
+					)
+			) 
+	</update>
+	
+	<!-- 入库主表模板打印 -->
+	<select id="queryMatBillMainPrintByTemlate" parameterType="java.util.Map" resultType="java.util.Map" >
+		select  
+			mbm.bill_id as id, 
+			mbm.bill_no,
+		    mbm.ori_no,
+		    mbm.bill_code,
+			mbm.BILL_TYPE  ,
+			mbm.STOCK_TYPE_CODE,
+			to_char(mbm.BILL_DATE, 'yyyy-MM-dd hh24:mi:ss') bill_date,
+			hsd.sup_code,
+			hsd.sup_name,
+			mbm.pay_code,
+			mbm.payable_money payable_money_main,
+			mbm.bill_money bill_money_main,
+			u.user_name maker,
+			to_char(mbm.make_date, 'yyyy-MM-dd hh24:mi:ss') make_date,
+			c.user_name checker,
+			to_char(mbm.chk_date, 'yyyy-MM-dd hh24:mi:ss') chk_date,
+			mbm.note
+		from  MAT_BILL_MAIN mbm  
+		left join HOS_SUP_DICT hsd 
+			on mbm.group_id=hsd.group_id 
+			and mbm.hos_id=hsd.hos_id 
+			and mbm.sup_id=hsd.sup_id 
+			and mbm.sup_no = hsd.sup_no
+		left join sys_user u 
+			on mbm.maker=u.user_id 
+			and mbm.group_id=u.group_id 
+			and mbm.hos_id=u.hos_id 
+			and mbm.copy_code=u.copy_code
+		left join sys_user c 
+			on mbm.maker=c.user_id 
+			and mbm.group_id=c.group_id 
+			and mbm.hos_id=c.hos_id 
+			and mbm.copy_code=c.copy_code
+		where mbm.group_id = #{group_id,jdbcType=INTEGER} 
+			and mbm.hos_id = #{hos_id,jdbcType=INTEGER} 
+			and mbm.copy_code = #{copy_code,jdbcType=VARCHAR}
+			and mbm.bill_id=#{bill_id,jdbcType=INTEGER}
+	</select>
+	<!-- 入库主表模板打印批量 -->
+	<select id="queryMatBillMainPrintByTemlateBatch" parameterType="java.util.Map" resultType="java.util.Map" >
+		select 
+			mbm.bill_id as id, 
+			mbm.bill_no,
+			mbm.ori_no,
+			mbm.bill_code,
+			case mbm.BILL_TYPE
+				when '1' then '普通发票'
+				when '2' then '红冲发票'
+				else '未维护'
+			end as BILL_TYPE,
+			mbm.STOCK_TYPE_CODE,
+			to_char(mbm.BILL_DATE, 'yyyy-MM-dd hh24:mi:ss') bill_date,
+			hsd.sup_code,
+			hsd.sup_name,
+			mbm.pay_code,
+			mbm.payable_money payable_money_main,
+			mbm.bill_money bill_money_main,
+			u.user_name maker,
+			to_char(mbm.make_date, 'yyyy-MM-dd hh24:mi:ss') make_date,
+			c.user_name checker,
+			to_char(mbm.chk_date, 'yyyy-MM-dd hh24:mi:ss') chk_date,
+			mbm.note,
+			f.store_name ad store_code
+		from  MAT_BILL_MAIN mbm  
+		left join HOS_SUP_DICT hsd 
+			on mbm.group_id=hsd.group_id 
+			and mbm.hos_id=hsd.hos_id 
+			and mbm.sup_id=hsd.sup_id
+		left join sys_user u
+			on mbm.maker=u.user_id
+			and mbm.group_id=u.group_id
+			and mbm.hos_id=u.hos_id
+			and mbm.copy_code=u.copy_code
+		left join sys_user c
+			on mbm.maker=c.user_id
+			and mbm.group_id=c.group_id
+			and mbm.hos_id=c.hos_id
+			and mbm.copy_code=c.copy_code
+		left join hos_store_dict f on mbm.group_id = f.group_id
+			and mbm.hos_id = f.hos_id
+			and mbm.store_id = f.store_id
+			and f.is_stop = 0
+		where mbm.group_id = #{group_id,jdbcType=INTEGER}
+			and mbm.hos_id = #{hos_id,jdbcType=INTEGER}
+			and mbm.copy_code = #{copy_code,jdbcType=VARCHAR}
+			and mbm.bill_id in  (${paraId}) 
+	</select>
+	
+	<!-- 入库明细表模板打印 -->
+	<select id="queryMatBillDetailPrintByTemlate" parameterType="java.util.Map" resultType="java.util.Map" >
+		select  
+			mbd.bill_id as id, 
+			mim.in_no,
+			hsd.store_name,
+			mim.brief, 
+			to_char(mbm.bill_date, 'yyyy-MM-dd hh24:mi:ss') bill_date, 
+			mbd.payable_money, 
+			mbd.bill_money,
+			mim.in_date,
+			hspd.sup_name as sup_name,
+			ck.user_name as confirmer_name,
+			mfb.out_amount,
+			mid.amount, 
+			case mim.bill_state
+			    when 0 then '货到票未到'
+			    when 1 then '货票同到'
+			    else '未维护'
+			end as bill_state_name
+		from MAT_BILL_DETAIL  mbd
+		left join MAT_BILL_MAIN mbm 
+			on mbd.group_id=mbm.group_id 
+			and mbd.hos_id=mbm.hos_id 
+			and mbd.copy_code=mbm.copy_code 
+			and mbd.bill_id =mbm.bill_id
+		left join MAT_IN_MAIN mim 
+			on mbd.group_id=mim.group_id 
+			and mbd.hos_id=mim.hos_id 
+			and mbd.copy_code=mim.copy_code 
+			and mbd.in_id=mim.in_id 
+		left join hos_store_dict hsd 
+			on mbd.group_id=hsd.group_id 
+			and mbd.hos_id=hsd.hos_id 
+			and mim.store_id =hsd.store_id
+		left join hos_sup_dict hspd on mbm.group_id = hspd.group_id
+			and mbm.hos_id = hspd.hos_id
+			and mbm.sup_id = hspd.sup_id
+			and hspd.is_stop = 0 
+		left join sys_user ck on mim.group_id = ck.group_id
+			and mim.hos_id = ck.hos_id
+			and mim.confirmer = ck.user_id 	
+		left join mat_in_detail mid on mim.group_id = mid.group_id
+			and mim.hos_id = mid.hos_id
+			and mim.copy_code = mid.copy_code
+			and mim.in_id = mid.in_id 
+		left join mat_fifo_balance mfb on mim.group_id = mfb.group_id
+			and mim.hos_id = mfb.hos_id
+			and mim.copy_code = mfb.copy_code
+			and mim.store_id = mfb.store_id
+			and mid.inv_id = mfb.inv_id
+			and mid.batch_no = mfb.batch_no
+			and mid.batch_sn = mfb.batch_sn
+			and mid.bar_code = mfb.bar_code
+			and mid.price = mfb.price 
+		where mbd.group_id = #{group_id,jdbcType=INTEGER} 
+			and mbd.hos_id = #{hos_id,jdbcType=INTEGER} 
+			and mbd.copy_code = #{copy_code,jdbcType=VARCHAR}
+			<!--    and mbd.in_id =  #{in_id,jdbcType=INTEGER} -->
+			<if test="p_num ==1">
+				and mbm.bill_id in (${paraId})
+			</if>
+			<if test="p_num ==0">
+				and  mbm.bill_id=#{bill_id,jdbcType=INTEGER}
+			</if>
+		order by mbm.bill_id
+	</select>
+</mapper>
+

@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.mat.dao.affi.query.MatAffiStockRoutingMapper"> 
+
+	<resultMap id="matAffiStockRoutingMap" type="java.util.Map">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="store_code" column="store_code" />
+		<result property="store_name" column="store_name" />
+		<result property="inv_code" column="inv_code" />
+		<result property="inv_name" column="inv_name" />
+		<result property="inv_model" column="inv_model" />
+		<result property="fac_name" column="fac_name" />
+		<result property="unit_name" column="unit_name" />
+		<result property="batch_no" column="batch_no" />
+		<result property="price" column="price" />
+		<result property="amount" column="amount" />
+		<result property="money" column="money" />
+		<result property="bid_code" column="bid_code" />
+		<result property="sup_id" column="sup_id" />
+		<result property="sup_name" column="sup_name" />
+		<result property="is_com" column="is_com" />
+		<result property="is_zero_store" column="is_zero_store" />
+	</resultMap>
+
+	<!-- 代销-库存分布查询 -->
+	<!-- liusiqi 18-04-11 sup从入库主表中获取(原来关联mat_inv_sup) -->
+	<select id="queryMatAffiStockRouting" parameterType="java.util.Map" resultMap="matAffiStockRoutingMap">
+		with t_tmp as (
+				select
+					<if test="c_store != null and c_store != '' ">
+					    hsd.store_code,hsd.store_name,
+					</if>
+					mid.bid_code,mid.inv_code,mid.inv_name,mid.inv_model,hfd.fac_name,
+					hu.unit_name,hsd2.sup_name,
+					<if test="c_batch_no != null and c_batch_no != '' ">
+					    mab.batch_no,
+					</if>
+					nvl(mab.price, 0.00) AS price, 
+			        SUM(nvl(mab.in_amount, 0.00) - nvl(mab.out_amount, 0.00)) AS amount, 
+			        SUM(nvl(mab.in_money, 0.00) - nvl(mab.out_money, 0.00)) AS money
+			   from mat_affi_batch mab
+			   left join mat_inv_dict mid 
+					 on mid.group_id = mab.group_id 
+					and mab.hos_id = mid.hos_id
+					and mab.inv_id = mid.inv_id
+					and mid.is_stop=0
+			<if test="c_store != null and c_store != '' ">
+			   left join hos_store_dict hsd 
+					 on hsd.group_id = mab.group_id
+					and hsd.hos_id = mab.hos_id 
+					and hsd.store_id = mab.store_id
+					and hsd.is_stop=0
+			</if>
+				left join mat_affi_in_detail maid
+			        on maid.group_id=mab.group_id
+			        and maid.hos_id=mab.hos_id
+			        and maid.copy_code=mab.copy_code
+			        and maid.inv_id=mab.inv_id
+			        and maid.batch_no=mab.batch_no
+			        and maid.batch_sn=mab.batch_sn
+			        and maid.bar_code=mab.bar_code
+			        and maid.price=mab.price
+		        left join mat_affi_in mai
+			        on mai.group_id=maid.group_id
+			        and mai.hos_id=maid.hos_id
+			        and mai.copy_code=maid.copy_code
+			        and mai.in_id=maid.in_id
+		        left join hos_sup hsd2
+			        on hsd2.group_id=mai.group_id
+			        and hsd2.hos_id=mai.hos_id
+			        and hsd2.sup_id=mai.sup_id
+				left join hos_unit hu 
+					on hu.group_id = mid.group_id 
+					and hu.hos_id = mid.hos_id 
+					and hu.unit_code = mid.unit_code
+				left join hos_fac_dict hfd 
+					on hfd.group_id = mid.group_id 
+					and hfd.hos_id = mid.hos_id 
+					and hfd.fac_id = mid.fac_id 
+					and hfd.is_stop=0
+			<where>
+				to_char(mid.mat_type_id)  in ( 
+					select vus.perm_code 
+					from v_user_data_perm vus 
+				   	where 
+				   		vus.group_id = #{group_id,jdbcType=INTEGER}
+						and vus.hos_id = #{hos_id,jdbcType=INTEGER}
+					    and vus.table_code = 'MAT_TYPE_DICT'
+						and vus.user_id = #{user_id,jdbcType=INTEGER}
+					    and vus.is_read = 1
+					    and vus.is_write = 1 
+			    )
+				<if test="group_id != null and group_id != ''">
+					and mab.group_id = #{group_id}
+				</if>
+				<if test="hos_id != null and hos_id != ''">
+					and mab.hos_id = #{hos_id}
+				</if>
+				<if test="copy_code != null and copy_code != ''">
+					and mab.copy_code = #{copy_code}
+				</if>
+				<!-- 只显示有权限的库房信息 -->
+				and to_char(mab.store_id) in (
+					select perm_code 
+					from v_user_data_perm  
+					where 
+						group_id = #{group_id,jdbcType=INTEGER}
+						and hos_id = #{hos_id,jdbcType=INTEGER}
+						and table_code = 'HOS_STORE_DICT'
+						and user_id = #{user_id,jdbcType=INTEGER}
+						and is_read = 1 and is_write = 1 
+				)
+				<if test="store_id != null and store_id != ''">
+					and mab.store_id = #{store_id}
+				</if>
+				<if test="mat_type_id != null and mat_type_id != ''">
+					and mid.mat_type_id in ${mat_type_id}
+				</if>
+				<if test="mat_type_no != null and mat_type_no != ''">
+					and mid.mat_type_no = #{mat_type_no}
+				</if>
+				<if test="inv_id != null and inv_id != ''">
+					and (
+						mid.inv_id like '%${inv_id}%'
+						or mid.inv_code like '%${inv_id}%'
+						or upper(mid.inv_name) like '%${inv_id}%'
+						or upper(mid.inv_model) like '%${inv_id}%'
+						or upper(mid.spell_code) like '%${inv_id}%'
+						or upper(mid.wbx_code) like '%${inv_id}%'
+						or lower(mid.spell_code) like '%${inv_id}%'
+						or lower(mid.wbx_code) like '%${inv_id}%'
+						or lower(mid.inv_name) like '%${inv_id}%'
+					)  
+				</if>
+				<if test="inv_no != null and inv_no != ''">
+					and mid.inv_no = #{inv_no}
+				</if>
+				<if test="batch_no != null and batch_no != ''">
+					and mab.batch_no like '%${batch_no}%'
+				</if>
+				<if test="is_charge != null and is_charge != ''">
+					and mid.is_charge = #{is_charge}
+				</if>
+				<if test="is_com != null and is_com != ''">
+					and mid.is_com = #{is_com}
+				</if>
+				<if test="sup_id != null and sup_id != ''">
+					and hsd2.sup_id = #{sup_id}
+				</if>
+					<if test="fac_id != null and fac_id != ''">
+					and hfd.fac_id = #{fac_id}
+				</if>
+				<if test="inv_model != null and inv_model != ''">
+					and (mid.inv_model like '%${inv_model}%'
+						or mid.inv_name like '%${inv_model}%'
+						or mid.inv_code like '%${inv_model}%'
+						or upper(mid.spell_code) like '%${inv_model}%'
+						or upper(mid.wbx_code) like '%${inv_model}%'
+						or lower(mid.spell_code) like '%${inv_model}%'
+						or lower(mid.wbx_code) like '%${inv_model}%'
+					)
+				</if>
+			</where>
+			group by
+				<if test="c_store != null and c_store != '' ">
+				   hsd.store_code,hsd.store_name,
+				</if>
+				mid.bid_code,mid.inv_code,mid.inv_name,mid.inv_model,hfd.fac_name,mab.price,
+				<if test="c_batch_no != null and c_batch_no != '' ">
+				   	mab.batch_no,
+				</if>
+				 hu.unit_name,hsd2.sup_name
+		)
+		select
+			<if test="c_store != null and c_store != '' ">
+				store_code,store_name,
+			</if>
+			bid_code,inv_code,inv_name,inv_model,fac_name,unit_name,sup_name,
+			<if test="c_batch_no != null and c_batch_no != '' ">
+				batch_no,
+			</if>
+			price,amount, money
+		from t_tmp
+		<where>
+			amount &gt; 0
+		</where>
+		union all
+		select 
+		<if test="c_store != null and c_store != '' ">
+		    null,null,
+		</if>
+		null,null,null,null,null,null,null,
+		<if test="c_batch_no != null and c_batch_no != '' ">
+		    null,
+		</if>
+		null, SUM(nvl(amount,0)) AS amount, SUM(nvl(money,0)) AS money
+		from t_tmp
+	    
+	</select>
+</mapper>
+

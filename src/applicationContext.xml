@@ -1,0 +1,332 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:aop="http://www.springframework.org/schema/aop"
+	xmlns:tx="http://www.springframework.org/schema/tx" xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:jaxws="http://cxf.apache.org/jaxws"
+	xsi:schemaLocation=" 
+       http://www.springframework.org/schema/beans 
+       http://www.springframework.org/schema/beans/spring-beans-4.0.xsd
+       http://www.springframework.org/schema/tx 
+       http://www.springframework.org/schema/tx/spring-tx-4.0.xsd
+       http://www.springframework.org/schema/aop 
+       http://www.springframework.org/schema/aop/spring-aop-4.0.xsd
+       http://www.springframework.org/schema/context
+       http://www.springframework.org/schema/context/spring-context-4.0.xsd
+       http://cxf.apache.org/jaxws 	
+       http://cxf.apache.org/schemas/jaxws.xsd
+     ">
+
+	<!-- 加载系统模块配置文件begin -->
+	<context:component-scan base-package="com.chd.hrp.**.serviceImpl"
+		use-default-filters="false">
+		<context:include-filter type="annotation"
+			expression="org.springframework.stereotype.Service" />
+	</context:component-scan>
+	<!-- 加载系统模块配置文件end -->
+	
+	
+	<!-- webservice -->
+	<import resource="webservice.xml" />
+	<aop:aspectj-autoproxy proxy-target-class="true" />
+
+	<!--配置数据源属性文件引入system.properties -->
+	<bean id="propertyConfigurer"
+		class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+		<property name="location">
+			<value>/WEB-INF/resource/system.properties</value>
+		</property>
+	</bean>
+
+	<!-- druid spring 拦截 begin -->
+	<!-- 数据源配置, 使用 druid 数据库连接池 -->
+	<!-- 数据源驱动类可不写，Druid默认会自动根据URL识别DriverClass 基本属性 url、user、password 配置初始化大小、最小、最大 
+		配置获取连接等待超时的时间 配置间隔多久才进行一次检测，检测需要关闭的空闲连接，单位是毫秒 -->
+	<bean id="oracleDataSource" class="com.alibaba.druid.pool.DruidDataSource"
+		init-method="init" destroy-method="close">
+		<property name="driverClassName" value="${driverClassName}" />
+		<property name="url" value="${url}" />
+		<property name="username" value="${username}" />
+		<property name="password" value="${password}" />
+		<property name="initialSize" value="1" />
+		<property name="minIdle" value="1" />
+		<property name="maxActive" value="200" />
+		<property name="maxWait" value="60000" />
+		<!-- 配置间隔多久才进行一次检测，检测需要关闭的空闲连接，单位是毫秒 -->
+		<property name="timeBetweenEvictionRunsMillis" value="60000" />
+		<!-- 配置一个连接在池中最小生存的时间，单位是毫秒 -->
+		<property name="minEvictableIdleTimeMillis" value="300000" />
+		<property name="validationQuery" value="${validationQuery}" />
+		<property name="testWhileIdle" value="true" />
+		<property name="testOnBorrow" value="false" />
+		<property name="testOnReturn" value="false" />
+		<!-- property name="keepAlive" value="true" /-->
+		<!-- 配置removeAbandoned对性能会有一些影响，建议怀疑存在泄漏之后再打开。 在上面的配置中，如果连接超过30分钟未关闭， 就会被强行回收，并且日志记录连接申请时的调用堆栈。 -->
+		<!-- property name="removeAbandoned" value="true"/>
+		<property name="removeAbandonedTimeout" value="1800"/>
+		<property name="logAbandoned" value="true" /-->
+		<!-- 打开PSCache，并且指定每个连接上PSCache的大小 -->
+		<property name="poolPreparedStatements" value="true" />
+		<property name="maxOpenPreparedStatements" value="100" />
+		<property name="maxPoolPreparedStatementPerConnectionSize" value="100" />
+		<property name="proxyFilters">
+			<list>
+				<!-- <ref bean="wall-filter" /> -->
+				<ref bean="stat-filter" />
+				<ref bean="log-filter" />
+			</list>
+		</property>
+		</bean>
+
+	<!-- cache数据库配置，如果在不使用的情况下，需注销掉此数据源配置与datasource key值对应的配置 -->
+	<!-- 
+	<bean id="cacheDataSource" class="com.alibaba.druid.pool.DruidDataSource"
+		init-method="init" destroy-method="close">
+		<property name="driverClassName" value="${cache.driverClassName}" />
+		<property name="url" value="${cache.url}" />
+		<property name="username" value="${cache.username}" />
+		<property name="password" value="${cache.password}" />
+		<property name="initialSize" value="2" />
+		<property name="minIdle" value="1" />
+		<property name="maxActive" value="200" />
+		<property name="maxWait" value="60000" />
+		<property name="timeBetweenEvictionRunsMillis" value="60000" />
+		<property name="minEvictableIdleTimeMillis" value="300000" />
+		<property name="testWhileIdle" value="true" />
+		<property name="testOnBorrow" value="false" />
+		<property name="testOnReturn" value="false" />
+		<property name="validationQuery">  
+			<value>${cache.validationQuery}</value>  
+		</property>  
+		<property name="poolPreparedStatements" value="true" />
+		<property name="removeAbandoned" value="true"/>
+		<property name="removeAbandonedTimeout" value="180"/>
+		<property name="maxOpenPreparedStatements" value="100" />
+		<property name="maxPoolPreparedStatementPerConnectionSize"
+			value="100" />
+		<property name="proxyFilters">
+			<list>
+				<ref bean="stat-filter" />
+				<ref bean="log-filter" />
+			</list>
+		</property>
+	</bean>
+	  -->
+		<!--动态数据源配置-->
+	    <bean id="dataSource" class="com.chd.base.datasource.DynamicDataSource">
+		<!--引入定义好的数据源-->
+	        <property  name="targetDataSources">
+	            <map  key-type="java.lang.String">
+	              <entry key="oracle" value-ref="oracleDataSource" />
+	              <!-- <entry key="cache" value-ref="cacheDataSource" /> --> 
+	            </map>
+	        </property>
+		<!--定义默认数据源-->
+	        <property name="defaultTargetDataSource" ref="oracleDataSource" />
+	    </bean>
+		
+		<!-- 以下配置用于排查 分析 程序中有地方连接未关闭造成的连接数被占满 并输出日志 的确出错位置 此配置项会影响性能，只在排查的时候打开。系统运行时最好关闭。 -->
+		<!-- ############################begin############################ -->
+		<!-- 超过时间限制是否回收 -->
+		<!-- <property name="removeAbandoned" value="true" /> -->
+		<!-- 超时时间；单位为秒。180秒=3分钟 -->
+		<!-- <property name="removeAbandonedTimeout" value="180" /> -->
+		<!-- 关闭abanded连接时输出错误日志 -->
+
+		<!-- <property name="logAbandoned" value="true" /> -->
+		<!-- ############################end############################ -->
+		
+
+	<!-- <bean id="wall-filter" class="com.alibaba.druid.wall.WallFilter"> <property 
+		name="dbType" value="oracle" /> </bean> -->
+
+	<bean id="stat-filter" class="com.alibaba.druid.filter.stat.StatFilter">
+		<property name="mergeSql" value="true" />
+		<property name="slowSqlMillis" value="3000" />
+		<property name="logSlowSql" value="true" />
+	</bean>
+
+	<bean id="log-filter" class="com.alibaba.druid.filter.logging.Log4jFilter">
+		<property name="connectionLogEnabled" value="false" />
+		<property name="statementLogEnabled" value="false" />
+		<property name="resultSetLogEnabled" value="false" />
+
+		<property name="statementCreateAfterLogEnabled" value="false" />
+		<property name="statementPrepareAfterLogEnabled" value="false" />
+		<property name="statementPrepareCallAfterLogEnabled" value="false" />
+
+		<property name="statementExecutableSqlLogEnable" value="true" />
+
+	</bean>
+	<!-- 创建SessionFactory -->
+	<bean id="sqlSessionFactory" class="com.chd.base.tool.SqlSessionFactoryBean">
+		<property name="dataSource" ref="dataSource" />
+		<property name="configLocation" value="classpath:sqlMapConfig.xml" /><!-- 
+			mybatis设置文件 -->
+		<!-- 加载mybatis的mapper文件 -->
+		<property name="mapperLocations">
+			<list>
+				<value>classpath:mapper/hrp/**/*.xml</value>
+			</list>
+		</property>
+		<!-- mybatis 分页插件 -->
+		<property name="plugins">
+			<array>
+				<bean class="com.github.pagehelper.PageHelper">
+					<property name="properties">
+						<value>
+							dialect=oracle
+							offsetAsPageNum=true
+							reasonable=true
+							rowBoundsWithCount=true
+						</value>
+					</property>
+				</bean>
+			</array>
+		</property>
+	</bean>
+	<!-- 创建Session -->
+	<bean id="sqlSession" class="org.mybatis.spring.SqlSessionTemplate"
+		scope="prototype">
+		<constructor-arg index="0" ref="sqlSessionFactory" />
+	</bean>
+	<bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+		<property name="basePackage" value="com.chd.hrp.**.dao" />
+		<property name="markerInterface" value="com.chd.base.SqlMapper" />
+		<property name="sqlSessionFactoryBeanName" value="sqlSessionFactory" />
+	</bean>
+	<bean id="processTime" class="com.chd.base.ProcessMonitor"></bean>
+	<!-- 注解方式配置事物 -->
+	<!-- <tx:annotation-driven transaction-manager="transactionManager" /> -->
+	<!-- spring 声明式的事务 -->
+	<aop:aspectj-autoproxy />
+
+	<aop:config>       
+        <aop:aspect ref="processTime"></aop:aspect>
+	</aop:config>
+	<aop:config>
+		<aop:pointcut id="appService"
+			expression="execution(* com.chd.hrp.**..service..*Service*.*(..))" />
+		<aop:advisor advice-ref="txAdvice" pointcut-ref="appService" />
+	</aop:config>
+	<!-- PROPAGATION_REQUIRED 支持当前事务，如果当前没有事务，就新建一个事务。这是最常见的选择。<br> PROPAGATION_SUPPORTS支持当前事务，如果当前没有事务，就以非事务方式执行。 
+		PROPAGATION_MANDATORY 支持当前事务，如果当前没有事务，就抛出异常。 PROPAGATION_REQUIRES_NEW新建事务，如果当前存在事务，把当前事务挂起。 
+		PROPAGATION_NOT_SUPPORTED 以非事务方式执行操作，如果当前存在事务，就把当前事务挂起。 PROPAGATION_NEVER以非事务方式执行，如果当前存在事务，则抛出异常。 
+		PROPAGATION_NESTED 如果当前存在事务，则在嵌套事务内执行。如果当前没有事务，则进行与PROPAGATION_REQUIRED类似的操作。 -->
+	<tx:advice id="txAdvice" transaction-manager="transactionManager">
+		<tx:attributes>
+			<!-- 添加数据 纳入事物拦截的方法前缀 -->
+			<tx:method name="add*" propagation="REQUIRED" />
+			<tx:method name="insert*" propagation="REQUIRED" />
+			<tx:method name="save*" propagation="REQUIRED" />
+			<tx:method name="init*" propagation="REQUIRED" />
+			<!-- 更新数据 纳入事物拦截的方法前缀 -->
+			<tx:method name="update*" propagation="REQUIRED" />
+			<tx:method name="modify*" propagation="REQUIRED" />
+			<tx:method name="edit*" propagation="REQUIRED" />
+			<!-- 删除数据 纳入事物拦截的方法前缀 -->
+			<tx:method name="delete*" propagation="REQUIRED" />
+			<tx:method name="remove*" propagation="REQUIRED" />
+			<tx:method name="clear*" propagation="REQUIRED" />
+			<!--审核 -->
+			<tx:method name="audit*" propagation="REQUIRED" />
+			<!--反审核 -->
+			<tx:method name="reAudit*" propagation="REQUIRED" />
+
+			<!--计算 -->
+			<tx:method name="collect*" propagation="REQUIRED" />
+			<!--导入 -->
+			<tx:method name="import*" propagation="REQUIRED" />
+			<tx:method name="read*" propagation="REQUIRED" />
+			<!--导出 -->
+			<tx:method name="export*" propagation="SUPPORTS" />
+			<!--确定 -->
+			<tx:method name="confirm*" propagation="REQUIRED" />
+			<!--反确定 -->
+			<tx:method name="reConfirm*" propagation="REQUIRED" />
+			<!--记账 -->
+			<tx:method name="charge*" propagation="REQUIRED" />
+			<!--反记账 -->
+			<tx:method name="reCharge*" propagation="REQUIRED" />
+			<!--报废 -->
+			<tx:method name="failed*" propagation="REQUIRED" />
+			<!--恢复 -->
+			<tx:method name="reFailed*" propagation="REQUIRED" />
+			<!--打印 -->
+			<tx:method name="print*" propagation="SUPPORTS" />
+			<!--复制 -->
+			<tx:method name="copy*" propagation="REQUIRED" />
+			<!--冲销/账 -->
+			<tx:method name="offset*" propagation="REQUIRED" />
+			<!--终止计划 -->
+			<tx:method name="stop*" propagation="REQUIRED" />
+			<!--设置 -->
+			<tx:method name="set*" propagation="REQUIRED" />
+			<!--图形 -->
+			<tx:method name="graphical*" propagation="REQUIRED" />
+
+			<!-- 查询数据 纳入事物拦截的方法前缀 -->
+			<tx:method name="query*" propagation="SUPPORTS" />
+			<tx:method name="get*" propagation="SUPPORTS" />
+			<tx:method name="find*" propagation="SUPPORTS" />
+			<tx:method name="load*" propagation="SUPPORTS" />
+			<tx:method name="search*" propagation="SUPPORTS" />
+
+			<tx:method name="*" propagation="SUPPORTS" />
+
+
+		</tx:attributes>
+	</tx:advice>
+
+	<bean id="transactionManager"
+		class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+		<property name="dataSource" ref="dataSource" />
+	</bean>
+
+	<!-- 支持上传文件 -->
+	<bean id="multipartResolver"
+		class="org.springframework.web.multipart.commons.CommonsMultipartResolver" />
+
+
+	<!--程序启动加载-begin -->
+	<!--系统信息加载 -->
+	<bean class="com.chd.base.startup.LoadSystemInfo" init-method="afterPropertiesSet" />
+	<bean class="com.chd.base.startup.LoadChdInfo" init-method="afterPropertiesSet" />
+	<!-- sql文件加载 -->
+	<bean class="com.chd.base.startup.LoadSqlFile" init-method="afterPropertiesSet" />
+	<!--菜单文件加载 -->
+	<bean class="com.chd.base.startup.LoadMenuFile" init-method="afterPropertiesSet" />
+	<!--任务同步加载 -->
+	<bean class="com.chd.base.startup.SynJobState" init-method="afterPropertiesSet" />	
+	<!--程序启动加载-end -->
+	<bean id="SpringApplicationContext" class="com.chd.base.quartz.ApplicationContextHelper"></bean>
+	<!-- Activiti5工作流 -->
+	<import resource="activiti.cfg.xml" />
+ 
+	<bean id="dataSourceAspect" class="com.chd.base.datasource.DataSourceAspect" />
+    <aop:config>
+        <aop:aspect ref="dataSourceAspect">
+            <aop:pointcut id="dataSourcePointcut" expression="execution(* com.chd.hrp.*.serviceImpl..*.*(..))"/>
+            <aop:before pointcut-ref="dataSourcePointcut" method="beforeInvoke" />
+        </aop:aspect>
+    </aop:config>
+
+
+
+	<!-- 配置druid监控spring jdbc -->
+	<bean id="druid-stat-interceptor"
+		class="com.alibaba.druid.support.spring.stat.DruidStatInterceptor">
+	</bean>
+	<bean id="druid-stat-pointcut" class="org.springframework.aop.support.JdkRegexpMethodPointcut"
+		scope="prototype">
+		<property name="patterns">
+			<list>
+				<value>com.chd.hrp.*.service.*</value>
+				<value>com.chd.hrp.*.serviceImpl.*</value>
+			</list>
+		</property>
+	</bean>
+	<aop:config>
+		<aop:advisor advice-ref="druid-stat-interceptor"
+			pointcut-ref="druid-stat-pointcut" />
+	</aop:config>
+</beans>

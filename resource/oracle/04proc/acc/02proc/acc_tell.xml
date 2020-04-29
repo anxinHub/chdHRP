@@ -1,0 +1,2124 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+
+	<sql id="act_balance_subjinitial" type="proc"><![CDATA[
+	CREATE OR REPLACE PROCEDURE act_balance_subjinitial
+	/*初始余额校验*/
+	(
+	  p_group_id number,
+	  p_hos_id number,
+	  p_copy_code varchar2,
+	  p_subj_code varchar2,
+	  p_subj_select_flag integer,--是否含对账明细:1包含对账明细,2不包含对账明细
+	  p_para_flag integer,--判断银行对账方式（0.出纳与银行对账 1.会计与银行对账）
+	  projdata OUT ACT_BOOKS.balancecursor
+	)
+	IS
+	  ddl_sql varchar2(4000);
+	  p_acc_year varchar2(10);
+	  p_acc_month varchar2(10);
+	  unit_end_os1 number(19,2);--用于计算单位银行存款账面余额
+	  unit_end_os2 number(19,2);--用于计算单位银行存款账面余额
+	  unit_end_os number(19,2);--单位银行存款账面余额
+	  bank_end_os number(19,2);--银行对账单存款余额
+	  unit_add_os number(19,2);--加:银行已收单位未收
+	  bank_add_os number(19,2);--加:单位已收银行未收
+	  unit_minus_os number(19,2);--减:银行已收单位未收
+	  bank_minus_os number(19,2);--减:单位已收银行未收
+	  num NUMBER;
+	  is_flag number(4,0);
+	BEGIN
+	  /*结果集临时表*/
+	  -- EXECUTE IMMEDIATE 'drop Table t_accinitialbalance_result';
+	  SELECT COUNT(1) INTO num FROM USER_TABLES WHERE TABLE_NAME = UPPER('t_accinitialbalance_result') ;
+	  IF num = 0 THEN
+	    ddl_sql:='
+	      Create Global Temporary Table t_accinitialbalance_result(
+	        acc_year varchar2(20),
+	        acc_month varchar2(2),
+	        subj_code varchar2(18),
+	        unit_bank_name varchar2(200),
+	        bank_statement_name varchar2(200),
+	        debit numeric(19,2),
+	        credit numeric(19,2)
+	      )On COMMIT Delete ROWS
+	    ';
+	    execute immediate ddl_sql;
+	  END IF;
+	
+	  --查询出纳账管理模块启用的年度
+	  select nvl(start_year,'0'), nvl(start_month,0)
+	  into p_acc_year, p_acc_month
+	  from SYS_MOD_START
+	  where group_id = p_group_id
+	    and hos_id = p_hos_id
+	    and copy_code = p_copy_code
+	    and mod_code = '0101';
+	
+	  --查询出单位银行存款账面余额和银行对账单存款余额赋值给变量,便于计算 单位-调节后余额和银行-调节后余额
+	  --单位银行存款账面余额 = 账表年初余额 + 业务表本期发生额
+	  --账表年初余额
+	  is_flag := 0;
+	  select count(0) into is_flag
+	  from acc_leder
+	  where group_id = p_group_id
+	    and hos_id = p_hos_id
+	    and copy_code = p_copy_code
+	    and acc_year = p_acc_year
+	    and acc_month = 00
+	    and subj_code = p_subj_code;
+	  if is_flag > 0 then
+	    select nvl(end_os, 0) into unit_end_os1
+	    from acc_leder
+	    where group_id = p_group_id
+	      and hos_id = p_hos_id
+	      and copy_code = p_copy_code
+	      and acc_year = p_acc_year
+	      and acc_month = 00
+	      and subj_code = p_subj_code;
+	  else
+	    unit_end_os1 := 0;
+	  end if;
+	
+	  --业务表本期发生额
+	  is_flag := 0;
+	  select count(0) into is_flag
+	  from acc_vouch v
+	  inner join acc_vouch_detail d
+	    on v.vouch_id = d.vouch_id
+	  where d.group_id = p_group_id
+	    and d.hos_id = p_hos_id
+	    and d.copy_code = p_copy_code
+	    and v.acc_year = p_acc_year
+	    and v.acc_month < p_acc_month
+	    and d.subj_code = p_subj_code;
+	  if is_flag > 0 then
+	    select nvl(sum(d.debit),0) - nvl(sum(d.credit),0) into unit_end_os2
+	    from acc_vouch v
+	    inner join acc_vouch_detail d
+	      on v.vouch_id = d.vouch_id
+	    where d.group_id = p_group_id
+	      and d.hos_id = p_hos_id
+	      and d.copy_code = p_copy_code
+	      and v.acc_year = p_acc_year
+	      and v.acc_month < p_acc_month
+	      and d.subj_code = p_subj_code;
+	  else
+	    unit_end_os2 := 0;
+	  end if;
+	
+	  unit_end_os := nvl(unit_end_os1, 0) + nvl(unit_end_os2, 0);
+	
+	  --银行初始余额
+	  is_flag := 0;
+	  select count(0) into is_flag
+	  from acc_bank_check
+	  where group_id = p_group_id
+	    and hos_id = p_hos_id
+	    and copy_code = p_copy_code
+	    and acc_year = p_acc_year
+	    and is_init = 1
+	    and bal <> 0
+	    and subj_code = p_subj_code;
+	  if is_flag > 0 then
+	    select sum(nvl(bal,0)) into bank_end_os
+	    from acc_bank_check
+	    where group_id = p_group_id
+	      and hos_id = p_hos_id
+	      and copy_code = p_copy_code
+	      and acc_year = p_acc_year
+	      and is_init = 1
+	      and bal <> 0
+	      and subj_code = p_subj_code;
+	  else
+	    bank_end_os := 0;
+	  end if;
+	
+	  --插入 单位银行存款账面余额 银行对账单存款余额
+	  execute immediate '
+	    insert into t_accinitialbalance_result(
+	      acc_year,acc_month,subj_code,unit_bank_name,bank_statement_name,debit,credit
+	    )
+	    values(
+	      '||p_acc_year||','''||p_acc_month||''','''||p_subj_code||''',''单位银行存款账面余额'',
+	      ''银行对账单存款余额'','||unit_end_os||','||bank_end_os||'
+	    )
+	  ';
+	
+	  --查询出 （加：银行已收单位未收） 赋值给变量，便于计算 单位-调节后余额
+	  is_flag := 0;
+	  select count(0) into is_flag
+	  from ACC_BANK_CHECK
+	  where group_id = p_group_id
+	    and hos_id = p_hos_id
+	    and copy_code = p_copy_code
+	    and acc_year = p_acc_year
+	    and is_init = 1
+	    and credit <>0
+	    and subj_code = p_subj_code;
+	  if is_flag > 0 then
+	    select NVL(sum(credit),0) into unit_add_os
+	    from ACC_BANK_CHECK
+	    where group_id = p_group_id
+	      and hos_id = p_hos_id
+	      and copy_code = p_copy_code
+	      and acc_year = p_acc_year
+	      and is_init = 1
+	      and credit <>0
+	      and subj_code = p_subj_code;
+	  else
+	    unit_add_os := 0;
+	  end if;
+	
+	  if p_para_flag = 0 then
+	    --加：单位已收银行未收（出纳账与银行对账）
+	    is_flag := 0;
+	    select count(0) into is_flag
+	    from ACC_TELL
+	    where group_id = p_group_id
+	      and hos_id = p_hos_id
+	      and copy_code = p_copy_code
+	      and acc_year = p_acc_year
+	      and is_init = 1
+	      and debit <>0
+	      and cash_subj_code = p_subj_code;
+	    if is_flag > 0 then
+	      select sum(NVL(debit,0))
+	      into bank_add_os
+	      from ACC_TELL
+	      where group_id = p_group_id
+	        and hos_id = p_hos_id
+	        and copy_code = p_copy_code
+	        and acc_year = p_acc_year
+	        and is_init = 1
+	        and debit <>0
+	        and cash_subj_code = p_subj_code;
+	    else
+	      bank_add_os := 0;
+	    end if;
+	  else
+	    --加：单位已收银行未收（会计账与银行对账）
+	    is_flag := 0;
+	    select count(0) into is_flag
+	    from ACC_VOUCH_CHECK
+	    where group_id = p_group_id
+	      and hos_id = p_hos_id
+	      and copy_code = p_copy_code
+	      and acc_year = p_acc_year
+	      and is_init = 1
+	      and debit <> 0
+	      and subj_code = p_subj_code;
+	    if is_flag > 0 then
+	      select nvl(sum(debit),0)
+	      into bank_add_os
+	      from ACC_VOUCH_CHECK
+	      where group_id = p_group_id
+	        and hos_id = p_hos_id
+	        and copy_code = p_copy_code
+	        and acc_year = p_acc_year
+	        and is_init = 1
+	        and debit <> 0
+	        and subj_code = p_subj_code;
+	    else
+	      bank_add_os := 0;
+	    end if;
+	  end if;
+	
+	  --插入 加：银行已收单位未收 加：单位已收银行未收
+	  execute immediate '
+	    insert into t_accinitialbalance_result(
+	      acc_year,acc_month,subj_code,unit_bank_name,bank_statement_name,debit,credit
+	    )
+	    values(
+	      '||p_acc_year||','''||p_acc_month||''','''||p_subj_code||''',''加：银行已收单位未收'',
+	      ''加：单位已收银行未收'','||unit_add_os||','||bank_add_os||'
+	    )
+	  ';
+	
+	  --是否含对账明细:1包含对账明细,2不包含对账明细
+	  IF p_subj_select_flag = 1 THEN
+	    --判断银行对账方式（0.出纳与银行对账 1.会计与银行对账）
+	    IF p_para_flag = 0 THEN
+	      --dbms_output.put_line();
+	      execute immediate '
+	        insert into t_accinitialbalance_result(
+	          acc_year,acc_month,subj_code,unit_bank_name,bank_statement_name,debit,credit
+	        )
+	        select '||p_acc_year||','||p_acc_month||','||p_subj_code||',
+	          a_table.abc_unit_name,b_table.at_unit_name,a_table.credit,b_table.debit
+	        from (
+	          select rownum id,
+	            abc.subj_code,to_char(abc.occur_date,''YYYY-MM-DD'') ||''  ''|| abc.summary  ||''  ''|| apt.pay_name ||''  ''|| abc.check_no abc_unit_name,
+	            abc.credit
+	          from acc_bank_check abc
+	          left join acc_pay_type apt
+	            on abc.group_id = apt.group_id
+	            and abc.hos_id = apt.hos_id
+	            and abc.copy_code = apt.copy_code
+	            and abc.pay_type_code = apt.pay_code
+	          where abc.group_id = '||p_group_id||'
+	            and abc.hos_id = '||p_hos_id||'
+	            and abc.copy_code = '''||p_copy_code||'''
+	            and abc.acc_year = '||p_acc_year||'
+	            and abc.is_init = 1
+	            and abc.credit <> 0
+	            and abc.subj_code = '''||p_subj_code||'''
+	        ) a_table
+	        full join (
+	          select rownum id, at.cash_subj_code,
+	            to_char(at.occur_date,''YYYY-MM-DD'') ||''  ''|| at.summary  ||''  ''|| apt.pay_name  ||''  ''|| at.check_no  at_unit_name,
+	            at.debit
+	          from acc_tell at
+	          left join acc_pay_type apt
+	            on at.group_id = apt.group_id
+	            and at.hos_id = apt.hos_id
+	            and at.copy_code = apt.copy_code
+	            and at.pay_type_code = apt.pay_code
+	          where at.group_id = '||p_group_id||'
+	            and at.hos_id = '||p_hos_id||'
+	            and at.copy_code = '''||p_copy_code||'''
+	            and at.acc_year = '||p_acc_year||'
+	            and at.is_init = 1
+	            and at.debit <> 0
+	            and at.cash_subj_code = '''||p_subj_code||'''
+	        ) b_table
+	        on a_table.id = b_table.id
+	      ';
+	    ELSE
+	      execute immediate '
+	        insert into t_accinitialbalance_result(
+	          acc_year,acc_month,subj_code,unit_bank_name,bank_statement_name,debit,credit
+	        )
+	        select '||p_acc_year||','||p_acc_month||','||p_subj_code||',
+	          a_table.abc_unit_name,b_table.avc_unit_name,a_table.credit,b_table.debit
+	        from (
+	          select rownum id,
+	          abc.subj_code,to_char(abc.occur_date,''YYYY-MM-DD'') ||''  ''|| abc.summary  ||''  ''|| apt.pay_name ||''  ''|| abc.check_no abc_unit_name,
+	          abc.credit
+	          from
+	          acc_bank_check abc
+	          left join acc_pay_type apt
+	            on abc.group_id = apt.group_id
+	            and abc.hos_id = apt.hos_id
+	            and abc.copy_code = apt.copy_code
+	            and abc.pay_type_code = apt.pay_code
+	          where abc.group_id = '||p_group_id||'
+	            and abc.hos_id = '||p_hos_id||'
+	            and abc.copy_code = '''||p_copy_code||'''
+	            and abc.acc_year = '||p_acc_year||'
+	            and abc.is_init = 1
+	            and abc.credit <>0
+	            and abc.subj_code = '''||p_subj_code||'''
+	        ) a_table
+	        full join (
+	          select rownum id,
+	            to_char(avc.occur_date,''YYYY-MM-DD'') ||''  ''|| avc.summary  ||''  ''|| apt.pay_name ||''  ''|| avc.check_no avc_unit_name,
+	            avc.debit
+	          from acc_vouch_check avc
+	          left join acc_pay_type apt
+	            on avc.group_id = apt.group_id
+	            and avc.hos_id = apt.hos_id
+	            and avc.copy_code = apt.copy_code
+	            and avc.pay_type_code = apt.pay_code
+	          where avc.group_id= '||p_group_id||'
+	            and avc.hos_id = '||p_hos_id||'
+	            and avc.copy_code = '''||p_copy_code||'''
+	            and avc.acc_year = '||p_acc_year||'
+	            and avc.is_init = 1
+	            and avc.debit <> 0
+	            and avc.subj_code = '''||p_subj_code||'''
+	        ) b_table
+	        on a_table.id = b_table.id
+	      ';
+	    END IF;
+
+	    --插入 小计
+	    execute immediate '
+	      insert into t_accinitialbalance_result(
+	        acc_year,acc_month,subj_code,unit_bank_name,bank_statement_name,debit,credit
+	      )
+	      values(
+	        '||p_acc_year||','''||p_acc_month||''','''||p_subj_code||''',''小计'',
+	        ''小计'','||unit_add_os||','||bank_add_os||'
+	      )
+	    ';
+	  END IF;
+	
+	  --查询出 （减：银行已付单位未付） 赋值给变量，便于计算 单位-调节后余额
+	  is_flag := 0;
+	  select count(0) into is_flag
+	  from  ACC_BANK_CHECK
+	  where group_id = p_group_id
+	    and hos_id = p_hos_id
+	    and copy_code = p_copy_code
+	    and acc_year = p_acc_year
+	    and is_init = 1
+	    and debit <> 0
+	    and subj_code = p_subj_code ;
+	  if is_flag > 0 then
+	    select NVL(sum(debit),0)
+	    into unit_minus_os
+	    from  ACC_BANK_CHECK
+	    where group_id = p_group_id
+	      and hos_id = p_hos_id
+	      and copy_code = p_copy_code
+	      and acc_year = p_acc_year
+	      and is_init = 1
+	      and debit <> 0
+	      and subj_code = p_subj_code ;
+	  else
+	    unit_minus_os := 0;
+	  end if;
+	
+	  if p_para_flag = 0 then
+	    --加：单位已付银行未付（出纳账与银行对账）
+	    is_flag := 0;
+	    select count(0) into is_flag
+	    from ACC_TELL
+	    where group_id = p_group_id
+	      and hos_id = p_hos_id
+	      and copy_code = p_copy_code
+	      and acc_year = p_acc_year
+	      and is_init = 1
+	      and credit <> 0
+	      and cash_subj_code = p_subj_code;
+	    if is_flag > 0 then
+	      select NVL(sum(credit),0)
+	      into bank_minus_os
+	      from ACC_TELL
+	      where group_id = p_group_id
+	        and hos_id = p_hos_id
+	        and copy_code = p_copy_code
+	        and acc_year = p_acc_year
+	        and is_init = 1
+	        and credit <> 0
+	        and cash_subj_code = p_subj_code;
+	    else
+	      bank_minus_os := 0;
+	    end if;
+	  else
+	    --加：单位已付银行未付（会计账与银行对账）
+	    is_flag := 0;
+	    select count(0) into is_flag
+	    from ACC_VOUCH_CHECK
+	    where group_id = p_group_id
+	      and hos_id = p_hos_id
+	      and copy_code = p_copy_code
+	      and acc_year = p_acc_year
+	      and is_init = 1
+	      and credit <> 0
+	      and subj_code = p_subj_code;
+	    if is_flag > 0 then
+	      select nvl(sum(credit),0)
+	      into bank_minus_os
+	      from ACC_VOUCH_CHECK
+	      where group_id = p_group_id
+	        and hos_id = p_hos_id
+	        and copy_code = p_copy_code
+	        and acc_year = p_acc_year
+	        and is_init = 1
+	        and credit <> 0
+	        and subj_code = p_subj_code;
+	    else
+	      bank_minus_os := 0;
+	    end if;
+	  end if;
+	
+	  --插入 加：银行已付单位未付 加：单位已付银行未付
+	  execute immediate '
+	    insert into t_accinitialbalance_result(
+	      acc_year,acc_month,subj_code,unit_bank_name,bank_statement_name,debit,credit
+	    )
+	    values(
+	      '||p_acc_year||','''||p_acc_month||''','''||p_subj_code||''',''减：银行已付单位未付'',
+	      ''减：单位已付银行未付'','||unit_minus_os||','||bank_minus_os||'
+	    )
+	  ';
+	
+	  --是否含对账明细:1包含对账明细,2不包含对账明细
+	  IF p_subj_select_flag=1 THEN
+	    --判断银行对账方式（0.出纳与银行对账 1.会计与银行对账）
+	    IF p_para_flag = 0 THEN
+	      execute immediate '
+	        insert into t_accinitialbalance_result(
+	          acc_year,acc_month,subj_code,unit_bank_name,bank_statement_name,debit,credit
+	        )
+	        select '||p_acc_year||','||p_acc_month||','||p_subj_code||',
+	          a_table.abc_unit_name,b_table.at_unit_name,a_table.debit,b_table.credit
+	        from (
+	          select rownum id,abc.subj_code,
+	            to_char(abc.occur_date,''YYYY-MM-DD'') ||''  ''|| abc.summary  ||''  ''|| apt.pay_name ||''  ''|| abc.check_no abc_unit_name,
+	            abc.debit
+	          from acc_bank_check abc
+	          left join acc_pay_type apt
+	            on abc.group_id = apt.group_id
+	            and abc.hos_id = apt.hos_id
+	            and abc.copy_code = apt.copy_code
+	            and abc.pay_type_code = apt.pay_code
+	          where abc.group_id = '||p_group_id||'
+	            and abc.hos_id = '||p_hos_id||'
+	            and abc.copy_code = '''||p_copy_code||'''
+	            and abc.acc_year = '||p_acc_year||'
+	            and abc.is_init = 1
+	            and abc.debit <> 0
+	            and abc.subj_code = '''||p_subj_code||'''
+	        ) a_table
+	        full join (
+	          select rownum id,at.cash_subj_code,
+	            to_char(at.occur_date,''YYYY-MM-DD'') ||''  ''|| at.summary  ||''  ''|| apt.pay_name  ||''  ''|| at.check_no  at_unit_name,
+	            at.credit
+	          from acc_tell at
+	          left join acc_pay_type apt
+	            on at.group_id = apt.group_id
+	            and at.hos_id = apt.hos_id
+	            and at.copy_code = apt.copy_code
+	            and at.pay_type_code = apt.pay_code
+	          where at.group_id = '||p_group_id||'
+	            and at.hos_id = '||p_hos_id||'
+	            and at.copy_code = '''||p_copy_code||'''
+	            and at.acc_year = '||p_acc_year||'
+	            and at.is_init = 1
+	            and at.credit <> 0
+	            and at.cash_subj_code = '''||p_subj_code||'''
+	        ) b_table
+	        on a_table.id = b_table.id
+	      ';
+	    ELSE
+	      execute immediate '
+	        insert into t_accinitialbalance_result (
+	          acc_year,acc_month,subj_code,unit_bank_name,bank_statement_name,debit,credit
+	        )
+	        select '||p_acc_year||','''||p_acc_month||''','''||p_subj_code||''',
+	          a_table.abc_unit_name,b_table.avc_unit_name,a_table.debit,b_table.credit
+	        from (
+	          select rownum id, abc.subj_code,
+	            to_char(abc.occur_date,''YYYY-MM-DD'') ||''  ''|| abc.summary  ||''  ''|| apt.pay_name ||''  ''|| abc.check_no abc_unit_name,
+	            abc.debit
+	          from acc_bank_check abc
+	          left join acc_pay_type apt
+	            on abc.group_id = apt.group_id
+	            and abc.hos_id = apt.hos_id
+	            and abc.copy_code = apt.copy_code
+	            and abc.pay_type_code = apt.pay_code
+	          where abc.group_id = '||p_group_id||'
+	            and abc.hos_id = '||p_hos_id||'
+	            and abc.copy_code = '''||p_copy_code||'''
+	            and abc.acc_year = '||p_acc_year||'
+	            and abc.is_init = 1
+	            and abc.debit <> 0
+	            and abc.subj_code = '''||p_subj_code||'''
+	        ) a_table
+	        full join (
+	          select rownum id,
+	            to_char(avc.occur_date,''YYYY-MM-DD'') ||''  ''|| avc.summary  ||''  ''|| apt.pay_name ||''  ''|| avc.check_no avc_unit_name,
+	            avc.credit
+	          from acc_vouch_check avc
+	          left join acc_pay_type apt
+	            on avc.group_id = apt.group_id
+	            and avc.hos_id = apt.hos_id
+	            and avc.copy_code = apt.copy_code
+	            and avc.pay_type_code = apt.pay_code
+	          where avc.group_id= '||p_group_id||'
+	            and avc.hos_id = '||p_hos_id||'
+	            and avc.copy_code = '''||p_copy_code||'''
+	            and avc.acc_year = '||p_acc_year||'
+	            and avc.is_init = 1
+	            and avc.credit <> 0
+	            and avc.subj_code = '''||p_subj_code||'''
+	        ) b_table
+	        on a_table.id = b_table.id
+	      ';
+	    END IF;
+
+	    --插入 小计
+	    execute immediate '
+	      insert into t_accinitialbalance_result(
+	        acc_year,acc_month,subj_code,unit_bank_name,bank_statement_name,debit,credit
+	      )
+	      values(
+	        '||p_acc_year||','''||p_acc_month||''','''||p_subj_code||''',''小计'',
+	        ''小计'','||unit_minus_os||','||bank_minus_os||'
+	      )
+	    ';
+	  END IF;
+	
+	  --插入 单位-调节后余额 银行-调节后余额
+	  execute immediate '
+	    insert into t_accinitialbalance_result(
+	      acc_year,acc_month,subj_code,unit_bank_name,bank_statement_name,debit,credit
+	    )
+	    values(
+	      '||p_acc_year||','''||p_acc_month||''','''||p_subj_code||''',''单位-调节后余额'',
+	      ''银行-调节后余额'','||(unit_end_os+unit_add_os-unit_minus_os)||','||(bank_end_os+bank_add_os-bank_minus_os)||'
+	    )
+	  ';
+	
+	
+	  ddl_sql:='
+	    select subj_code,unit_bank_name as unit_name,
+	      bank_statement_name as bank_name,debit,credit
+	    from t_accinitialbalance_result
+	  ';
+	
+	  open projdata for ddl_sql;
+	
+	END act_balance_subjinitial;
+	]]></sql>
+	
+	
+	<sql id="act_balance_adjust" type="proc"><![CDATA[
+CREATE OR REPLACE PROCEDURE ACT_BALANCE_ADJUST
+/*余额调节表*/
+(
+  p_group_id number,
+  p_hos_id number,
+  p_copy_code varchar2,
+  p_year_month varchar2,
+  p_subj_code varchar2,
+  p_subj_select_flag integer,--是否含对账明细:1包含对账明细,2不包含对账明细
+  p_is_account integer, --是否含未记账
+  p_para_flag integer,--判断银行对账方式（0.出纳与银行对账 1.会计与银行对账）
+  projdata OUT ACT_BOOKS.balancecursor
+)
+IS
+  ddl_sql varchar2(4000);
+  unit_end_os1 number(19,2);--用于计算单位银行存款账面余额
+  unit_end_os2 number(19,2);--用于计算单位银行存款账面余额
+  unit_end_os number(19,2);--单位银行存款账面余额
+  bank_end_os1 number(19,2);--用于计算银行对账单存款余额
+  bank_end_os2 number(19,2);--用于计算银行对账单存款余额
+  bank_end_os number(19,2);--银行对账单存款余额
+  unit_add_os number(19,2);--加:银行已收单位未收
+  bank_add_os number(19,2);--加:单位已收银行未收
+  bank_add_os1 number(19,2);--用于计算加:单位已收银行未收
+  bank_add_os2 number(19,2);--用于计算加:单位已收银行未收
+  unit_minus_os number(19,2);--减:银行已收单位未收
+  bank_minus_os number(19,2);--减:单位已收银行未收
+  bank_minus_os1 number(19,2);--用于计算减:单位已收银行未收
+  bank_minus_os2 number(19,2);--用于计算减:单位已收银行未收
+  unit_add_os_1 number(19,2);
+  bank_add_os1_1 number(19,2);
+  bank_add_os2_1 number(19,2);
+  unit_minus_os_1 number(19,2);
+  bank_minus_os1_1 number(19,2);
+  bank_minus_os2_2 number(19,2);
+  bank_add_os_1 number(19,2);
+  bank_minus_os_1  number(19,2);
+  
+  p_acc_year varchar2(20);
+  p_acc_month varchar2(20);
+  v_year_month varchar2(20);
+  num NUMBER(4,0);
+  is_flag number(4,0);
+BEGIN
+
+  /*结果集临时表*/
+  -- EXECUTE IMMEDIATE 'drop Table t_accbalance_result';
+  SELECT COUNT(1) INTO num FROM USER_TABLES WHERE TABLE_NAME = UPPER('t_accbalance_result') ;
+  IF num = 0 THEN
+    ddl_sql:='
+      create global temporary table t_accbalance_result(
+        subj_code varchar2(200),
+        unit_bank_name varchar2(200),
+        bank_statement_name varchar2(200),
+        debit numeric(19,2),
+        credit numeric(19,2)
+      )On COMMIT Delete ROWS
+    ';
+    /*
+    On COMMIT PRESERVE ROWS 会话性临时表
+    On Commit Delete Rows 事务性临时表
+    */
+    execute immediate ddl_sql;
+  END IF;
+
+  select substr(p_year_month,0,4) into p_acc_year from dual;
+  select to_char(to_date(p_year_month,'yyyy-MM-dd'),'yyyyMM') into v_year_month from dual;
+
+  --查询出单位银行存款账面余额和银行对账单存款余额赋值给变量，便于计算 单位-调节后余额和银行-调节后余额
+  if p_para_flag =0 then
+    --（出纳账与银行对账）
+    --计算单位银行存款账面余额（= 账表【年初】余额 + 出纳帐【截止日期之前】的发生额）
+    --账表【年初】余额
+    is_flag := 0;
+    SELECT count(0) into is_flag
+    from acc_leder
+    where group_id = p_group_id
+      and hos_id = p_hos_id
+      and copy_code = p_copy_code
+      and acc_year = p_acc_year
+      and acc_month = '00'
+      and subj_code = p_subj_code;
+    if is_flag > 0 then 
+      SELECT end_os into unit_end_os1
+      from acc_leder
+      where group_id = p_group_id
+        and hos_id = p_hos_id
+        and copy_code = p_copy_code
+        and acc_year = p_acc_year
+        and acc_month = '00'
+        and subj_code = p_subj_code;
+    else
+      unit_end_os1 := 0;
+    end if;
+    
+    --出纳帐【截止日期之前】的发生额
+    is_flag := 0; 
+    SELECT count(0) into is_flag
+    from acc_tell
+    where group_id = p_group_id
+      and hos_id = p_hos_id
+      and copy_code = p_copy_code
+      and acc_year = p_acc_year
+      and is_init = 0
+      and occur_date <= to_date(p_year_month, 'yyyy-MM-dd')
+      and cash_subj_code = p_subj_code;
+    if is_flag > 0 then 
+      SELECT sum(nvl(debit,0) - nvl(credit,0)) into unit_end_os2
+      from acc_tell
+      where group_id = p_group_id
+        and hos_id = p_hos_id
+        and copy_code = p_copy_code
+        and acc_year = p_acc_year
+        and is_init = 0
+        and occur_date <= to_date(p_year_month, 'yyyy-MM-dd')
+        and cash_subj_code = p_subj_code;
+    else 
+      unit_end_os2 := 0;
+    end if;
+      
+    unit_end_os := unit_end_os1 + unit_end_os2;
+  else
+    --（会计账与银行对账）
+    --计算单位银行存款账面余额（= 账表【年初】余额 + 辅助核算【截止日期之前】的发生额）
+    --账表【年初】余额
+    is_flag := 0;
+    SELECT count(0) into is_flag 
+    from acc_leder
+    where group_id = p_group_id
+      and hos_id = p_hos_id
+      and copy_code = p_copy_code
+      and acc_year  = p_acc_year
+      and acc_month = '00'
+      and subj_code = p_subj_code;
+    if is_flag > 0 then 
+      SELECT nvl(end_os, 0) into unit_end_os1
+      from acc_leder
+      where group_id = p_group_id
+        and hos_id = p_hos_id
+        and copy_code = p_copy_code
+        and acc_year  = p_acc_year
+        and acc_month = '00'
+        and subj_code = p_subj_code;
+    else 
+      unit_end_os1 := 0;
+    end if;
+    
+    --辅助核算【截止日期之前】的发生额
+    is_flag := 0;
+    select count(0) into is_flag 
+    from acc_vouch_check a 
+    inner join acc_vouch b 
+      on a.group_id = b.group_id 
+      and a.hos_id = b.hos_id 
+      and a.copy_code = b.copy_code 
+      and a.vouch_id = b.vouch_id 
+    where a.group_id = p_group_id
+      and a.hos_id = p_hos_id
+      and a.copy_code = p_copy_code
+      and a.acc_year = p_acc_year
+      and a.is_init = 0
+      and b.vouch_date <= to_date(p_year_month, 'yyyy-MM-dd')
+      and subj_code = p_subj_code
+      and (
+        (p_is_account = 0 and b.state = 99)
+        or 
+        (p_is_account = 1 and b.state > 0)
+      );
+    if is_flag > 0 then 
+      select sum(nvl(debit,0) - nvl(credit,0)) into unit_end_os2 
+      from acc_vouch_check a 
+      inner join acc_vouch b 
+        on a.group_id = b.group_id 
+        and a.hos_id = b.hos_id 
+        and a.copy_code = b.copy_code 
+        and a.vouch_id = b.vouch_id 
+      where a.group_id = p_group_id
+        and a.hos_id = p_hos_id
+        and a.copy_code = p_copy_code
+        and a.acc_year = p_acc_year
+        and a.is_init = 0
+        and b.vouch_date <= to_date(p_year_month, 'yyyy-MM-dd')
+        and subj_code = p_subj_code
+        and (
+          (p_is_account = 0 and b.state = 99)
+          or 
+          (p_is_account = 1 and b.state > 0)
+        );
+    else 
+      unit_end_os2 := 0;
+    end if;
+     dbms_output.put_line('unit_end_os1:'||unit_end_os1||',unit_end_os2:'||unit_end_os2);  
+    unit_end_os := unit_end_os1 + unit_end_os2;
+  end if;
+    
+  --计算银行对账单存款余额（= 银行账【年初】余额 + 银行账【截止日期之前】的发生额）
+  --银行账【年初】余额
+  is_flag := 0;
+  SELECT count(0) into is_flag 
+  FROM acc_bank_check
+  where group_id = p_group_id
+    and hos_id = p_hos_id
+    and copy_code = p_copy_code
+    and acc_year = p_acc_year
+    and subj_code = p_subj_code
+    and bal <> 0
+    and is_init = 1;
+  if is_flag > 0 then 
+    SELECT sum(nvl(bal, 0)) into bank_end_os1 
+    FROM acc_bank_check
+    where group_id = p_group_id
+      and hos_id = p_hos_id
+      and copy_code = p_copy_code
+      and acc_year = p_acc_year
+      and subj_code = p_subj_code      
+      and bal <> 0
+      and is_init = 1;
+  else 
+    bank_end_os1 := 0;
+  end if;
+  
+  --银行账【截止日期之前】的发生额
+  is_flag := 0;
+  select count(0) into is_flag 
+  from acc_bank_check abc
+  where group_id = p_group_id
+    and hos_id = p_hos_id
+    and copy_code = p_copy_code
+    and acc_year = p_acc_year
+    and occur_date <= to_date(p_year_month, 'yyyy-MM-dd')
+    and is_init = 0
+    AND subj_code = p_subj_code;
+  if is_flag > 0 then 
+    select sum(nvl(abc.credit, 0) - nvl(abc.debit, 0)) into bank_end_os2
+    from acc_bank_check abc
+    where group_id = p_group_id
+      and hos_id = p_hos_id
+      and copy_code = p_copy_code
+      and acc_year = p_acc_year
+      and occur_date <= to_date(p_year_month, 'yyyy-MM-dd')
+      and is_init = 0
+      AND subj_code = p_subj_code;
+  else 
+    bank_end_os2 := 0;
+  end if;
+  dbms_output.put_line('bank_end_os1:'||bank_end_os1||',bank_end_os2:'||bank_end_os2);  
+  bank_end_os := bank_end_os1 + bank_end_os2;
+
+  --插入 单位银行存款账面余额 银行对账单存款余额
+  execute immediate '
+    insert into t_accbalance_result(
+      subj_code,unit_bank_name,bank_statement_name,debit,credit
+    )
+    values(
+      '''||p_subj_code||''',''单位银行存款账面余额'',''银行对账单存款余额'',
+      '||unit_end_os||','||bank_end_os||'
+    )
+  ';
+
+  --查询出 （加：银行已收单位未收） 赋值给变量，便于计算 单位-调节后余额
+  is_flag := 0;
+  SELECT count(0) into is_flag
+  FROM ACC_BANK_CHECK
+  where group_id = p_group_id
+    and hos_id = p_hos_id
+    and copy_code = p_copy_code
+    and acc_year = p_acc_year
+    and occur_date <= to_date(p_year_month, 'yyyy-MM-dd')
+    --and is_init = 0
+    and is_check = 0
+    and credit <> 0
+    and subj_code = p_subj_code;
+  if is_flag > 0 then
+    SELECT sum(nvl(credit,0)) into unit_add_os
+    FROM ACC_BANK_CHECK
+    where group_id = p_group_id
+      and hos_id = p_hos_id
+      and copy_code = p_copy_code
+      and acc_year = p_acc_year
+      and occur_date <= to_date(p_year_month, 'yyyy-MM-dd')
+      --and is_init = 0
+      and is_check = 0
+      and credit <> 0
+      and subj_code = p_subj_code;
+  else
+    unit_add_os := 0;
+  end if;
+
+/**********************加：银行已收单位未收+大于对账日期的已对账的数据begin*************************************/
+  is_flag := 0;
+  SELECT count(0) into is_flag
+  FROM ACC_BANK_CHECK a
+  where group_id = p_group_id
+    and hos_id = p_hos_id
+    and copy_code = p_copy_code
+    and acc_year = p_acc_year
+    and occur_date <= to_date(p_year_month, 'yyyy-MM-dd')
+    --and is_init = 0
+    and credit <> 0
+    and subj_code = p_subj_code
+    and is_check=1
+    and exists(
+        select 1 from acc_bank_veri v
+        where a.group_id=v.group_id and a.hos_id=v.hos_id and a.copy_code=v.copy_code and v.bank_id=a.bank_id
+        and v.acc_year||v.acc_month>v_year_month
+    );
+     
+  if is_flag > 0 then
+    SELECT sum(nvl(credit,0)) into unit_add_os_1
+    FROM ACC_BANK_CHECK a
+    where group_id = p_group_id
+      and hos_id = p_hos_id
+      and copy_code = p_copy_code
+      and acc_year = p_acc_year
+      and occur_date <= to_date(p_year_month, 'yyyy-MM-dd')
+      --and is_init = 0
+      and credit <> 0
+      and subj_code = p_subj_code
+      and is_check=1
+      and exists(
+        select 1 from acc_bank_veri v
+        where a.group_id=v.group_id and a.hos_id=v.hos_id and a.copy_code=v.copy_code and v.bank_id=a.bank_id
+        and v.acc_year||v.acc_month>v_year_month
+    );
+   
+  else
+    unit_add_os_1 := 0;
+  end if;
+  unit_add_os:=unit_add_os+unit_add_os_1;
+
+/**********************加：银行已收单位未收+大于对账日期的已对账的数据end****************************************/
+
+  if p_para_flag =0 then
+    --加：单位已收银行未收（出纳账与银行对账）
+    is_flag := 0;
+    select count(0) into is_flag
+    from acc_tell
+    where group_id = p_group_id
+      and hos_id = p_hos_id
+      and copy_code = p_copy_code
+      and acc_year = p_acc_year
+      and occur_date <= to_date(p_year_month, 'yyyy-MM-dd')
+      and cash_subj_code = p_subj_code
+      --and is_init = 0
+      and is_check = 0
+      and debit <> 0;
+    if is_flag > 0 then
+      select sum(nvl(debit,0)) into bank_add_os
+      from acc_tell
+      where group_id = p_group_id
+        and hos_id = p_hos_id
+        and copy_code = p_copy_code
+        and acc_year = p_acc_year
+        and occur_date <= to_date(p_year_month, 'yyyy-MM-dd')
+        and cash_subj_code = p_subj_code
+        --and is_init = 0
+        and is_check = 0
+        and debit <> 0;
+    else
+      bank_add_os := 0;
+    end if;
+    
+    
+    /**********************加：单位已收银行未收（出纳账与银行对账）+大于对账日期的已对账的数据begin************************/
+    
+     is_flag := 0;
+    select count(0) into is_flag
+    from acc_tell a
+    where group_id = p_group_id
+      and hos_id = p_hos_id
+      and copy_code = p_copy_code
+      and acc_year = p_acc_year
+      and occur_date <= to_date(p_year_month, 'yyyy-MM-dd')
+      and cash_subj_code = p_subj_code
+      --and is_init = 0
+      and is_check = 1
+      and debit <> 0
+      and exists(
+            select 1 from acc_bank_veri v
+            where a.group_id=v.group_id and a.hos_id=v.hos_id and a.copy_code=v.copy_code and a.tell_id =v.tell_id
+            and v.acc_year||v.acc_month>v_year_month
+      );
+    if is_flag > 0 then
+      select sum(nvl(debit,0)) into bank_add_os_1
+      from acc_tell a
+      where group_id = p_group_id
+        and hos_id = p_hos_id
+        and copy_code = p_copy_code
+        and acc_year = p_acc_year
+        and occur_date <= to_date(p_year_month, 'yyyy-MM-dd')
+        and cash_subj_code = p_subj_code
+        --and is_init = 0
+        and is_check = 1
+        and debit <> 0
+        and exists(
+            select 1 from acc_bank_veri v
+            where a.group_id=v.group_id and a.hos_id=v.hos_id and a.copy_code=v.copy_code and a.tell_id =v.tell_id
+            and v.acc_year||v.acc_month>v_year_month
+      );
+    else
+      bank_add_os_1 := 0;
+    end if;
+    bank_add_os:=bank_add_os+bank_add_os_1;
+    /**********************加：单位已收银行未收（出纳账与银行对账）+大于对账日期的已对账的数据end****************************************/
+  else
+    
+  
+    --加：单位已收银行未收（会计账与银行对账）
+    is_flag := 0;
+    select count(0) into is_flag
+    from acc_vouch_check a 
+    where a.group_id = p_group_id
+      and a.hos_id = p_hos_id
+      and a.copy_code = p_copy_code
+      and a.acc_year = p_acc_year
+      and a.occur_date <= to_date(p_year_month, 'yyyy-MM-dd')
+      and a.subj_code = p_subj_code
+      and a.is_init = 1 
+      and a.debit <> 0
+      and not exists(
+            select 1 from acc_bank_veri v
+            where a.group_id=v.group_id and a.hos_id=v.hos_id and a.copy_code=v.copy_code and a.vouch_check_id =v.vouch_check_id
+      );
+    if is_flag > 0 then
+      select sum(nvl(debit,0)) into bank_add_os1
+      from acc_vouch_check a 
+      where a.group_id = p_group_id
+        and a.hos_id = p_hos_id
+        and a.copy_code = p_copy_code
+        and a.acc_year = p_acc_year
+        and a.occur_date <= to_date(p_year_month, 'yyyy-MM-dd')
+        and a.subj_code = p_subj_code
+        and a.is_init = 1
+        and a.debit <> 0
+        and not exists(
+            select 1 from acc_bank_veri v
+            where a.group_id=v.group_id and a.hos_id=v.hos_id and a.copy_code=v.copy_code and a.vouch_check_id =v.vouch_check_id
+      );
+    else
+      bank_add_os1 := 0;
+    end if;
+  
+  /**********************加：单位已收银行未收（会计账与银行对账）+大于对账日期的已对账的数据begin******************************/
+  
+  is_flag := 0;
+    select count(0) into is_flag
+    from acc_vouch_check a 
+    where a.group_id = p_group_id
+      and a.hos_id = p_hos_id
+      and a.copy_code = p_copy_code
+      and a.acc_year = p_acc_year
+      and a.occur_date <= to_date(p_year_month, 'yyyy-MM-dd')
+      and a.subj_code = p_subj_code
+      and a.is_init = 1 
+      and a.debit <> 0
+      and exists(
+            select 1 from acc_bank_veri v
+            where a.group_id=v.group_id and a.hos_id=v.hos_id and a.copy_code=v.copy_code and a.vouch_check_id =v.vouch_check_id
+            and v.acc_year||v.acc_month>v_year_month
+      );
+    if is_flag > 0 then
+      select sum(nvl(debit,0)) into bank_add_os1_1
+      from acc_vouch_check a 
+      where a.group_id = p_group_id
+        and a.hos_id = p_hos_id
+        and a.copy_code = p_copy_code
+        and a.acc_year = p_acc_year
+        and a.occur_date <= to_date(p_year_month, 'yyyy-MM-dd')
+        and a.subj_code = p_subj_code
+        and a.is_init = 1
+        and a.debit <> 0
+        and exists(
+            select 1 from acc_bank_veri v
+            where a.group_id=v.group_id and a.hos_id=v.hos_id and a.copy_code=v.copy_code and a.vouch_check_id =v.vouch_check_id
+            and v.acc_year||v.acc_month>v_year_month
+      );
+    else
+      bank_add_os1_1 := 0;
+    end if;
+    bank_add_os1:=bank_add_os1+bank_add_os1_1;
+  /**********************加：单位已收银行未收（会计账与银行对账）+大于对账日期的已对账的数据end******************************/
+  
+    is_flag := 0;
+    select count(0) into is_flag
+    from acc_vouch_check a 
+    inner join acc_vouch b 
+      on a.group_id = b.group_id 
+      and a.hos_id = b.hos_id 
+      and a.copy_code = b.copy_code 
+      and a.vouch_id = b.vouch_id 
+    where a.group_id = p_group_id
+      and a.hos_id = p_hos_id
+      and a.copy_code = p_copy_code
+      and a.acc_year = p_acc_year
+      and b.vouch_date <= to_date(p_year_month, 'yyyy-MM-dd')
+      and a.subj_code = p_subj_code
+      --and a.is_init = 0 
+      and a.debit <> 0
+      and not exists(
+            select 1 from acc_bank_veri v
+            where a.group_id=v.group_id and a.hos_id=v.hos_id and a.copy_code=v.copy_code and a.vouch_check_id =v.vouch_check_id
+        );
+    if is_flag > 0 then
+      select sum(nvl(debit,0)) into bank_add_os2
+      from acc_vouch_check a 
+      inner join acc_vouch b 
+        on a.group_id = b.group_id 
+        and a.hos_id = b.hos_id 
+        and a.copy_code = b.copy_code 
+        and a.vouch_id = b.vouch_id 
+      where a.group_id = p_group_id
+        and a.hos_id = p_hos_id
+        and a.copy_code = p_copy_code
+        and a.acc_year = p_acc_year
+        and b.vouch_date <= to_date(p_year_month, 'yyyy-MM-dd')
+        and a.subj_code = p_subj_code
+        --and a.is_init = 0
+        and a.debit <> 0
+        and not exists(
+            select 1 from acc_bank_veri v
+            where a.group_id=v.group_id and a.hos_id=v.hos_id and a.copy_code=v.copy_code and a.vouch_check_id =v.vouch_check_id
+        );
+    else
+      bank_add_os2 := 0;
+    end if;
+    
+    
+    /**********************加：单位已收银行未收（会计账与银行对账）+大于对账日期的已对账的数据begin*************************************/
+     is_flag := 0;
+    select count(0) into is_flag
+    from acc_vouch_check a 
+    inner join acc_vouch b 
+      on a.group_id = b.group_id 
+      and a.hos_id = b.hos_id 
+      and a.copy_code = b.copy_code 
+      and a.vouch_id = b.vouch_id 
+    where a.group_id = p_group_id
+      and a.hos_id = p_hos_id
+      and a.copy_code = p_copy_code
+      and a.acc_year = p_acc_year
+      and b.vouch_date <= to_date(p_year_month, 'yyyy-MM-dd')
+      and a.subj_code = p_subj_code
+      --and a.is_init = 0 
+      and a.debit <> 0
+      and exists(
+            select 1 from acc_bank_veri v
+            where a.group_id=v.group_id and a.hos_id=v.hos_id and a.copy_code=v.copy_code and a.vouch_check_id =v.vouch_check_id
+            and v.acc_year||v.acc_month>v_year_month
+        );
+    if is_flag > 0 then
+      select sum(nvl(debit,0)) into bank_add_os2_1
+      from acc_vouch_check a 
+      inner join acc_vouch b 
+        on a.group_id = b.group_id 
+        and a.hos_id = b.hos_id 
+        and a.copy_code = b.copy_code 
+        and a.vouch_id = b.vouch_id 
+      where a.group_id = p_group_id
+        and a.hos_id = p_hos_id
+        and a.copy_code = p_copy_code
+        and a.acc_year = p_acc_year
+        and b.vouch_date <= to_date(p_year_month, 'yyyy-MM-dd')
+        and a.subj_code = p_subj_code
+        --and a.is_init = 0
+        and a.debit <> 0
+        and exists(
+            select 1 from acc_bank_veri v
+            where a.group_id=v.group_id and a.hos_id=v.hos_id and a.copy_code=v.copy_code and a.vouch_check_id =v.vouch_check_id
+            and v.acc_year||v.acc_month>v_year_month
+        );
+    else
+      bank_add_os2_1 := 0;
+    end if;
+    bank_add_os2:=bank_add_os2+bank_add_os2_1;
+    /**********************加：单位已收银行未收（会计账与银行对账）+大于对账日期的已对账的数据end*************************************/
+    
+    
+    bank_add_os :=bank_add_os1+bank_add_os2;
+  end if;
+
+
+  --插入 加：银行已收单位未收 加：单位已收银行未收
+  execute immediate '
+    insert into t_accbalance_result(
+      subj_code,unit_bank_name,bank_statement_name,debit,credit
+    )
+    values(
+      '''||p_subj_code||''',''加：银行已收单位未收'',''加：单位已收银行未收'',
+      '||unit_add_os||','||bank_add_os||'
+    )
+  ';
+
+  --是否含对账明细:1包含对账明细,0不包含对账明细
+  IF p_subj_select_flag=1 THEN
+    --判断银行对账方式（0.出纳与银行对账 1.会计与银行对账）
+    IF p_para_flag = 0 THEN
+      execute immediate '
+        insert into t_accbalance_result(
+          subj_code,unit_bank_name,bank_statement_name,debit,credit
+        )
+        select '''||p_subj_code||''',a_table.abc_bank_name,
+          b_table.at_unit_name,a_table.credit,b_table.debit
+        from (
+          select rownum id, tmp1.*
+          from (
+            select abc.subj_code,abc.occur_date, abc.bank_id,
+              to_char(abc.occur_date,''yyyy-mm-dd'') ||''  ''|| abc.summary  ||''  ''|| apt.pay_name abc_bank_name,
+              abc.credit
+            from acc_bank_check abc
+            left join acc_pay_type apt
+              on apt.group_id = abc.group_id
+              and apt.hos_id = abc.hos_id
+              and apt.copy_code = abc.copy_code
+              and apt.pay_code = abc.pay_type_code
+            where abc.group_id = '||p_group_id||'
+              and abc.hos_id = '||p_hos_id||'
+              and abc.copy_code = '''||p_copy_code||'''
+              and abc.acc_year = '||p_acc_year||'
+              and abc.occur_date <= to_date('''||p_year_month||''', ''yyyy-MM-dd'')
+              --and abc.is_init = 0 
+              and abc.is_check = 0
+              and abc.credit <> 0
+              and abc.subj_code = '''||p_subj_code||'''
+               ----------加上大于对账日期已对账的数据begin----------------------------
+              union all
+              select abc.subj_code,abc.occur_date, abc.bank_id,
+              to_char(abc.occur_date,''yyyy-mm-dd'') ||''  ''|| abc.summary  ||''  ''|| apt.pay_name abc_bank_name,
+              abc.credit
+            from acc_bank_check abc
+            left join acc_pay_type apt
+              on apt.group_id = abc.group_id
+              and apt.hos_id = abc.hos_id
+              and apt.copy_code = abc.copy_code
+              and apt.pay_code = abc.pay_type_code
+            where abc.group_id = '||p_group_id||'
+              and abc.hos_id = '||p_hos_id||'
+              and abc.copy_code = '''||p_copy_code||'''
+              and abc.acc_year = '||p_acc_year||'
+              and abc.occur_date <= to_date('''||p_year_month||''', ''yyyy-MM-dd'')
+              --and abc.is_init = 0 
+              and abc.is_check = 1
+              and abc.credit <> 0
+              and abc.subj_code = '''||p_subj_code||'''
+              and exists(
+                  select 1 from acc_bank_veri v
+                  where abc.group_id=v.group_id and abc.hos_id=v.hos_id and abc.copy_code=v.copy_code and abc.bank_id =v.bank_id
+                  and v.acc_year||v.acc_month>'||v_year_month||'
+              )
+               order by occur_date, bank_id 
+               ----------加上大于对账日期已对账的数据end----------------------------
+              
+          ) tmp1 
+         
+        ) a_table
+        full join (
+          select rownum id, tmp2.* 
+          from (
+            select at.cash_subj_code,at.occur_date, at.tell_id,
+              to_char(at.occur_date,''yyyy-mm-dd'') ||''  ''|| at.summary  ||''  ''|| apt.pay_name  at_unit_name,
+              at.debit
+            from acc_tell at
+            left join acc_pay_type apt
+              on apt.group_id = at.group_id
+              and apt.hos_id = at.hos_id
+              and apt.copy_code = at.copy_code
+              and apt.pay_code = at.pay_type_code
+            where at.group_id = '||p_group_id||'
+              and at.hos_id = '||p_hos_id||'
+              and at.copy_code = '''||p_copy_code||'''
+              and at.acc_year = '||p_acc_year||'
+              and at.occur_date <= to_date('''||p_year_month||''', ''yyyy-MM-dd'')
+              --and at.is_init = 0
+              and at.is_check = 0
+              and at.debit <> 0
+              and at.cash_subj_code = '''||p_subj_code||'''
+              /**********************大于对账日期的已对账的数据end******************************/
+              union all
+              select at.cash_subj_code,at.occur_date, at.tell_id,
+              to_char(at.occur_date,''yyyy-mm-dd'') ||''  ''|| at.summary  ||''  ''|| apt.pay_name  at_unit_name,
+              at.debit
+            from acc_tell at
+            left join acc_pay_type apt
+              on apt.group_id = at.group_id
+              and apt.hos_id = at.hos_id
+              and apt.copy_code = at.copy_code
+              and apt.pay_code = at.pay_type_code
+            where at.group_id = '||p_group_id||'
+              and at.hos_id = '||p_hos_id||'
+              and at.copy_code = '''||p_copy_code||'''
+              and at.acc_year = '||p_acc_year||'
+              and at.occur_date <= to_date('''||p_year_month||''', ''yyyy-MM-dd'')
+              --and at.is_init = 0
+              and at.is_check = 1
+              and at.debit <> 0
+              and at.cash_subj_code = '''||p_subj_code||'''
+              and exists(
+                  select 1 from acc_bank_veri v
+                  where at.group_id=v.group_id and at.hos_id=v.hos_id and at.copy_code=v.copy_code and at.tell_id =v.tell_id
+                  and v.acc_year||v.acc_month>'||v_year_month||'
+              )
+               order by occur_date, tell_id 
+              /**********************大于对账日期的已对账的数据end******************************/
+           
+          ) tmp2
+        ) b_table
+          on a_table.id = b_table.id
+       order by a_table.id, b_table.id
+      ';
+    ELSE
+      execute immediate '
+        insert into t_accbalance_result(
+          subj_code,unit_bank_name,bank_statement_name,debit,credit
+        )
+        select '||p_subj_code||',a_table.abc_bank_name,
+          b_table.at_unit_name,a_table.credit,b_table.debit
+        from (
+          select rownum id, tmp1.* 
+          from (
+         
+            select abc.subj_code,abc.occur_date, abc.bank_id,
+              to_char(abc.occur_date,''yyyy-mm-dd'') ||''  ''|| abc.summary  ||''  ''|| apt.pay_name  abc_bank_name,
+              abc.credit
+            from acc_bank_check abc
+            left join acc_pay_type apt
+              on apt.group_id = abc.group_id
+              and apt.hos_id = abc.hos_id
+              and apt.copy_code = abc.copy_code
+              and apt.pay_code = abc.pay_type_code
+            where abc.group_id = '||p_group_id||'
+              and abc.hos_id = '||p_hos_id||'
+              and abc.copy_code = '''||p_copy_code||'''
+              and abc.acc_year = '||p_acc_year||'
+              and abc.occur_date <= to_date('''||p_year_month||''', ''yyyy-MM-dd'')
+              --and abc.is_init = 0
+              and abc.is_check = 0
+              and abc.credit <>0
+              and abc.subj_code = '''||p_subj_code||'''
+              ----------加上大于对账日期已对账的数据begin----------------------------
+              union all
+              select abc.subj_code,abc.occur_date, abc.bank_id,
+              to_char(abc.occur_date,''yyyy-mm-dd'') ||''  ''|| abc.summary  ||''  ''|| apt.pay_name abc_bank_name,
+              abc.credit
+            from acc_bank_check abc
+            left join acc_pay_type apt
+              on apt.group_id = abc.group_id
+              and apt.hos_id = abc.hos_id
+              and apt.copy_code = abc.copy_code
+              and apt.pay_code = abc.pay_type_code
+            where abc.group_id = '||p_group_id||'
+              and abc.hos_id = '||p_hos_id||'
+              and abc.copy_code = '''||p_copy_code||'''
+              and abc.acc_year = '||p_acc_year||'
+              and abc.occur_date <= to_date('''||p_year_month||''', ''yyyy-MM-dd'')
+              --and abc.is_init = 0 
+              and abc.is_check = 1
+              and abc.credit <> 0
+              and abc.subj_code = '''||p_subj_code||'''
+              and exists(
+                  select 1 from acc_bank_veri v
+                  where abc.group_id=v.group_id and abc.hos_id=v.hos_id and abc.copy_code=v.copy_code and abc.bank_id =v.bank_id
+                  and v.acc_year||v.acc_month>'||v_year_month||'
+              )
+              order by occur_date, bank_id 
+              ----------加上大于对账日期已对账的数据end----------------------------
+             
+          ) tmp1
+        ) a_table
+        full join (
+          select rownum id, tmp2.subj_code,tmp2.at_unit_name,tmp2.debit
+          from ( 
+      select tt.* from (
+            select avc.subj_code,av.vouch_date occur_date, avc.vouch_check_id ,
+              to_char(av.vouch_date,''yyyy-mm-dd'') ||''  ''|| avc.summary  ||''  ''|| apt.pay_name  at_unit_name,
+              avc.debit
+            from acc_vouch_check avc 
+            inner join acc_vouch av 
+              on avc.group_id = av.group_id 
+              and avc.hos_id = av.hos_id 
+              and avc.copy_code = av.copy_code 
+              and avc.vouch_id = av.vouch_id 
+            left join acc_pay_type apt
+              on apt.group_id = avc.group_id
+              and apt.hos_id = avc.hos_id
+              and apt.copy_code = avc.copy_code
+              and apt.pay_code = avc.pay_type_code
+            where avc.group_id = '||p_group_id||'
+              and avc.hos_id = '||p_hos_id||'
+              and avc.copy_code = '''||p_copy_code||'''
+              and avc.acc_year = '||p_acc_year||'
+              and av.vouch_date <= to_date('''||p_year_month||''', ''yyyy-MM-dd'')
+              --and avc.is_init = 0
+              and avc.debit <> 0
+              and avc.subj_code = '''||p_subj_code||'''
+              and not exists(
+               select 1 from acc_bank_veri v
+               where avc.group_id=v.group_id and avc.hos_id=v.hos_id and avc.copy_code=v.copy_code and avc.vouch_check_id =v.vouch_check_id
+              )
+            ----------加上大于对账日期已对账的数据begin----------------------------
+             union all  
+             select avc.subj_code,av.vouch_date occur_date, avc.vouch_check_id ,
+              to_char(av.vouch_date,''yyyy-mm-dd'') ||''  ''|| avc.summary  ||''  ''|| apt.pay_name  at_unit_name,
+              avc.debit
+            from acc_vouch_check avc 
+            inner join acc_vouch av 
+              on avc.group_id = av.group_id 
+              and avc.hos_id = av.hos_id 
+              and avc.copy_code = av.copy_code 
+              and avc.vouch_id = av.vouch_id 
+            left join acc_pay_type apt
+              on apt.group_id = avc.group_id
+              and apt.hos_id = avc.hos_id
+              and apt.copy_code = avc.copy_code
+              and apt.pay_code = avc.pay_type_code
+            where avc.group_id = '||p_group_id||'
+              and avc.hos_id = '||p_hos_id||'
+              and avc.copy_code = '''||p_copy_code||'''
+              and avc.acc_year = '||p_acc_year||'
+              and av.vouch_date <= to_date('''||p_year_month||''', ''yyyy-MM-dd'')
+              --and avc.is_init = 0
+              and avc.debit <> 0
+              and avc.subj_code = '''||p_subj_code||'''
+              and exists(
+               select 1 from acc_bank_veri v
+               where avc.group_id=v.group_id and avc.hos_id=v.hos_id and avc.copy_code=v.copy_code and avc.vouch_check_id =v.vouch_check_id
+               and v.acc_year||v.acc_month>'||v_year_month||' 
+              )  
+            ----------加上大于对账日期已对账的数据end----------------------------
+            union all
+            select avc.subj_code,avc.occur_date,avc.vouch_check_id,
+              to_char(avc.occur_date,''yyyy-mm-dd'') ||''  ''|| avc.summary  ||''  ''|| apt.pay_name  at_unit_name,
+              avc.debit
+            from acc_vouch_check avc  
+            left join acc_pay_type apt
+              on apt.group_id = avc.group_id
+              and apt.hos_id = avc.hos_id
+              and apt.copy_code = avc.copy_code
+              and apt.pay_code = avc.pay_type_code
+            where avc.group_id = '||p_group_id||'
+              and avc.hos_id = '||p_hos_id||'
+              and avc.copy_code = '''||p_copy_code||'''
+              and avc.acc_year = '||p_acc_year||'
+              and avc.occur_date <= to_date('''||p_year_month||''', ''yyyy-MM-dd'')
+              and avc.is_init = 1
+              and avc.debit <> 0
+              and avc.subj_code = '''||p_subj_code||'''
+              and not exists(
+               select 1 from acc_bank_veri v
+               where avc.group_id=v.group_id and avc.hos_id=v.hos_id and avc.copy_code=v.copy_code and avc.vouch_check_id =v.vouch_check_id
+              )
+              ----------加上大于对账日期已对账的数据begin----------------------------
+             union all 
+             select avc.subj_code,avc.occur_date,avc.vouch_check_id,
+              to_char(avc.occur_date,''yyyy-mm-dd'') ||''  ''|| avc.summary  ||''  ''|| apt.pay_name  at_unit_name,
+              avc.debit
+            from acc_vouch_check avc  
+            left join acc_pay_type apt
+              on apt.group_id = avc.group_id
+              and apt.hos_id = avc.hos_id
+              and apt.copy_code = avc.copy_code
+              and apt.pay_code = avc.pay_type_code
+            where avc.group_id = '||p_group_id||'
+              and avc.hos_id = '||p_hos_id||'
+              and avc.copy_code = '''||p_copy_code||'''
+              and avc.acc_year = '||p_acc_year||'
+              and avc.occur_date <= to_date('''||p_year_month||''', ''yyyy-MM-dd'')
+              and avc.is_init = 1
+              and avc.debit <> 0
+              and avc.subj_code = '''||p_subj_code||'''
+              and exists(
+               select 1 from acc_bank_veri v
+               where avc.group_id=v.group_id and avc.hos_id=v.hos_id and avc.copy_code=v.copy_code and avc.vouch_check_id =v.vouch_check_id
+               and v.acc_year||v.acc_month>'||v_year_month||' 
+              )
+              ----------加上大于对账日期已对账的数据end----------------------------
+        ) tt
+         order by occur_date,vouch_check_id
+          ) tmp2
+         
+        ) b_table
+          on a_table.id = b_table.id
+       order by  a_table.id,b_table.id
+      ';
+    END IF;
+
+    --插入 小计
+    execute immediate '
+      insert into t_accbalance_result(
+        subj_code,unit_bank_name,bank_statement_name,debit,credit
+      )
+      values(
+        '''||p_subj_code||''',''小计'',''小计'','||unit_add_os||','||bank_add_os||'
+      )
+    ';
+  END IF;
+
+  --查询出（减：银行已付单位未付）赋值给变量，便于计算 单位-调节后余额
+  is_flag := 0;
+  SELECT count(0) into is_flag
+  FROM ACC_BANK_CHECK
+  where group_id = p_group_id
+    and hos_id = p_hos_id
+    and copy_code = p_copy_code
+    and acc_year = p_acc_year
+    and occur_date <= to_date(p_year_month, 'yyyy-MM-dd')
+    --and is_init = 0
+    and is_check = 0
+    and debit <> 0
+    and subj_code = p_subj_code;
+  if is_flag > 0 then
+    SELECT sum(nvl(debit,0)) into unit_minus_os
+    FROM ACC_BANK_CHECK
+    where group_id = p_group_id
+      and hos_id = p_hos_id
+      and copy_code = p_copy_code
+      and acc_year = p_acc_year
+      and occur_date <= to_date(p_year_month, 'yyyy-MM-dd')
+      --and is_init = 0
+      and is_check = 0
+      and debit <> 0
+      and subj_code = p_subj_code;
+  else
+    unit_minus_os := 0;
+  end if;
+
+/**********************减：银行已付单位未付-大于对账日期的已对账的数据begin**********************************************************/
+is_flag := 0;
+  SELECT count(0) into is_flag
+  FROM ACC_BANK_CHECK a
+  where group_id = p_group_id
+    and hos_id = p_hos_id
+    and copy_code = p_copy_code
+    and acc_year = p_acc_year
+    and occur_date <= to_date(p_year_month, 'yyyy-MM-dd')
+    --and is_init = 0
+    and is_check = 1
+    and debit <> 0
+    and subj_code = p_subj_code
+    and exists(
+        select 1 from acc_bank_veri v
+        where a.group_id=v.group_id and a.hos_id=v.hos_id and a.copy_code=v.copy_code and v.bank_id=a.bank_id
+        and v.acc_year||v.acc_month>v_year_month
+    );
+  if is_flag > 0 then
+    SELECT sum(nvl(debit,0)) into unit_minus_os_1
+    FROM ACC_BANK_CHECK a
+    where group_id = p_group_id
+      and hos_id = p_hos_id
+      and copy_code = p_copy_code
+      and acc_year = p_acc_year
+      and occur_date <= to_date(p_year_month, 'yyyy-MM-dd')
+      --and is_init = 0
+      and is_check = 1
+      and debit <> 0
+      and subj_code = p_subj_code
+      and exists(
+        select 1 from acc_bank_veri v
+        where a.group_id=v.group_id and a.hos_id=v.hos_id and a.copy_code=v.copy_code and v.bank_id=a.bank_id
+        and v.acc_year||v.acc_month>v_year_month
+    );
+  else
+    unit_minus_os_1 := 0;
+  end if;
+ unit_minus_os:=unit_minus_os+unit_minus_os_1;
+/**********************减：银行已付单位未付-大于对账日期的已对账的数据end**********************************************************/
+
+
+  if p_para_flag =0 then
+    --：减：单位已付银行未付 （出纳账与银行对账）
+    is_flag := 0;
+    select count(0) into is_flag
+    from acc_tell
+    where group_id = p_group_id
+      and hos_id = p_hos_id
+      and copy_code = p_copy_code
+      and acc_year = p_acc_year
+      and occur_date <= to_date(p_year_month, 'yyyy-MM-dd')
+      --and is_init = 0
+      and is_check = 0
+      and credit <> 0
+      and cash_subj_code = p_subj_code;
+    if is_flag > 0 then
+      select sum(nvl(credit,0)) into bank_minus_os
+      from acc_tell
+      where group_id = p_group_id
+        and hos_id = p_hos_id
+        and copy_code = p_copy_code
+        and acc_year = p_acc_year
+        and occur_date <= to_date(p_year_month, 'yyyy-MM-dd')
+        --and is_init = 0
+        and is_check = 0
+        and credit <> 0
+        and cash_subj_code = p_subj_code;
+    else
+      bank_minus_os := 0;
+    end if;
+    
+     /**********************减：单位已付银行未付 （出纳账与银行对账）+大于对账日期的已对账的数据begin************************/
+     is_flag := 0;
+    select count(0) into is_flag
+    from acc_tell a
+    where group_id = p_group_id
+      and hos_id = p_hos_id
+      and copy_code = p_copy_code
+      and acc_year = p_acc_year
+      and occur_date <= to_date(p_year_month, 'yyyy-MM-dd')
+      --and is_init = 0
+      and is_check = 1
+      and credit <> 0
+      and cash_subj_code = p_subj_code
+      and exists(
+          select 1 from acc_bank_veri v
+          where a.group_id=v.group_id and a.hos_id=v.hos_id and a.copy_code=v.copy_code and v.tell_id=a.tell_id
+          and v.acc_year||v.acc_month>v_year_month
+      );
+    if is_flag > 0 then
+      select sum(nvl(credit,0)) into bank_minus_os_1
+      from acc_tell a
+      where group_id = p_group_id
+        and hos_id = p_hos_id
+        and copy_code = p_copy_code
+        and acc_year = p_acc_year
+        and occur_date <= to_date(p_year_month, 'yyyy-MM-dd')
+        --and is_init = 0
+        and is_check = 1
+        and credit <> 0
+        and cash_subj_code = p_subj_code
+        and exists(
+            select 1 from acc_bank_veri v
+            where a.group_id=v.group_id and a.hos_id=v.hos_id and a.copy_code=v.copy_code and v.tell_id=a.tell_id
+            and v.acc_year||v.acc_month>v_year_month
+        );
+    else
+      bank_minus_os_1 := 0;
+    end if;
+     bank_minus_os:=bank_minus_os+bank_minus_os_1;
+    /**********************减：单位已付银行未付 （出纳账与银行对账）+大于对账日期的已对账的数据end************************/
+  else
+    --：减：单位已付银行未付 （单位账与银行对账）
+    is_flag := 0;
+    select count(0) into is_flag
+    from acc_vouch_check a 
+    where a.group_id = p_group_id
+      and a.hos_id = p_hos_id
+      and a.copy_code = p_copy_code
+      and a.acc_year = p_acc_year
+      and a.occur_date <= to_date(p_year_month, 'yyyy-MM-dd')
+      and a.subj_code = p_subj_code
+      and a.is_init = 1
+      and a.credit <> 0
+      and not exists(
+            select 1 from acc_bank_veri v
+            where a.group_id=v.group_id and a.hos_id=v.hos_id and a.copy_code=v.copy_code and a.vouch_check_id =v.vouch_check_id
+            and v.acc_year||v.acc_month<=v_year_month
+      );
+    if is_flag > 0 then
+      select sum(nvl(credit,0)) into bank_minus_os1
+      from acc_vouch_check a 
+      where a.group_id = p_group_id
+        and a.hos_id = p_hos_id
+        and a.copy_code = p_copy_code
+        and a.acc_year = p_acc_year
+        and a.occur_date <= to_date(p_year_month, 'yyyy-MM-dd')
+        and a.subj_code = p_subj_code
+        and a.is_init = 1
+        and a.credit <> 0
+        and not exists(
+            select 1 from acc_bank_veri v
+            where a.group_id=v.group_id and a.hos_id=v.hos_id and a.copy_code=v.copy_code and a.vouch_check_id =v.vouch_check_id
+       );
+    else
+      bank_minus_os1 := 0;
+    end if;
+    
+    /**********************减：单位已付银行未付 （单位账与银行对账）-大于对账日期的已对账的数据begin**********************************************************/
+    
+    is_flag := 0;
+    select count(0) into is_flag
+    from acc_vouch_check a 
+    where a.group_id = p_group_id
+      and a.hos_id = p_hos_id
+      and a.copy_code = p_copy_code
+      and a.acc_year = p_acc_year
+      and a.occur_date <= to_date(p_year_month, 'yyyy-MM-dd')
+      and a.subj_code = p_subj_code
+      and a.is_init = 1
+      and a.credit <> 0
+      and exists(
+            select 1 from acc_bank_veri v
+            where a.group_id=v.group_id and a.hos_id=v.hos_id and a.copy_code=v.copy_code and a.vouch_check_id =v.vouch_check_id
+            and v.acc_year||v.acc_month>v_year_month
+      );
+    if is_flag > 0 then
+      select sum(nvl(credit,0)) into bank_minus_os1_1
+      from acc_vouch_check a 
+      where a.group_id = p_group_id
+        and a.hos_id = p_hos_id
+        and a.copy_code = p_copy_code
+        and a.acc_year = p_acc_year
+        and a.occur_date <= to_date(p_year_month, 'yyyy-MM-dd')
+        and a.subj_code = p_subj_code
+        and a.is_init = 1
+        and a.credit <> 0
+        and exists(
+            select 1 from acc_bank_veri v
+            where a.group_id=v.group_id and a.hos_id=v.hos_id and a.copy_code=v.copy_code and a.vouch_check_id =v.vouch_check_id
+            and v.acc_year||v.acc_month>v_year_month
+       );
+    else
+      bank_minus_os1_1 := 0;
+    end if;
+    bank_minus_os1:=bank_minus_os1+bank_minus_os1_1;
+    /**********************减：单位已付银行未付 （单位账与银行对账）-大于对账日期的已对账的数据end**********************************************************/
+    
+    
+    
+    is_flag := 0;
+    select count(0) into is_flag
+    from acc_vouch_check a 
+    inner join acc_vouch b 
+      on a.group_id = b.group_id 
+      and a.hos_id = b.hos_id 
+      and a.copy_code = b.copy_code 
+      and a.vouch_id = b.vouch_id 
+    where a.group_id = p_group_id
+      and a.hos_id = p_hos_id
+      and a.copy_code = p_copy_code
+      and a.acc_year = p_acc_year
+      and b.vouch_date <= to_date(p_year_month, 'yyyy-MM-dd')
+      and a.subj_code = p_subj_code
+      --and a.is_init = 0
+      and a.credit <> 0
+      and not exists(
+            select 1 from acc_bank_veri v
+            where a.group_id=v.group_id and a.hos_id=v.hos_id and a.copy_code=v.copy_code and a.vouch_check_id =v.vouch_check_id
+       );
+    if is_flag > 0 then
+      select sum(nvl(credit,0)) into bank_minus_os2
+      from acc_vouch_check a 
+      inner join acc_vouch b 
+        on a.group_id = b.group_id 
+        and a.hos_id = b.hos_id 
+        and a.copy_code = b.copy_code 
+        and a.vouch_id = b.vouch_id 
+      where a.group_id = p_group_id
+        and a.hos_id = p_hos_id
+        and a.copy_code = p_copy_code
+        and a.acc_year = p_acc_year
+        and b.vouch_date <= to_date(p_year_month, 'yyyy-MM-dd')
+        and a.subj_code = p_subj_code
+        --and a.is_init = 0
+        and a.credit <> 0
+        and not exists(
+            select 1 from acc_bank_veri v
+            where a.group_id=v.group_id and a.hos_id=v.hos_id and a.copy_code=v.copy_code and a.vouch_check_id =v.vouch_check_id
+            and v.acc_year||v.acc_month<=v_year_month
+       );
+    else
+      bank_minus_os2 := 0;
+    end if;
+    
+    /**********************减：单位已付银行未付 （单位账与银行对账）-大于对账日期的已对账的数据begin**********************************************************/
+    
+    
+     is_flag := 0;
+    select count(0) into is_flag
+    from acc_vouch_check a 
+    inner join acc_vouch b 
+      on a.group_id = b.group_id 
+      and a.hos_id = b.hos_id 
+      and a.copy_code = b.copy_code 
+      and a.vouch_id = b.vouch_id 
+    where a.group_id = p_group_id
+      and a.hos_id = p_hos_id
+      and a.copy_code = p_copy_code
+      and a.acc_year = p_acc_year
+      and b.vouch_date <= to_date(p_year_month, 'yyyy-MM-dd')
+      and a.subj_code = p_subj_code
+      --and a.is_init = 0
+      and a.credit <> 0
+      and exists(
+            select 1 from acc_bank_veri v
+            where a.group_id=v.group_id and a.hos_id=v.hos_id and a.copy_code=v.copy_code and a.vouch_check_id =v.vouch_check_id
+            and v.acc_year||v.acc_month>v_year_month
+       );
+    if is_flag > 0 then
+      select sum(nvl(credit,0)) into bank_minus_os2_2
+      from acc_vouch_check a 
+      inner join acc_vouch b 
+        on a.group_id = b.group_id 
+        and a.hos_id = b.hos_id 
+        and a.copy_code = b.copy_code 
+        and a.vouch_id = b.vouch_id 
+      where a.group_id = p_group_id
+        and a.hos_id = p_hos_id
+        and a.copy_code = p_copy_code
+        and a.acc_year = p_acc_year
+        and b.vouch_date <= to_date(p_year_month, 'yyyy-MM-dd')
+        and a.subj_code = p_subj_code
+        --and a.is_init = 0
+        and a.credit <> 0
+        and exists(
+            select 1 from acc_bank_veri v
+            where a.group_id=v.group_id and a.hos_id=v.hos_id and a.copy_code=v.copy_code and a.vouch_check_id =v.vouch_check_id
+            and v.acc_year||v.acc_month>v_year_month
+       );
+    else
+      bank_minus_os2_2 := 0;
+    end if;
+    bank_minus_os2:=bank_minus_os2+bank_minus_os2_2;
+    /**********************减：单位已付银行未付 （单位账与银行对账）-大于对账日期的已对账的数据end**********************************************************/
+    
+    
+    bank_minus_os := bank_minus_os1+bank_minus_os2;
+  end if;
+
+  --插入 加：银行已付单位未付 加：单位已付银行未付
+  execute immediate '
+    insert into t_accbalance_result(
+      subj_code,unit_bank_name,bank_statement_name,debit,credit
+    )
+    values(
+      '''||p_subj_code||''',''减：银行已付单位未付'',''减：单位已付银行未付'',
+      '||unit_minus_os||','||bank_minus_os||'
+    )
+  ';
+
+  --是否含对账明细:1包含对账明细,0不包含对账明细
+  IF p_subj_select_flag=1 THEN
+    --判断银行对账方式（0.出纳与银行对账 1.会计与银行对账）
+    IF p_para_flag = 0 THEN
+      execute immediate '
+        insert into t_accbalance_result(
+          subj_code,unit_bank_name,bank_statement_name,debit,credit
+        )
+        select '||p_subj_code||',a_table.abc_bank_name,
+          b_table.at_unit_name,a_table.debit,b_table.credit
+        from (
+          select rownum id, tmp1.* 
+          from ( 
+            select abc.subj_code,abc.occur_date, abc.bank_id,
+              to_char(abc.occur_date,''yyyy-mm-dd'') ||''  ''|| abc.summary  ||''  ''|| apt.pay_name  abc_bank_name,
+              abc.debit
+            from acc_bank_check abc
+            left join acc_pay_type apt
+              on apt.group_id = abc.group_id
+              and apt.hos_id = abc.hos_id
+              and apt.copy_code = abc.copy_code
+              and apt.pay_code = abc.pay_type_code
+            where abc.group_id = '||p_group_id||'
+              and abc.hos_id = '||p_hos_id||'
+              and abc.copy_code = '''||p_copy_code||'''
+              and abc.acc_year = '||p_acc_year||'
+              and abc.occur_date <= to_date('''||p_year_month||''', ''yyyy-MM-dd'')
+              --and abc.is_init = 0
+              and abc.is_check = 0
+              and abc.debit <> 0
+              and abc.subj_code = '''||p_subj_code||'''
+             ----------加上大于对账日期已对账的数据begin----------------------------
+              union all
+             select abc.subj_code,abc.occur_date, abc.bank_id, 
+              to_char(abc.occur_date,''yyyy-mm-dd'') ||''  ''|| abc.summary  ||''  ''|| apt.pay_name  abc_bank_name,
+              abc.debit
+            from acc_bank_check abc
+            left join acc_pay_type apt
+              on apt.group_id = abc.group_id
+              and apt.hos_id = abc.hos_id
+              and apt.copy_code = abc.copy_code
+              and apt.pay_code = abc.pay_type_code
+            where abc.group_id = '||p_group_id||'
+              and abc.hos_id = '||p_hos_id||'
+              and abc.copy_code = '''||p_copy_code||'''
+              and abc.acc_year = '||p_acc_year||'
+              and abc.occur_date <= to_date('''||p_year_month||''', ''yyyy-MM-dd'')
+              --and abc.is_init = 0
+              and abc.is_check = 1
+              and abc.debit <> 0
+              and abc.subj_code = '''||p_subj_code||'''
+              and exists(
+                select 1 from acc_bank_veri v
+                where abc.group_id=v.group_id and abc.hos_id=v.hos_id and abc.copy_code=v.copy_code and v.bank_id=abc.bank_id
+                and v.acc_year||v.acc_month>'||v_year_month||'
+            )
+            order by occur_date, bank_id 
+             ----------加上大于对账日期已对账的数据end----------------------------
+          ) tmp1 
+        
+          
+        ) a_table
+        full join (
+          select rownum id, tmp2.* 
+          from ( 
+            select at.cash_subj_code,at.occur_date, at.tell_id,
+              to_char(at.occur_date,''yyyy-mm-dd'') ||''  ''|| at.summary  ||''  ''|| apt.pay_name  at_unit_name,
+              at.credit
+            from acc_tell at
+            left join acc_pay_type apt
+              on apt.group_id = at.group_id
+              and apt.hos_id = at.hos_id
+              and apt.copy_code = at.copy_code
+              and apt.pay_code = at.pay_type_code
+            where at.group_id = '||p_group_id||'
+              and at.hos_id = '||p_hos_id||'
+              and at.copy_code = '''||p_copy_code||'''
+              and at.acc_year = '||p_acc_year||'
+              and at.occur_date <= to_date('''||p_year_month||''', ''yyyy-MM-dd'')
+              --and at.is_init = 0
+              and at.is_check = 0
+              and at.credit <> 0
+              and at.cash_subj_code = '''||p_subj_code||'''
+             ----------加上大于对账日期已对账的数据begin----------------------------
+             union all
+             select at.cash_subj_code,at.occur_date, at.tell_id,
+              to_char(at.occur_date,''yyyy-mm-dd'') ||''  ''|| at.summary  ||''  ''|| apt.pay_name  at_unit_name,
+              at.credit
+            from acc_tell at
+            left join acc_pay_type apt
+              on apt.group_id = at.group_id
+              and apt.hos_id = at.hos_id
+              and apt.copy_code = at.copy_code
+              and apt.pay_code = at.pay_type_code
+            where at.group_id = '||p_group_id||'
+              and at.hos_id = '||p_hos_id||'
+              and at.copy_code = '''||p_copy_code||'''
+              and at.acc_year = '||p_acc_year||'
+              and at.occur_date <= to_date('''||p_year_month||''', ''yyyy-MM-dd'')
+              --and at.is_init = 0
+              and at.is_check = 1
+              and at.credit <> 0
+              and at.cash_subj_code = '''||p_subj_code||'''
+              and exists(
+                select 1 from acc_bank_veri v
+                where at.group_id=v.group_id and at.hos_id=v.hos_id and at.copy_code=v.copy_code and v.tell_id=at.tell_id
+                and v.acc_year||v.acc_month>'||v_year_month||'
+            )
+             order by occur_date, tell_id 
+             ----------加上大于对账日期已对账的数据end----------------------------
+          ) tmp2 
+        ) b_table
+          on a_table.id = b_table.id
+       order by a_table.id, b_table.id
+      ';
+    ELSE
+      execute immediate '
+        insert into t_accbalance_result(
+          subj_code,unit_bank_name,bank_statement_name,debit,credit
+        )
+        select '||p_subj_code||',a_table.abc_bank_name,
+          b_table.at_unit_name,a_table.debit,b_table.credit
+        from (
+          select rownum id, tmp1.* 
+          from ( 
+            select abc.subj_code,abc.occur_date, abc.bank_id,
+              to_char(abc.occur_date,''yyyy-mm-dd'') ||''  ''|| abc.summary  ||''  ''|| apt.pay_name  abc_bank_name,
+              abc.debit
+            from acc_bank_check abc
+            left join acc_pay_type apt
+              on apt.group_id = abc.group_id
+              and apt.hos_id = abc.hos_id
+              and apt.copy_code = abc.copy_code
+              and apt.pay_code = abc.pay_type_code
+            where abc.group_id = '||p_group_id||'
+              and abc.hos_id = '||p_hos_id||'
+              and abc.copy_code = '''||p_copy_code||'''
+              and abc.acc_year = '||p_acc_year||'
+              and abc.occur_date <= to_date('''||p_year_month||''', ''yyyy-MM-dd'')
+              --and abc.is_init = 0
+              and abc.is_check = 0
+              and abc.debit <> 0
+              and abc.subj_code = '''||p_subj_code||'''
+             ----------加上大于对账日期已对账的数据begin----------------------------
+              union all
+               select abc.subj_code,abc.occur_date, abc.bank_id,
+              to_char(abc.occur_date,''yyyy-mm-dd'') ||''  ''|| abc.summary  ||''  ''|| apt.pay_name  abc_bank_name,
+              abc.debit
+            from acc_bank_check abc
+            left join acc_pay_type apt
+              on apt.group_id = abc.group_id
+              and apt.hos_id = abc.hos_id
+              and apt.copy_code = abc.copy_code
+              and apt.pay_code = abc.pay_type_code
+            where abc.group_id = '||p_group_id||'
+              and abc.hos_id = '||p_hos_id||'
+              and abc.copy_code = '''||p_copy_code||'''
+              and abc.acc_year = '||p_acc_year||'
+              and abc.occur_date <= to_date('''||p_year_month||''', ''yyyy-MM-dd'')
+              --and abc.is_init = 0
+              and abc.is_check = 1
+              and abc.debit <> 0
+              and abc.subj_code = '''||p_subj_code||'''
+              and exists(
+                select 1 from acc_bank_veri v
+                where abc.group_id=v.group_id and abc.hos_id=v.hos_id and abc.copy_code=v.copy_code and v.bank_id=abc.bank_id
+                and v.acc_year||v.acc_month>'||v_year_month||'
+             )
+            order by occur_date, bank_id 
+             
+              ----------加上大于对账日期已对账的数据end----------------------------
+            
+          ) tmp1 
+            
+        ) a_table
+        full join (
+          select rownum id, tmp2.subj_code , tmp2.at_unit_name , tmp2.credit 
+          from (
+      select tt.* from (
+            select avc.subj_code,av.vouch_date occur_date, avc.vouch_check_id, 
+              to_char(av.vouch_date,''yyyy-mm-dd'') ||''  ''|| avc.summary  ||''  ''|| apt.pay_name  at_unit_name,
+              avc.credit
+            from acc_vouch_check avc 
+            inner join acc_vouch av 
+              on avc.group_id = av.group_id 
+              and avc.hos_id = av.hos_id 
+              and avc.copy_code = av.copy_code 
+              and avc.vouch_id = av.vouch_id 
+            left join acc_pay_type apt
+              on apt.group_id = avc.group_id
+              and apt.hos_id = avc.hos_id
+              and apt.copy_code = avc.copy_code
+              and apt.pay_code = avc.pay_type_code
+            where avc.group_id = '||p_group_id||'
+              and avc.hos_id = '||p_hos_id||'
+              and avc.copy_code = '''||p_copy_code||'''
+              and avc.acc_year = '||p_acc_year||'
+              and av.vouch_date <= to_date('''||p_year_month||''', ''yyyy-MM-dd'')
+              --and avc.is_init = 0
+              and avc.credit <> 0
+              and avc.subj_code = '''||p_subj_code||'''
+              and not exists(
+                  select 1 from acc_bank_veri v
+                  where avc.group_id=v.group_id and avc.hos_id=v.hos_id and avc.copy_code=v.copy_code and avc.vouch_check_id =v.vouch_check_id                
+              )
+            ----------加上大于对账日期已对账的数据begin----------------------------
+            union all
+            select avc.subj_code,av.vouch_date occur_date, avc.vouch_check_id, 
+              to_char(av.vouch_date,''yyyy-mm-dd'') ||''  ''|| avc.summary  ||''  ''|| apt.pay_name  at_unit_name,
+              avc.credit
+            from acc_vouch_check avc 
+            inner join acc_vouch av 
+              on avc.group_id = av.group_id 
+              and avc.hos_id = av.hos_id 
+              and avc.copy_code = av.copy_code 
+              and avc.vouch_id = av.vouch_id 
+            left join acc_pay_type apt
+              on apt.group_id = avc.group_id
+              and apt.hos_id = avc.hos_id
+              and apt.copy_code = avc.copy_code
+              and apt.pay_code = avc.pay_type_code
+            where avc.group_id = '||p_group_id||'
+              and avc.hos_id = '||p_hos_id||'
+              and avc.copy_code = '''||p_copy_code||'''
+              and avc.acc_year = '||p_acc_year||'
+              and av.vouch_date <= to_date('''||p_year_month||''', ''yyyy-MM-dd'')
+              --and avc.is_init = 0
+              and avc.credit <> 0
+              and avc.subj_code = '''||p_subj_code||'''
+              and exists(
+                  select 1 from acc_bank_veri v
+                  where avc.group_id=v.group_id and avc.hos_id=v.hos_id and avc.copy_code=v.copy_code and avc.vouch_check_id =v.vouch_check_id                
+                  and v.acc_year||v.acc_month>'||v_year_month||'
+              )  
+              
+            ----------加上大于对账日期已对账的数据end----------------------------  
+            union all
+            select avc.subj_code,avc.occur_date, avc.vouch_check_id,
+              to_char(avc.occur_date,''yyyy-mm-dd'') ||''  ''|| avc.summary  ||''  ''|| apt.pay_name  at_unit_name,
+              avc.credit
+            from acc_vouch_check avc 
+            left join acc_pay_type apt
+              on apt.group_id = avc.group_id
+              and apt.hos_id = avc.hos_id
+              and apt.copy_code = avc.copy_code
+              and apt.pay_code = avc.pay_type_code
+            where avc.group_id = '||p_group_id||'
+              and avc.hos_id = '||p_hos_id||'
+              and avc.copy_code = '''||p_copy_code||'''
+              and avc.acc_year = '||p_acc_year||'
+              and avc.occur_date <= to_date('''||p_year_month||''', ''yyyy-MM-dd'')
+              and avc.is_init = 1
+              and avc.credit <> 0
+              and avc.subj_code = '''||p_subj_code||'''
+              and not exists(
+                  select 1 from acc_bank_veri v
+                  where avc.group_id=v.group_id and avc.hos_id=v.hos_id and avc.copy_code=v.copy_code and avc.vouch_check_id =v.vouch_check_id                
+              )
+              ----------加上大于对账日期已对账的数据begin----------------------------
+              union all
+              select avc.subj_code,avc.occur_date, avc.vouch_check_id,
+              to_char(avc.occur_date,''yyyy-mm-dd'') ||''  ''|| avc.summary  ||''  ''|| apt.pay_name  at_unit_name,
+              avc.credit
+            from acc_vouch_check avc 
+            left join acc_pay_type apt
+              on apt.group_id = avc.group_id
+              and apt.hos_id = avc.hos_id
+              and apt.copy_code = avc.copy_code
+              and apt.pay_code = avc.pay_type_code
+            where avc.group_id = '||p_group_id||'
+              and avc.hos_id = '||p_hos_id||'
+              and avc.copy_code = '''||p_copy_code||'''
+              and avc.acc_year = '||p_acc_year||'
+              and avc.occur_date <= to_date('''||p_year_month||''', ''yyyy-MM-dd'')
+              and avc.is_init = 1
+              and avc.credit <> 0
+              and avc.subj_code = '''||p_subj_code||'''
+              and exists(
+                  select 1 from acc_bank_veri v
+                  where avc.group_id=v.group_id and avc.hos_id=v.hos_id and avc.copy_code=v.copy_code and avc.vouch_check_id =v.vouch_check_id                
+                  and v.acc_year||v.acc_month>'||v_year_month||'
+              )
+              ----------加上大于对账日期已对账的数据end----------------------------  
+        ) tt
+        order by occur_date, vouch_check_id
+          ) tmp2
+          
+        ) b_table
+          on a_table.id = b_table.id
+      order by a_table.id, b_table.id
+      ';
+    END IF;
+
+    --插入 小计
+    execute immediate '
+      insert into t_accbalance_result(
+        subj_code,unit_bank_name,bank_statement_name,debit,credit
+      )
+      values(
+        '''||p_subj_code||''',''小计'',''小计'','||unit_minus_os||','||bank_minus_os||'
+      )
+    ';
+  END IF;
+
+  --插入 单位-调节后余额 银行-调节后余额
+  execute immediate '
+    insert into t_accbalance_result(
+      subj_code,unit_bank_name,bank_statement_name,debit,credit
+    )
+    values(
+      '||p_subj_code||',''单位-调节后余额'',''银行-调节后余额'',
+      '||(unit_end_os+unit_add_os-unit_minus_os)||','||(bank_end_os+bank_add_os-bank_minus_os)||'
+    )
+  ';
+
+  ddl_sql := '
+    select subj_code,unit_bank_name as unit_name,
+      bank_statement_name as bank_name,debit,credit
+    from t_accbalance_result  
+    
+  ';
+  --dbms_output.put_line(ddl_sql);
+  open projdata for ddl_sql;
+
+END act_balance_adjust;
+  
+	]]></sql>
+</root>
+

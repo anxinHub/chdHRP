@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.mat.dao.dura.query.MatDuraQueryDistributionMapper">
+
+	<resultMap id="matInvMap"  type="java.util.Map">
+		<result property="mat_type_id" column="mat_type_id"/>
+        <result property="mat_type_name" column="mat_type_name"/>
+    
+        <result property="inv_code" column="inv_code"/>
+        <result property="inv_id" column="inv_id"/>
+        <result property="inv_name" column="inv_name"/>
+        <result property="inv_model" column="inv_model"/>
+	</resultMap>
+	<select id="queryMatDuraQueryDistribution" parameterType="java.util.Map"  resultType="java.util.Map">
+        
+		SELECT hdd.dept_code, hdd.dept_name, mid.inv_code, mid.inv_name, 
+		 sum(mdss.end_amount) end_amount
+		FROM mat_dura_dept_surplus mdss
+		LEFT JOIN hos_dept_dict hdd
+			ON mdss.group_id = hdd.group_id 
+			AND mdss.hos_id = hdd.hos_id 
+			AND mdss.dept_id = hdd.dept_id 
+			AND hdd.is_stop = 0 
+		LEFT JOIN mat_inv_dict mid 
+			ON mdss.group_id = mid.group_id 
+			AND mdss.hos_id = mid.hos_id 
+			AND mdss.copy_code = mid.copy_code 
+			AND mdss.inv_id = mid.inv_id 
+			AND mid.is_stop = 0
+		where mdss.group_id = #{group_id,jdbcType=INTEGER} 
+			AND mdss.hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND mdss.copy_code = #{copy_code,jdbcType=VARCHAR} 
+			<if test="year != null and year != ''">
+				AND mdss.year = #{year,jdbcType=VARCHAR}
+			</if>
+			<if test="month != null and month != ''">
+				AND mdss.month = #{month,jdbcType=VARCHAR}
+			</if>
+			<if test="inv_id != null and inv_id != ''">
+				AND mdss.inv_id in (${inv_id})
+			</if>
+			<if test="inv_message != null and inv_message != ''">
+				AND (
+					mid.inv_code like '%' || #{inv_message,jdbcType=VARCHAR} || '%'
+					OR
+					mid.inv_name like '%' || #{inv_message,jdbcType=VARCHAR} || '%'
+					OR
+					mid.spell_code like '%' || #{inv_message,jdbcType=VARCHAR} || '%'
+					OR
+					mid.wbx_code like '%' || #{inv_message,jdbcType=VARCHAR} || '%'
+					OR
+					mid.inv_model like '%' || #{inv_message,jdbcType=VARCHAR} || '%'
+					OR
+					mid.alias like '%' || #{inv_message,jdbcType=VARCHAR} || '%'
+					OR
+					mid.alias_spell like '%' || #{inv_message,jdbcType=VARCHAR} || '%'
+				)
+			</if>
+           group by hdd.dept_code, hdd.dept_name, mid.inv_code, mid.inv_name
+           having sum(mdss.end_amount)>0
+        union all 
+        SELECT hdd.store_code dept_code, hdd.store_name dept_name, mid.inv_code, mid.inv_name, 
+         sum(mdss.end_amount) end_amount
+        FROM mat_dura_store_surplus mdss
+        LEFT JOIN hos_store_dict hdd
+            ON mdss.group_id = hdd.group_id 
+            AND mdss.hos_id = hdd.hos_id 
+            AND mdss.store_id = hdd.store_id 
+            AND hdd.is_stop = 0 
+        LEFT JOIN mat_inv_dict mid 
+            ON mdss.group_id = mid.group_id 
+            AND mdss.hos_id = mid.hos_id 
+            AND mdss.copy_code = mid.copy_code 
+            AND mdss.inv_id = mid.inv_id 
+            AND mid.is_stop = 0
+        where mdss.group_id = #{group_id,jdbcType=INTEGER} 
+            AND mdss.hos_id = #{hos_id,jdbcType=INTEGER} 
+            AND mdss.copy_code = #{copy_code,jdbcType=VARCHAR} 
+            <if test="year != null and year != ''">
+                AND mdss.year = #{year,jdbcType=VARCHAR}
+            </if>
+            <if test="month != null and month != ''">
+                AND mdss.month = #{month,jdbcType=VARCHAR}
+            </if>
+            <if test="inv_id != null and inv_id != ''">
+                AND mdss.inv_id in (${inv_id})
+            </if>
+            <if test="inv_message != null and inv_message != ''">
+                AND (
+                    mid.inv_code like '%' || #{inv_message,jdbcType=VARCHAR} || '%'
+                    OR
+                    mid.inv_name like '%' || #{inv_message,jdbcType=VARCHAR} || '%'
+                    OR
+                    mid.spell_code like '%' || #{inv_message,jdbcType=VARCHAR} || '%'
+                    OR
+                    mid.wbx_code like '%' || #{inv_message,jdbcType=VARCHAR} || '%'
+                    OR
+                    mid.inv_model like '%' || #{inv_message,jdbcType=VARCHAR} || '%'
+                    OR
+                    mid.alias like '%' || #{inv_message,jdbcType=VARCHAR} || '%'
+                    OR
+                    mid.alias_spell like '%' || #{inv_message,jdbcType=VARCHAR} || '%'
+                )
+            </if>
+           group by hdd.store_code, hdd.store_name, mid.inv_code, mid.inv_name
+           having sum(mdss.end_amount)>0
+	</select>
+	
+	<select id="queryInvMatType" parameterType="java.util.Map"  resultMap="matInvMap">
+		 with temp as
+			 (select distinct mat_type_id
+			  from mat_inv_dict
+			  where is_dura = 1
+			  and is_stop = 0
+			  order by mat_type_id)
+			  
+		 select 
+			mat_type_id, 
+			mat_type_name
+		 from mat_type_dict
+		 where 
+		    group_id = #{group_id,jdbcType=INTEGER} 
+			AND hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND copy_code = #{copy_code,jdbcType=VARCHAR} 
+		    AND mat_type_id in (select mat_type_id from temp)	
+	</select>
+	
+	<select id="queryMatInvByMenu" parameterType="java.util.Map"  resultMap="matInvMap">
+		 select distinct inv_code, inv_id, inv_name, inv_model
+		  from mat_inv_dict
+		 where 
+		    group_id = #{group_id,jdbcType=INTEGER} 
+			AND hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND copy_code = #{copy_code,jdbcType=VARCHAR} 
+		    AND mat_type_id = #{mat_type_id,jdbcType=VARCHAR}	
+	</select>
+	
+</mapper>
+

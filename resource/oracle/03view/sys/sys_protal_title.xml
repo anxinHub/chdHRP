@@ -1,0 +1,705 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+
+	<sql id="V_MAT_BATCH_WARNING" type="view" desc="材料效期预警"><![CDATA[
+CREATE OR REPLACE VIEW V_MAT_BATCH_WARNING AS
+SELECT
+    mbv.group_id ,
+    mbv.hos_id ,
+    mbv.copy_code ,
+    mbv.inv_id ,
+    t.inv_code ,
+    t.inv_name,
+    t.inv_model ,
+    t.unit_code ,
+    t.unit_name ,
+    a.store_id ,
+    a.store_code ,
+    a.store_name ,
+    a.batch_no ,
+    a.bar_code ,
+    a.left_amount ,
+    mbv.inva_date ,
+     para.para_value as warn_days ,
+    sysdate queryDate ,
+    nvl(ROUND(TO_NUMBER(mbv.inva_date - sysdate)), 0)  days,
+
+    case
+      when TO_NUMBER(mbv.inva_date - sysdate) > 0 AND  TO_NUMBER(mbv.inva_date - sysdate) <
+				(select  para_value from acc_para where group_id = mbv.group_id and hos_id = mbv.hos_id
+				and copy_code = mbv.copy_code and para_code = '04003') then '临近'
+      when TO_NUMBER(mbv.inva_date - sysdate) = 0 then '到期'
+      when TO_NUMBER(mbv.inva_date - sysdate)< 0  then '过期'
+      else '其它'
+        end state
+
+    FROM MAT_BATCH_VALIDITY  mbv
+    left join ( select mfb.group_id , mfb.hos_id , mfb.copy_code , mfb.inv_id , mfb.batch_no , mfb.store_id ,
+          hsd.store_code , hsd.store_name , mfb.bar_code , mfb.left_amount from MAT_FIFO_BALANCE mfb
+          left join HOS_STORE_DICT hsd
+            on
+              mfb.group_id = hsd.group_id and
+              mfb.hos_id = hsd.hos_id and
+              mfb.store_id = hsd.store_id and
+              hsd.is_stop = 0 )a
+      ON
+        mbv.group_id = a.group_id  and
+        mbv.hos_id = a.hos_id  and
+        mbv.copy_code = a.copy_code  and
+        mbv.inv_id = a.inv_id   and
+        mbv.batch_no = a.batch_no
+    left join ( select mid.group_id , mid.hos_id , mid.copy_code , mid.inv_id , mid.inv_code , mid.inv_name,
+          mid.inv_model , mid.unit_code , hu.unit_name , mid.use_state , mid.mat_type_id , mid.is_com
+          from MAT_INV_DICT mid
+          left join HOS_UNIT hu
+            on
+              mid.group_id = hu.group_id and
+              mid.hos_id = hu.hos_id  and
+              mid.unit_code = hu.unit_code
+              and mid.use_state = 1
+          ) t
+      ON
+        mbv.group_id = t.group_id  and
+        mbv.hos_id = t.hos_id  and
+        mbv.copy_code = t.copy_code and
+        mbv.inv_id = t.inv_id and
+        t.use_state = 1
+    left join acc_para para
+      ON
+        mbv.group_id = para.group_id  and
+        mbv.hos_id = para.hos_id  and
+        mbv.copy_code = para.copy_code and
+        para.para_code = '04003'
+
+	]]></sql>
+	
+	<sql id="V_MAT_SAFESTORE_WARNING" type="view" desc="安全库存预警"><![CDATA[
+CREATE OR REPLACE VIEW V_MAT_SAFESTORE_WARNING AS
+SELECT
+		msi.group_id ,
+		msi.hos_id ,
+		msi.copy_code ,
+		msi.store_id ,
+		hsd.store_name,
+		msi.inv_id ,
+		t.inv_code ,
+		t.inv_name ,
+		t.inv_model ,
+		t.unit_code ,
+		t.unit_name ,
+		msi.package_code ,
+		hp.pack_name ,
+		msi.period_num ,
+		msi.num_exchange ,
+		mih.cur_amount ,
+		msi.secu_limit ,
+		( mih.cur_amount - msi.secu_limit ) diff
+		FROM MAT_STORE_INV  msi
+		left join ( select mid.group_id , mid.hos_id , mid.copy_code , mid.inv_id , mid.inv_code , mid.inv_name ,
+					mid.inv_model , mid.unit_code , hu.unit_name , mid.mat_type_id from MAT_INV_DICT mid
+					left join HOS_UNIT hu
+						on
+							mid.group_id = hu.group_id and
+							mid.hos_id = hu.hos_id  and
+							mid.unit_code = hu.unit_code and
+							hu.is_stop = 0
+					where  mid.use_state = 1
+					) t
+			on
+				msi.group_id = t.group_id and
+				msi.hos_id = t.hos_id  and
+				msi.copy_code = t.copy_code and
+				msi.inv_id = t.inv_id
+		left join  HOS_PACKAGE hp
+			on
+				msi.group_id = hp.group_id and
+				msi.hos_id = hp.hos_id  and
+				msi.package_code = hp.pack_code
+		left join MAT_INV_HOLD mih
+			ON
+				msi.group_id = mih.group_id and
+				msi.hos_id = mih.hos_id  and
+				msi.copy_code = mih.copy_code and
+				msi.store_id = mih.store_id and
+				msi.inv_id = mih.inv_id
+		left join HOS_STORE_DICT hsd
+			on
+        msi.group_id = hsd.group_id and
+        msi.hos_id = hsd.hos_id  and
+        msi.store_id = hsd.store_id and
+				hsd.is_stop = 0
+   where  mih.cur_amount <= msi.warn_amount
+
+
+	]]></sql>
+	
+	
+	<sql id="V_MAT_HIGHSTORE_WARNING" type="view" desc="超高限预警"><![CDATA[
+CREATE OR REPLACE VIEW V_MAT_HIGHSTORE_WARNING AS
+SELECT
+    msi.group_id ,
+    msi.hos_id ,
+    msi.copy_code ,
+    msi.store_id ,
+    hsd.store_name,
+    msi.inv_id ,
+    t.inv_code ,
+    t.inv_name ,
+    t.inv_model ,
+    t.unit_code ,
+    t.unit_name ,
+    mih.cur_amount ,
+    msi.high_limit ,
+    ( mih.cur_amount - msi.high_limit ) diff
+    FROM MAT_STORE_INV  msi
+    left join ( select mid.group_id , mid.hos_id , mid.copy_code , mid.inv_id , mid.inv_code , mid.inv_name ,
+          mid.inv_model , mid.unit_code , hu.unit_name , mid.mat_type_id from MAT_INV_DICT mid
+          left join HOS_UNIT hu
+            on
+              mid.group_id = hu.group_id and
+              mid.hos_id = hu.hos_id  and
+              mid.unit_code = hu.unit_code and
+              hu.is_stop = 0
+          where  mid.use_state = 1
+          ) t
+      on
+        msi.group_id = t.group_id and
+        msi.hos_id = t.hos_id  and
+        msi.copy_code = t.copy_code and
+        msi.inv_id = t.inv_id
+    left join MAT_INV_HOLD mih
+      ON
+        msi.group_id = mih.group_id and
+        msi.hos_id = mih.hos_id  and
+        msi.copy_code = mih.copy_code and
+        msi.store_id = mih.store_id and
+        msi.inv_id = mih.inv_id
+    left join HOS_STORE_DICT hsd
+      on
+        msi.group_id = hsd.group_id and
+        msi.hos_id = hsd.hos_id  and
+        msi.store_id = hsd.store_id and
+				hsd.is_stop = 0
+   where  mih.cur_amount  > msi.high_limit
+
+
+
+	]]></sql>
+	
+	<sql id="V_MAT_SHORTSTORE_WARNING" type="view" desc="短缺货预警"><![CDATA[
+		CREATE OR REPLACE VIEW V_MAT_SHORTSTORE_WARNING AS
+	SELECT
+    msi.group_id ,
+    msi.hos_id ,
+    msi.copy_code ,
+    msi.store_id ,
+    hsd.store_name,
+    msi.inv_id ,
+    t.inv_code ,
+    t.inv_name ,
+    t.inv_model ,
+    t.unit_code ,
+    t.unit_name ,
+    mih.cur_amount ,
+    msi.low_limit ,
+    ( mih.cur_amount - msi.low_limit ) diff
+    FROM MAT_STORE_INV  msi
+    left join ( select mid.group_id , mid.hos_id , mid.copy_code , mid.inv_id , mid.inv_code , mid.inv_name ,
+          mid.inv_model , mid.unit_code , hu.unit_name , mid.mat_type_id from MAT_INV_DICT mid
+          left join HOS_UNIT hu
+            on
+              mid.group_id = hu.group_id and
+              mid.hos_id = hu.hos_id  and
+              mid.unit_code = hu.unit_code and
+              hu.is_stop = 0
+          where  mid.use_state = 1
+          ) t
+      on
+        msi.group_id = t.group_id and
+        msi.hos_id = t.hos_id  and
+        msi.copy_code = t.copy_code and
+        msi.inv_id = t.inv_id
+    left join MAT_INV_HOLD mih
+      ON
+        msi.group_id = mih.group_id and
+        msi.hos_id = mih.hos_id  and
+        msi.copy_code = mih.copy_code and
+        msi.store_id = mih.store_id and
+        msi.inv_id = mih.inv_id
+    left join HOS_STORE_DICT hsd
+      on
+        msi.group_id = hsd.group_id and
+        msi.hos_id = hsd.hos_id  and
+        msi.store_id = hsd.store_id and
+				hsd.is_stop = 0
+    where mih.cur_amount  < msi.low_limit
+
+	]]></sql>
+	
+	<sql id="V_MAT_INVCERT_WARNING" type="view" desc="材料证件效期预警"><![CDATA[
+	CREATE OR REPLACE VIEW V_MAT_INVCERT_WARNING AS
+	select distinct 
+        a.group_id, 
+        a.hos_id, 
+        a.copy_code, 
+        a.inv_id, 
+        a.cert_id, 
+        a.cert_code, 
+        c.fac_code, 
+        c.fac_name, 
+        b.end_date, 
+        d.cert_type_code, 
+        d.cert_type_name as type_name, 
+        mid.inv_code, 
+        mid.inv_name, 
+        mid.inv_model, 
+        mid.fac_id, 
+        mid.fac_no, 
+        mid.is_quality, 
+        sysdate AS queryDate, 
+        nvl(ROUND(TO_NUMBER(b.end_date - TRUNC(sysdate, 'dd'))), 0) as days,
+        wst.WARN_TYPE_CODE,
+        wst.fdays,
+        wst.warn_type_name as state
+    from mat_prod_cert_inv a
+    left join mat_prod_cert b on a.group_id = b.group_id
+    and a.hos_id = b.hos_id
+    and a.copy_code = b.copy_code
+    and a.cert_id = b.cert_id 
+    left join hos_fac c on c.group_id = b.group_id
+    and c.hos_id = b.hos_id
+    and c.fac_id = b.fac_id 
+    left join mat_cert_type d on d.group_id = b.group_id
+    and d.hos_id = b.hos_id
+    and d.copy_code = b.copy_code
+    and d.cert_type_code = b.cert_type_code 
+    left join mat_store_inv msi on a.group_id = msi.group_id
+    and a.hos_id = msi.hos_id
+    and a.copy_code = msi.copy_code
+    and a.inv_id = msi.inv_id 
+    left join mat_inv_dict mid on a.group_id = mid.group_id
+    and a.hos_id = mid.hos_id
+    and a.copy_code = mid.copy_code
+    and a.inv_id = mid.inv_id
+    and mid.is_stop = 0 
+	left join (select distinct cert_id, x_d, WARN_DATA.warn_type_code, x_d - mwt.days as fdays,mwt.warn_type_name as warn_type_name
+    from (select cert_id,
+               x_d,
+               case
+                 when warn_type_code is not null then
+                  warn_type_code
+                 else
+                  warn_type_code_5
+               end as warn_type_code
+          from (select cert_id,
+                       base_data.x_d,
+                       (select min(WARN_TYPE_code)
+                          from MAT_WARN_TYPE mwt
+                         where is_stop = 0
+                           and ((warn_way = 1 and x_d < 0) or
+                               (warn_way = 2 and x_d > 0 and x_d <= mwt.days) or
+                               (warn_way = 3 and x_d = 0) or
+                               (warn_way = 4 and x_d > mwt.days))) as warn_type_code,
+                       (select min(WARN_TYPE_code)
+                          from MAT_WARN_TYPE mwt
+                         where is_stop = 0
+                           and (warn_way = 5 and base_data.is_kx = 0)) as warn_type_code_5
+                  from (select cert_id,
+                               ROUND(TO_NUMBER(end_date - TRUNC(sysdate, 'dd'))) x_d,
+                               case
+                                 when exists
+                                  (select 1
+                                         from mat_prod_cert_file mpcf
+                                        where mpcf.group_id = mpc.group_id
+                                          and mpcf.hos_id = mpc.hos_id
+                                          and mpcf.copy_code = mpc.copy_code
+                                          and mpcf.cert_id = mpc.cert_id) then
+                                  1
+                                 else
+                                  0
+                               end is_kx,
+                               mpc.end_date
+                          from mat_prod_cert mpc
+                        ) base_data)) WARN_DATA
+
+  		left join MAT_WARN_TYPE mwt
+    	on WARN_DATA.warn_type_code = mwt.warn_type_code
+   		) wst on wst.cert_id = a.cert_id
+    	
+
+
+	]]></sql>
+	
+	
+	<sql id="V_MAT_SUPCERT_WARNING" type="view" desc="供应商证件效期预警"><![CDATA[
+	CREATE OR REPLACE VIEW V_MAT_SUPCERT_WARNING AS
+select WARN_DATA.group_id,
+       WARN_DATA.hos_id,
+       WARN_DATA.copy_code,
+       hsd.sup_name,
+       cert_id,
+       x_d as days,
+       case WARN_DATA.warn_type_code
+         when '001' then
+          '过期'
+         when '002' then
+          '提前'
+         when '003' then
+          '到期'
+         when '004' then
+          '未到期'
+         when '005' then
+          '缺失'
+       end as state
+  from (select cert_id,
+               x_d,
+               case
+                 when warn_type_code is not null then
+                  warn_type_code
+                 else
+                  warn_type_code_5
+               end as warn_type_code,
+               group_id,
+               hos_id,
+               copy_code,
+               sup_id
+          from (select cert_id,
+                       base_data.x_d,
+                       base_data.group_id,
+                       base_data.hos_id,
+                       base_data.copy_code,
+                       base_data.sup_id,
+                       (select min(WARN_TYPE_code)
+                          from MAT_WARN_TYPE mwt
+                         where is_stop = 0
+                           and mwt.group_id = base_data.group_id
+                           and mwt.hos_id = base_data.hos_id
+                           and mwt.copy_code = base_data.copy_code
+                           and ((warn_way = 1 and x_d < 0) or
+                               (warn_way = 2 and x_d > 0 and x_d <= mwt.days) or
+                               (warn_way = 3 and x_d = 0) or
+                               (warn_way = 4 and x_d > mwt.days))) as warn_type_code,
+                       (select min(WARN_TYPE_code)
+                          from MAT_WARN_TYPE mwt
+                         where is_stop = 0
+                           and mwt.group_id = base_data.group_id
+                           and mwt.hos_id = base_data.hos_id
+                           and mwt.copy_code = base_data.copy_code
+                           and (warn_way = 5 and base_data.is_kx = 0)) as warn_type_code_5
+                
+                  from (select cert_id,
+                               ROUND(TO_NUMBER(end_date - TRUNC(sysdate, 'dd'))) x_d,
+                               case
+                                 when exists
+                                  (select 1
+                                         from MAT_SUP_CERT_FILE mscf
+                                        where mscf.group_id = mvcd.group_id
+                                          and mscf.hos_id = mvcd.hos_id
+                                          and mscf.copy_code = mvcd.copy_code
+                                          and mscf.cert_id = mvcd.cert_id) then
+                                  1
+                                 else
+                                  0
+                               end is_kx,
+                               mvcd.end_date,
+                               mvcd.group_id,
+                               mvcd.hos_id,
+                               mvcd.copy_code,
+                               mvcd.sup_id
+                          from MAT_VEN_CERT_DETAIL mvcd) base_data)) WARN_DATA
+
+  left join MAT_WARN_TYPE mwt
+    on WARN_DATA.warn_type_code = mwt.warn_type_code
+   and mwt.group_id = WARN_DATA.group_id
+   and mwt.hos_id = WARN_DATA.hos_id
+   and mwt.copy_code = WARN_DATA.copy_code
+  LEFT JOIN Hos_Sup_Dict hsd
+    on WARN_DATA.group_id = hsd.group_id
+   and WARN_DATA.hos_id = hsd.hos_id
+   and WARN_DATA.sup_id = hsd.sup_id
+   and hsd.is_stop = 0
+	
+
+
+
+	]]></sql>
+	
+	<sql id="V_MAT_ORDER_WARNING" type="view" desc="供应商订单到货预警"><![CDATA[
+		CREATE OR REPLACE VIEW V_MAT_ORDER_WARNING AS
+		with order_tmp as (
+			select a.group_id,a.hos_id,a.copy_code,b.sup_id,b.sup_no,b.sup_code,b.sup_name,count(0)  count_num
+		    from mat_order_main a
+		    left join hos_sup_dict b on a.group_id=b.group_id and a.hos_id=b.hos_id and a.sup_id=b.sup_id and a.sup_no=b.sup_no
+		    group by a.group_id,a.hos_id,a.copy_code,b.sup_id,b.sup_no,b.sup_code,b.sup_name
+		),over_tmp as (
+		    select a.group_id,a.hos_id,a.copy_code,b.sup_code,b.sup_name,nvl(count(0),0) count_num
+		    from mat_order_main a
+		    left join hos_sup_dict b on a.group_id=b.group_id and a.hos_id=b.hos_id and a.sup_id=b.sup_id and a.sup_no=b.sup_no
+		    where a.state=2
+		   		and to_char(a.arrive_date,'yyyy-MM-dd') <= substr(to_char(sysdate,'YYYY-MM-DD HH24:MI:SS'),0,10)
+		    group by a.group_id,a.hos_id,a.copy_code,b.sup_code,b.sup_name
+		)
+		select aa.group_id,aa.hos_id,aa.copy_code,aa.sup_id,aa.sup_no,aa.sup_code,aa.sup_name,aa.count_num order_num,
+		    nvl(cc.count_num,0) over_num
+		from order_tmp aa
+		left join over_tmp cc on aa.group_id=cc.group_id and aa.hos_id=cc.hos_id and aa.copy_code=cc.copy_code and aa.sup_code=cc.sup_code
+		where  cc.count_num > 0
+		order by aa.sup_code
+	]]></sql>
+	
+	<sql id="V_SYS_PORTAL_NOTICE" type="view" desc="系统通知表"><![CDATA[
+	CREATE OR REPLACE VIEW V_SYS_PORTAL_NOTICE AS
+	SELECT a.group_id
+         ,a.hos_id
+         ,a.mod_code
+         ,a.CONTENT
+         ,a.USER_ID
+         ,to_char('yyyy-MM-dd HH:mm:ss',a.CREATE_DATE) CREATE_DATE
+         ,a.STATE
+      FROM SYS_PORTAL_NOTICE a
+      where state=1
+	]]></sql>
+	
+	<sql id="V_SYS_PORTAL_PUBLIC" type="view" desc="系统公告表"><![CDATA[
+	CREATE OR REPLACE VIEW V_SYS_PORTAL_PUBLIC AS
+	SELECT a.group_id
+         ,a.hos_id
+         ,a.PUBLIC_ID
+         ,a.TITLE
+         ,a.CONTENT
+         ,a.USER_ID
+         ,a.DEPT_ID
+         ,to_char('yyyy-MM-dd HH:mm:ss',a.CREATE_DATE) CREATE_DATE
+         ,a.CLICK_COUNT
+         ,a.STATE
+         ,a.MOD_CODE
+      FROM SYS_PORTAL_PUBLIC a
+      where state=1
+      order by a.CREATE_DATE desc
+	]]></sql>
+	
+	<sql id="V_SYS_PORTAL_NEWS" type="view" desc="系统新闻表"><![CDATA[
+	CREATE OR REPLACE VIEW V_SYS_PORTAL_NEWS AS
+	SELECT a.group_id
+         ,a.hos_id
+         ,a.NEWS_ID
+         ,a.TITLE
+         ,a.CONTENT
+         ,a.USER_ID
+         ,a.DEPT_ID
+         ,to_char('yyyy-MM-dd HH:mm:ss',a.CREATE_DATE) CREATE_DATE
+         ,a.CLICK_COUNT
+         ,a.STATE
+         ,a.MOD_CODE
+      FROM SYS_PORTAL_NEWS a
+      where state=1
+      order by a.CREATE_DATE desc
+	]]></sql>
+	
+	
+	<sql id="V_SYS_PORTAL_DISCUSS" type="view" desc="系统讨论表"><![CDATA[
+	CREATE OR REPLACE VIEW V_SYS_PORTAL_DISCUSS AS
+	SELECT a.group_id
+         ,a.hos_id
+         ,a.DISCUSS_ID
+         ,a.TITLE
+         ,a.CONTENT
+         ,a.USER_ID
+         ,a.DEPT_ID
+         ,to_char('yyyy-MM-dd HH:mm:ss',a.CREATE_DATE) CREATE_DATE
+         ,a.CLICK_COUNT
+         ,a.STATE
+         ,a.MOD_CODE
+      FROM SYS_PORTAL_DISCUSS a
+      where state=1
+      order by a.CREATE_DATE desc
+	]]></sql>
+	
+	
+	<sql id="V_MAT_SUPCERT_WARNING" type="view" desc="厂商证件预警"><![CDATA[
+	CREATE OR REPLACE VIEW V_MAT_SUPCERT_WARNING AS
+select WARN_DATA.group_id,
+       WARN_DATA.hos_id,
+       WARN_DATA.copy_code,
+       hsd.sup_name,
+       cert_id,
+       x_d as days,
+       case WARN_DATA.warn_type_code
+         when '001' then
+          '过期'
+         when '002' then
+          '提前'
+         when '003' then
+          '到期'
+         when '004' then
+          '未到期'
+         when '005' then
+          '缺失'
+       end as state
+  from (select cert_id,
+               x_d,
+               case
+                 when warn_type_code is not null then
+                  warn_type_code
+                 else
+                  warn_type_code_5
+               end as warn_type_code,
+               group_id,
+               hos_id,
+               copy_code,
+               sup_id
+          from (select cert_id,
+                       base_data.x_d,
+                       base_data.group_id,
+                       base_data.hos_id,
+                       base_data.copy_code,
+                       base_data.sup_id,
+                       (select min(WARN_TYPE_code)
+                          from MAT_WARN_TYPE mwt
+                         where is_stop = 0
+                           and mwt.group_id = base_data.group_id
+                           and mwt.hos_id = base_data.hos_id
+                           and mwt.copy_code = base_data.copy_code
+                           and ((warn_way = 1 and x_d < 0) or
+                               (warn_way = 2 and x_d > 0 and x_d <= mwt.days) or
+                               (warn_way = 3 and x_d = 0) or
+                               (warn_way = 4 and x_d > mwt.days))) as warn_type_code,
+                       (select min(WARN_TYPE_code)
+                          from MAT_WARN_TYPE mwt
+                         where is_stop = 0
+                           and mwt.group_id = base_data.group_id
+                           and mwt.hos_id = base_data.hos_id
+                           and mwt.copy_code = base_data.copy_code
+                           and (warn_way = 5 and base_data.is_kx = 0)) as warn_type_code_5
+                
+                  from (select cert_id,
+                               ROUND(TO_NUMBER(end_date - TRUNC(sysdate, 'dd'))) x_d,
+                               case
+                                 when exists
+                                  (select 1
+                                         from MAT_SUP_CERT_FILE mscf
+                                        where mscf.group_id = mvcd.group_id
+                                          and mscf.hos_id = mvcd.hos_id
+                                          and mscf.copy_code = mvcd.copy_code
+                                          and mscf.cert_id = mvcd.cert_id) then
+                                  1
+                                 else
+                                  0
+                               end is_kx,
+                               mvcd.end_date,
+                               mvcd.group_id,
+                               mvcd.hos_id,
+                               mvcd.copy_code,
+                               mvcd.sup_id
+                          from MAT_VEN_CERT_DETAIL mvcd) base_data)) WARN_DATA
+
+  left join MAT_WARN_TYPE mwt
+    on WARN_DATA.warn_type_code = mwt.warn_type_code
+   and mwt.group_id = WARN_DATA.group_id
+   and mwt.hos_id = WARN_DATA.hos_id
+   and mwt.copy_code = WARN_DATA.copy_code
+  LEFT JOIN Hos_Sup_Dict hsd
+    on WARN_DATA.group_id = hsd.group_id
+   and WARN_DATA.hos_id = hsd.hos_id
+   and WARN_DATA.sup_id = hsd.sup_id
+   and hsd.is_stop = 0
+	
+
+
+
+	]]></sql>
+	
+	<sql id="V_MAT_VENDOR_WARNING" type="view" desc="厂商证件预警"><![CDATA[
+	CREATE OR REPLACE VIEW V_MAT_VENDOR_WARNING AS
+select WARN_DATA.group_id,
+       WARN_DATA.hos_id,
+       WARN_DATA.copy_code,
+       hfd.fac_name,
+       cert_id,
+       x_d as days,
+       case WARN_DATA.warn_type_code
+         when '001' then
+          '过期'
+         when '002' then
+          '提前'
+         when '003' then
+          '到期'
+         when '004' then
+          '未到期'
+         when '005' then
+          '缺失'
+       end as state
+  from (select cert_id,
+               x_d,
+               case
+                 when warn_type_code is not null then
+                  warn_type_code
+                 else
+                  warn_type_code_5
+               end as warn_type_code,
+               group_id,
+               hos_id,
+               copy_code,
+               fac_id
+          from (select cert_id,
+                       base_data.x_d,
+                       base_data.group_id,
+                       base_data.hos_id,
+                       base_data.copy_code,
+                       base_data.fac_id,
+                       (select min(WARN_TYPE_code)
+                          from MAT_WARN_TYPE mwt
+                         where is_stop = 0
+                           and mwt.group_id = base_data.group_id
+                           and mwt.hos_id = base_data.hos_id
+                           and mwt.copy_code = base_data.copy_code
+                           and ((warn_way = 1 and x_d < 0) or
+                               (warn_way = 2 and x_d > 0 and x_d <= mwt.days) or
+                               (warn_way = 3 and x_d = 0) or
+                               (warn_way = 4 and x_d > mwt.days))) as warn_type_code,
+                       (select min(WARN_TYPE_code)
+                          from MAT_WARN_TYPE mwt
+                         where is_stop = 0
+                           and mwt.group_id = base_data.group_id
+                           and mwt.hos_id = base_data.hos_id
+                           and mwt.copy_code = base_data.copy_code
+                           and (warn_way = 5 and base_data.is_kx = 0)) as warn_type_code_5
+                
+                  from (select cert_id,
+                               ROUND(TO_NUMBER(end_date - TRUNC(sysdate, 'dd'))) x_d,
+                               case
+                                 when exists
+                                  (select 1
+                                         from MAT_FAC_CERT_FILE mfcf
+                                        where mfcf.group_id = mfc.group_id
+                                          and mfcf.hos_id = mfc.hos_id
+                                          and mfcf.copy_code = mfc.copy_code
+                                          and mfcf.cert_id = mfc.cert_id) then
+                                  1
+                                 else
+                                  0
+                               end is_kx,
+                               mfc.end_date,
+                               mfc.group_id,
+                               mfc.hos_id,
+                               mfc.copy_code,
+                               mfc.fac_id
+                          from MAT_FAC_CERT mfc) base_data)) WARN_DATA
+
+  left join MAT_WARN_TYPE mwt
+    on WARN_DATA.warn_type_code = mwt.warn_type_code
+   and mwt.group_id = WARN_DATA.group_id
+   and mwt.hos_id = WARN_DATA.hos_id
+   and mwt.copy_code = WARN_DATA.copy_code
+  LEFT JOIN Hos_Fac_Dict hfd
+    on WARN_DATA.group_id = hfd.group_id
+   and WARN_DATA.hos_id = hfd.hos_id
+   and WARN_DATA.fac_id = hfd.fac_id
+   and hfd.is_stop = 0
+	
+
+
+
+	]]></sql>
+</root>
+

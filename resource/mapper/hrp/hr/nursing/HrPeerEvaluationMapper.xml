@@ -1,0 +1,271 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.hr.dao.nursing.HrPeerEvaluationMapper">
+ 	<resultMap id="hrPeerEvaluation" type="java.util.Map">
+	  	<result column="year" property="year"/>
+	  	<result column="dept_no" property="dept_no"/>
+	  	<result column="dept_name" property="dept_name"/>
+	  	<result column="emp_id" property="emp_id"/>
+	  	<result column="emp_name" property="emp_name"/>
+	  	<result column="emp_code" property="emp_code"/>
+	 	<result column="duty_code" property="duty_code"/>
+	  	<result column="duty_name" property="duty_name"/>
+	  	<result column="title_code" property="title_code"/>
+	  	<result column="title_name" property="title_name"/>
+	  	<result column="level_code" property="level_code"/>
+	  	<result column="level_name" property="level_name"/>
+	  	<result column="peer_score" property="peer_score"/>
+	  	<result column="state" property="state"/>
+	  	<result column="state_name" property="state_name"/>
+	  	<result column="qualified_name" property="qualified_name"/>
+	  	<result column="note" property="note"/>
+  	</resultMap>
+
+	<insert id="addBatch" parameterType="java.util.List" >
+		INSERT INTO HR_PEER (
+			group_id,
+			hos_id,
+			year,
+			emp_id,
+			duty_code,
+			title_code,
+			level_code,
+			peer_score,
+			state,
+			note
+		) (
+		<foreach collection="list" item="item" index="index" separator=" union all " >
+			select 		
+				#{item.group_id,jdbcType=INTEGER},
+				#{item.hos_id,jdbcType=INTEGER},
+				#{item.year,jdbcType=VARCHAR},
+				#{item.emp_id,jdbcType=INTEGER},
+				#{item.duty_code,jdbcType=VARCHAR},
+				#{item.title_code,jdbcType=VARCHAR},
+				#{item.level_code,jdbcType=VARCHAR},
+				#{item.peer_score,jdbcType=INTEGER},
+				#{item.state,jdbcType=INTEGER},
+				#{item.note,jdbcType=VARCHAR}
+		    from dual
+		</foreach>
+		)
+	</insert>
+	
+	<delete id="deleteHrPeer" parameterType="java.util.Map">
+		DELETE FROM HR_PEER 
+		where  group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+		<if test="year != null and year != ''">
+			AND year = #{year,jdbcType=VARCHAR}
+		</if>
+		<if test="emp_id != null and emp_id != ''">
+			AND emp_id = #{emp_id,jdbcType=INTEGER}
+		</if>
+	</delete>
+	
+	<delete id="deletePeerEvaluation" parameterType="java.util.List">
+		
+			<foreach collection="list" index="index" item="item" open="begin" separator=";" close=";end;">
+				DELETE FROM HR_PEER 
+				WHERE
+					group_id = #{item.group_id,jdbcType=INTEGER}
+					AND hos_id = #{item.hos_id,jdbcType=INTEGER}
+					AND year = #{item.year,jdbcType=VARCHAR}
+					AND emp_id = #{item.emp_id,jdbcType=INTEGER}
+			</foreach>
+	</delete>
+	
+	<select id="query" parameterType="java.util.Map" resultMap="hrPeerEvaluation" >
+		with inservice_statistics as( 
+		 	select hoe.emp_id,hoe.emp_code,hoe.emp_name,hde.dept_id,hde.dept_no,hde.dept_name,hd.duty_code,hd.duty_name,
+    			t.field_col_code level_code ,t.field_col_name  level_name,hes.peer_score,hes.year,hes.state,hes.note,
+    			case when hes.state = 0 then '新建' when hes.state = 1 then '提交' else '' end state_name ,
+    			case when hes.peer_score-hls.peer_score &gt;= 0 then '合格'  else '不合格' end  as qualified_name 
+     		from HR_PEER hes 
+    		left join hr_level_set hls on hes.level_code=hls.level_code and hls.year=to_char(hes.year)
+    		left join hos_emp hoe on hes.emp_id=hoe.emp_id 
+    		left join hr_emp_promotion hep on hes.emp_id = hep.emp_id and hes.group_id=hep.group_id and hes.hos_id=hep.hos_id and hes.level_code=hep.level_code
+    		left join hr_fiied_data t on hep.level_code =t.field_col_code and field_tab_code = 'DIC_LEVEL' and t.group_id=hep.group_id and   t.hos_id=hep.hos_id
+    		left join hos_dept_dict hde on hoe.dept_no =hde.dept_no and hoe.group_id=hde.group_id and hoe.hos_id=hde.hos_id
+    		left join hr_hos_duty hhd on hoe.emp_id=hhd.emp_id and hoe.group_id=hhd.group_id and hoe.hos_id=hhd.hos_id and hhd.duty_code=hes.duty_code
+    		left join hos_duty hd on hhd.duty_code=hd.duty_code and hd.group_id=hhd.group_id and hd.hos_id=hhd.hos_id
+    		left join hr_emp_technology_title het on hoe.emp_id =het.emp_id and hoe.group_id=het.group_id and hoe.hos_id=het.hos_id 
+    		<!-- left join hr_title ht on het.title_code=ht.title_code and ht.group_id=het.group_id and ht.hos_id=het.hos_id -->
+    				WHERE 
+		hes.group_id = #{group_id}   and 
+		hes.hos_id = #{hos_id}
+    		group by hoe.emp_id,hoe.emp_code,hoe.emp_name,hde.dept_id,hde.dept_no,hde.dept_name,hd.duty_code,hd.duty_name<!-- ,ht.title_code,ht.title_name -->,
+    			t.field_col_code  ,t.field_col_name ,hes.peer_score,hes.year,hls.education,hes.peer_score,hes.state,hls.peer_score,hes.note
+		)
+     	select * from inservice_statistics inst 
+		<where>
+			<!-- 不查询出已删除职工的数据 -->
+			inst.emp_id is not null
+			<if test="edu_date!=null and edu_date !=''">
+			and inst.edu_date=#{edu_date}
+			</if>
+			<if test="emp_id !=null and emp_id !=''">
+	 		and inst.emp_id like '%${emp_id}%'
+			</if>
+			<if test="emp_name !=null and emp_name !=''">
+			and inst.emp_name like  '%${emp_name}%'
+			</if>
+			<if test="dept_id !=null and dept_id !=''">
+	 		and inst.dept_id=#{dept_id}
+			</if>
+			<if test="duty_code !=null and duty_code !=''">
+			and inst.duty_code=#{duty_code}
+			</if>
+			<if test="title_code !=null and title_code !=''">
+			and inst.title_code=#{title_code}
+			</if>
+			<if test="level_code !=null and level_code !=''">
+			and inst.level_code=#{level_code}
+			</if>
+			<if test="year !=null and year !=''">
+				and inst.year=#{year}
+			</if>
+		</where>
+		order by inst.emp_code
+	</select>
+		<select id="queryByCode" resultMap="hrPeerEvaluation"  parameterType="java.util.Map" >
+	
+		SELECT 
+		group_id,
+		hos_id,
+		year,
+		emp_id,
+		duty_code,
+		title_code,
+		level_code,
+		peer_score,
+		state,
+		note
+		FROM hr_peer 
+		WHERE 
+		group_id = #{group_id,jdbcType=INTEGER}   and 
+		hos_id = #{hos_id,jdbcType=INTEGER}   and 
+		year = #{year,jdbcType=VARCHAR}   and 
+		emp_id = #{emp_id,jdbcType=INTEGER} 
+	
+	</select>
+	<!-- 提交 -->
+	<update id="addPromotionEvaluate" parameterType="java.util.Map">
+	    UPDATE hr_promotion_evaluate set  peer_score = #{peer_score,jdbcType=INTEGER}
+		<where>                     
+			AND group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND year = #{year,jdbcType=VARCHAR}
+			AND emp_id = #{emp_id,jdbcType=INTEGER}
+		</where>  
+	</update>
+	
+	<update id="confirmPeerEvaluation" parameterType="java.util.Map">
+		update HR_PEER set state= #{state,jdbcType=INTEGER}
+		<where>
+			AND group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND year = #{year,jdbcType=VARCHAR}
+			AND emp_id = #{emp_id,jdbcType=INTEGER}
+		</where>  
+	</update>
+	
+	<!--撤回  -->
+	<update id="reConfirmPromotionEvaluate" parameterType="java.util.Map">
+		UPDATE hr_promotion_evaluate set  peer_score = null
+		<where>                     
+			AND group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND year = #{year,jdbcType=VARCHAR}
+			AND emp_id = #{emp_id,jdbcType=INTEGER}
+		</where>  
+	</update>
+	<update id="reConfirmPromotionEvaluateBatch">
+		<foreach collection="list" item="item" open="begin" close=";end;" separator=";">
+			UPDATE hr_promotion_evaluate set  peer_score = null
+			<where>                     
+					group_id = #{item.group_id,jdbcType=INTEGER}
+				AND hos_id = #{item.hos_id,jdbcType=INTEGER}
+				AND year = #{item.year,jdbcType=VARCHAR}
+				AND emp_id = #{item.emp_id,jdbcType=INTEGER}
+			</where>  
+		</foreach>
+	</update>
+	
+	<update id="reConfirmPeerEvaluation" parameterType="java.util.Map">
+		update HR_PEER  set  state= #{state,jdbcType=INTEGER}
+		<where>                     
+			AND group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND year = #{year,jdbcType=VARCHAR}
+			AND emp_id = #{emp_id,jdbcType=INTEGER}
+		</where>  
+	</update>
+	<update id="reConfirmPeerEvaluationBatch">
+		<foreach collection="list" item="item" open="begin" close=";end;" separator=";">
+			update HR_PEER  set  state= #{item.state,jdbcType=INTEGER}
+			<where>                     
+				AND group_id = #{item.group_id,jdbcType=INTEGER}
+				AND hos_id = #{item.hos_id,jdbcType=INTEGER}
+				AND year = #{item.year,jdbcType=VARCHAR}
+				AND emp_id = #{item.emp_id,jdbcType=INTEGER}
+			</where>  
+		</foreach>
+	</update>
+	
+	<select id="queryPeerEvaluationByEmpId" parameterType="java.util.List" resultType="java.util.Map" >
+		 with list_temp as (
+			<foreach collection="list" item="item" index="index" separator=" union all " >
+				select    
+					#{item.group_id,jdbcType=INTEGER} as group_id, 
+					#{item.hos_id,jdbcType=INTEGER} as hos_id, 
+					#{item.year,jdbcType=VARCHAR} as year,
+					#{item.emp_id,jdbcType=INTEGER} as emp_id
+				from dual
+			</foreach>
+		)
+		select a.group_id,a.hos_id,a.year,a.emp_id,c.emp_code,c.emp_name
+		from list_temp a
+		join hr_peer b on a.group_id=b.group_id and a.hos_id=b.hos_id and a.year=b.year and a.emp_id=b.emp_id
+		left join hos_emp c on b.group_id=c.group_id and b.hos_id=c.hos_id and b.emp_id=c.emp_id and c.is_stop = 0
+	</select>
+	
+	<!-- 查询指定集合中指定状态的数量 -->
+	<select id="queryStateCount" resultType="java.lang.Integer">
+		select count(*)
+		from hr_peer hp
+		where hp.group_id=#{map.group_id, jdbcType=INTEGER} 
+		  and hp.hos_id=#{map.hos_id, jdbcType=INTEGER}
+		  and hp.state=#{map.state, jdbcType=INTEGER}
+		  and (
+		<foreach collection="list" item="item" index="index" separator=" or ">
+			(
+				hp.year=#{item.year, jdbcType=VARCHAR}
+				and hp.emp_id=#{item.emp_id, jdbcType=INTEGER}
+			)
+		</foreach>
+		)
+	</select>
+	
+	<!-- 批量提交 -->
+	<update id="confirmPeerEvaluationBatch" parameterType="java.util.List">
+		<foreach collection="list" item="item" index="index" open="begin" close=";end;" separator=";" >
+			update HR_PEER set state= #{map.state,jdbcType=INTEGER}
+			<where>
+					group_id = #{map.group_id,jdbcType=INTEGER}
+				AND hos_id = #{map.hos_id,jdbcType=INTEGER}
+				AND year = #{item.year,jdbcType=VARCHAR}
+				AND emp_id = #{item.emp_id,jdbcType=INTEGER}
+			</where>
+			;
+			UPDATE hr_promotion_evaluate set  peer_score=#{item.peer_score,jdbcType=INTEGER}
+			<where>                     
+					group_id = #{map.group_id,jdbcType=INTEGER}
+				AND hos_id = #{map.hos_id,jdbcType=INTEGER}
+				AND year = #{item.year,jdbcType=VARCHAR}
+				AND emp_id = #{item.emp_id,jdbcType=INTEGER}
+			</where>  
+		</foreach>
+	</update>
+	
+</mapper>

@@ -1,0 +1,423 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.mat.dao.info.basic.MatSafeChangeMapper">
+
+	<resultMap id="matSafeChange" type="java.util.Map">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="change_id" column="change_id"/>
+		<result property="change_no" column="change_no"/>
+		<result property="store_id" column="store_id"/>
+		<result property="store_no" column="store_no"/>
+		<result property="store_code" column="store_code"/>
+		<result property="store_name" column="store_name"/>
+		<result property="maker" column="maker"/>
+		<result property="maker_name" column="maker_name"/>
+		<result property="make_date" column="make_date"/>
+		<result property="state" column="state"/>
+		<result property="state_name" column="state_name"/>
+		<result property="checker" column="checker"/>
+		<result property="checker_name" column="checker_name"/>
+		<result property="check_date" column="check_date"/>
+		<result property="confirmer" column="confirmer"/>
+		<result property="confirmer_name" column="confirmer_name"/>
+		<result property="confirm_date" column="confirm_date"/>
+		<result property="brief" column="brief"/>
+	</resultMap>
+	
+	<resultMap id="matSafeChangeDetail" type="java.util.Map">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="change_id" column="change_id"/>
+		<result property="change_no" column="change_no"/>
+		<result property="detail_id" column="detail_id"/>
+		<result property="inv_id" column="inv_id"/>
+		<result property="inv_code" column="inv_code"/>
+		<result property="inv_name" column="inv_name"/>
+		<result property="inv_model" column="inv_model"/>
+		<result property="fac_name" column="fac_name"/>
+		<result property="unit_name" column="unit_name"/>
+		<result property="period" column="period"/>
+		<result property="period_name" column="period_name"/>
+		<result property="period_num" column="period_num"/>
+		<result property="high_limit" column="high_limit"/>
+		<result property="secu_limit" column="secu_limit"/>
+		<result property="low_limit" column="low_limit"/>
+		<result property="ps_period" column="ps_period"/>
+		<result property="cg_period" column="cg_period"/>
+		<result property="min_pur" column="min_pur"/>
+		<result property="rxhl_period" column="rxhl_period"/>
+		<result property="note" column="note"/>
+	</resultMap>
+
+	<!-- 列表查询 -->
+	<select id="queryMatSafeChangeList" parameterType="java.util.Map" resultMap="matSafeChange">
+		SELECT a.group_id, a.hos_id, a.copy_code, 
+			a.change_id, a.change_no, a.brief, a.state, 
+			a.store_id, b.store_no, b.store_code, b.store_name, 
+			a.make_date, a.maker, c.user_name maker_name, 
+			a.check_date, a.checker, d.user_name checker_name,
+			a.confirm_date, a.confirmer, e.user_name confirmer_name, 
+			case a.state when 1 then '未审核' when 2 then '已审核' when 3 then '已确认' end state_name 
+		FROM mat_safe_change a 
+		LEFT JOIN hos_store_dict b 
+			ON a.group_id = b.group_id 
+			AND a.hos_id = b.hos_id 
+			AND a.store_id = b.store_id 
+			AND b.is_stop = 0
+		LEFT JOIN sys_user c 
+			ON a.group_id = c.group_id 
+			AND a.hos_id = c.hos_id 
+			AND a.maker = c.user_id 
+		LEFT JOIN sys_user d 
+			ON a.group_id = d.group_id 
+			AND a.hos_id = d.hos_id 
+			AND a.checker = d.user_id 
+		LEFT JOIN sys_user e 
+			ON a.group_id = e.group_id 
+			AND a.hos_id = e.hos_id 
+			AND a.confirmer = e.user_id 
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER} 
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			<if test="begin_date != null and begin_date != ''">
+			AND a.make_date &gt;= #{begin_date,jdbcType=DATE}
+			</if>
+			<if test="end_date != null and end_date != ''">
+			AND a.make_date &lt;= #{end_date,jdbcType=DATE}
+			</if>
+			<if test="store_id != null and store_id != ''">
+				AND a.store_id = #{store_id,jdbcType=INTEGER}
+			</if>
+			<if test=" state != ''">
+				AND a.state = #{state,jdbcType=INTEGER}
+			</if>
+			<if test="store_id == null or store_id == ''">
+				AND exists (
+					select vudp.perm_code
+					from v_user_data_perm vudp
+					where vudp.group_id = #{group_id,jdbcType=INTEGER}
+						and vudp.hos_id = #{hos_id,jdbcType=INTEGER}
+						and vudp.table_code = 'HOS_STORE_DICT'
+						and vudp.is_write = 1
+						and vudp.user_id = #{user_id,jdbcType=INTEGER}
+						and a.store_id = vudp.perm_code
+				)
+			</if>
+			<if test="change_no != null and change_no != ''">
+				AND a.change_no = #{change_no,jdbcType=VARCHAR}
+			</if>
+		ORDER BY a.change_no
+	</select>
+	
+	<!-- 主表精准查询 -->
+	<select id="queryMatSafeChangeById" parameterType="java.util.Map" resultMap="matSafeChange">
+		SELECT a.group_id, a.hos_id, a.copy_code, 
+			a.change_id, a.change_no, a.brief, a.state, 
+			a.store_id, b.store_no, b.store_code, b.store_name, 
+			a.make_date, a.maker, c.user_name meker_name, 
+			a.check_date, a.checker, d.user_name checker_name, 
+			a.confirm_date, a.confirmer, e.user_name confirmer_name, 
+			case a.state when 0 then '未审核' else '已审核' end state_name 
+		FROM mat_safe_change a 
+		LEFT JOIN hos_store_dict b 
+			ON a.group_id = b.group_id 
+			AND a.hos_id = b.hos_id 
+			AND a.store_id = b.store_id 
+			AND b.is_stop = 0
+		LEFT JOIN sys_user c 
+			ON a.group_id = c.group_id 
+			AND a.hos_id = c.hos_id 
+			AND a.maker = c.user_id 
+		LEFT JOIN sys_user d 
+			ON a.group_id = d.group_id 
+			AND a.hos_id = d.hos_id 
+			AND a.checker = d.user_id 
+		LEFT JOIN sys_user e 
+			ON a.group_id = e.group_id 
+			AND a.hos_id = e.hos_id 
+			AND a.confirmer = e.user_id 
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER} 
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND a.change_id = #{change_id,jdbcType=BIGINT} 
+	</select>
+	
+	<!-- 明细表精准查询 -->
+	<select id="queryMatSafeChangeDetailById" parameterType="java.util.Map" resultMap="matSafeChangeDetail">
+		SELECT a.group_id, a.hos_id, a.copy_code, a.change_id, a.change_no, detail_id, 
+			a.inv_id, b.inv_code, b.inv_name, b.inv_model, c.fac_name, d.unit_name, 
+			a.period, a.period_num, a.high_limit, a.secu_limit, a.low_limit, a.ps_period, 
+			a.cg_period, a.min_pur, a.rxhl_period, a.note, 
+			case a.period when 1 then '年' when 2 then '季' when 3 then '月' when 4 then '天' else '' end period_name
+		FROM mat_safe_change_d a 
+		LEFT JOIN mat_inv b 
+			ON a.group_id = b.group_id 
+			AND a.hos_id = b.hos_id 
+			AND a.copy_code = b.copy_code 
+			AND a.inv_id = b.inv_id 
+		LEFT JOIN hos_fac c 
+			ON b.group_id = c.group_id 
+			AND b.hos_id = c.hos_id 
+			AND b.fac_id = c.fac_id 
+		LEFT JOIN hos_unit d 
+			ON b.group_id = d.group_id 
+			AND b.hos_id = d.hos_id 
+			AND b.unit_code = d.unit_code 
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER} 
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND a.change_id = #{change_id,jdbcType=BIGINT} 
+		ORDER BY a.detail_id
+	</select>
+	
+	<!-- 主表添加 -->
+	<insert id="addMatSafeChange" parameterType="java.util.Map">
+		INSERT INTO mat_safe_change(
+			group_id, hos_id, copy_code, change_id, change_no, 
+			store_id, maker, make_date, brief, state 
+		)
+		VALUES(
+			#{group_id,jdbcType=INTEGER}, 
+			#{hos_id,jdbcType=INTEGER}, 
+			#{copy_code,jdbcType=VARCHAR}, 
+			#{change_id,jdbcType=BIGINT}, 
+			#{change_no,jdbcType=VARCHAR}, 
+			#{store_id,jdbcType=INTEGER}, 
+			#{maker,jdbcType=INTEGER}, 
+			#{make_date,jdbcType=DATE}, 
+			#{brief,jdbcType=VARCHAR}, 
+			#{state,jdbcType=INTEGER} 
+		)
+	</insert>
+	
+	<!-- 明细表添加 -->
+	<insert id="addMatSafeChangeDetail" parameterType="java.util.List">
+		INSERT INTO mat_safe_change_d(
+			group_id, hos_id, copy_code, change_id, change_no, 
+			detail_id, inv_id, period, period_num, high_limit, secu_limit, 
+			low_limit, ps_period, cg_period, min_pur, rxhl_period, note 
+		)
+		SELECT #{map.group_id,jdbcType=INTEGER} group_id, 
+			#{map.hos_id,jdbcType=INTEGER} hos_id, 
+			#{map.copy_code,jdbcType=VARCHAR} copy_code, 
+			#{map.change_id,jdbcType=BIGINT} change_id, 
+			#{map.change_no,jdbcType=VARCHAR} change_no, 
+			detail_id, inv_id, period, period_num, high_limit, secu_limit, 
+			low_limit, ps_period, cg_period, min_pur, rxhl_period, note 
+		FROM(
+			<foreach collection="list" item="item" index="index" separator=" union all ">
+				SELECT 
+					#{item.detail_id,jdbcType=BIGINT} detail_id, 
+					#{item.inv_id,jdbcType=INTEGER} inv_id, 
+					#{item.period,jdbcType=INTEGER} period, 
+					#{item.period_num,jdbcType=NUMERIC} period_num, 
+					#{item.high_limit,jdbcType=NUMERIC} high_limit, 
+					#{item.secu_limit,jdbcType=NUMERIC} secu_limit, 
+					#{item.low_limit,jdbcType=NUMERIC} low_limit, 
+					#{item.ps_period,jdbcType=NUMERIC} ps_period, 
+					#{item.cg_period,jdbcType=NUMERIC} cg_period, 
+					#{item.min_pur,jdbcType=NUMERIC} min_pur, 
+					#{item.rxhl_period,jdbcType=NUMERIC} rxhl_period, 
+					#{item.note,jdbcType=VARCHAR} note 
+				FROM dual
+			</foreach>
+		) tmp
+	</insert>
+	
+	<!-- 主表修改 -->
+	<update id="updateMatSafeChangeById" parameterType="java.util.Map">
+		UPDATE mat_safe_change 
+		SET store_id = #{store_id,jdbcType=INTEGER}, 
+			brief = #{brief,jdbcType=VARCHAR}
+		WHERE group_id = #{group_id,jdbcType=INTEGER} 
+			AND hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND copy_code = #{copy_code,jdbcType=VARCHAR} 
+			AND change_id = #{change_id,jdbcType=BIGINT} 
+	</update>
+	
+	<!-- 删除明细 -->
+	<delete id="deleteMatSafeChangeDetailById" parameterType="java.util.Map">
+		DELETE FROM mat_safe_change_d 
+		WHERE group_id = #{group_id,jdbcType=INTEGER} 
+			AND hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND copy_code = #{copy_code,jdbcType=VARCHAR} 
+			AND change_id = #{change_id,jdbcType=BIGINT} 
+	</delete>
+	
+	<!-- 删除所有数据 -->
+	<delete id="deleteMatSafeChange" parameterType="java.util.Map">
+		BEGIN 
+			DELETE FROM mat_safe_change_d 
+			WHERE group_id = #{map.group_id,jdbcType=INTEGER} 
+				AND hos_id = #{map.hos_id,jdbcType=INTEGER} 
+				AND copy_code = #{map.copy_code,jdbcType=VARCHAR} 
+				AND change_id in (
+					<foreach collection="list" item="item" index="index" separator="union all" >
+					SELECT #{item.change_id,jdbcType=BIGINT} change_id FROM DUAL
+					</foreach>
+				);
+				
+			DELETE FROM mat_safe_change 
+			WHERE group_id = #{map.group_id,jdbcType=INTEGER} 
+				AND hos_id = #{map.hos_id,jdbcType=INTEGER} 
+				AND copy_code = #{map.copy_code,jdbcType=VARCHAR} 
+				AND change_id in (
+					<foreach collection="list" item="item" index="index" separator="union all" >
+					SELECT #{item.change_id,jdbcType=BIGINT} change_id FROM DUAL
+					</foreach>
+				);
+		END;
+	</delete>
+	
+	<!-- 状态校验 -->
+	<select id="existsMatSafeChangeState" parameterType="java.util.Map" resultType="java.lang.Integer">
+		SELECT count(1) 
+		FROM mat_safe_change 
+		WHERE group_id = #{group_id,jdbcType=INTEGER} 
+			AND hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND copy_code = #{copy_code,jdbcType=VARCHAR} 
+			AND change_id = #{change_id,jdbcType=BIGINT} 
+			AND state &lt;&gt; #{exists_state,jdbcType=INTEGER} 
+	</select>
+	<!-- 状态校验批量 -->
+	<select id="existsMatSafeChangeStateBatch" parameterType="java.util.Map" resultType="java.lang.Integer">
+		SELECT count(1) 
+		FROM mat_safe_change 
+		WHERE group_id = #{map.group_id,jdbcType=INTEGER} 
+			AND hos_id = #{map.hos_id,jdbcType=INTEGER} 
+			AND copy_code = #{map.copy_code,jdbcType=VARCHAR} 
+			AND state &lt;&gt; #{map.exists_state,jdbcType=INTEGER} 
+			AND change_id in (
+				<foreach collection="list" item="item" index="index" separator="union all" >
+				SELECT #{item.change_id,jdbcType=BIGINT} change_id FROM DUAL
+				</foreach>
+			)
+	</select>
+	
+	<!-- 审核、消审 -->
+	<update id="updateMatSafeChangeState" parameterType="java.util.Map">
+		UPDATE mat_safe_change 
+		SET 
+			checker = #{map.checker,jdbcType=INTEGER},
+			check_date = #{map.check_date,jdbcType=DATE},
+			state = #{map.state,jdbcType=INTEGER}
+		WHERE group_id = #{map.group_id,jdbcType=INTEGER} 
+			AND hos_id = #{map.hos_id,jdbcType=INTEGER} 
+			AND copy_code = #{map.copy_code,jdbcType=VARCHAR} 
+			AND change_id in (
+				<foreach collection="list" item="item" index="index" separator="union all" >
+				SELECT #{item.change_id,jdbcType=BIGINT} change_id FROM DUAL
+				</foreach>
+			)
+	</update>
+	
+	<!-- 确认 -->
+	<update id="confirmMatSafeChange" parameterType="java.util.Map">
+		UPDATE mat_safe_change 
+		SET 
+			confirmer = #{map.confirmer,jdbcType=INTEGER},
+			confirm_date = #{map.confirm_date,jdbcType=DATE},
+			state = #{map.state,jdbcType=INTEGER}
+		WHERE group_id = #{map.group_id,jdbcType=INTEGER} 
+			AND hos_id = #{map.hos_id,jdbcType=INTEGER} 
+			AND copy_code = #{map.copy_code,jdbcType=VARCHAR} 
+			AND change_id in (
+				<foreach collection="list" item="item" index="index" separator="union all" >
+				SELECT #{item.change_id,jdbcType=BIGINT} change_id FROM DUAL
+				</foreach>
+			)
+	</update>
+	
+	<!-- 材料列表查询 -->
+	<select id="queryMatInvBySafeChange" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT a.inv_id "inv_id", b.inv_code "inv_code", b.inv_name "inv_name", b.alias "alias",  
+			b.inv_model "inv_model", c.fac_name "fac_name", d.unit_name "unit_name", 
+			a.period "period", a.period_num "period_num", a.high_limit "high_limit", 
+			a.secu_limit "secu_limit", a.low_limit "low_limit", a.ps_period "ps_period", 
+			a.cg_period "cg_period", a.min_pur "min_pur", a.rxhl_period "rxhl_period", 
+			case a.period when 1 then '年' when 2 then '季' when 3 then '月' when 4 then '天' else '' end "period_name",
+			e.mat_type_name "mat_type_name" 
+		FROM mat_store_inv a 
+		LEFT JOIN mat_inv b
+			ON a.group_id = b.group_id 
+			AND a.hos_id = b.hos_id 
+			AND a.copy_code = b.copy_code 
+			AND a.inv_id=  b.inv_id 
+		LEFT JOIN hos_fac c
+			ON b.group_id = c.group_id 
+			AND b.hos_id = c.hos_id 
+			AND b.fac_id = c.fac_id 
+		LEFT JOIN hos_unit d
+			ON b.group_id = d.group_id 
+			AND b.hos_id = d.hos_id 
+			AND b.unit_code = d.unit_code 
+		LEFT JOIN mat_type e 
+			ON b.group_id = e.group_id 
+			AND b.hos_id = e.hos_id 
+			AND b.copy_code = e.copy_code 
+			AND b.mat_type_id = e.mat_type_id
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER} 
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND a.store_id = #{store_id,jdbcType=INTEGER}
+			<if test="key != null and key != ''">
+			AND (
+				b.inv_code like '%${key}%'
+				or b.inv_name like '%${key}%'
+				or b.inv_model like '%${key}%'
+				or b.spell_code like '%${key}%'
+			)
+			</if>
+	</select>
+	
+	<!-- 调整信息更新到安全库存中 -->
+	<update id="updateMatStoreInvBySafeChange" parameterType="java.util.Map">
+		UPDATE mat_store_inv a 
+		SET (
+			period, period_num, high_limit, secu_limit, low_limit, ps_period, cg_period, min_pur, rxhl_period
+		) = (
+			SELECT period, period_num, high_limit, secu_limit, low_limit, ps_period, cg_period, min_pur, rxhl_period
+			FROM mat_safe_change b 
+			LEFT JOIN mat_safe_change_d c 
+				ON b.group_id = c.group_id 
+				AND b.hos_id = c.hos_id 
+				AND b.copy_code = c.copy_code 
+				AND b.change_id = c.change_id 
+			WHERE b.group_id = #{map.group_id,jdbcType=INTEGER} 
+				AND b.hos_id = #{map.hos_id,jdbcType=INTEGER} 
+				AND b.copy_code = #{map.copy_code,jdbcType=VARCHAR} 
+				AND b.change_id in (
+					<foreach collection="list" item="item" index="index" separator="union all" >
+					SELECT #{item.change_id,jdbcType=BIGINT} change_id FROM DUAL
+					</foreach>
+				)
+				AND a.store_id = b.store_id 
+				AND a.inv_id = c.inv_id 
+		) 
+		WHERE a.group_id = #{map.group_id,jdbcType=INTEGER} 
+			AND a.hos_id = #{map.hos_id,jdbcType=INTEGER} 
+			AND a.copy_code = #{map.copy_code,jdbcType=VARCHAR} 
+			AND exists(
+			SELECT 1
+			FROM mat_safe_change b 
+			LEFT JOIN mat_safe_change_d c 
+				ON b.group_id = c.group_id 
+				AND b.hos_id = c.hos_id 
+				AND b.copy_code = c.copy_code 
+				AND b.change_id = c.change_id 
+			WHERE b.group_id = #{map.group_id,jdbcType=INTEGER} 
+				AND b.hos_id = #{map.hos_id,jdbcType=INTEGER} 
+				AND b.copy_code = #{map.copy_code,jdbcType=VARCHAR} 
+				AND b.change_id in (
+					<foreach collection="list" item="item" index="index" separator="union all" >
+					SELECT #{item.change_id,jdbcType=BIGINT} change_id FROM DUAL
+					</foreach>
+				)
+				AND a.store_id = b.store_id 
+				AND a.inv_id = c.inv_id 
+		)
+	</update>
+</mapper>

@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+
+	<sql id="v_med_stock_imme" type="view" desc="药品库存占用量"><![CDATA[
+		
+		CREATE OR REPLACE VIEW V_MED_STOCK_IMME AS
+        SELECT group_id, hos_id, copy_code, store_id, med_id, price, batch_sn, batch_no, bar_code, location_id, SUM(amount) as amount 
+          FROM ( 
+            --出库未确认单据 
+            SELECT mom.group_id, mom.hos_id, mom.copy_code, mom.store_id, 
+              matod.med_id, matod.price, matod.batch_sn, matod.batch_no, matod.bar_code, 
+              matod.location_id, SUM(NVL(matod.amount, 0)) as amount 
+            FROM med_out_main mom 
+            LEFT JOIN med_out_detail matod 
+              ON mom.group_id = matod.group_id 
+              AND mom.hos_id = matod.hos_id 
+              AND mom.copy_code = matod.copy_code 
+              AND mom.out_id = matod.out_id 
+            WHERE mom.state < 3 
+              AND mom.bus_type_code <> '21' 
+            GROUP BY mom.group_id, mom.hos_id, mom.copy_code, mom.store_id, matod.med_id, 
+              matod.price, matod.batch_sn, matod.batch_no, matod.bar_code, matod.location_id 
+            --退货未确认单据 
+            UNION ALL 
+            SELECT mim.group_id, mim.hos_id, mim.copy_code, mim.store_id, 
+              matid.med_id, matid.price, matid.batch_sn, matid.batch_no, matid.bar_code, 
+              matid.location_id, -1 * SUM(NVL(matid.amount, 0)) as amount 
+            FROM med_in_main mim 
+            LEFT JOIN med_in_detail matid 
+              ON mim.group_id = matid.group_id 
+              AND mim.hos_id = matid.hos_id 
+              AND mim.copy_code = matid.copy_code 
+              AND mim.in_id = matid.in_id 
+            WHERE mim.state < 3 
+              AND mim.bus_type_code in (10,12,16,22) 
+            GROUP BY mim.group_id, mim.hos_id, mim.copy_code, mim.store_id, matid.med_id, 
+              matid.price, matid.batch_sn, matid.batch_no, matid.bar_code, matid.location_id 
+          ) 
+      GROUP BY group_id, hos_id, copy_code, store_id, med_id, price, batch_sn, batch_no, bar_code, location_id
+		
+		
+	]]></sql>
+</root>
+

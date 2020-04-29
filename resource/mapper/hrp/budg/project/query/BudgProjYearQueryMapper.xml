@@ -1,0 +1,519 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.budg.dao.project.query.BudgProjYearQueryMapper">
+
+	<resultMap id="budgProjYearMap" type="java.util.Map">
+	<result property="group_id" column="group_id"/>
+	<result property="hos_id" column="hos_id"/>
+	<result property="hos_name" column="hos_name"/>
+	<result property="hos_simple" column="hos_simple"/>
+	<result property="copy_code" column="copy_code"/>
+	<result property="budg_year" column="budg_year"/>
+	<result property="proj_id" column="proj_id"/>
+	<result property="proj_code" column="proj_code"/>
+	<result property="proj_name" column="proj_name"/>
+	<result property="b_remain_amoun" column="b_remain_amoun"/>
+	<result property="budg_amount" column="budg_amount"/>
+	<result property="cost_amount" column="cost_amount"/>
+	<result property="t_budg_amount" column="t_budg_amount"/>
+	
+	<result property="t_cost_amount" column="t_cost_amount"/>
+	<result property="remain_amount" column="remain_amount"/>
+	<result property="t_rate" column="t_rate"/>
+	
+	<result property="b_remain_amounO" column="b_remain_amounO"/>
+	<result property="budg_amountO" column="budg_amountO"/>
+	<result property="cost_amountO" column="cost_amountO"/>
+	<result property="t_budg_amountO" column="t_budg_amountO"/>
+	
+	<result property="t_cost_amountO" column="t_cost_amountO"/>
+	<result property="remain_amountO" column="remain_amountO"/>
+	<result property="t_rateO" column="t_rateO"/>
+	
+	
+	<result property="b_remain_amounM" column="b_remain_amounM"/>
+	<result property="budg_amountM" column="budg_amountM"/>
+	<result property="cost_amountM" column="cost_amountM"/>
+	<result property="t_budg_amountM" column="t_budg_amountM"/>
+	
+	<result property="t_cost_amountM" column="t_cost_amountM"/>
+	<result property="remain_amountM" column="remain_amountM"/>
+	<result property="t_rateM" column="t_rateM"/>
+	
+	<result property="proj_state" column="proj_state"/>
+	
+	</resultMap>
+	
+	<!-- 项目预算查询  报表(一) -->
+	<select id="queryBudgProjYearQuery" parameterType="java.util.Map" resultMap="budgProjYearMap" >
+		
+		with sumData as(
+			SELECT group_id, hos_id, copy_code, budg_year, proj_id, sum(nvl(b_remain_amoun,0)) b_remain_amoun, 
+				sum(nvl(budg_amount,0)) budg_amount , sum(nvl(cost_amount,0))  cost_amount , 
+				sum(nvl(t_budg_amount,0)) t_budg_amount
+				
+			FROM BUDG_PROJ_YEAR
+			where group_id = ${group_id} and hos_id = ${hos_id}  and copy_code = ${copy_code}
+			group by group_id, hos_id, copy_code, budg_year, proj_id
+		),
+		outData as (<!-- 外拨资金 临时表  source_attr != 1 -->
+			SELECT bpy.group_id, bpy.hos_id, bpy.copy_code, bpy.budg_year, bpy.proj_id,
+				sum(nvl(bpy.b_remain_amoun,0)) b_remain_amoun, sum(nvl(bpy.budg_amount,0)) budg_amount , 
+				sum(nvl(bpy.cost_amount,0))  cost_amount , sum(nvl(bpy.t_budg_amount,0)) t_budg_amount
+				
+			FROM BUDG_PROJ_YEAR bpy
+			left join hos_source hs
+				on
+					bpy.group_id = hs.group_id
+					and bpy.hos_id = hs.hos_id
+					and bpy.source_id = hs.source_id
+			where bpy.group_id = ${group_id} and bpy.hos_id = ${hos_id}  and bpy.copy_code = ${copy_code} and hs.source_attr != 1
+			group by bpy.group_id, bpy.hos_id, bpy.copy_code, bpy.budg_year, bpy.proj_id
+		),
+		matchData as (<!-- 配套资金 临时表  source_attr = 1 -->
+			SELECT bpy.group_id, bpy.hos_id, bpy.copy_code, bpy.budg_year, bpy.proj_id,
+				sum(nvl(bpy.b_remain_amoun,0)) b_remain_amoun, sum(nvl(bpy.budg_amount,0)) budg_amount , 
+				sum(nvl(bpy.cost_amount,0))  cost_amount , sum(nvl(bpy.t_budg_amount,0)) t_budg_amount
+				
+			FROM BUDG_PROJ_YEAR bpy
+			left join hos_source hs
+				on
+					bpy.group_id = hs.group_id
+					and bpy.hos_id = hs.hos_id
+					and bpy.source_id = hs.source_id
+			where bpy.group_id = ${group_id} and bpy.hos_id = ${hos_id}  and bpy.copy_code = ${copy_code} and hs.source_attr = 1
+			group by bpy.group_id, bpy.hos_id, bpy.copy_code, bpy.budg_year, bpy.proj_id
+		)
+		
+		SELECT 
+			a.group_id,
+			a.hos_id,
+			a.copy_code,
+			a.budg_year,
+			a.proj_id,
+			hpd.proj_code,
+			hpd.proj_name ,
+			nvl(a.b_remain_amoun,0) b_remain_amoun,
+			nvl(a.budg_amount,0) budg_amount,
+			nvl(a.cost_amount,0) cost_amount,
+			nvl(a.t_budg_amount,0) t_budg_amount ,
+			nvl(b.b_remain_amoun,0) b_remain_amounO,
+			nvl(b.budg_amount,0) budg_amountO,
+			nvl(b.cost_amount,0) cost_amountO,
+			nvl(b.t_budg_amount,0) t_budg_amountO ,
+			nvl(c.b_remain_amoun,0) b_remain_amounM,
+			nvl(c.budg_amount,0)  budg_amountM ,
+			nvl(c.cost_amount,0) cost_amountM,
+			nvl(c.t_budg_amount,0) t_budg_amountM ,
+			case apa.proj_state when '01' then '执行' when '02' then '结项' else '中止' end proj_state
+		FROM sumData a 
+		
+		left join outData b
+			on 
+				a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code
+				and a.budg_year = b.budg_year
+				and a.proj_id = b.proj_id
+		left join matchData c
+			on 
+				a.group_id = c.group_id
+				and a.hos_id = c.hos_id
+				and a.copy_code = c.copy_code
+				and a.budg_year = c.budg_year
+				and a.proj_id = c.proj_id
+		left join hos_proj_dict hpd
+			on
+				a.group_id = hpd.group_id
+				and a.hos_id = hpd.hos_id
+				and a.proj_id = hpd.proj_id
+				and hpd.is_stop = 0
+		left join acc_proj_attr apa
+			on
+				a.group_id = apa.group_id
+				and a.hos_id = apa.hos_id
+				and a.proj_id = apa.proj_id
+		where                      
+			a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			<if test="budg_year != null and budg_year != ''">
+			AND a.budg_year = #{budg_year,jdbcType=VARCHAR}
+			</if>
+			<if test="proj_id != null and proj_id != ''">
+			AND a.proj_id = #{proj_id,jdbcType=INTEGER}
+			</if>
+			<if test="type_code != null and type_code != ''">
+			AND hpd.type_code = #{type_code,jdbcType=VARCHAR}
+			</if>
+			<if test="level_code != null and level_code != ''">
+			AND apa.level_code = #{level_code,jdbcType=VARCHAR}
+			</if>
+			<if test="proj_state != null and proj_state != ''">
+			AND apa.proj_state = #{proj_state,jdbcType=VARCHAR}
+			</if>
+			<if test="con_emp_id != null and con_emp_id != ''">
+			AND apa.con_emp_id = #{con_emp_id,jdbcType=INTEGER}
+			</if>
+		order by a.proj_id asc
+	</select>
+	
+	
+	<!-- 项目预算查询  报表(二) -->
+	<select id="queryBudgProjYearQueryT" parameterType="java.util.Map" resultMap="budgProjYearMap" >
+		
+		with sumData as(
+			SELECT group_id, hos_id, copy_code, budg_year, proj_id, sum(nvl(t_budg_amount,0)) t_budg_amount, 
+				sum(nvl(t_cost_amount,0)) t_cost_amount , sum(nvl(remain_amount,0))  remain_amount ,
+				case sum(nvl(t_budg_amount,0)) when 0 then 0.00 else sum(nvl(t_cost_amount,0))/sum(nvl(t_budg_amount,0))*100 end t_rate
+				
+			FROM BUDG_PROJ_YEAR
+			where group_id = ${group_id} and hos_id = ${hos_id}  and copy_code = ${copy_code}
+			group by group_id, hos_id, copy_code, budg_year, proj_id
+		),
+		outData as (<!-- 外拨资金 临时表  source_attr != 1 -->
+			SELECT bpy.group_id, bpy.hos_id, bpy.copy_code, bpy.budg_year, bpy.proj_id,
+				sum(nvl(bpy.t_budg_amount,0)) t_budg_amount, sum(nvl(bpy.t_cost_amount,0)) t_cost_amount , 
+				sum(nvl(bpy.remain_amount,0))  remain_amount , 
+				case sum(nvl(bpy.t_budg_amount,0)) when 0 then 0.00 else sum(nvl(bpy.t_cost_amount,0))/sum(nvl(bpy.t_budg_amount,0))*100 end t_rate
+			FROM BUDG_PROJ_YEAR bpy
+			left join hos_source hs
+				on
+					bpy.group_id = hs.group_id
+					and bpy.hos_id = hs.hos_id
+					and bpy.source_id = hs.source_id
+			where bpy.group_id = ${group_id} and bpy.hos_id = ${hos_id}  and bpy.copy_code = ${copy_code} and hs.source_attr != 1
+			group by bpy.group_id, bpy.hos_id, bpy.copy_code, bpy.budg_year, bpy.proj_id
+		),
+		matchData as (<!-- 配套资金 临时表  source_attr = 1 -->
+			SELECT bpy.group_id, bpy.hos_id, bpy.copy_code, bpy.budg_year, bpy.proj_id,
+				sum(nvl(bpy.t_budg_amount,0)) t_budg_amount, sum(nvl(bpy.t_cost_amount,0)) t_cost_amount , 
+				sum(nvl(bpy.remain_amount,0))  remain_amount , 
+				case sum(nvl(bpy.t_budg_amount,0)) when 0 then 0.00 else sum(nvl(bpy.t_cost_amount,0))/sum(nvl(bpy.t_budg_amount,0))*100 end t_rate
+				
+			FROM BUDG_PROJ_YEAR bpy
+			left join hos_source hs
+				on
+					bpy.group_id = hs.group_id
+					and bpy.hos_id = hs.hos_id
+					and bpy.source_id = hs.source_id
+			where bpy.group_id = ${group_id} and bpy.hos_id = ${hos_id}  and bpy.copy_code = ${copy_code} and hs.source_attr = 1
+			group by bpy.group_id, bpy.hos_id, bpy.copy_code, bpy.budg_year, bpy.proj_id
+		)
+		
+		SELECT 
+			a.group_id,
+			a.hos_id,
+			a.copy_code,
+			a.budg_year,
+			a.proj_id,
+			hpd.proj_code,
+			hpd.proj_name ,
+			nvl(a.t_budg_amount,0) t_budg_amount,
+			nvl(a.t_cost_amount,0) t_cost_amount,
+			nvl(a.remain_amount,0) remain_amount,
+			nvl(a.t_rate,0) t_rate ,
+			nvl(b.t_budg_amount,0) t_budg_amountO,
+			nvl(b.t_cost_amount,0) t_cost_amountO,
+			nvl(b.remain_amount,0) remain_amountO,
+			nvl(b.t_rate,0) t_rateO ,
+			nvl(c.t_budg_amount,0) t_budg_amountM,
+			nvl(c.t_cost_amount,0) t_cost_amountM ,
+			nvl(c.remain_amount,0) remain_amountM,
+			nvl(c.t_rate,0) t_rateM ,
+			case apa.proj_state when '01' then '执行' when '02' then '结项' else '中止' end proj_state
+		FROM sumData a 
+		
+		left join outData b
+			on 
+				a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code
+				and a.budg_year = b.budg_year
+				and a.proj_id = b.proj_id
+		left join matchData c
+			on 
+				a.group_id = c.group_id
+				and a.hos_id = c.hos_id
+				and a.copy_code = c.copy_code
+				and a.budg_year = c.budg_year
+				and a.proj_id = c.proj_id
+		left join hos_proj_dict hpd
+			on
+				a.group_id = hpd.group_id
+				and a.hos_id = hpd.hos_id
+				and a.proj_id = hpd.proj_id
+				and hpd.is_stop = 0
+		left join acc_proj_attr apa
+			on
+				a.group_id = apa.group_id
+				and a.hos_id = apa.hos_id
+				and a.proj_id = apa.proj_id
+		where                      
+			a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			<if test="budg_year != null and budg_year != ''">
+			AND a.budg_year = #{budg_year,jdbcType=VARCHAR}
+			</if>
+			<if test="proj_id != null and proj_id != ''">
+			AND a.proj_id = #{proj_id,jdbcType=INTEGER}
+			</if>
+			<if test="type_code != null and type_code != ''">
+			AND hpd.type_code = #{type_code,jdbcType=VARCHAR}
+			</if>
+			<if test="level_code != null and level_code != ''">
+			AND apa.level_code = #{level_code,jdbcType=VARCHAR}
+			</if>
+			<if test="proj_state != null and proj_state != ''">
+			AND apa.proj_state = #{proj_state,jdbcType=VARCHAR}
+			</if>
+			<if test="con_emp_id != null and con_emp_id != ''">
+			AND apa.con_emp_id = #{con_emp_id,jdbcType=INTEGER}
+			</if>
+		order by a.proj_id asc
+	</select>
+	
+	
+	<!-- 项目预算查询(一) (集团) -->
+	<select id="queryBudgProjYearGroupQuery" parameterType="java.util.Map" resultMap="budgProjYearMap" >
+		
+		with sumData as(
+			SELECT group_id, hos_id,  budg_year, proj_id, sum(nvl(b_remain_amoun,0)) b_remain_amoun, 
+				sum(nvl(budg_amount,0)) budg_amount , sum(nvl(cost_amount,0))  cost_amount , 
+				sum(nvl(t_budg_amount,0)) t_budg_amount
+				
+			FROM BUDG_PROJ_YEAR
+			where group_id = ${group_id} 
+			group by group_id, hos_id,  budg_year, proj_id
+		),
+		outData as (<!-- 外拨资金 临时表  source_attr != 1 -->
+			SELECT bpy.group_id, bpy.hos_id,  bpy.budg_year, bpy.proj_id,
+				sum(nvl(bpy.b_remain_amoun,0)) b_remain_amoun, sum(nvl(bpy.budg_amount,0)) budg_amount , 
+				sum(nvl(bpy.cost_amount,0))  cost_amount , sum(nvl(bpy.t_budg_amount,0)) t_budg_amount
+				
+			FROM BUDG_PROJ_YEAR bpy
+			left join hos_source hs
+				on
+					bpy.group_id = hs.group_id
+					and bpy.hos_id = hs.hos_id
+					and bpy.source_id = hs.source_id
+			where bpy.group_id = ${group_id}  and hs.source_attr != 1
+			group by bpy.group_id, bpy.hos_id,  bpy.budg_year, bpy.proj_id
+		),
+		matchData as (<!-- 配套资金 临时表  source_attr = 1 -->
+			SELECT bpy.group_id, bpy.hos_id,  bpy.budg_year, bpy.proj_id,
+				sum(nvl(bpy.b_remain_amoun,0)) b_remain_amoun, sum(nvl(bpy.budg_amount,0)) budg_amount , 
+				sum(nvl(bpy.cost_amount,0))  cost_amount , sum(nvl(bpy.t_budg_amount,0)) t_budg_amount
+				
+			FROM BUDG_PROJ_YEAR bpy
+			left join hos_source hs
+				on
+					bpy.group_id = hs.group_id
+					and bpy.hos_id = hs.hos_id
+					and bpy.source_id = hs.source_id
+			where bpy.group_id = ${group_id}  and hs.source_attr = 1
+			group by bpy.group_id, bpy.hos_id,  bpy.budg_year, bpy.proj_id
+		)
+		
+		SELECT 
+			a.group_id,
+			a.hos_id,
+			hid.hos_name ,
+			hid.hos_simple ,
+			a.budg_year,
+			a.proj_id,
+			hpd.proj_code,
+			hpd.proj_name ,
+			nvl(a.b_remain_amoun,0) b_remain_amoun,
+			nvl(a.budg_amount,0) budg_amount,
+			nvl(a.cost_amount,0) cost_amount,
+			nvl(a.t_budg_amount,0) t_budg_amount ,
+			nvl(b.b_remain_amoun,0) b_remain_amounO,
+			nvl(b.budg_amount,0) budg_amountO,
+			nvl(b.cost_amount,0) cost_amountO,
+			nvl(b.t_budg_amount,0) t_budg_amountO ,
+			nvl(c.b_remain_amoun,0) b_remain_amounM,
+			nvl(c.budg_amount,0)  budg_amountM ,
+			nvl(c.cost_amount,0) cost_amountM,
+			nvl(c.t_budg_amount,0) t_budg_amountM ,
+			case apa.proj_state when '01' then '执行' when '02' then '结项' else '中止' end proj_state
+		FROM sumData a 
+		
+		left join outData b
+			on 
+				a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.budg_year = b.budg_year
+				and a.proj_id = b.proj_id
+		left join matchData c
+			on 
+				a.group_id = c.group_id
+				and a.hos_id = c.hos_id
+				and a.budg_year = c.budg_year
+				and a.proj_id = c.proj_id
+		left join hos_info_dict hid
+			on
+				a.group_id = hid.group_id
+				and a.hos_id = hid.hos_id
+				and hid.is_stop = 0
+		left join hos_proj_dict hpd
+			on
+				a.group_id = hpd.group_id
+				and a.hos_id = hpd.hos_id
+				and a.proj_id = hpd.proj_id
+				and hpd.is_stop = 0
+		left join acc_proj_attr apa
+			on
+				a.group_id = apa.group_id
+				and a.hos_id = apa.hos_id
+				and a.proj_id = apa.proj_id
+		where                      
+			a.group_id = #{group_id,jdbcType=INTEGER}
+			<if test="hos_id != null and hos_id != ''">
+			AND a.hos_id = #{hos_id,jdbcType=VARCHAR}
+			</if>
+			<if test="budg_year != null and budg_year != ''">
+			AND a.budg_year = #{budg_year,jdbcType=VARCHAR}
+			</if>
+			<if test="proj_id != null and proj_id != ''">
+			AND a.proj_id = #{proj_id,jdbcType=INTEGER}
+			</if>
+			<if test="type_code != null and type_code != ''">
+			AND hpd.type_code = #{type_code,jdbcType=VARCHAR}
+			</if>
+			<if test="level_code != null and level_code != ''">
+			AND apa.level_code = #{level_code,jdbcType=VARCHAR}
+			</if>
+			<if test="proj_state != null and proj_state != ''">
+			AND apa.proj_state = #{proj_state,jdbcType=VARCHAR}
+			</if>
+			<if test="con_emp_id != null and con_emp_id != ''">
+			AND apa.con_emp_id = #{con_emp_id,jdbcType=INTEGER}
+			</if>
+		order by a.proj_id asc
+	</select>
+	
+	
+	<!-- 项目预算查询  报表(二)(集团) -->
+	<select id="queryBudgProjYearGroupQueryT" parameterType="java.util.Map" resultMap="budgProjYearMap" >
+		
+		with sumData as(
+			SELECT group_id, hos_id,  budg_year, proj_id, sum(nvl(t_budg_amount,0)) t_budg_amount, 
+				sum(nvl(t_cost_amount,0)) t_cost_amount , sum(nvl(remain_amount,0))  remain_amount ,
+				case sum(nvl(t_budg_amount,0)) when 0 then 0.00 else sum(nvl(t_cost_amount,0))/sum(nvl(t_budg_amount,0))*100 end t_rate
+				
+			FROM BUDG_PROJ_YEAR
+			where group_id = ${group_id} 
+			group by group_id, hos_id,  budg_year, proj_id
+		),
+		outData as (<!-- 外拨资金 临时表  source_attr != 1 -->
+			SELECT bpy.group_id, bpy.hos_id,  bpy.budg_year, bpy.proj_id,
+				sum(nvl(bpy.t_budg_amount,0)) t_budg_amount, sum(nvl(bpy.t_cost_amount,0)) t_cost_amount , 
+				sum(nvl(bpy.remain_amount,0))  remain_amount , 
+				case sum(nvl(bpy.t_budg_amount,0)) when 0 then 0.00 else sum(nvl(bpy.t_cost_amount,0))/sum(nvl(bpy.t_budg_amount,0))*100 end t_rate
+			FROM BUDG_PROJ_YEAR bpy
+			left join hos_source hs
+				on
+					bpy.group_id = hs.group_id
+					and bpy.hos_id = hs.hos_id
+					and bpy.source_id = hs.source_id
+			where bpy.group_id = ${group_id}   and hs.source_attr != 1
+			group by bpy.group_id, bpy.hos_id,  bpy.budg_year, bpy.proj_id
+		),
+		matchData as (<!-- 配套资金 临时表  source_attr = 1 -->
+			SELECT bpy.group_id, bpy.hos_id,  bpy.budg_year, bpy.proj_id,
+				sum(nvl(bpy.t_budg_amount,0)) t_budg_amount, sum(nvl(bpy.t_cost_amount,0)) t_cost_amount , 
+				sum(nvl(bpy.remain_amount,0))  remain_amount , 
+				case sum(nvl(bpy.t_budg_amount,0)) when 0 then 0.00 else sum(nvl(bpy.t_cost_amount,0))/sum(nvl(bpy.t_budg_amount,0))*100 end t_rate
+				
+			FROM BUDG_PROJ_YEAR bpy
+			left join hos_source hs
+				on
+					bpy.group_id = hs.group_id
+					and bpy.hos_id = hs.hos_id
+					and bpy.source_id = hs.source_id
+			where bpy.group_id = ${group_id}   and hs.source_attr = 1
+			group by bpy.group_id, bpy.hos_id, bpy.budg_year, bpy.proj_id
+		)
+		
+		SELECT 
+			a.group_id,
+			a.hos_id,
+			hid.hos_name ,
+			hid.hos_simple ,
+			a.budg_year,
+			a.proj_id,
+			hpd.proj_code,
+			hpd.proj_name ,
+			nvl(a.t_budg_amount,0) t_budg_amount,
+			nvl(a.t_cost_amount,0) t_cost_amount,
+			nvl(a.remain_amount,0) remain_amount,
+			nvl(a.t_rate,0) t_rate ,
+			nvl(b.t_budg_amount,0) t_budg_amountO,
+			nvl(b.t_cost_amount,0) t_cost_amountO,
+			nvl(b.remain_amount,0) remain_amountO,
+			nvl(b.t_rate,0) t_rateO ,
+			nvl(c.t_budg_amount,0) t_budg_amountM,
+			nvl(c.t_cost_amount,0) t_cost_amountM ,
+			nvl(c.remain_amount,0) remain_amountM,
+			nvl(c.t_rate,0) t_rateM ,
+			case apa.proj_state when '01' then '执行' when '02' then '结项' else '中止' end proj_state
+		FROM sumData a 
+		
+		left join outData b
+			on 
+				a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.budg_year = b.budg_year
+				and a.proj_id = b.proj_id
+		left join matchData c
+			on 
+				a.group_id = c.group_id
+				and a.hos_id = c.hos_id
+				and a.budg_year = c.budg_year
+				and a.proj_id = c.proj_id
+		left join hos_info_dict hid
+			on
+				a.group_id = hid.group_id
+				and a.hos_id = hid.hos_id
+				and hid.is_stop = 0
+		left join hos_proj_dict hpd
+			on
+				a.group_id = hpd.group_id
+				and a.hos_id = hpd.hos_id
+				and a.proj_id = hpd.proj_id
+				and hpd.is_stop = 0
+		left join acc_proj_attr apa
+			on
+				a.group_id = apa.group_id
+				and a.hos_id = apa.hos_id
+				and a.proj_id = apa.proj_id
+		where                      
+			a.group_id = #{group_id,jdbcType=INTEGER}
+			<if test="hos_id != null and hos_id != ''">
+			AND a.hos_id = #{hos_id,jdbcType=VARCHAR}
+			</if>
+			<if test="budg_year != null and budg_year != ''">
+			AND a.budg_year = #{budg_year,jdbcType=VARCHAR}
+			</if>
+			<if test="proj_id != null and proj_id != ''">
+			AND a.proj_id = #{proj_id,jdbcType=INTEGER}
+			</if>
+			<if test="type_code != null and type_code != ''">
+			AND hpd.type_code = #{type_code,jdbcType=VARCHAR}
+			</if>
+			<if test="level_code != null and level_code != ''">
+			AND apa.level_code = #{level_code,jdbcType=VARCHAR}
+			</if>
+			<if test="proj_state != null and proj_state != ''">
+			AND apa.proj_state = #{proj_state,jdbcType=VARCHAR}
+			</if>
+			<if test="con_emp_id != null and con_emp_id != ''">
+			AND apa.con_emp_id = #{con_emp_id,jdbcType=INTEGER}
+			</if>
+		order by a.proj_id asc
+	</select>
+	
+</mapper>
+

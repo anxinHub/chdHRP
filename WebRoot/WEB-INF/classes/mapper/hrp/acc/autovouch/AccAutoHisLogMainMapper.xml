@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.acc.dao.autovouch.AccAutoHisLogMainMapper">
+
+	<resultMap id="accHisView" type="java.util.Map">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="his_log_code" column="his_log_code" />
+		<result property="his_log_name" column="his_log_name" />
+		<result property="his_log_date" column="his_log_date" />
+		<result property="is_stop" column="is_stop" />
+		<result property="g_day" column="g_day" />
+	</resultMap>
+
+	<insert id="addBatch" parameterType="java.util.List" >
+		<foreach collection="list" item="item" index="index" open="begin" close=";end;" separator=";" >
+			INSERT INTO acc_his_log_main (
+				group_id, 
+				hos_id, 
+				copy_code, 
+				his_log_code, 
+				his_log_name,
+				is_stop,
+				g_day,
+				sort_code
+			) VALUES (
+				#{item.group_id,jdbcType=INTEGER},
+				#{item.hos_id,jdbcType=INTEGER},
+				#{item.copy_code,jdbcType=VARCHAR},
+				#{item.his_log_code,jdbcType=VARCHAR},
+				#{item.his_log_name,jdbcType=VARCHAR},
+				#{item.is_stop,jdbcType=INTEGER},
+				#{item.g_day,jdbcType=INTEGER},
+				#{item.sort_code,jdbcType=INTEGER}
+			)
+		</foreach>
+	</insert>
+	
+		<update id="updateBatch" parameterType="java.util.Map">
+		<foreach collection="list" item="item" index="index" open="begin" close=";end;" separator=";" >
+		UPDATE acc_his_log_main 
+			<trim prefix="SET"  suffixOverrides=","> 
+				<if test="item.is_stop != null and item.is_stop != ''">
+					is_stop = #{item.is_stop,jdbcType=INTEGER}, 
+				</if>
+				<if test="item.g_day != null and item.g_day != ''">
+					g_day = #{item.g_day,jdbcType=INTEGER}, 
+				</if>
+			</trim>
+			<where>
+				<if test="item.group_id != null and item.group_id != ''">
+					 group_id =#{item.group_id,jdbcType=INTEGER}
+				</if>
+				<if test="item.hos_id != null and item.hos_id != ''">
+					and hos_id =#{item.hos_id,jdbcType=INTEGER}
+				</if>
+				<if test="item.copy_code != null and item.copy_code != ''">
+					and copy_code =#{item.copy_code,jdbcType=VARCHAR}
+				</if>
+				<if test="item.his_log_code != null and item.his_log_code != ''">
+					and his_log_code =#{item.his_log_code,jdbcType=VARCHAR}
+				</if>
+			</where>
+		</foreach>
+	</update>
+
+	<select id="queryAccHisViewLog" parameterType="java.util.Map" resultMap="accHisView">
+	       select
+	           ahld.group_id,
+		       ahld.hos_id,
+		       ahld.copy_code,
+		       ahld.his_log_code,
+		       ahlm.his_log_name,
+		       ahld.his_log_date
+		 	 from acc_his_log_detail ahld
+		     left join init_acc_his_log_main ahlm
+		     on  ahld.his_log_code = ahlm.his_log_code
+		     where ahld.group_id = #{group_id}
+		     and ahld.hos_id = #{hos_id}
+		     and ahld.copy_code = #{copy_code}
+		    <if test="his_log_code != null and his_log_code != ''">
+		     and ahld.his_log_code = #{his_log_code}
+		          
+             </if>
+		     order by ahlm.sort_code,ahld.his_log_code, ahld.his_log_date
+	</select>
+	
+	
+	<insert id="addBatchDetail" parameterType="java.util.List" >
+		<foreach collection="list" item="item" index="index" open="begin" close=";end;" separator=";" >
+			INSERT INTO acc_his_log_detail (
+				group_id, 
+				hos_id, 
+				copy_code, 
+				his_log_code, 
+				his_log_date
+			) VALUES (
+				#{item.group_id,jdbcType=INTEGER},
+				#{item.hos_id,jdbcType=INTEGER},
+				#{item.copy_code,jdbcType=VARCHAR},
+				#{item.his_log_code,jdbcType=VARCHAR},
+				to_date(#{item.his_log_date},'yyyy-MM-dd')
+			)
+		</foreach>
+	</insert>
+	
+	<insert id="add" useGeneratedKeys="true" >	
+		 
+		INSERT INTO acc_his_log_main (
+			group_id, 
+			hos_id, 
+			copy_code, 
+			his_log_code, 
+			his_log_name,
+			is_stop,
+			g_day,
+			sort_code
+		) VALUES (
+			#{group_id,jdbcType=INTEGER},
+			#{hos_id,jdbcType=INTEGER},
+			#{copy_code,jdbcType=VARCHAR},
+			#{his_log_code,jdbcType=VARCHAR},
+			#{his_log_name,jdbcType=VARCHAR},
+			#{is_stop,jdbcType=INTEGER},
+			#{g_day,jdbcType=INTEGER},
+			#{sort_code,jdbcType=INTEGER}
+		)
+	</insert>
+	
+	<update id="update" parameterType="java.util.Map" >
+		UPDATE acc_his_log_main
+		SET 
+		is_stop = #{is_stop,jdbcType=INTEGER},
+		g_day = #{g_day,jdbcType=INTEGER}
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=INTEGER}
+			and his_log_code = #{his_log_code,jdbcType=VARCHAR}
+	</update>
+	
+	
+	
+	<delete id="delete" parameterType="java.util.Map">
+		
+	delete from acc_his_log_detail d
+		where exists(select 1 from acc_his_log_main m where m.is_stop=1 and m.group_id=d.group_id 
+    	and m.hos_id=d.hos_id and m.copy_code=d.copy_code and m.his_log_code=d.his_log_code )
+	</delete>
+	
+	<delete id="deleteBatch" parameterType="java.util.List" >
+		DELETE FROM acc_his_log_detail
+		WHERE 
+		<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+			group_id = #{item.group_id,jdbcType=INTEGER}
+			and hos_id = #{item.hos_id,jdbcType=INTEGER}
+			and copy_code = #{item.copy_code,jdbcType=VARCHAR}
+			and his_log_code = #{item.his_log_code,jdbcType=VARCHAR}
+			and his_log_date = to_date(#{item.his_log_date},'yyyy-MM-dd')
+		</foreach>
+	</delete>
+	
+	<select id="queryAutoHisViewSetting" parameterType="java.util.Map" resultMap="accHisView">
+			select
+	           ahlc.group_id,
+		       ahlc.hos_id,
+		       ahlc.copy_code,
+		       iahlm.his_log_code,
+		       iahlm.his_log_name,
+		       ahlc.is_stop,
+           	   ahlc.g_day,
+           	   iahlm.sort_code
+		 	 from init_acc_his_log_main iahlm
+		     left join acc_his_log_main ahlc
+		     on  iahlm.his_log_code = ahlc.his_log_code
+			order by iahlm.sort_code
+	</select>
+
+	<select id="queryById" resultType="Integer" parameterType="java.util.Map">
+		select count(*)
+		from acc_his_log_main
+		where group_id = #{group_id,jdbcType=INTEGER}
+			and hos_id = #{hos_id,jdbcType=INTEGER}
+			and copy_code = #{copy_code,jdbcType=VARCHAR}
+			and his_log_code = #{his_log_code,jdbcType=VARCHAR}
+	</select>
+
+	<select id="queryDetailById" resultType="Integer" parameterType="java.util.Map">
+		select count(*)
+		from acc_his_log_detail
+		where group_id = #{group_id,jdbcType=INTEGER}
+			and hos_id = #{hos_id,jdbcType=INTEGER}
+			and copy_code = #{copy_code,jdbcType=VARCHAR}
+			and his_log_code = #{his_log_code,jdbcType=VARCHAR}
+			and his_log_date = to_date(#{his_log_date},'yyyy-MM-dd')
+	</select>
+	
+	<select id="queryByCode" parameterType="java.util.Map" resultMap="accHisView">
+		select
+		      his_log_code,
+		      his_log_name
+		 	from init_acc_his_log_main 
+		 where his_log_code = #{his_log_code,jdbcType=VARCHAR}
+	</select>
+
+</mapper>
+

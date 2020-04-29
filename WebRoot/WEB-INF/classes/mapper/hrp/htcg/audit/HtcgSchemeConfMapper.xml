@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.htcg.dao.audit.HtcgSchemeConfMapper">
+	<resultMap id="schemeConf" type="com.chd.hrp.htcg.entity.audit.HtcgSchemeConf">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="acc_year" column="acc_year" />
+		<result property="acc_month" column="acc_month" />
+		<result property="scheme_seq_no" column="scheme_seq_no" />
+		<result property="scheme_note" column="scheme_note" />
+		<result property="period_type_code" column="period_type_code" />
+		<result property="period_type_name" column="period_type_name" />
+		<result property="scheme_code" column="scheme_code" />
+		<result property="scheme_name" column="scheme_name" />
+		<result property="period_code" column="period_code" />
+		<result property="period_name" column="period_name" />
+	</resultMap>
+	
+	<resultMap id="schemeConfPeriod" type="java.util.Map">
+	    <result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="scheme_seq_no" column="scheme_seq_no" />
+		<result column="scheme_code" property="scheme_code"/>
+		<result column="period_type_code" property="period_type_code"/>
+		<result column="acc_year" property="acc_year"/>
+		<result column="acc_month" property="acc_month"/>
+	</resultMap>
+	
+	<insert id = "addBatchHtcgSchemeConf" parameterType="java.util.List">
+	                   insert into htcg_scheme_conf
+								  (group_id,
+								   hos_id,
+								   copy_code,
+								   scheme_seq_no,
+								   scheme_code,
+								   period_type_code,
+								   acc_year,
+								   acc_month)
+					        <foreach collection="list" item="item" separator="union all">
+							     select 
+							            #{item.group_id},
+							            #{item.hos_id},
+							            #{item.copy_code},
+							            #{item.scheme_seq_no},
+							            #{item.scheme_code},
+							            #{item.period_type_code},
+							            #{item.acc_year},
+							            #{item.acc_month} 
+							      from dual
+					    </foreach>
+	</insert>
+	
+	
+	<select id="queryHtcgSchemeConfPeriod" resultMap="schemeConfPeriod" parameterType="java.util.Map">
+			   with temp as(
+			     select 
+					   hst.group_id,
+						 hst.hos_id,
+						 hst.copy_code,
+						 hst.scheme_seq_no,
+						 hst.scheme_code,
+						 decode(hspcs.month_flag,1,'01',decode(hspcs.quarter_flag,1,'02',
+						 decode(hspcs.half_year_flag,1,'03',decode(hspcs.year_flag,1,'04')))) period_type_code
+					 from htcg_seq_table hst
+					 left join htcg_scheme_seq hss
+					 on hst.group_id = hss.group_id
+					 and hst.hos_id = hss.hos_id
+					 and hst.copy_code = hss.copy_code
+					 and hst.scheme_code = hss.scheme_code
+					 and hst.scheme_seq_no = hss.scheme_seq_no
+					 left join htcg_scheme_period_conf_seq hspcs
+					 on  hst.group_id = hspcs.group_id
+					 and hst.hos_id = hspcs.hos_id
+					 and hst.copy_code = hspcs.copy_code
+					 and hst.scheme_code = hspcs.scheme_code
+					 and hst.scheme_seq_no = hspcs.scheme_seq_no
+					 where hst.group_id = #{group_id}
+					 and hst.hos_id = #{hos_id}
+					 and hst.copy_code = #{copy_code}
+					 and hst.scheme_code = #{scheme_code}
+					 and hst.scheme_seq_no = #{scheme_seq_no}
+				),period as(
+				      select hpt.period_type_code,
+										 hpt.period_type_name,
+										 hpd.period_code,
+										 hpd.period_name,
+										 hpd.beg_month,
+										 hpd.end_month
+								from htcg_period_dict hpd
+								left join htcg_period_type hpt
+									on hpd.period_type_code = hpt.period_type_code
+							 order by hpt.period_type_code, hpd.period_code
+				 )select 
+				     t.group_id,
+						 t.hos_id,
+						 t.copy_code,
+						 t.scheme_seq_no,
+						 t.scheme_code,
+						 t.period_type_code,
+						 #{acc_year} acc_year,
+						 p.period_code acc_month
+				   from temp t
+					 left join period p
+					 on t.period_type_code = p.period_type_code
+	
+	</select>
+	
+	<select id="queryHtcgSchemeConf" resultMap="schemeConf" parameterType="java.util.Map">
+		               select 
+						 hsc.group_id,
+						 hsc.hos_id,
+						 hsc.copy_code,
+						 hsc.scheme_seq_no,
+						 hsc.scheme_code,
+						 hs.scheme_name,
+						 hs.scheme_note,
+						 hsc.period_type_code,
+						 hpt.period_type_name,
+						 hsc.acc_year,
+						 hsc.acc_month,
+						 hpd.period_code,
+						 hpd.period_name
+					from htcg_scheme_conf hsc
+					left join htcg_seq_table hst
+					on hsc.group_id = hst.group_id
+					and hsc.hos_id = hst.hos_id
+					and hsc.copy_code = hst.copy_code
+					and hsc.scheme_seq_no = hst.scheme_seq_no
+					and hsc.scheme_code = hst.scheme_code
+					left join htcg_scheme hs
+					on hs.group_id = hsc.group_id
+					and hs.hos_id = hsc.hos_id
+					and hs.copy_code = hsc.copy_code
+					and hs.scheme_code = hsc.scheme_code
+					left join htcg_period_type hpt
+					on hpt.period_type_code = hsc.period_type_code
+					left join htcg_period_dict hpd
+					on hpd.period_type_code = hpt.period_type_code
+					and hpd.period_code = hsc.acc_month
+					<where>
+					           hsc.group_id = #{group_id}
+					       and hsc.hos_id = #{hos_id}
+					       and hsc.copy_code = #{copy_code}
+					     <if test="scheme_seq_no != null and scheme_seq_no != ''">
+					       and hsc.scheme_seq_no = #{scheme_seq_no}
+			             </if>
+					     <if test="scheme_code != null and scheme_code != ''">
+					        and hsc.scheme_code = #{scheme_code}
+			             </if>
+			             <if test="acc_year != null and acc_year != ''">
+					        and hsc.acc_year = #{acc_year}
+			             </if>
+			             <if test="period_type_code != null and period_type_code != ''">
+					        and hsc.period_type_code = #{period_type_code}
+			             </if>
+			             <if test="period_code != null and period_code != ''">
+					        and hsc.acc_month = #{period_code}
+			             </if>
+					</where>
+				   order by  hsc.group_id,hsc.hos_id,hsc.copy_code,hsc.scheme_code,hsc.acc_year
+		   
+	</select>
+	
+	<delete id="deleteHtcgSchemeConf" parameterType="java.util.Map">
+	      delete from htcg_scheme_conf 
+	      where group_id = #{group_id}
+	      and hos_id = #{hos_id}
+	      and copy_code = #{copy_code}
+	      and scheme_code = #{scheme_code}
+	      and acc_year = #{acc_year}
+	</delete>
+	
+	<delete id="deleteBatchHtcgSchemeConf" parameterType="java.util.List">
+
+		        delete from htcg_scheme_conf where 
+			<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+				           group_id = #{item.group_id}
+					   and hos_id = #{item.hos_id}
+					   and copy_code = #{item.copy_code}
+					   and scheme_seq_no = #{item.scheme_seq_no}
+					   and scheme_code = #{item.scheme_code}
+					   and period_type_code = #{item.period_type_code}
+					   and acc_year = #{item.acc_year}
+					   and acc_month = #{item.acc_month}
+			</foreach>
+	</delete>
+</mapper>
+	

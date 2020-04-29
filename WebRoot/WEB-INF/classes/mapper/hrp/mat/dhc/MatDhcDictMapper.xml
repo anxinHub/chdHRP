@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.mat.dao.dhc.MatDhcDictMapper">
+	
+	<select id="queryTree" parameterType="java.util.Map" resultType="java.util.Map" >
+		<!-- 仓库列表 -->
+		SELECT 0 id, '_1' code, '' super_code, '库房' name, 0 type, 0 state FROM DUAL
+		UNION ALL
+		SELECT a.store_id id, a.store_code code, '_1' super_code, a.store_code || ' ' || a.store_name name, 
+			0 type, nvl(b.state, 0) state
+		FROM hos_store_dict a 
+		LEFT JOIN mat_dura_store_status b 
+			ON a.group_id = b.group_id 
+			AND a.hos_id = b.hos_id 
+			AND b.copy_code = #{copy_code,jdbcType=VARCHAR} 
+			AND a.store_id = b.store_id 
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER} 
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND a.is_stop = 0 
+			AND a.store_id in (
+				SELECT perm_code
+				FROM v_user_data_perm
+				WHERE group_id = #{group_id,jdbcType=INTEGER}  
+					AND hos_id = #{hos_id,jdbcType=INTEGER} 
+					AND user_id = #{user_id,jdbcType=INTEGER} 
+					AND table_code = 'HOS_STORE_DICT'
+					AND is_read = 1 AND is_write = 1 
+			)
+		UNION ALL
+		<!-- 科室列表 -->
+		SELECT 0 id, '_2' code, '' super_code, '科室' name, 1 type, 0 state FROM DUAL
+		UNION ALL
+		SELECT a.dept_id id, a.dept_code code, case when super_code = '0' then '_2' else super_code end super_code, 
+			a.dept_code || ' ' || a.dept_name name, 1 type, nvl(b.state, 0) state
+		FROM hos_dept_dict a 
+		LEFT JOIN mat_dura_dept_status b 
+			ON a.group_id = b.group_id 
+			AND a.hos_id = b.hos_id 
+			AND b.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND a.dept_id = b.dept_id
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER} 
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND a.is_stop = 0 
+			AND a.dept_id in (
+				SELECT perm_code
+				FROM v_user_data_perm
+				WHERE group_id = #{group_id,jdbcType=INTEGER} 
+					AND hos_id = #{hos_id,jdbcType=INTEGER} 
+					AND user_id = #{user_id,jdbcType=INTEGER} 
+					AND table_code = 'HOS_DEPT_DICT'
+					AND is_read = 1 AND is_write = 1 
+			)
+	</select>
+</mapper>
+

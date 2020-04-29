@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.hr.dao.nursing.HrTeachingStatisticsMapper">
+  <resultMap id="assPriceChnage" type="java.util.Map">
+	  <result column="emp_id" property="emp_id"/>
+	  <result column="emp_code" property="emp_code"/>
+	  <result column="emp_name" property="emp_name"/>
+	  <result column="dept_no" property="dept_no"/>
+	  <result column="dept_name" property="dept_name"/>
+	  <result column="teach_date" property="teach_date"/>
+	  <result column="duty_code" property="duty_code"/>
+	  <result column="duty_name" property="duty_name"/>
+	  <result column="title_code" property="title_code"/>
+	  <result column="title_name" property="title_name"/>
+	  <result column="col_code" property="col_code"/>
+	  <result column="col_name" property="col_name"/>
+	  <result column="countnum" property="countnum"/>
+	  <result column="hours" property="hours"/>
+	  <result column="state_name" property="state_name"/>
+	  <result column="teach_type_code" property="teach_type_code"/>
+	  <result column="teach_type_name" property="teach_type_name"/>
+  </resultMap>
+  
+	<select id="query" parameterType="java.util.Map" resultMap="assPriceChnage">
+	 	with inservice_statistics as(
+			select hoe.emp_id,hoe.emp_code,hoe.emp_name,hde.dept_no,hde.dept_name,hd.duty_code,hd.duty_name,ht.title_code,ht.title_name,
+				t.field_col_code col_code ,t.field_col_name  col_name,substr(hes.teach_date,0,4)teach_date ,t1.field_col_code as teach_type_code ,t1.field_col_name as teach_type_name
+		 	from HR_TEACH hes 
+			left join hr_fiied_data t1 on hes.teach_type =t1.field_col_code and t1.field_tab_code = 'DIC_TEACH_TYPE'
+			left join hos_emp hoe on hes.emp_id=hoe.emp_id 
+		  	left join hr_emp_promotion hep on hes.emp_id = hep.emp_id and hes.group_id=hep.group_id and hes.hos_id=hep.hos_id and hes.level_code=hep.level_code
+		    left join hr_fiied_data t on hep.level_code =t.field_col_code and t.field_tab_code = 'DIC_LEVEL' and t.group_id=hep.group_id and   t.hos_id=hep.hos_id
+		    left join hos_dept_dict hde on hoe.dept_no =hde.dept_no and hoe.group_id=hde.group_id and hoe.hos_id=hde.hos_id
+		    left join hr_hos_duty hhd on hoe.emp_id=hhd.emp_id and hoe.group_id=hhd.group_id and hoe.hos_id=hhd.hos_id and hes.duty_code=hhd.duty_code
+		    left join hos_duty hd on hhd.duty_code=hd.duty_code and hd.group_id=hhd.group_id and hd.hos_id=hhd.hos_id
+		    left join hr_emp_technology_title het on hoe.emp_id =het.emp_id and hoe.group_id=het.group_id and hoe.hos_id=het.hos_id 
+		    left join hr_title ht on het.title_code=ht.title_code and ht.group_id=het.group_id and ht.hos_id=het.hos_id
+					WHERE 
+		hes.group_id = #{group_id}   and 
+		hes.hos_id = #{hos_id}
+			group by hoe.emp_id,hoe.emp_code,hoe.emp_name,hde.dept_name,hd.duty_name,ht.title_name,t.field_col_name,hde.dept_no,hd.duty_code,ht.title_code,t.field_col_code,hes.teach_date,t1.field_col_code，t1.field_col_name
+		)
+		select ins.teach_date,ins.emp_id,ins.emp_name,ins.emp_code,ins.teach_type_name,ins.col_name ,count(distinct ins.teach_type_code) countnum from inservice_statistics ins
+		<where>
+			<if test="year !=null and year !=''">
+			 	and ins.teach_date=#{year}
+			</if>
+			<if test="emp_id !=null and emp_id !=''">
+			 	and ins.emp_id =#{emp_id}
+			</if>
+			<if test="emp_name !=null and emp_name !=''">
+			 	and ins.emp_name=#{emp_name}
+			</if>
+			<if test="dept_no !=null and dept_no !=''">
+				and ins.dept_no=#{dept_no}
+			</if>
+			<if test="duty_code !=null and duty_code !=''">
+			 	and ins.duty_code=#{duty_code}
+			</if>
+			<if test="title_code !=null and title_code !=''">
+			 	and ins.title_code=#{title_code}
+			</if>
+			<if test="col_code !=null and col_code !=''">
+			 	and ins.col_code=#{level_code}
+			</if>
+			<if test="teach_type_code !=null and teach_type_code !=''">
+			 	and ins.teach_type_code=#{teach_type_code}
+			</if>
+		</where>
+		group by ins.teach_date,ins.emp_id,ins.emp_name,ins.emp_code,ins.col_name,ins.teach_type_name
+		order by ins.emp_code
+	</select>
+	
+	<select id="queryTeachingStatisticsByPrint" parameterType="java.util.Map" resultType="java.util.Map">
+		with inservice_statistics as(
+			select hoe.emp_id,hoe.emp_code,hoe.emp_name,hde.dept_no,hde.dept_name,hd.duty_code,hd.duty_name,ht.title_code,ht.title_name,
+				t.field_col_code col_code ,t.field_col_name  col_name,substr(hes.teach_date,0,4)teach_date ,t1.field_col_code as teach_type_code ,t1.field_col_name as teach_type_name
+		 	from HR_TEACH hes 
+			left join hr_fiied_data t1 on hes.teach_type =t1.field_col_code and t1.field_tab_code = 'DIC_TEACH_TYPE'
+			left join hos_emp hoe on hes.emp_id=hoe.emp_id 
+		  	left join hr_emp_promotion hep on hes.emp_id = hep.emp_id and hes.group_id=hep.group_id and hes.hos_id=hep.hos_id and hes.level_code=hep.level_code
+		    left join hr_fiied_data t on hep.level_code =t.field_col_code and t.field_tab_code = 'DIC_LEVEL' and t.group_id=hep.group_id and   t.hos_id=hep.hos_id
+		    left join hos_dept_dict hde on hoe.dept_no =hde.dept_no and hoe.group_id=hde.group_id and hoe.hos_id=hde.hos_id
+		    left join hr_hos_duty hhd on hoe.emp_id=hhd.emp_id and hoe.group_id=hhd.group_id and hoe.hos_id=hhd.hos_id and hes.duty_code=hhd.duty_code
+		    left join hos_duty hd on hhd.duty_code=hd.duty_code and hd.group_id=hhd.group_id and hd.hos_id=hhd.hos_id
+		    left join hr_emp_technology_title het on hoe.emp_id =het.emp_id and hoe.group_id=het.group_id and hoe.hos_id=het.hos_id 
+		    left join hr_title ht on het.title_code=ht.title_code and ht.group_id=het.group_id and ht.hos_id=het.hos_id
+			group by hoe.emp_id,hoe.emp_code,hoe.emp_name,hde.dept_name,hd.duty_name,ht.title_name,t.field_col_name,hde.dept_no,hd.duty_code,ht.title_code,t.field_col_code,hes.teach_date,t1.field_col_code，t1.field_col_name
+		)
+		select ins.teach_date,ins.emp_id,ins.emp_name,ins.emp_code,ins.col_name ,count(distinct ins.teach_type_code) countnum from inservice_statistics ins
+		<where>
+			<if test="teach_date !=null and teach_date !=''">
+			 	and ins.teach_date=#{teach_date}
+			</if>
+			<if test="emp_id !=null and emp_id !=''">
+			 	and ins.emp_code like '%${emp_id}%'
+			</if>
+			<if test="emp_name !=null and emp_name !=''">
+			 	and ins.emp_name=#{emp_name}
+			</if>
+			<if test="dept_no !=null and dept_no !=''">
+				and ins.dept_no=#{dept_no}
+			</if>
+			<if test="duty_code !=null and duty_code !=''">
+			 	and ins.duty_code=#{duty_code}
+			</if>
+			<if test="title_code !=null and title_code !=''">
+			 	and ins.title_code=#{title_code}
+			</if>
+			<if test="col_code !=null and col_code !=''">
+			 	and ins.col_code=#{level_code}
+			</if>
+			<if test="teach_type_code !=null and teach_type_code !=''">
+			 	and ins.teach_type_code=#{teach_type_code}
+			</if>
+		</where>
+		group by ins.teach_date,ins.emp_id,ins.emp_name,ins.emp_code,ins.col_name
+	</select>
+	
+</mapper>

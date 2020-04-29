@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+	<sql id="v_acc_ass_pre_pay_m" type="view" desc="资产付款主表信息"><![CDATA[
+	CREATE OR REPLACE VIEW V_ACC_ASS_PRE_PAY_M AS
+      SELECT 
+        RS.GROUP_ID,  --集团ID
+        RS.HOS_ID,    --医院ID
+        RS.COPY_CODE, --账套编码
+        RS.PAY_NO AS BUSINESS_ID,     --付款单ID
+        RS.PAY_NO AS BUSINESS_NO,     --付款单号     
+        RS.VEN_ID SUP_ID,  --供应商ID
+        HSD.SUP_NO,  --供应商变更ID
+        HSD.SUP_CODE,    --供应商编码
+        HSD.SUP_NAME,    --供应商名称        
+        SUM(ABD.BILL_MONEY) AS AMOUNT_MONEY, --付款金额      
+        RS.CREATE_EMP MAKER,    --制单人ID
+        SM.USER_NAME AS MAKER_NAME, --制单人名称      
+        RS.CREATE_DATE AS MAKE_DATE,    --编制日期
+        RS.AUDIT_DATE AS BUSI_DATE,    --业务日期
+        RS.AUDIT_EMP CONFIRMER,    --确认人ID
+        SF.USER_NAME AS CONFIRMER_NAME,    --确认人
+        RS.STATE       --状态
+    FROM ASS_PRE_PAY_MAIN RS
+    LEFT JOIN ASS_PRE_PAY_DETAIL APD --付款明细表
+     ON 
+        RS.GROUP_ID=APD.GROUP_ID
+        AND RS.HOS_ID=APD.HOS_ID
+        AND RS.COPY_CODE=APD.COPY_CODE
+        AND RS.PAY_NO=APD.PAY_NO
+    LEFT JOIN ASS_PRE_BILL_MAIN ABM--发票主表
+     ON 
+        APD.GROUP_ID=ABM.GROUP_ID
+        AND APD.HOS_ID=ABM.HOS_ID
+        AND APD.COPY_CODE=ABM.COPY_CODE
+        AND APD.BILL_NO=ABM.BILL_NO
+    LEFT JOIN ASS_PRE_BILL_DETAIL ABD--发票明细表
+     ON 
+        ABM.GROUP_ID=ABD.GROUP_ID
+        AND ABM.HOS_ID=ABD.HOS_ID
+        AND ABM.COPY_CODE=ABD.COPY_CODE
+        AND ABM.BILL_NO=ABD.BILL_NO
+    LEFT JOIN HOS_SUP_DICT HSD --供应商
+     ON 
+        RS.GROUP_ID=HSD.GROUP_ID 
+        AND RS.HOS_ID=HSD.HOS_ID
+        AND RS.VEN_ID=HSD.SUP_ID
+        AND RS.VEN_NO=HSD.SUP_NO
+     LEFT JOIN SYS_USER SM  --制单人
+     ON 
+        RS.GROUP_ID=SM.GROUP_ID
+        AND RS.HOS_ID=SM.HOS_ID
+        AND RS.COPY_CODE=SM.COPY_CODE
+        AND RS.CREATE_EMP=SM.USER_ID
+     LEFT JOIN SYS_USER SF   --确认人
+     ON 
+        RS.GROUP_ID=SF.GROUP_ID
+        AND RS.HOS_ID=SF.HOS_ID
+        AND RS.COPY_CODE=SF.COPY_CODE
+        AND RS.AUDIT_EMP=SF.USER_ID
+     WHERE RS.STATE=2 
+     AND ABD.NATURS_CODE IN ('01','02','03','04')   
+     GROUP BY  
+        RS.GROUP_ID,  
+        RS.HOS_ID, 
+        RS.COPY_CODE, 
+        RS.PAY_NO,  
+        RS.PAY_NO,       
+        RS.VEN_ID, 
+        HSD.SUP_NO,  
+        HSD.SUP_CODE, 
+        HSD.SUP_NAME,               
+        RS.CREATE_EMP,  
+        SM.USER_NAME,      
+        RS.CREATE_DATE, 
+        RS.AUDIT_DATE, 
+        RS.AUDIT_EMP, 
+        SF.USER_NAME,  
+        RS.STATE 
+   ]]></sql>
+   <sql id="v_acc_ass_pre_pay_d" type="view" desc="资产付款明细表信息"><![CDATA[
+	CREATE OR REPLACE VIEW V_ACC_ASS_PRE_PAY_D AS
+      SELECT 
+        RS.GROUP_ID,  --集团ID
+        RS.HOS_ID,    --医院ID
+        RS.COPY_CODE, --账套编码
+        RS.PAY_NO AS BUSINESS_ID,     --付款单ID
+        RS.PAY_NO AS BUSINESS_NO,     --付款单号     
+        RS.BILL_NO,       --发票号
+        RS.BILL_MONEY,    --发票金额
+        APS.PAY_CODE, --付款方式编码
+        APT.PAY_NAME, --付款方式名称
+        APT.PAY_TYPE, --支付属性
+        APA.TYPE_NAME,--支付属性名称
+        PS.SOURCE_ID,  --资金来源ID
+        HS.SOURCE_CODE,    --资金来源编码
+        HS.SOURCE_NAME,    --资金来源名称
+        HS.SOURCE_ATTR FUND_SOURCE_ATTR,--资金来源性质
+        HSN.NATURE_CODE AS SOURCE_NATURE_CODE, --资金来源属性
+        HSN.NATURE_NAME AS SOURCE_NATURE_NAME, --资金来源性质名称
+        APS.PAY_MONEY,   --付款金额  
+        ABD.ASS_ID,  --资产ID
+        ABD.ASS_NO,   --资产变更NO
+        ATD.ASS_TYPE_ID AS SUB_TYPE_ID, --分类ID
+        ATD.ASS_TYPE_CODE, --分类编码
+        ATD.ASS_TYPE_NAME, --分类名称
+        ABD.BILL_MONEY  AMOUNT_MONEY --卡片发票金额        
+    FROM ASS_PRE_PAY_DETAIL RS
+    LEFT JOIN ASS_PRE_BILL_MAIN ABM--发票主表
+     ON 
+        RS.GROUP_ID=ABM.GROUP_ID
+        AND RS.HOS_ID=ABM.HOS_ID
+        AND RS.COPY_CODE=ABM.COPY_CODE
+        AND RS.BILL_NO=ABM.BILL_NO
+    LEFT JOIN ASS_PRE_BILL_DETAIL ABD--发票明细表
+     ON 
+        ABM.GROUP_ID=ABD.GROUP_ID
+        AND ABM.HOS_ID=ABD.HOS_ID
+        AND ABM.COPY_CODE=ABD.COPY_CODE
+        AND ABM.BILL_NO=ABD.BILL_NO
+    LEFT JOIN ASS_NO_DICT AD --资产字典
+      ON 
+         ABD.GROUP_ID=AD.GROUP_ID
+         AND ABD.HOS_ID=AD.HOS_ID
+         AND ABD.COPY_CODE=AD.COPY_CODE
+         AND ABD.ASS_ID=AD.ASS_ID
+         AND ABD.ASS_NO=AD.ASS_NO
+      LEFT JOIN ASS_TYPE_DICT ATD --资产分类
+      ON 
+         RS.GROUP_ID=ATD.GROUP_ID
+         AND RS.HOS_ID=ATD.HOS_ID
+         AND RS.COPY_CODE=ATD.COPY_CODE
+         AND AD.ASS_TYPE_ID=ATD.ASS_TYPE_ID 
+    LEFT JOIN ASS_PRE_PAY_STAGE APS  --支付方式付款表
+     ON 
+        RS.GROUP_ID=APS.GROUP_ID
+        AND RS.HOS_ID=APS.HOS_ID
+        AND RS.COPY_CODE=APS.COPY_CODE
+        AND RS.PAY_NO=APS.PAY_NO
+        AND RS.BILL_NO=APS.BILL_NO
+    LEFT JOIN ACC_PAY_TYPE APT  --支付方式字典
+     ON 
+        APS.GROUP_ID=APT.GROUP_ID
+        AND APS.HOS_ID=APT.HOS_ID
+        AND APS.COPY_CODE=APT.COPY_CODE
+        AND APS.PAY_CODE=APT.PAY_CODE
+    LEFT JOIN ACC_PAY_ATTR APA  --支付属性
+     ON 
+        APT.GROUP_ID=APA.GROUP_ID
+        AND APT.HOS_ID=APA.HOS_ID
+        AND APT.COPY_CODE=APA.COPY_CODE
+        AND APT.PAY_TYPE=APA.PAY_TYPE
+    LEFT JOIN ASS_PAY_SOURCE PS  --对应资金来源
+      ON 
+         APT.GROUP_ID=PS.GROUP_ID
+         AND APT.HOS_ID=PS.HOS_ID
+         AND APS.COPY_CODE=PS.COPY_CODE
+         AND APT.PAY_CODE=PS.PAY_CODE
+    LEFT JOIN HOS_SOURCE HS  --资金来源
+      ON 
+         PS.GROUP_ID=HS.GROUP_ID
+         AND PS.HOS_ID=HS.HOS_ID
+         AND PS.SOURCE_ID=HS.SOURCE_ID
+    LEFT JOIN HOS_SOURCE_NATURE HSN --资金来源性质
+      ON 
+         HS.SOURCE_ATTR=HSN.NATURE_CODE
+    WHERE ABD.NATURS_CODE IN ('01','02','03','04')
+   ]]></sql>
+</root>     

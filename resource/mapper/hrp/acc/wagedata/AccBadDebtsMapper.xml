@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.acc.dao.AccBadDebtsMapper">
+
+	<select id="queryBadDebts" resultType="java.util.Map">
+	select
+		p1.seqno,
+		p1.debt_comp,
+		p1.ACC_SUBJ_CODE,
+		p2.subj_name acc_subj_name,
+		p1.RESP_DEPT,
+    	p1.DEBT_MONEY,
+		to_char(p1.occ_date,'yyyy-mm-dd') occ_date,
+		to_char(p1.aff_date,'yyyy-mm-dd') aff_date,
+		p1.aff_money,
+		p1.reget_money,
+		p1.noget_money,
+		p1.aff_no,
+		p1.note 
+	from ACC_BADDEBT_BOOK
+		p1 left join acc_subj p2
+		on p1.acc_subj_code = p2.subj_code
+		and
+		p2.group_id = #{group_id,jdbcType=INTEGER}
+		and p2.hos_id = #{hos_id,jdbcType=INTEGER}
+		and p2.copy_code = #{copy_code,jdbcType=VARCHAR}
+		and p2.acc_year = #{acc_year,jdbcType=VARCHAR}
+		where 1=1
+		<if test="occ_date_state != null and occ_date_state != '' ">
+			and p1.occ_date &gt;= to_date(substr(#{occ_date_state,jdbcType=VARCHAR},0,10),'yyyy-mm-dd')
+		</if>
+		<if test="occ_date_end != null and occ_date_end != '' ">
+			and p1.occ_date &lt;= to_date(substr(#{occ_date_end,jdbcType=VARCHAR},0,10),'yyyy-mm-dd')
+		</if>
+		<if test="aff_date_state != null and aff_date_state != '' ">
+			and p1.aff_date &gt;= to_date(substr(#{aff_date_state,jdbcType=VARCHAR},0,10),'yyyy-mm-dd')
+		</if>
+		<if test="aff_date_end != null and aff_date_end != '' ">
+			and p1.aff_date &lt;= to_date(substr(#{aff_date_end,jdbcType=VARCHAR},0,10),'yyyy-mm-dd')
+		</if>
+		<if test="debt_comp != null and debt_comp != '' ">
+			and p1.debt_comp like '${debt_comp}%'
+		</if>
+		<if test="resp_dept != null and resp_dept != '' ">
+			and p1.resp_dept like '${resp_dept}%'
+		</if>
+		<if test="aff_no != null and aff_no != '' ">
+			and p1.aff_no like '${aff_no}%'
+		</if>
+		<if test="debt_money_state != null and debt_money_state != '' ">
+			and p1.debt_money &gt;= #{debt_money_state,jdbcType=INTEGER}
+		</if>
+		<if test="debt_money_end != null and debt_money_end != '' ">
+			and p1.debt_money &lt;= #{debt_money_end,jdbcType=INTEGER}
+		</if>
+	</select>
+
+	<!-- add -->
+	<insert id="addBadDebts">
+		insert into ACC_BADDEBT_BOOK
+				(SEQNO,ACC_SUBJ_CODE,RESP_DEPT,DEBT_MONEY,OCC_DATE,
+				AFF_DATE,AFF_MONEY,REGET_MONEY,NOGET_MONEY,AFF_NO,NOTE,DEBT_COMP
+				)
+				
+				select ACC_BADDEBT_BOOK_SEQ.nextval SEQNO,tt.* from 
+				<foreach collection="list" close=" ) " open=" ( " item="vo" separator=" union all ">
+				select
+					#{vo.ACC_SUBJ_CODE,jdbcType=VARCHAR} ACC_SUBJ_CODE,
+					#{vo.RESP_DEPT,jdbcType=VARCHAR} RESP_DEPT,
+					#{vo.DEBT_MONEY,jdbcType=INTEGER} DEBT_MONEY,
+					to_date(substr(#{vo.OCC_DATE,jdbcType=VARCHAR},0,10),'yyyy-mm-dd') OCC_DATE,
+					<if test="vo.AFF_DATE == null or vo.AFF_DATE == '' ">null AFF_DATE,</if>
+					<if test="vo.AFF_DATE != null and vo.AFF_DATE != '' ">to_date(substr(#{vo.AFF_DATE,jdbcType=VARCHAR},0,10),'yyyy-mm-dd') AFF_DATE,</if>
+					
+					<if test="vo.AFF_MONEY == null or vo.AFF_MONEY == '' ">0 AFF_MONEY,</if>
+					<if test="vo.AFF_MONEY != null and vo.AFF_MONEY != '' ">#{vo.AFF_MONEY,jdbcType=INTEGER} AFF_MONEY,</if>
+					
+					<if test="vo.REGET_MONEY == null or vo.REGET_MONEY == '' ">0 REGET_MONEY,</if>
+					<if test="vo.REGET_MONEY != null and vo.REGET_MONEY != '' ">#{vo.REGET_MONEY,jdbcType=INTEGER} REGET_MONEY,</if>
+					
+					<if test="vo.NOGET_MONEY == null or vo.NOGET_MONEY == '' ">0 NOGET_MONEY,</if>
+					<if test="vo.NOGET_MONEY != null and vo.NOGET_MONEY != '' ">#{vo.NOGET_MONEY,jdbcType=INTEGER} NOGET_MONEY,</if>
+					
+					<if test="vo.AFF_NO == null or vo.AFF_NO == '' ">null AFF_NO,</if>
+					<if test="vo.AFF_NO != null and vo.AFF_NO != '' ">#{vo.AFF_NO,jdbcType=VARCHAR} AFF_NO,</if>
+					
+					<if test="vo.NOTE == null or vo.NOTE == '' ">null NOTE,</if>
+					<if test="vo.NOTE != null and vo.NOTE != '' ">#{vo.NOTE,jdbcType=VARCHAR} NOTE,</if>
+					
+					#{vo.DEBT_COMP,jdbcType=VARCHAR} DEBT_COMP
+				from
+					dual
+				</foreach> tt
+	</insert>
+
+	<!-- 添加科目 -->
+	<insert id="addBadDebtsTo">
+	insert into ACC_BADDEBT_BOOK
+				(SEQNO,ACC_SUBJ_CODE,RESP_DEPT,DEBT_MONEY,OCC_DATE,
+				AFF_DATE,AFF_MONEY,REGET_MONEY,NOGET_MONEY,AFF_NO,NOTE,DEBT_COMP
+				)
+				
+				select ACC_BADDEBT_BOOK_SEQ.nextval SEQNO,tt.* from 
+				<foreach collection="list" close=" ) " open=" ( " item="vo" separator=" union all ">
+				select
+					#{vo.ACC_SUBJ_CODE,jdbcType=VARCHAR} ACC_SUBJ_CODE,
+					#{vo.RESP_DEPT,jdbcType=VARCHAR} RESP_DEPT,
+					#{vo.DEBT_MONEY,jdbcType=INTEGER} DEBT_MONEY,
+					to_date(#{vo.OCC_DATE,jdbcType=VARCHAR},'yyyy-mm-dd') OCC_DATE,
+					<if test="vo.AFF_DATE == null or vo.AFF_DATE == '' ">null AFF_DATE,</if>
+					<if test="vo.AFF_DATE != null and vo.AFF_DATE != '' ">to_date(#{vo.AFF_DATE,jdbcType=VARCHAR},'yyyy-mm-dd') AFF_DATE,</if>
+					
+					<if test="vo.AFF_MONEY == null or vo.AFF_MONEY == '' ">0 AFF_MONEY,</if>
+					<if test="vo.AFF_MONEY != null and vo.AFF_MONEY != '' ">#{vo.AFF_MONEY,jdbcType=INTEGER} AFF_MONEY,</if>
+					
+					<if test="vo.REGET_MONEY == null or vo.REGET_MONEY == '' ">0 REGET_MONEY,</if>
+					<if test="vo.REGET_MONEY != null and vo.REGET_MONEY != '' ">#{vo.REGET_MONEY,jdbcType=INTEGER} REGET_MONEY,</if>
+					
+					<if test="vo.NOGET_MONEY == null or vo.NOGET_MONEY == '' ">0 NOGET_MONEY,</if>
+					<if test="vo.NOGET_MONEY != null and vo.NOGET_MONEY != '' ">#{vo.NOGET_MONEY,jdbcType=INTEGER} NOGET_MONEY,</if>
+					
+					<if test="vo.AFF_NO == null or vo.AFF_NO == '' ">null AFF_NO,</if>
+					<if test="vo.AFF_NO != null and vo.AFF_NO != '' ">#{vo.AFF_NO,jdbcType=VARCHAR} AFF_NO,</if>
+					
+					<if test="vo.NOTE == null or vo.NOTE == '' ">null NOTE,</if>
+					<if test="vo.NOTE != null and vo.NOTE != '' ">#{vo.NOTE,jdbcType=VARCHAR} NOTE,</if>
+					
+					#{vo.DEBT_COMP,jdbcType=VARCHAR} DEBT_COMP
+				from
+					dual
+				</foreach> tt
+	</insert>
+
+	<!-- 查询科目 -->
+	<select id="queryAccSubjSelect" resultType="java.util.Map">
+		select 
+			subj_code ACC_SUBJ_CODE,
+			subj_code||' '||subj_name_all ACC_SUBJ_NAME 
+		from 
+			acc_subj
+		where 
+			group_id = #{group_id,jdbcType=INTEGER}
+			and hos_id = #{hos_id,jdbcType=INTEGER}
+			and copy_code = #{copy_code,jdbcType=VARCHAR}
+			and IS_LAST = 1
+			and IS_STOP = 0
+			and acc_year = #{acc_year,jdbcType=VARCHAR}
+			and rownum &lt;= 11
+	</select>
+
+	<!-- 全量更新删除所有数据 -->
+	<delete id="deleteAddBadDebts">
+		delete from ACC_BADDEBT_BOOK
+	</delete>
+
+</mapper>
+

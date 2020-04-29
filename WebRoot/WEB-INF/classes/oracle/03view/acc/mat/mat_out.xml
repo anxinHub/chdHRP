@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+
+	<sql id="v_mat_out_main" type="view" desc="物流出库主表视图"><![CDATA[
+	 CREATE OR REPLACE VIEW v_mat_out_main AS
+    SELECT 
+        MOM.GROUP_ID,  --集团ID
+        MOM.HOS_ID,    --医院ID
+        MOM.COPY_CODE, --账套编码
+        MOM.OUT_ID AS BUSINESS_ID,     --出库单ID
+        MOM.OUT_NO AS BUSINESS_NO,     --出库单号
+        MOM.YEAR,      --年份
+        MOM.MONTH,     --月份
+        MOM.BUS_TYPE_CODE,--业务类型
+        MBT.BUS_TYPE_NAME,--业务类型名称
+        MOM.STORE_ID,  --仓库ID
+        HST.STORE_NO,  --仓库变更ID
+        HST.STORE_CODE,    --仓库编码
+        HST.STORE_NAME,    --仓库名称
+        MOM.BRIEF,    --摘要
+        MOM.MAKER,    --制单人ID
+        SM.USER_NAME AS MAKER_NAME, --制单人名称
+        MOM.OUT_DATE AS MAKE_DATE,    --编制日期
+        MOM.CHECKER,    --审核人ID
+        SC.USER_NAME AS CHECKER_NAME,    --审核人
+        MOM.CHECK_DATE,    --审核日期
+        MOM.CONFIRMER,    --入库确认人ID
+        SF.USER_NAME  AS CONFIRMER_NAME,    --入库确认人
+        MOM.CONFIRM_DATE AS BUSI_DATE,    --业务日期
+        MOM.PROJ_ID,  --项目ID
+        HPD.PROJ_NO,  --项目变更ID
+        HPD.PROJ_CODE,    --项目编码
+        HPD.PROJ_NAME,    --项目名称
+        HS.SOURCE_ID,    --资金来源ID
+        HS.SOURCE_CODE,    --资金来源编码
+        HS.SOURCE_NAME,    --资金来源名称
+        HSN.NATURE_CODE AS SOURCE_NATURE_CODE, --资金来源属性
+        HSN.NATURE_NAME AS SOURCE_NATURE_NAME, --资金来源性质名称
+        MOM.DEPT_EMP AS EMP_ID,   --采购员ID
+        HED.EMP_NO ,  --领料人变更ID
+        HED.EMP_CODE ,  --领料人编码
+        HED.EMP_NAME,  --领料人名称
+        HDD.DEPT_ID,   --领料科室ID
+        HDD.DEPT_NO,   --领料科室变更ID
+        HDD.DEPT_NAME,  --领料科室名称
+        MOM.STATE,       --状态
+        HS.SOURCE_ATTR FUND_SOURCE_ATTR,--资金来源性质
+        ATTR.OUT_CODE--支出性质  
+     FROM MAT_OUT_MAIN MOM
+     LEFT JOIN MAT_BUS_TYPE MBT
+     ON 
+        MOM.BUS_TYPE_CODE=MBT.BUS_TYPE_CODE
+     LEFT JOIN HOS_STORE_DICT HST
+     ON 
+        MOM.GROUP_ID=HST.GROUP_ID
+        AND MOM.HOS_ID=HST.HOS_ID
+        AND MOM.STORE_ID=HST.STORE_ID
+        AND MOM.STORE_NO=HST.STORE_NO
+     LEFT JOIN SYS_USER SM  --制单人
+     ON 
+        MOM.GROUP_ID=SM.GROUP_ID
+        AND MOM.HOS_ID=SM.HOS_ID
+        AND MOM.COPY_CODE=SM.COPY_CODE
+        AND MOM.MAKER=SM.USER_ID
+     LEFT JOIN SYS_USER SC   --审核人
+     ON 
+        MOM.GROUP_ID=SC.GROUP_ID
+        AND MOM.HOS_ID=SC.HOS_ID
+        AND MOM.COPY_CODE=SC.COPY_CODE
+        AND MOM.CHECKER=SC.USER_ID
+     LEFT JOIN SYS_USER SF   --确认人
+     ON 
+        MOM.GROUP_ID=SF.GROUP_ID
+        AND MOM.HOS_ID=SF.HOS_ID
+        AND MOM.COPY_CODE=SF.COPY_CODE
+        AND MOM.CONFIRMER=SF.USER_ID
+     LEFT JOIN HOS_EMP_DICT HED   --领料员
+     ON 
+        MOM.GROUP_ID=HED.GROUP_ID
+        AND MOM.HOS_ID=HED.HOS_ID
+        AND MOM.DEPT_EMP=HED.EMP_ID
+        AND HED.IS_STOP=0
+     LEFT JOIN HOS_DEPT_DICT HDD   --领料科室   
+     ON 
+        MOM.GROUP_ID=HDD.GROUP_ID
+        AND MOM.HOS_ID=HDD.HOS_ID
+        AND MOM.DEPT_ID=HDD.DEPT_ID
+        AND MOM.DEPT_NO=HDD.DEPT_NO
+     LEFT JOIN ACC_DEPT_ATTR ATTR --科室属性
+     ON 
+     	HDD.DEPT_ID=ATTR.DEPT_ID 
+     	AND HDD.GROUP_ID=ATTR.GROUP_ID 
+     	AND HDD.HOS_ID=ATTR.HOS_ID
+     LEFT JOIN HOS_PROJ_DICT HPD 
+     ON 
+        MOM.GROUP_ID=HPD.GROUP_ID 
+        AND MOM.HOS_ID=HPD.HOS_ID
+        AND MOM.PROJ_ID=HPD.PROJ_ID
+        AND HPD.IS_STOP=0   
+     LEFT JOIN MAT_OUT_RESOURCE MIR 
+     ON 
+        MOM.GROUP_ID=MIR.GROUP_ID 
+        AND MOM.HOS_ID=MIR.HOS_ID
+        AND MOM.COPY_CODE=MIR.COPY_CODE
+        AND MOM.OUT_ID=MIR.OUT_ID
+     LEFT JOIN HOS_SOURCE HS
+     ON 
+        MIR.GROUP_ID=HS.GROUP_ID
+        AND MIR.HOS_ID=HS.HOS_ID
+        AND MIR.SOURCE_ID=HS.SOURCE_ID
+     LEFT JOIN HOS_SOURCE_NATURE HSN
+     ON 
+        HS.SOURCE_ATTR=HSN.NATURE_CODE
+      WHERE  MOM.STATE=3
+             --AND HPD.IS_STOP=0
+             --AND HED.IS_STOP=0 
+ 
+	]]></sql>
+	<sql id="v_mat_out_detail" type="view" desc="物流入库明细视图"><![CDATA[
+	CREATE OR REPLACE VIEW v_mat_out_detail AS
+	  SELECT 
+	     MOD.GROUP_ID,  --集团ID
+	     MOD.HOS_ID,    --单位ID
+	     MOD.COPY_CODE, --账套编码
+	     MOD.OUT_ID AS BUSINESS_ID,     --出库ID
+	     MOD.OUT_NO  AS BUSINESS_NO,     --出库单号
+	     MOD.OUT_DETAIL_ID AS DETAIL_ID,--明细ID
+	     MIV.MAT_TYPE_ID AS SUB_TYPE_ID, --物资分类ID
+	     MIV.INV_CODE,  --材料编码
+	     MOD.BATCH_NO,  --批号
+	     MOD.PRICE,     --单价
+	     MOD.AMOUNT,    --数量
+	     MOD.AMOUNT_MONEY, --金额
+	     MIV.AMORTIZE_TYPE, --摊销方式
+         MOD.NOTE  --备注
+	    FROM MAT_OUT_DETAIL MOD
+	    LEFT JOIN MAT_INV_DICT MIV
+	    ON 
+	          MOD.GROUP_ID=MIV.GROUP_ID
+	      AND MOD.HOS_ID=MIV.HOS_ID
+	      AND MOD.COPY_CODE=MIV.COPY_CODE
+	      AND MOD.INV_ID=MIV.INV_ID
+	      AND MOD.INV_NO=MIV.INV_NO
+ 
+	]]></sql>
+	
+</root>
+

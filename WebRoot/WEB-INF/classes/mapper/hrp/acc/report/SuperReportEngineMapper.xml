@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.acc.dao.report.SuperReportEngineMapper">
+
+	<!-- 根据系统编码查询报表 -->
+	<select id="queryAccSuperReportByPerm" parameterType="java.util.Map" resultType="com.chd.hrp.acc.entity.report.RepDefine">
+		select r.report_code,r.report_name,r.report_type,r.report_group, r.report_attr,is_write, r.mod_code
+		from REP_DEFINE r 
+		where r.group_id = #{group_id} and r.hos_id = #{hos_id} and r.copy_code = #{copy_code}  and r.mod_code=#{mod_code}
+		and r.is_stop=0
+		<if test="report_type != null and report_type != ''">
+			and report_type=#{report_type}
+		</if>
+		and (r.is_perm=0 or exists(
+			select 1 from V_USER_DATA_PERM v where v.group_id=r.group_id and v.hos_id=r.hos_id and v.copy_code=r.copy_code
+			and v.perm_code=r.report_code and v.table_code='REP_DEFINE' and v.is_read=1 and r.is_perm=1 and v.user_id=#{user_id}
+		))
+		order by r.sort_code
+	</select>
+	
+	<!-- 根据报表编码、年度、月份查询报表实例数据 -->
+	<select id="querySuperReportInstance" parameterType="java.util.Map" resultType="com.chd.hrp.acc.entity.report.RepInstance">
+		select report_code,content
+		from REP_INSTANCE where report_code=#{report_code} and 
+		group_id = #{group_id} and hos_id = #{hos_id} and copy_code = #{copy_code}  and mod_code=#{mod_code}
+		and acc_year=#{acc_year} and acc_month=#{acc_month}
+	</select>
+	
+	<!-- 报表解析-执行函数、执行自定义SQL-->
+	<select id="querySuperReportInstanceByFun" parameterType="java.util.Map" resultType="String">
+		${fun_sql}
+	</select>
+	<select id="queryBySql" parameterType="java.lang.String" resultType="java.util.Map">
+  	 ${value}
+  </select>
+	<!-- 报表解析-执行存储过程-->
+	<select id="querySuperReportInstanceByProc" statementType="CALLABLE" parameterType="java.util.Map" resultType="String">
+		<![CDATA[
+		{call ${proc_sql}}
+		]]>
+	</select>
+	
+	<!-- 删除报表实例数据 -->
+	<delete id="deleteSuperReportInstance" parameterType="java.util.Map">
+		DELETE FROM REP_INSTANCE WHERE report_code=#{report_code} and group_id = #{group_id} and hos_id = #{hos_id} and copy_code = #{copy_code} 
+		and mod_code = #{mod_code} and  acc_year=#{acc_year} and acc_month=#{acc_month}
+	</delete>
+	
+	<!-- 添加报表实例数据 -->
+	<insert id="insertSuperReportInstance" parameterType="java.util.Map" >
+	
+		insert into REP_INSTANCE(report_code,group_id,hos_id,copy_code,mod_code,acc_year,acc_month,content,user_id,create_date)
+		values(#{report_code},#{group_id},#{hos_id},#{copy_code},#{mod_code},#{acc_year},#{acc_month},#{content},#{user_id},#{create_date})
+	</insert>
+	
+	<!-- 保存报表内容，大字段 -->
+	<update id="saveSuperReportContent" parameterType="java.util.Map" >
+		update REP_INSTANCE set 
+		content=#{content}
+		where report_code=#{report_code} and group_id = #{group_id} and hos_id = #{hos_id} 
+		and copy_code = #{copy_code}  and mod_code=#{mod_code} and acc_year=#{acc_year} and acc_month=#{acc_month}
+	</update>
+
+	<!-- 报表管理页面，查询报表的所有实例 -->
+	<select id="querySuperReportInstanceList" parameterType="java.util.Map" resultType="java.util.Map">
+	
+		select i.acc_year,i.acc_month,i.report_code,d.report_name,i.mod_code,
+		case i.acc_month when '00' then '' when '14' then '第一季度' when '15' then '第二季度' when '16' then '第三季度' when '17' then '第四季度' when '18' then '上半年' when '19' then '下半年' else acc_month end acc_month_name,
+		case d.report_type when 1 then '普通报表' when 2 then '月报' when 3 then '季报' when 4 then '半年报' when 5 then '年报' end report_type_name,
+		d.report_type,u.user_name,i.create_date
+		from REP_INSTANCE i 
+		inner join REP_DEFINE d on d.report_code=i.report_code and d.group_id=i.group_id and d.hos_id=i.hos_id and d.copy_code=i.copy_code and d.mod_code=i.mod_code
+   		inner join sys_user u on i.user_id=u.user_id and i.group_id=u.group_id and i.hos_id=u.hos_id
+		where i.report_code=#{report_code} and  i.group_id = #{group_id} and i.hos_id = #{hos_id} and i.copy_code = #{copy_code}  and i.mod_code=#{mod_code}
+		<if test="acc_year != null and acc_year != ''">
+			and i.acc_year=#{acc_year}
+		</if>
+		order by i.acc_year desc,i.acc_month desc
+	</select>
+	
+	<!-- 报表管理页面，删除报表实例 -->
+	<delete id="deleteBatchSuperReportInstance" parameterType="java.util.List">
+		DELETE FROM REP_INSTANCE 
+		WHERE report_code=#{report_code} and group_id=#{group_id} and hos_id=#{hos_id} 
+		and copy_code=#{copy_code} and mod_code=#{mod_code} and
+		<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+			acc_year = #{item.acc_year} and acc_month = #{item.acc_month}
+		</foreach>
+	</delete>
+	
+</mapper>
+

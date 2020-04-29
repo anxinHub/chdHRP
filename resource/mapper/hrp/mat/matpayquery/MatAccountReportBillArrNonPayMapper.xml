@@ -1,0 +1,1193 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.chd.hrp.mat.dao.matpayquery.MatAccountReportBillArrNonPayMapper">
+	<resultMap id="matAccountReportBillArrNonPayMap" type="java.util.Map" >
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="bill_id" column="bill_id"/>
+		<result property="bill_no" column="bill_no"/>
+		<result property="bill_date" column="bill_date"/>
+		<result property="sup_id" column="sup_id"/>
+		<result property="sup_no" column="sup_no"/>
+		<result property="sup_code" column="sup_code"/>
+		<result property="sup_name" column="sup_name"/>
+		<result property="emp_name" column="emp_name"/>
+		<result property="store_name" column="store_name"/>
+		<result property="bill_money" column="bill_money"/><!-- 发票金额:来源发票明细 -->
+		<result property="payable_money" column="payable_money"/><!-- 应付金额:来源发票明细 -->
+		<result property="coupon_money" column="coupon_money"/><!-- 优惠金额=发票金额-应付金额 -->
+		<result property="payed_money" column="payed_money"/><!-- 已付金额:来源付款明细  -->
+		<result property="nopay_money" column="nopay_money"/><!-- 未付金额=应付金额-已付金额 -->
+		<result property="init_amount_money" column="init_amount_money"/><!-- 供应商期初总金额 -->
+		<result property="in_amount_money" column="in_amount_money"/><!-- 供应商入库总金额 -->
+		<result property="pay_amount_money" column="pay_amount_money"/><!-- 供应商已付总金额 -->
+		<result property="unpaid_amount_money" column="unpaid_amount_money"/><!-- 供应商未付总金额=入库总金额-已付总金额 -->
+		<result property="acc_pay_money" column="acc_pay_money"/>
+		<result property="acc_mat_dis" column="acc_mat_dis"/>
+	</resultMap>
+	
+	<!-- 票到款未付明细表 查询 -->
+	<select id="queryMatAccountReportBillArrNonPay" resultMap="matAccountReportBillArrNonPayMap">
+		with a_table as(
+		     SELECT
+		        temp.group_id,temp.hos_id,temp.copy_code,temp.bill_id,temp.bill_no,temp.bill_date,
+		        temp.sup_id,temp.sup_name,temp.emp_name,temp.store_name,
+		        temp.bill_money,<!-- 发票金额:来源发票明细 -->
+		        nvl(temp.payable_money,0) as payable_money,<!-- 应付金额:来源发票明细 -->
+		        nvl(temp.coupon_money,0) as coupon_money,<!-- 优惠金额=发票金额-应付金额 -->
+		        nvl(temp2.payed_money,0) as payed_money,<!-- 已付金额=付款表付款金额+入库预付  -->
+		        nvl(temp.payable_money,0)-nvl(temp2.payed_money,0) as nopay_money<!-- 未付金额=应付金额-已付金额 -->
+		    FROM (
+		         <!-- 查询发票明细 -->
+		         SELECT 
+		            mbd.group_id, mbd.hos_id, mbd.copy_code, mbd.bill_id, mbd.bill_no,mbm.bill_date, 
+		            mim.sup_id, hsd.sup_name, hed.emp_name, hsdd.store_name,SUM(nvl(mbd.bill_money, 0)) AS bill_money, 
+		            SUM(nvl(mbd.payable_money, 0)) AS payable_money,
+		            SUM(nvl(mbd.bill_money, 0))-SUM(nvl(mbd.payable_money, 0)) AS coupon_money
+		         FROM MAT_BILL_MAIN mbm
+		         LEFT JOIN MAT_BILL_DETAIL mbd 
+		         ON 
+		         	mbm.group_id = #{group_id}
+		            AND mbm.hos_id = #{hos_id}
+		            AND mbm.copy_code = #{copy_code}
+		            AND mbm.bill_id = mbd.bill_id
+		            AND mbm.bill_no = mbd.bill_no
+		            AND mbm.state = 2 
+		         LEFT JOIN MAT_IN_MAIN mim 
+		         ON 
+		         	mbd.group_id = #{group_id}
+		            AND mbd.hos_id = #{hos_id}
+		            AND mbd.copy_code = #{copy_code}
+		            AND mbd.in_id = mim.in_id
+		            AND mim.bus_type_code = 2 
+		         LEFT JOIN HOS_SUP_DICT hsd 
+		         ON 
+		         	mim.group_id = #{group_id}
+		            AND mim.hos_id = #{hos_id}
+		            AND mim.sup_id = hsd.sup_id
+		            AND mim.sup_no = hsd.sup_no
+		         LEFT JOIN HOS_SUP hs 
+		         ON 
+		         	hsd.sup_id = hs.sup_id
+		            AND hsd.sup_code = hs.sup_code 
+		         LEFT JOIN HOS_SUP_TYPE hst 
+		         ON 
+		         	hs.type_code = hst.type_code
+		            AND hst.is_stop = 0 
+		         LEFT JOIN HOS_EMP_DICT hed 
+		         ON 
+		         	mim.group_id = #{group_id}
+		            AND mim.hos_id = #{hos_id}
+		            AND mim.stocker = hed.emp_id
+		            AND hed.is_stop = 0 
+		         LEFT JOIN HOS_STORE_DICT hsdd 
+		         ON 
+		         	mim.group_id = #{group_id}
+		            AND mim.hos_id = #{hos_id}
+		            AND mim.store_id = hsdd.store_id
+		            AND mim.store_no = hsdd.store_no
+		         left join mat_store_detail msd on mbm.group_id=msd.group_id
+			          and mbm.hos_id=msd.hos_id
+			          and hsdd.store_id=msd.store_id
+		         WHERE 
+		         	  mbm.group_id = #{group_id}
+		              AND mbm.hos_id = #{hos_id}
+		              AND mbm.copy_code = #{copy_code}
+		              AND mbm.state = 2
+		              AND mim.bus_type_code = 2
+		              <if test="begin_date != null and begin_date != '' and end_date != null and end_date != '' ">
+		               	  AND to_char(mbm.bill_date, 'yyyy-MM-dd') BETWEEN #{begin_date} AND #{end_date}
+		              </if>
+		              
+		              <if test="sup_id != null and sup_id != '' ">
+			              	AND mim.sup_id = #{sup_id}
+		              </if>
+		                <if test="set_id != null and set_id != '' ">
+			              	AND msd.set_id = #{set_id}
+		              </if>
+		              
+		              <if test="store_id != null and store_id != '' ">
+						  	AND hsdd.store_id = #{store_id} 
+		              </if>
+		              
+		              <if test="dept_id != null and dept_id != '' ">
+						  	AND mim.app_dept = #{dept_id}
+		              </if>
+		              <if test="stocker != null and stocker != '' ">
+					  		AND mim.stocker = #{stocker}
+		              </if>
+		              
+		              <if test="sup_type_code != null and sup_type_code != ''">
+					  		AND hst.type_code = #{sup_type_code}
+		              </if>
+		            GROUP BY mbd.group_id, mbd.hos_id, mbd.copy_code, mbd.bill_id, mbd.bill_no, mbm.bill_date, mim.sup_id, hsd.sup_name, hed.emp_name, hsdd.store_name
+		    ) temp left join(
+			        <!-- 查询已付款发票:已付金额 -->       
+			        SELECT 
+			            mbd.group_id, mbd.hos_id,mbd.copy_code, mbd.bill_id,mbd.bill_no,mbm.sup_id,
+			            sum(nvl(mpd.pay_money, 0)) as payed_money
+<!-- 			            sum(nvl(mppd.pre_pay_money,0))+sum(nvl(mpd.payed_money,0)) as payed_money已付=入库预付+付款表付款金额 -->
+			        FROM MAT_BILL_MAIN mbm
+			        LEFT JOIN MAT_BILL_DETAIL mbd 
+			        ON 
+			        	mbm.group_id = #{group_id}
+			            AND mbm.hos_id = #{hos_id}
+			            AND mbm.copy_code = #{copy_code}
+			            AND mbm.bill_id = mbd.bill_id
+			            AND mbm.bill_no = mbd.bill_no
+			            AND mbm.state = 2 
+			        LEFT JOIN MAT_PAY_DETAIL mpd 
+			        ON 
+			        	mbd.group_id = #{group_id}
+			            AND mbd.hos_id = #{hos_id}
+			            AND mbd.copy_code = #{copy_code}
+			            AND mbd.bill_id = mpd.bill_id
+			            AND mbd.bill_detail_id = mpd.bill_detail_id 
+			        LEFT JOIN MAT_PAY_MAIN mpm 
+			        ON 
+			        	mpd.group_id = #{group_id}
+			            AND mpd.hos_id = #{hos_id}
+			            AND mpd.copy_code = #{copy_code}
+			            AND mpd.pay_id = mpm.pay_id
+			            AND mpm.state = 2
+			            AND mpm.pay_bill_type = 0
+			        LEFT JOIN MAT_PRE_PAY_DETAIL mppd
+			        ON
+			            mbd.group_id = #{group_id}
+			            and mbd.hos_id = #{hos_id}
+			            and mbd.copy_code = #{copy_code}
+			            and mbd.in_id = mppd.in_id
+			            and mbd.in_detail_id = mppd.in_detail_id
+			        LEFT JOIN MAT_PRE_PAY_MAIN mppm
+			        ON
+			            mppd.group_id = #{group_id}
+			            and mppd.hos_id = #{hos_id}
+			            and mppd.copy_code = #{copy_code}
+			            and mppd.pre_pay_id = mppm.pre_pay_id
+			            and mppd.pre_pay_no = mppm.pre_pay_no
+			            and mppm.state = 2
+			            and mppm.pay_bill_type = 0
+			        WHERE     
+			            mbm.group_id = #{group_id}
+			            AND mbm.hos_id = #{hos_id}
+			            AND mbm.copy_code = #{copy_code}
+			            <if test="begin_date != null and begin_date != '' and end_date != null and end_date != '' ">
+				            AND to_char(mbm.bill_date, 'yyyy-MM-dd') BETWEEN #{begin_date} AND #{end_date}
+			            </if>
+			            AND mbm.state = 2
+			            AND 
+			            	mbd.bill_detail_id in (
+			                    <!-- 已付款的发票明细ID -->
+			                    select a.bill_detail_id from mat_pay_detail a
+			                    left join mat_bill_detail b
+			                    on
+			                         a.group_id = b.group_id
+			                         and a.hos_id = b.hos_id
+			                         and a.copy_code = b.copy_code
+			                         and a.bill_id = b.bill_id
+			                         and a.bill_detail_id = b.bill_detail_id
+			                )
+			        group by mbd.group_id, mbd.hos_id, mbd.copy_code, mbd.bill_id, mbd.bill_no,mbm.sup_id 
+		    ) temp2 ON
+		        temp.group_id = temp2.group_id
+		      and temp.hos_id = temp2.hos_id
+		      and temp.copy_code = temp2.copy_code
+		      and temp.bill_id = temp2.bill_id
+		      and temp.bill_no = temp2.bill_no
+		      and temp.sup_id = temp2.sup_id
+		      ORDER BY temp.bill_date,temp.bill_no
+		)
+			SELECT
+		        a.group_id,a.hos_id,a.copy_code,a.bill_id,to_char(a.bill_no) bill_no,a.bill_date,a.sup_id,a.sup_name,a.emp_name,
+		        a.store_name,a.bill_money,a.payable_money,a.coupon_money,a.payed_money,a.nopay_money
+			FROM a_table a
+			UNION ALL
+			SELECT NULL AS group_id,NULL AS hos_id,NULL AS copy_code,NULL AS bill_id,to_char('合计') AS bill_no,
+			       NULL AS bill_date,NULL AS sup_id,NULL AS sup_name,NULL AS emp_name,NULL AS store_name,
+			       sum(b.bill_money) as bill_money,sum(b.payable_money) as payable_money,sum(b.coupon_money) as coupon_money,
+			       sum(b.payed_money) as payed_money,sum(b.nopay_money) as nopay_money
+			FROM a_table b 
+		
+	</select>
+	
+	<select id="queryMatAccountReportBillArrNonPayMain" resultMap="matAccountReportBillArrNonPayMap">
+		with a_table as(
+		     SELECT
+		        temp.group_id,temp.hos_id,temp.copy_code,temp.bill_id,temp.bill_no,temp.bill_date,
+		        temp.sup_id,temp.sup_name,temp.emp_name,temp.store_name,
+		        temp.bill_money,<!-- 发票金额:来源发票明细 -->
+		        nvl(temp.payable_money,0) as payable_money,<!-- 应付金额:来源发票明细 -->
+		        nvl(temp.coupon_money,0) as coupon_money,<!-- 优惠金额=发票金额-应付金额 -->
+		        nvl(temp2.payed_money,0) as payed_money,<!-- 已付金额=付款表付款金额+入库预付  -->
+		        nvl(temp.payable_money,0)-nvl(temp2.payed_money,0) as nopay_money<!-- 未付金额=应付金额-已付金额 -->
+		    FROM (
+		         <!-- 查询发票明细 -->
+		         SELECT 
+		            mbd.group_id, mbd.hos_id, mbd.copy_code, mbd.bill_id, mbd.bill_no,mbm.bill_date, 
+		            mim.sup_id, hsd.sup_name, hed.emp_name, hsdd.store_name,SUM(nvl(mbd.bill_money, 0)) AS bill_money, 
+		            SUM(nvl(mbd.payable_money, 0)) AS payable_money,
+		            SUM(nvl(mbd.bill_money, 0))-SUM(nvl(mbd.payable_money, 0)) AS coupon_money
+		         FROM MAT_BILL_MAIN mbm
+		         LEFT JOIN MAT_BILL_DETAIL mbd 
+		         ON 
+		         	mbm.group_id = #{group_id}
+		            AND mbm.hos_id = #{hos_id}
+		            AND mbm.copy_code = #{copy_code}
+		            AND mbm.bill_id = mbd.bill_id
+		            AND mbm.bill_no = mbd.bill_no
+		            AND mbm.state = 2 
+		         LEFT JOIN MAT_IN_MAIN mim 
+		         ON 
+		         	mbd.group_id = #{group_id}
+		            AND mbd.hos_id = #{hos_id}
+		            AND mbd.copy_code = #{copy_code}
+		            AND mbd.in_id = mim.in_id
+		            AND mim.bus_type_code = 2 
+		         LEFT JOIN HOS_SUP_DICT hsd 
+		         ON 
+		         	mim.group_id = #{group_id}
+		            AND mim.hos_id = #{hos_id}
+		            AND mim.sup_id = hsd.sup_id
+		            AND mim.sup_no = hsd.sup_no
+		         LEFT JOIN HOS_SUP hs 
+		         ON 
+		         	hsd.sup_id = hs.sup_id
+		            AND hsd.sup_code = hs.sup_code 
+		         LEFT JOIN HOS_SUP_TYPE hst 
+		         ON 
+		         	hs.type_code = hst.type_code
+		            AND hst.is_stop = 0 
+		         LEFT JOIN HOS_EMP_DICT hed 
+		         ON 
+		         	mim.group_id = #{group_id}
+		            AND mim.hos_id = #{hos_id}
+		            AND mim.stocker = hed.emp_id
+		            AND hed.is_stop = 0 
+		         LEFT JOIN HOS_STORE_DICT hsdd 
+		         ON 
+		         	mim.group_id = #{group_id}
+		            AND mim.hos_id = #{hos_id}
+		            AND mim.store_id = hsdd.store_id
+		            AND mim.store_no = hsdd.store_no
+		         left join mat_store_detail msd on mbm.group_id=msd.group_id
+			          and mbm.hos_id=msd.hos_id
+			          and hsdd.store_id=msd.store_id
+		         WHERE 
+		         	  mbm.group_id = #{group_id}
+		              AND mbm.hos_id = #{hos_id}
+		              AND mbm.copy_code = #{copy_code}
+		              AND mbm.state = 2
+		              AND mim.bus_type_code = 2
+		              <if test="begin_date != null and begin_date != '' and end_date != null and end_date != '' ">
+		               	  AND to_char(mbm.bill_date, 'yyyy-MM-dd') BETWEEN #{begin_date} AND #{end_date}
+		              </if>
+		              
+		              <if test="sup_id != null and sup_id != '' ">
+			              	AND mim.sup_id = #{sup_id}
+		              </if>
+		                <if test="set_id != null and set_id != '' ">
+			              	AND msd.set_id = #{set_id}
+		              </if>
+		              
+		              <if test="store_id != null and store_id != '' ">
+						  	AND hsdd.store_id = #{store_id} 
+		              </if>
+		              
+		              <if test="dept_id != null and dept_id != '' ">
+						  	AND mim.app_dept = #{dept_id}
+		              </if>
+		              <if test="stocker != null and stocker != '' ">
+					  		AND mim.stocker = #{stocker}
+		              </if>
+		              
+		              <if test="sup_type_code != null and sup_type_code != ''">
+					  		AND hst.type_code = #{sup_type_code}
+		              </if>
+		            GROUP BY mbd.group_id, mbd.hos_id, mbd.copy_code, mbd.bill_id, mbd.bill_no, mbm.bill_date, mim.sup_id, hsd.sup_name, hed.emp_name, hsdd.store_name
+		    ) temp left join(
+			        <!-- 查询已付款发票:已付金额 -->       
+			        SELECT 
+			            mbd.group_id, mbd.hos_id,mbd.copy_code, mbd.bill_id,mbd.bill_no,mbm.sup_id,
+			            sum(nvl(mpd.pay_money, 0)) as payed_money
+<!-- 			            sum(nvl(mppd.pre_pay_money,0))+sum(nvl(mpd.payed_money,0)) as payed_money已付=入库预付+付款表付款金额 -->
+			        FROM MAT_BILL_MAIN mbm
+			        LEFT JOIN MAT_BILL_DETAIL mbd 
+			        ON 
+			        	mbm.group_id = #{group_id}
+			            AND mbm.hos_id = #{hos_id}
+			            AND mbm.copy_code = #{copy_code}
+			            AND mbm.bill_id = mbd.bill_id
+			            AND mbm.bill_no = mbd.bill_no
+			            AND mbm.state = 2 
+			        LEFT JOIN MAT_PAY_DETAIL mpd 
+			        ON 
+			        	mbd.group_id = #{group_id}
+			            AND mbd.hos_id = #{hos_id}
+			            AND mbd.copy_code = #{copy_code}
+			            AND mbd.bill_id = mpd.bill_id
+			            AND mbd.bill_detail_id = mpd.bill_detail_id 
+			        LEFT JOIN MAT_PAY_MAIN mpm 
+			        ON 
+			        	mpd.group_id = #{group_id}
+			            AND mpd.hos_id = #{hos_id}
+			            AND mpd.copy_code = #{copy_code}
+			            AND mpd.pay_id = mpm.pay_id
+			            AND mpm.state = 2
+			            AND mpm.pay_bill_type = 0
+			        LEFT JOIN MAT_PRE_PAY_DETAIL mppd
+			        ON
+			            mbd.group_id = #{group_id}
+			            and mbd.hos_id = #{hos_id}
+			            and mbd.copy_code = #{copy_code}
+			            and mbd.in_id = mppd.in_id
+			            and mbd.in_detail_id = mppd.in_detail_id
+			        LEFT JOIN MAT_PRE_PAY_MAIN mppm
+			        ON
+			            mppd.group_id = #{group_id}
+			            and mppd.hos_id = #{hos_id}
+			            and mppd.copy_code = #{copy_code}
+			            and mppd.pre_pay_id = mppm.pre_pay_id
+			            and mppd.pre_pay_no = mppm.pre_pay_no
+			            and mppm.state = 2
+			            and mppm.pay_bill_type = 0
+			        WHERE     
+			            mbm.group_id = #{group_id}
+			            AND mbm.hos_id = #{hos_id}
+			            AND mbm.copy_code = #{copy_code}
+			            <if test="begin_date != null and begin_date != '' and end_date != null and end_date != '' ">
+				            AND to_char(mbm.bill_date, 'yyyy-MM-dd') BETWEEN #{begin_date} AND #{end_date}
+			            </if>
+			            AND mbm.state = 2
+			            AND 
+			            	mbd.bill_detail_id in (
+			                    <!-- 已付款的发票明细ID -->
+			                    select a.bill_detail_id from mat_pay_detail a
+			                    left join mat_bill_detail b
+			                    on
+			                         a.group_id = b.group_id
+			                         and a.hos_id = b.hos_id
+			                         and a.copy_code = b.copy_code
+			                         and a.bill_id = b.bill_id
+			                         and a.bill_detail_id = b.bill_detail_id
+			                )
+			        group by mbd.group_id, mbd.hos_id, mbd.copy_code, mbd.bill_id, mbd.bill_no,mbm.sup_id 
+		    ) temp2 ON
+		        temp.group_id = temp2.group_id
+		      and temp.hos_id = temp2.hos_id
+		      and temp.copy_code = temp2.copy_code
+		      and temp.bill_id = temp2.bill_id
+		      and temp.bill_no = temp2.bill_no
+		      and temp.sup_id = temp2.sup_id
+		      ORDER BY temp.bill_date,temp.bill_no
+		)
+		select a.group_id, a.hos_id, a.copy_code,  a.sup_id, to_char(a.sup_name) as sup_name, a.emp_name, a.store_name
+      		, sum(a.bill_money) as bill_money, sum(a.payable_money) as payable_money, sum(a.coupon_money) as coupon_money, sum(a.payed_money) as payed_money, sum(a.nopay_money) as nopay_money
+    	from a_table a
+     	group by a.group_id, a.hos_id, a.copy_code,  a.sup_id, a.sup_name, a.emp_name, a.store_name
+			UNION ALL
+			SELECT NULL AS group_id,NULL AS hos_id,NULL AS copy_code,NULL AS sup_id,to_char('合计') AS sup_name,NULL AS emp_name,NULL AS store_name,
+			       sum(b.bill_money) as bill_money,sum(b.payable_money) as payable_money,sum(b.coupon_money) as coupon_money,
+			       sum(b.payed_money) as payed_money,sum(b.nopay_money) as nopay_money
+			FROM a_table b 
+		
+	</select>
+	 
+	
+	<!-- 发票报表 -->
+	<select id="queryMatPayBillDetail" parameterType="java.util.Map" resultType="java.util.Map">
+	
+	                 with bill_temp as (
+         select 
+              mbm.group_id,
+              mbm.hos_id,
+              mbm.copy_code,
+              hsup.sup_id,
+              hsup.sup_no,
+              hsup.sup_code,
+              hsup.sup_name,
+              mbm.bill_id,
+              mbd.bill_no,
+              sum(mbd.bill_money) bill_money
+             from mat_bill_detail mbd
+              left join mat_bill_main mbm
+              on mbm.group_id = mbd.group_id
+              and mbm.hos_id = mbd.hos_id
+              and mbm.copy_code = mbd.copy_code
+              and mbm.bill_id = mbd.bill_id
+              and mbm.bill_no = mbd.bill_no
+              left join hos_sup_dict hsup
+              on hsup.group_id = mbm.group_id
+              and hsup.hos_id = mbm.hos_id
+              and hsup.sup_id = mbm.sup_id
+              and hsup.sup_no = mbm.sup_no
+              left join mat_in_main mim
+              on mim.group_id = mbd.group_id
+              and mim.hos_id = mbd.hos_id
+              and mim.copy_code = mbd.copy_code
+              and mim.in_id = mbd.in_id
+              left join hos_store_dict hsd
+              on hsd.group_id = mim.group_id
+              and hsd.hos_id = mim.hos_id
+              and hsd.store_id = mim.store_id
+              and hsd.store_no = mim.store_no
+               join (select distinct a.group_id, a.hos_id, a.store_id, c.store_no
+               from mat_store_detail a
+               left join mat_store_set b
+                 on a.group_id = b.group_id
+                and a.hos_id = b.hos_id
+                and a.set_id = b.set_id
+               left join hos_store_dict c
+                 on a.group_id = c.group_id
+                and a.hos_id = c.hos_id
+                and a.store_id = c.store_id
+                and c.is_stop = 0
+              where a.group_id = #{group_id}
+                and a.hos_id =  #{hos_id}
+                <if test="set_id != null and set_id !='' "> 
+				 and a.set_id =  #{set_id}
+			    </if>
+               
+                ) set_store
+		      on set_store.group_id = mim.group_id
+		     and set_store.hos_id = mim.hos_id
+		     and set_store.store_id = mim.store_id
+		     and set_store.store_no = mim.store_no
+              where mbm.group_id = #{group_id}
+              and mbm.hos_id = #{hos_id}
+              and mbm.copy_code = #{copy_code}
+              <if test="begin_date != null and begin_date != '' and end_date != null and end_date != '' ">
+                and mbm.bill_date  between to_date(#{begin_date},'yyyy-MM-dd') and to_date(#{end_date},'yyyy-MM-dd')
+		      </if>
+		      <if test="sup_id != null and sup_id !='' ">
+				and	mbm.sup_id = #{sup_id}
+			  </if>
+			  <if test="bill_no != null and bill_no !='' ">
+				and	mbm.bill_no like '%'||#{bill_no}||'%' 
+			  </if>
+			  <if test="store_id != null and store_id !='' ">
+				and	hsd.store_id = #{store_id}
+			  </if>
+			  <if test="state != null and state !='' ">
+				and	mbm.state = #{state}
+			  </if>
+			  <if test="sup_msg != null and sup_msg !='' ">
+				and (
+						 hsup.sup_name like '%${sup_msg}%'
+					  or hsup.sup_code like '%${sup_msg}%'
+					  or upper(hsup.spell_code) like '%${sup_msg}%'
+					  or lower(hsup.spell_code) like '%${sup_msg}%'
+					) 
+			  </if>
+            group by  mbm.group_id,mbm.hos_id,mbm.copy_code,hsup.sup_id,hsup.sup_no,hsup.sup_code,hsup.sup_name,mbm.bill_id,mbd.bill_no
+        )select 
+            sup_code,
+						to_char(sup_name) sup_name,
+						to_char(wmsys.wm_concat(to_char(bill_no))) bill_no,
+						sum(bill_money) bill_money,
+						count(*) countnum
+          from 
+          bill_temp
+          group by sup_code,sup_name
+          union all 
+          select null,'合计',null,sum(bill_money),count(*)
+          from 
+          bill_temp
+          order by sup_code,sup_name
+          
+		<!-- with b_tmp as (
+		  select distinct a.bill_no, a.sup_id, a.sup_no, a.group_id, a.hos_id
+          , a.copy_code,a.bill_money as bill_money, a.bill_id
+          , count(0) as countnum
+        from mat_bill_main a  
+        left join MAT_BILL_DETAIL b on 
+        a.group_id=b.group_id
+        and a.hos_id=b.hos_id
+        and a.copy_code=b.copy_code
+        and a.bill_id=b.bill_id
+        and a.bill_no=b.bill_no
+        left join mat_in_main c on
+        a.group_id=c.group_id
+        and a.hos_id=c.hos_id
+        and a.copy_code=c.copy_code
+        and b.in_id=c.in_id
+        	<where>
+				<if test="group_id != null and group_id !='' ">
+					and a.group_id = #{group_id,jdbcType=INTEGER}
+				</if>
+				<if test="hos_id != null and hos_id !='' ">
+					and  a.hos_id = #{hos_id,jdbcType=INTEGER}
+				</if>
+				<if test="copy_code != null and copy_code !='' ">
+					and  a.copy_code = #{copy_code ,jdbcType=VARCHAR}
+				</if>
+				and  a.state = 2
+				<if test="begin_date != null and begin_date != '' and end_date != null and end_date != '' ">
+		           	AND to_char(c.confirm_date, 'yyyy-MM-dd') between #{begin_date} and #{end_date}
+		        </if>
+				<if test="sup_id != null and sup_id !='' ">
+					and a.sup_id = #{sup_id,jdbcType=INTEGER}
+				</if>
+				<if test="bill_no != null and bill_no !='' ">
+					and a.bill_no like '%${bill_no}%'
+				</if>
+			</where>
+          	 group by a.bill_no, a.sup_id, a.sup_no, a.group_id, a.hos_id, a.copy_code, a.bill_id,a.bill_money
+		), store_tmp as (
+			<if test="store_id !='' ">
+				select group_id,hos_id,store_id,store_no
+				from hos_store_dict 
+				<where>
+					<if test="group_id !=null and group_id !='' ">
+						and group_id = #{group_id,jdbcType=INTEGER}
+					</if>
+					<if test="hos_id !=null and hos_id !='' ">
+						and hos_id = #{hos_id,jdbcType=INTEGER}
+					</if>
+						and store_id = #{store_id,jdbcType=INTEGER}
+						and is_stop = 0
+				</where>
+			</if>
+			<if test="set_id !='' ">
+				select a.group_id,a.hos_id,a.store_id,c.store_no,a.set_id
+				from mat_store_detail a
+				left join mat_store_set b on a.group_id=b.group_id and a.hos_id=b.hos_id and a.set_id=b.set_id
+				left join hos_store_dict c on a.group_id=c.group_id and a.hos_id=c.hos_id and a.store_id=c.store_id and c.is_stop=0
+				<where>
+					<if test="group_id !=null and group_id !='' ">
+						and a.group_id = #{group_id,jdbcType=INTEGER}
+					</if>
+					<if test="hos_id !=null and hos_id !='' ">
+						and a.hos_id = #{hos_id,jdbcType=INTEGER}
+					</if>
+						and a.set_id = #{set_id,jdbcType=INTEGER}
+				</where>
+			</if>
+			<if test="set_id =='' and store_id =='' ">
+				select group_id,hos_id,store_id,store_no
+				from hos_store_dict
+				<where>
+					<if test="group_id !=null and group_id !='' ">
+						and group_id = #{group_id,jdbcType=INTEGER}
+					</if>
+					<if test="hos_id !=null and hos_id !='' ">
+						and hos_id = #{hos_id,jdbcType=INTEGER}
+					</if>
+						and is_stop=0
+				</where>
+			</if>
+		),in_date as (
+         	  select distinct a.group_id, a.hos_id, a.copy_code, a.bill_id, c.store_id
+        from mat_bill_main a
+        left join mat_bill_detail b on a.group_id = b.group_id
+        and a.hos_id = b.hos_id
+        and a.copy_code = b.copy_code
+        and a.bill_id = b.bill_id 
+        left join mat_in_main c on b.group_id = c.group_id
+        and b.hos_id = c.hos_id
+        and b.copy_code = c.copy_code
+        and b.in_id = c.in_id 
+          join store_tmp hsd on c.group_id = hsd.group_id
+        and c.hos_id = hsd.hos_id
+        and c.store_id = hsd.store_id
+        and c.store_no = hsd.store_no 
+            where  a.group_id = #{group_id,jdbcType=INTEGER}
+          		and  a.hos_id = #{hos_id,jdbcType=INTEGER}
+          		and  a.copy_code = #{copy_code,jdbcType=VARCHAR}
+          		<if test="beginDate != null and beginDate != '' and endDate !=null and endDate !=''">
+					AND c.confirm_date between to_date(#{beginDate,jdbcType=DATE},'yyyy-MM-dd') and to_date(#{endDate,jdbcType=DATE},'yyyy-MM-dd')
+		  		</if>
+		  		<if test="maker != null and maker !='' ">
+		  			and c.maker=  #{maker,jdbcType=INTEGER}
+		  		</if>
+	),
+
+	ta_teml as (  select distinct tt.group_id, tt.hos_id, tt.copy_code, tt.sup_name, tt.bill_money
+          , tt.bill_no, tt.countnum
+        from (
+          select mm.group_id, mm.hos_id, mm.copy_code
+            , to_char(hsd.sup_name) as sup_name
+            , mm.bill_money, mm.bill_no, mm.countnum 
+          from (
+            select a.group_id, a.hos_id, a.copy_code, a.sup_id, a.sup_no
+              , to_char(wm_concat(to_char(a.bill_no) || ' ')) as bill_no , b.store_id 
+              , count(0) as countnum, sum(a.bill_money) as bill_money
+            from b_tmp a
+            left join in_date b
+                 on 
+                      a.group_id = b.group_id
+                      and a.hos_id = b.hos_id
+                      and a.copy_code = b.copy_code
+                      and a.bill_id = b.bill_id                      
+            group by a.group_id, a.hos_id, a.copy_code, a.sup_id, a.sup_no , b.store_id
+          ) mm
+          left join hos_sup_dict hsd on mm.group_id = hsd.group_id
+          and mm.hos_id = hsd.hos_id
+          and mm.sup_id = hsd.sup_id
+          and mm.sup_no = hsd.sup_no 
+                  
+          left join store_tmp st on mm.group_id = st.group_id
+          and mm.hos_id = st.hos_id
+          and mm.store_id = st.store_id 
+		    <where>
+		      	mm.group_id=#{group_id,jdbcType=INTEGER}
+			    and mm.hos_id=#{hos_id,jdbcType=INTEGER}
+			    and mm.copy_code=#{copy_code,jdbcType=VARCHAR}
+			  <if test="store_id != '' and store_id!=null">
+			    and st.store_id=#{store_id,jdbcType=INTEGER}
+			  </if>
+			    <if test="set_id != '' and set_id !=null">
+			    and st.set_id=#{set_id,jdbcType=INTEGER}
+			  </if>
+			  	<if test="sup_msg!=null and sup_msg!=''">
+						and (
+							hsd.sup_name like '%${sup_msg}%'
+						  or hsd.sup_code like '%${sup_msg}%'
+						  or upper(hsd.spell_code) like '%${sup_msg}%'
+						  or lower(hsd.spell_code) like '%${sup_msg}%'
+						) 
+					</if>
+			  
+		    </where>
+  order by hsd.sup_name
+	  ) tt
+	        order by  tt.sup_name
+	   ) 
+	   select *
+    from ta_teml
+    union all
+    select null as group_id, null as hos_id, null as copy_code, '合计' as sup_name
+      , sum(bill_money) as bill_money, null 
+      , sum(countnum) as countnum
+    from ta_teml -->
+  
+	</select>
+	
+	
+	<!-- 票到款未付总表 -->
+	<select id="queryMatAccountReportBillArrNonPaySum" parameterType="java.util.Map" resultType="java.util.Map">
+		with mat_begin_tmp as (
+		     select mim.group_id,mim.hos_id,mim.copy_code,mim.sup_id,<!-- mim.sup_no, -->sum(mid.amount_money) amount_money
+		     from mat_in_main mim
+		     left join mat_in_detail mid on mim.group_id=mid.group_id and mim.hos_id=mid.hos_id and mim.copy_code=mid.copy_code
+		          and mim.in_id=mid.in_id
+		     <where>
+		     	<if test="group_id != null and group_id !='' ">
+					and mim.group_id = #{group_id,jdbcType=INTEGER}
+				</if>
+				<if test="hos_id != null and hos_id !='' ">
+					and mim.hos_id = #{hos_id,jdbcType=INTEGER}
+				</if>
+				<if test="copy_code != null and copy_code !='' ">
+					and mim.copy_code = #{copy_code ,jdbcType=VARCHAR}
+				</if>
+				<if test="year != null and year !='' ">
+					and mim.year = #{year ,jdbcType=VARCHAR}
+				</if>
+				<if test="month != null and month !='' ">
+					and <![CDATA[ mim.month < #{month ,jdbcType=VARCHAR} ]]>
+				</if>
+		     </where>
+		     group by mim.group_id,mim.hos_id,mim.copy_code,mim.sup_id<!-- ,mim.sup_no -->
+		),acc_begin_tmp as (
+		     select alc.check6_id,<!-- alc.check6_no, -->alc.group_id,alc.hos_id,alc.copy_code,alc.acc_year,
+		     	sum(case when asu.subj_dire=0 then nvl(alc.end_os,0) else 0 end) nc_debit,
+		     	sum(case when asu.subj_dire=1 then  nvl(alc.end_os,0) else 0 end) nc_credit
+		     from acc_leder_check alc
+		     left join acc_subj asu on alc.group_id =asu.group_id and alc.hos_id=asu.hos_id  and alc.copy_code=asu.copy_code 
+		    	and alc.acc_year = asu.acc_year  and alc.subj_code=asu.subj_code 
+		     <where>
+		     	<if test="group_id != null and group_id !='' ">
+					and alc.group_id = #{group_id,jdbcType=INTEGER}
+				</if>
+				<if test="hos_id != null and hos_id !='' ">
+					and alc.hos_id = #{hos_id,jdbcType=INTEGER}
+				</if>
+				<if test="copy_code != null and copy_code !='' ">
+					and alc.copy_code = #{copy_code ,jdbcType=VARCHAR}
+				</if>
+				<if test="year != null and year !='' ">
+					and alc.acc_year = #{year ,jdbcType=VARCHAR}
+				</if>
+				<if test="month != null and month !='' ">
+					and <![CDATA[ alc.acc_month < #{month ,jdbcType=VARCHAR} ]]>
+				</if>
+				and nvl(alc.check6_id,0)!=0
+		     </where>
+		     group by alc.check6_id,<!-- alc.check6_no, -->alc.group_id,alc.hos_id,alc.copy_code,alc.acc_year
+		),this_mat_add as (
+			select mbm.group_id,mbm.hos_id,mbm.copy_code,mbm.sup_id,<!-- mbm.sup_no, -->sum(mbd.bill_money) bill_money
+		    from mat_bill_main mbm
+		    left join mat_bill_detail mbd on mbm.group_id=mbd.group_id and mbm.hos_id=mbd.hos_id and mbm.copy_code=mbd.copy_code
+		    	and mbm.bill_id=mbd.bill_id
+		    <where>
+		    	<if test="group_id != null and group_id !='' ">
+					and mbm.group_id = #{group_id,jdbcType=INTEGER}
+				</if>
+				<if test="hos_id != null and hos_id !='' ">
+					and mbm.hos_id = #{hos_id,jdbcType=INTEGER}
+				</if>
+				<if test="copy_code != null and copy_code !='' ">
+					and mbm.copy_code = #{copy_code ,jdbcType=VARCHAR}
+				</if>
+				and mbm.state=2 
+				<if test="begin_date != null and begin_date !='' and end_date != null and end_date !='' ">
+					and to_char(mbm.make_date,'yyyy-MM-dd') between #{begin_date} and #{end_date}
+				</if>
+		    </where>
+		    group by mbm.group_id,mbm.hos_id,mbm.copy_code,mbm.sup_id<!-- ,mbm.sup_no -->
+		),this_mat_mis as (
+		      select mpm.group_id,mpm.hos_id,mpm.copy_code,mpm.sup_id,<!-- mpm.sup_no, -->sum(mpd.pay_money) pay_money
+		      from mat_pay_main mpm
+		      left join mat_pay_detail mpd on mpm.group_id=mpd.group_id and mpm.hos_id=mpd.hos_id and mpm.copy_code=mpd.copy_code
+		           and mpm.pay_id=mpd.pay_id 
+		      <where>
+		      	<if test="group_id != null and group_id !='' ">
+					and mpm.group_id = #{group_id,jdbcType=INTEGER}
+				</if>
+				<if test="hos_id != null and hos_id !='' ">
+					and mpm.hos_id = #{hos_id,jdbcType=INTEGER}
+				</if>
+				<if test="copy_code != null and copy_code !='' ">
+					and mpm.copy_code = #{copy_code ,jdbcType=VARCHAR}
+				</if>
+				and mpm.state=2
+				<if test="begin_date != null and begin_date !='' and end_date != null and end_date !='' ">
+					and to_char(mpm.make_date,'yyyy-MM-dd') between #{begin_date} and #{end_date}
+				</if>
+		      </where>
+		      group by  mpm.group_id,mpm.hos_id,mpm.copy_code,mpm.sup_id<!-- ,mpm.sup_no -->
+		),this_acc_mis as (
+		    select a.check6_id,<!-- a.check6_no, -->b.group_id,b.hos_id,b.copy_code,b.acc_year,sum(nvl(a.debit,0)) bq_debit,sum(nvl(a.credit,0)) bq_credit
+		    from   acc_vouch b
+		    left join acc_vouch_check a  on b.group_id=a.group_id and b.hos_id=a.hos_id 
+		         and b.copy_code=a.copy_code and b.acc_year = a.acc_year and b.vouch_id=a.vouch_id 
+		    <where>
+		    	<if test="group_id != null and group_id !='' ">
+					and b.group_id = #{group_id,jdbcType=INTEGER}
+				</if>
+				<if test="hos_id != null and hos_id !='' ">
+					and b.hos_id = #{hos_id,jdbcType=INTEGER}
+				</if>
+				<if test="copy_code != null and copy_code !='' ">
+					and b.copy_code = #{copy_code ,jdbcType=VARCHAR}
+				</if>
+				<if test="year != null and year !='' ">
+					and a.acc_year = #{year ,jdbcType=VARCHAR}
+				</if>
+				<if test="month != null and month !='' ">
+					and TO_NUMBER(b.acc_year||''||b.acc_month) = #{year}||#{month}
+				</if>
+				and <![CDATA[ b.state>=1]]>
+				and nvl(a.check6_id,0)!=0
+				and b.busi_type_code = '040703'
+		    </where>
+		    group by a.check6_id,<!-- a.check6_no, -->b.group_id,b.hos_id,b.copy_code,b.acc_year           
+		),sup_tmp as (
+			select distinct sup_id,<!-- sup_no, -->group_id,hos_id  
+			from (
+		         	select  sup_id,<!-- sup_no , -->group_id,hos_id from mat_begin_tmp
+		            union all 
+		            select  check6_id,<!-- check6_no, -->group_id,hos_id from acc_begin_tmp
+		            union all
+		            select sup_id,<!-- sup_no , -->group_id,hos_id from this_mat_add
+		            union all
+		            select sup_id,<!-- sup_no , -->group_id,hos_id from this_mat_mis
+		            union all
+		            select check6_id,<!-- check6_no, -->group_id,hos_id from this_acc_mis
+		        ) 
+		)
+		
+		select a.sup_id,<!-- a.sup_no, -->b.sup_code,b.sup_name,
+			nvl(mb.amount_money,0) as mat_begin,nvl(ab.nc_credit,0)-nvl(nc_debit,0) as acc_begin,
+			nvl(ma.bill_money,0) as mat_add_this,
+			nvl(mm.pay_money,0) as mat_mis_this, nvl(am.bq_debit,0)-nvl(bq_credit,0) as acc_mis_this,
+		    nvl(mb.amount_money,0)+nvl(ma.bill_money,0)-nvl(mm.pay_money,0) as mat_end,
+		    nvl(ab.nc_credit,0)-nvl(nc_debit,0)-nvl(am.bq_debit,0)+nvl(bq_credit,0) as acc_end
+		from sup_tmp a
+		left join hos_sup_dict b on a.group_id=b.group_id and a.hos_id=b.hos_id and a.sup_id=b.sup_id <!-- and a.sup_no=b.sup_no -->
+		left join mat_begin_tmp mb on a.group_id=mb.group_id and a.hos_id=mb.hos_id and a.sup_id=mb.sup_id <!-- and a.sup_no=mb.sup_no -->
+		left join acc_begin_tmp  ab on a.group_id=ab.group_id and a.hos_id=ab.hos_id and a.sup_id=ab.check6_id <!-- and a.sup_no=ab.check6_no -->
+		left join this_mat_add ma on a.group_id=ma.group_id and a.hos_id=ma.hos_id and a.sup_id=ma.sup_id <!-- and a.sup_no=ma.sup_no -->
+		left join this_mat_mis mm on a.group_id=mm.group_id and a.hos_id=mm.hos_id and a.sup_id=mm.sup_id <!-- and a.sup_no=mm.sup_no -->
+		left join this_acc_mis am on a.group_id=am.group_id and a.hos_id=am.hos_id and a.sup_id=am.check6_id <!-- and a.sup_no=am.check6_no -->
+		<where>
+			<if test="sup_id !=null and sup_id!=''">
+				and b.sup_id=#{sup_id,jdbcType=INTEGER}
+			</if>
+		</where>
+		order by b.sup_code
+	</select>
+	
+	<select id="querySupInPayUnpaidAmountMoney" parameterType="java.util.Map" resultMap="matAccountReportBillArrNonPayMap">
+    with temp as(
+      select 
+        mim.sup_id, mim.sup_no,hsd.sup_code,hsd.sup_name,
+        sum(nvl(mid.amount_money, 0)) init_in_amount_money,
+        0 init_pay_amount_money,
+        0 in_amount_money,
+        0 pay_amount_money
+        ,0 as acc_pay_money
+      from mat_in_main mim
+      left join mat_in_detail mid
+      on mid.group_id=mim.group_id
+      and mid.hos_id=mim.hos_id
+      and mid.copy_code=mim.copy_code
+      and mid.in_id=mim.in_id
+      left join hos_sup_dict hsd
+      on hsd.group_id=mim.group_id
+      and hsd.hos_id=mim.hos_id
+      and hsd.sup_id=mim.sup_id
+      and hsd.is_stop=0
+      where mim.group_id=#{group_id}
+      and mim.hos_id=#{hos_id}
+      and mim.copy_code=#{copy_code}
+      and mim.state=3
+      and mid.amount_money != 0
+      and mim.bus_type_code in ('2','12','47','48')<!-- 采购入库 2 采购退货 12 专购品入库47 专购品退货48 -->
+    
+      <if test="sup_id!=null and sup_id!=''">
+         and hsd.sup_id=#{sup_id}
+      </if>
+      <if test="store_id!=null and store_id!=''">
+         and mim.store_id=#{store_id}
+      </if>
+      <if test="sup_code!=null and sup_code!=''">
+         and (
+             hsd.sup_code like '%${sup_code}%'
+            or hsd.sup_name like '%${sup_code}%'
+            or hsd.spell_code like '%${sup_code}%'
+            or hsd.wbx_code like '%${sup_code}%'
+         )
+      </if>
+      <if test="begin_date != null and begin_date != ''">
+      and  to_char(mim.confirm_date,'yyyy-mm-dd') <![CDATA[ < ]]> #{begin_date}
+        </if>
+      group by mim.sup_id,mim.sup_no,hsd.sup_code,hsd.sup_name
+      
+      
+      union all
+			 select 
+			   hsd.sup_id,hsd.sup_no,hsd.sup_code,hsd.sup_name,
+			   sum(nvl(mndd.amount_money,0)) init_in_amount_money,
+		        0 init_pay_amount_money,
+		        0 in_amount_money,
+		        0 pay_amount_money
+		        ,0 as acc_pay_money
+			 from mat_nopay_deliver mnd
+			 left join mat_nopay_deliver_d mndd
+			 on mndd.group_id=mnd.group_id
+			 and mndd.hos_id=mnd.hos_id
+			 and mndd.copy_code=mnd.copy_code
+			 and mndd.deliver_id=mnd.deliver_id
+			 and mndd.deliver_no=mnd.deliver_no
+			 left join hos_sup_dict hsd
+			 on hsd.group_id=mnd.group_id
+			 and hsd.hos_id=mnd.hos_id
+			 and hsd.sup_id=mnd.sup_id
+			 and hsd.is_stop=0
+			 where mnd.group_id=#{group_id}
+			and mnd.hos_id=#{hos_id}
+			and mnd.copy_code=#{copy_code}
+			and mndd.amount_money!=0
+			and mnd.state=3
+			
+			<if test="sup_id!=null and sup_id!=''">
+			   and hsd.sup_id=#{sup_id}
+			</if>
+			<if test="store_id!=null and store_id!=''">
+		        and mnd.store_id=#{store_id}
+		    </if>
+			<if test="sup_code!=null and sup_code!=''">
+			   and (
+			   		hsd.sup_code like '%${sup_code}%'
+			   	 or hsd.sup_name like '%${sup_code}%'
+			   	 or hsd.spell_code like '%${sup_code}%'
+			   	 or hsd.wbx_code like '%${sup_code}%'
+			   )
+			</if> 
+			 group by 
+			   hsd.sup_id,hsd.sup_no,hsd.sup_code,hsd.sup_name
+
+
+      
+      union all
+      select 
+        mpm.sup_id, mpm.sup_no,hsd.sup_code,hsd.sup_name,
+        0 init_in_amount_money,
+        sum(nvl(mpd.pay_money, 0)) init_pay_amount_money,
+        0 in_amount_money,
+        0 pay_amount_money
+        ,0 as acc_pay_money
+      from mat_pay_main mpm
+      left join mat_pay_detail mpd
+      on mpd.group_id=mpm.group_id
+      and mpd.hos_id=mpm.hos_id
+      and mpd.copy_code=mpm.copy_code
+      and mpd.pay_id=mpm.pay_id
+      and mpd.pay_bill_no=mpm.pay_bill_no
+      
+      left join hos_sup_dict hsd
+      on hsd.group_id=mpm.group_id
+      and hsd.hos_id=mpm.hos_id
+      and hsd.sup_id=mpm.sup_id
+      and hsd.is_stop=0
+      where mpm.group_id=#{group_id}
+      and mpm.hos_id=#{hos_id}
+      and mpm.copy_code=#{copy_code}
+      
+      and mpm.state>=2 
+      and exists(
+      select 1 from mat_in_main t 
+      where t.group_id=mpm.group_id and t.hos_id=mpm.hos_id and t.copy_code=mpm.copy_code 
+      and t.sup_id=mpm.sup_id
+      <if test="store_id!=null and store_id!=''">
+		        and t.store_id=#{store_id}
+		    </if>
+      )
+      <if test="store_id!=null and store_id!=''">
+		       
+				<!-- 处理入库与发票 付款 对应不上的数据  一个供应商供应多个仓库时需要按仓库过滤 -->
+				  AND NOT EXISTS (SELECT 1
+						FROM mat_bill_detail c
+						LEFT JOIN mat_in_main d
+						  ON c.group_id = d.group_id
+						 AND c.hos_id = d.hos_id
+						 AND c.copy_code = d.copy_code
+						 AND c.in_id = d.in_id
+					   WHERE c.group_id = mpd.group_id
+						 AND c.hos_id = mpd.hos_id
+						 AND c.copy_code = mpd.copy_code
+						 AND c.bill_id = mpd.bill_id
+						 and d.store_id!=#{store_id}
+				  )
+		    </if>
+      <if test="sup_id!=null and sup_id!=''">
+         and hsd.sup_id=#{sup_id}
+      </if>
+     
+      <if test="sup_code!=null and sup_code!=''">
+         and (
+             hsd.sup_code like '%${sup_code}%'
+            or hsd.sup_name like '%${sup_code}%'
+            or hsd.spell_code like '%${sup_code}%'
+            or hsd.wbx_code like '%${sup_code}%'
+         )
+      </if>
+      <if test="begin_date != null and begin_date != ''">
+       and to_char(mpm.pay_date,'yyyy-MM-dd')   <![CDATA[ < ]]> #{begin_date}
+        </if>
+      group by mpm.sup_id,mpm.sup_no,hsd.sup_code,hsd.sup_name
+      
+      
+      union all
+      select 
+        mim.sup_id, mim.sup_no,hsd.sup_code,hsd.sup_name,
+          0 init_in_amount_money,
+          0 init_pay_amount_money,
+        sum(nvl(mid.amount_money, 0)) in_amount_money,
+        0 pay_amount_money
+        ,0 as acc_pay_money
+      from mat_in_main mim
+      left join mat_in_detail mid
+      on mid.group_id=mim.group_id
+      and mid.hos_id=mim.hos_id
+      and mid.copy_code=mim.copy_code
+      and mid.in_id=mim.in_id
+      left join hos_sup_dict hsd
+      on hsd.group_id=mim.group_id
+      and hsd.hos_id=mim.hos_id
+      and hsd.sup_id=mim.sup_id
+      and hsd.is_stop=0
+      where mim.group_id=#{group_id}
+      and mim.hos_id=#{hos_id}
+      and mim.copy_code=#{copy_code}
+      and mid.amount_money!=0
+      and mim.state=3
+      and mim.bus_type_code in ('2','12','47','48')<!-- 采购入库 2 采购退货 12 专购品入库47 专购品退货48 -->
+      
+      <if test="sup_id!=null and sup_id!=''">
+         and hsd.sup_id=#{sup_id}
+      </if>
+      <if test="store_id!=null and store_id!=''">
+		 and mim.store_id=#{store_id}
+      </if>
+      <if test="sup_code!=null and sup_code!=''">
+         and (
+             hsd.sup_code like '%${sup_code}%'
+            or hsd.sup_name like '%${sup_code}%'
+            or hsd.spell_code like '%${sup_code}%'
+            or hsd.wbx_code like '%${sup_code}%'
+         )
+      </if>
+      <if test="begin_date != null and begin_date != ''">
+       and to_char(mim.confirm_date,'yyyy-mm-dd') <![CDATA[ >= ]]> #{begin_date}
+        </if>
+      <if test="end_date !=null and end_date !=''">
+        and to_char(mim.confirm_date,'yyyy-mm-dd') <![CDATA[ <= ]]> #{end_date}
+        </if>
+      group by mim.sup_id,mim.sup_no,hsd.sup_code,hsd.sup_name
+      
+      
+      union all
+      select 
+        mpm.sup_id, mpm.sup_no,hsd.sup_code,hsd.sup_name,
+              0 init_in_amount_money,
+        0 init_pay_amount_money,
+        0 in_amount_money,
+        sum(nvl(mpd.pay_money, 0)) pay_amount_money
+        ,0 as acc_pay_money
+      from mat_pay_main mpm
+      left join mat_pay_detail mpd
+      on mpd.group_id=mpm.group_id
+      and mpd.hos_id=mpm.hos_id
+      and mpd.copy_code=mpm.copy_code
+      and mpd.pay_id=mpm.pay_id
+      and mpd.pay_bill_no=mpm.pay_bill_no
+      
+      left join hos_sup_dict hsd
+      on hsd.group_id=mpm.group_id
+      and hsd.hos_id=mpm.hos_id
+      and hsd.sup_id=mpm.sup_id
+      and hsd.is_stop=0
+      
+      
+      where mpm.group_id=#{group_id}
+      and mpm.hos_id=#{hos_id}
+      and mpm.copy_code=#{copy_code}
+     
+      and mpm.state>=2 
+      and exists(
+      select 1 from mat_in_main t 
+      where t.group_id=mpm.group_id and t.hos_id=mpm.hos_id and t.copy_code=mpm.copy_code 
+      and t.sup_id=mpm.sup_id
+      <if test="store_id!=null and store_id!=''">
+		        and t.store_id=#{store_id}
+		    </if>
+      )
+      <if test="store_id!=null and store_id!=''">
+		       
+				<!-- 处理入库与发票 付款 对应不上的数据  一个供应商供应多个仓库时需要按仓库过滤 -->
+				  AND NOT EXISTS (SELECT 1
+						FROM mat_bill_detail c
+						LEFT JOIN mat_in_main d
+						  ON c.group_id = d.group_id
+						 AND c.hos_id = d.hos_id
+						 AND c.copy_code = d.copy_code
+						 AND c.in_id = d.in_id
+					   WHERE c.group_id = mpd.group_id
+						 AND c.hos_id = mpd.hos_id
+						 AND c.copy_code = mpd.copy_code
+						 AND c.bill_id = mpd.bill_id
+						 and d.store_id!=#{store_id}
+				  )
+		    </if>
+      <if test="sup_id!=null and sup_id!=''">
+         and hsd.sup_id=#{sup_id}
+      </if>
+     
+      <if test="sup_code!=null and sup_code!=''">
+         and (
+             hsd.sup_code like '%${sup_code}%'
+            or hsd.sup_name like '%${sup_code}%'
+            or hsd.spell_code like '%${sup_code}%'
+            or hsd.wbx_code like '%${sup_code}%'
+         )
+      </if>
+      <if test="begin_date != null and begin_date != ''">
+        and to_char(mpm.pay_date,'yyyy-MM-dd') <![CDATA[ >= ]]> #{begin_date}
+        </if>
+      <if test="end_date !=null and end_date !=''">
+        and to_char(mpm.pay_date,'yyyy-MM-dd') <![CDATA[ <= ]]> #{end_date}
+        </if>
+      group by mpm.sup_id,mpm.sup_no,hsd.sup_code,hsd.sup_name
+      
+      
+      union all
+      select 
+        c.check6_id sup_id, c.check6_no sup_no, d.sup_code, d.sup_name, 0 as init_in_amount_money
+      , 0 as init_pay_amount_money, 0 as in_amount_money
+      , 0 as pay_amount_money
+      ,sum(c.debit) as acc_pay_money
+      from acc_vouch a
+    left join acc_vouch_check c on a.group_id = c.group_id
+    and a.hos_id = c.hos_id
+    and a.copy_code = c.copy_code
+    and a.vouch_id = c.vouch_id 
+    left join hos_sup_dict d on c.group_id = d.group_id
+    and c.hos_id = d.hos_id
+    and c.check6_id = d.sup_id
+    and d.is_stop=0 
+      
+      where a.group_id=#{group_id}
+      and a.hos_id=#{hos_id}
+      and a.copy_code=#{copy_code}
+    
+      and a.state>=1
+      and nvl(c.check6_id,0) <![CDATA[ <> ]]> 0 
+      
+      and exists(
+      
+       select 1 from acc_busi_map a where a.subj_code=c.subj_code
+       and exists(select 1 from MAT_STORE_TYPE b where a.sub_type_id=b.mat_type_id
+             <if test="store_id!=null and store_id!=''">
+		        and b.store_id=#{store_id}
+		    </if> 
+             
+             ) 
+      )
+      
+      <if test="sup_id!=null and sup_id!=''">
+         and c.check6_id=#{sup_id}
+      </if>
+      
+      <if test="sup_code!=null and sup_code!=''">
+         and (
+             d.sup_code like '%${sup_code}%'
+            or d.sup_name like '%${sup_code}%'
+            or d.spell_code like '%${sup_code}%'
+            or d.wbx_code like '%${sup_code}%'
+         )
+      </if>
+      
+      <if test="begin_date != null and begin_date != ''">
+        and a.vouch_date <![CDATA[ >= ]]> to_date(#{begin_date,jdbcType=DATE},'yyyy-MM-dd')
+        </if>
+      <if test="end_date !=null and end_date !=''">
+        and a.vouch_date <![CDATA[ <= ]]> to_date(#{end_date,jdbcType=DATE},'yyyy-MM-dd')
+        </if>
+      group by c.check6_id , c.check6_no , d.sup_code, d.sup_name
+      )
+      
+      select 
+            1 as order_num ,
+            sup_id,sup_code,sup_name,
+            sum(nvl(init_in_amount_money,0))-sum(nvl(init_pay_amount_money,0)) init_amount_money,
+            sum(nvl(in_amount_money,0)) in_amount_money,
+            sum(nvl(pay_amount_money,0)) pay_amount_money,
+            sum(nvl(acc_pay_money,0)) as acc_pay_money,
+            sum(nvl(init_in_amount_money,0))-sum(nvl(init_pay_amount_money,0))+sum(nvl(in_amount_money,0)) as acc_mat_dis,
+            sum(nvl(init_in_amount_money,0))-sum(nvl(init_pay_amount_money,0))+sum(nvl(in_amount_money,0))-sum(nvl(pay_amount_money,0)) unpaid_amount_money
+      from temp
+      group by sup_id,sup_code,sup_name
+      having 
+        ( sum(nvl(init_in_amount_money,0))-sum(nvl(init_pay_amount_money,0))<![CDATA[<>]]>0
+      or sum(nvl(in_amount_money,0))<![CDATA[<>]]>0
+      or sum(nvl(pay_amount_money,0)) <![CDATA[<>]]>0)
+      
+      union all
+      select 
+            2 as order_num ,
+            null as sup_id,null as sup_code,'合计' as sup_name,
+            sum(nvl(init_in_amount_money,0))-sum(nvl(init_pay_amount_money,0)) init_amount_money,
+            sum(nvl(in_amount_money,0)) in_amount_money,
+            sum(nvl(pay_amount_money,0)) pay_amount_money,
+            sum(nvl(acc_pay_money,0)) as acc_pay_money,
+            sum(nvl(init_in_amount_money,0))-sum(nvl(init_pay_amount_money,0))+sum(nvl(in_amount_money,0)) as acc_mat_dis,
+            sum(nvl(init_in_amount_money,0))-sum(nvl(init_pay_amount_money,0))+sum(nvl(in_amount_money,0))-sum(nvl(pay_amount_money,0)) unpaid_amount_money
+      from temp
+      order by order_num,sup_code,sup_name
+
+  </select>
+</mapper>

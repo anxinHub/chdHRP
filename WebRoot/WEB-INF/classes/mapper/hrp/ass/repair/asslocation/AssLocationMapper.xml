@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.ass.dao.repair.asslocation.AssLocationMapper">
+	
+	<resultMap type="java.util.Map" id="AssLocationTree">
+		<result property="pId" column="pId" />
+		<result property="id" column="id" />
+		<result property="name" column="name" />
+	</resultMap>
+	
+	<select id="queryAssLocationByCode" resultType="java.util.Map">
+		select group_id,
+		       hos_id,
+		       copy_code,
+		       loc_code,
+		       loc_name,
+		       super_code,
+		       is_stop,
+		       is_last,
+		       spell_code,
+		       wbx_code
+		  from ass_location
+		  where group_id = #{group_id}
+		  and hos_id =  #{hos_id}
+		  and copy_code = #{copy_code}
+		  and loc_code= #{loc_code}
+	</select>
+	
+	<select id="querySuperLocationByLocCode" resultType="java.util.Map" parameterType="java.util.Map">
+		select group_id,
+		       hos_id,
+		       copy_code,
+		       loc_code,
+		       loc_name,
+		       super_code,
+		       is_stop,
+		       is_last,
+		       spell_code,
+		       wbx_code
+		  from ass_location
+		  where group_id = #{group_id}
+		  and hos_id =  #{hos_id}
+		  and copy_code = #{copy_code}
+		  and loc_code= #{super_code}
+	</select>
+	<select id="queryAssLocationSuperAll" parameterType="java.util.Map" resultType="java.util.Map">
+	select loc_code as id, loc_name as name, super_code as pId, spell_code, wbx_code
+		from ass_location
+		where group_id = #{group_id}
+			and hos_id = #{hos_id}
+			and copy_code = #{copy_code}
+			and is_stop = 0
+		   start with loc_code = #{super_code}
+			connect by prior  super_code  =  loc_code
+			order by loc_code
+	</select>
+	<select id="queryAssLocation" parameterType="java.util.Map" resultType="java.util.Map">
+		select group_id,
+		       hos_id,
+		       copy_code,
+		       loc_code,
+		       loc_name,
+		       super_code,
+		       is_stop,
+		       is_last,
+		       spell_code,
+		       wbx_code,
+		       loc_name_all
+		  from ass_location
+		  where group_id = #{group_id}
+		  and hos_id =  #{hos_id}
+		  and copy_code = #{copy_code}
+		  <if test="loc_code != null and loc_code != ''">
+		  	and loc_code like '${loc_code}%'  
+		  </if>
+		  <if test="loc_name != null and loc_name != ''">
+		  	and loc_name like '%${loc_name}%'  
+		  </if>
+		  <if test="is_stop != null and is_stop != ''">
+		  	and is_stop = #{is_stop}
+		  </if>
+	</select>
+	<insert id="addLocation" parameterType="java.util.Map" >
+	begin
+			insert into ass_location
+			  (group_id,
+			   hos_id,
+			   copy_code,
+			   loc_code,
+			   loc_name,
+			   super_code,
+			   is_stop,
+			   is_last,
+			   spell_code,
+			   wbx_code,
+			   loc_name_all
+			   )
+			values
+			  (
+			   #{group_id,jdbcType=INTEGER},
+			   #{hos_id,jdbcType=INTEGER},
+			   #{copy_code,jdbcType=VARCHAR},
+			   #{loc_code,jdbcType=VARCHAR},
+			   #{loc_name,jdbcType=VARCHAR},
+			   #{super_code,jdbcType=VARCHAR},
+			   #{is_stop},
+			   1,
+			   #{spell_code},
+			   #{wbx_code},
+			   #{loc_name_all}
+			   );
+			   update ass_location
+			     set is_last = 0
+			   where group_id = #{group_id}
+			     and hos_id = #{hos_id}
+			     and copy_code =#{copy_code}
+			     and loc_code = #{super_code};
+			end;
+	</insert>
+	<select id="queryAssLocationTree" resultMap="AssLocationTree" parameterType="java.util.Map">
+		select 
+	       loc_code as id ,
+	       loc_name as name ,
+	       super_code pId ,
+	       spell_code,
+	       wbx_code 
+	  from ass_location  
+	  where group_id =#{group_id}
+	  and hos_id = #{hos_id}
+	  and copy_code =#{copy_code}
+	 start with super_code =#{super_code}
+		connect by prior loc_code  = super_code
+	  order by loc_code
+	</select>
+	
+	<update id="update" parameterType="java.util.Map">
+	begin
+	update ass_location
+		   set 
+		       loc_name = #{loc_name},
+		       loc_name_all = #{loc_name_all},
+		       spell_code = #{spell_code},
+		       wbx_code = #{wbx_code}
+		 where group_id = #{group_id}
+		   and hos_id = #{hos_id}
+		   and copy_code = #{copy_code}
+		   and loc_code = #{loc_code};
+	update ass_location
+		   set 
+		       is_stop = #{is_stop}
+		 where group_id = #{group_id}
+		   and hos_id = #{hos_id}
+		   and copy_code = #{copy_code}
+		   and loc_code like '${loc_code}%';
+	end;		   
+		
+	</update>
+	<update id="updateLocNameAll" parameterType="java.util.Map">
+		update ass_location set 
+		  loc_name_all = replace(loc_name_all, #{old_loc_name}, #{new_loc_name})
+		where loc_code in(select loc_code as id 
+		from ass_location
+		where group_id = #{group_id}
+		   and hos_id = #{hos_id}
+		   and copy_code = #{copy_code}
+		  and is_stop = 0
+		  and super_code like '${loc_code}%'
+		)
+	</update>
+	
+	<select id="queryAssExists" parameterType="java.util.Map" resultType="Integer">
+	select count(*)
+	from sys_dict_use
+	where  table_code = 'ass_location'
+	and column_code = 'loc_code'
+	
+	</select>
+	
+	<delete id="deleteAssLocationBatch" parameterType="java.util.List">
+	delete ass_location 
+	where
+	<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+			group_id = #{item.group_id,jdbcType=INTEGER}
+			and hos_id = #{item.hos_id,jdbcType=INTEGER}
+			and copy_code =#{item.copy_code,jdbcType=VARCHAR}
+			and loc_code like '${item.loc_code}%'
+	</foreach>
+	</delete>
+	<delete id="deleteAssLocationDeptBatch" parameterType="java.util.List">
+	delete ass_location_dept 
+	where
+	<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+			group_id = #{item.group_id,jdbcType=INTEGER}
+			and hos_id = #{item.hos_id,jdbcType=INTEGER}
+			and copy_code =#{item.copy_code,jdbcType=VARCHAR}
+			and loc_code like '${item.loc_code}%'
+	</foreach>
+	</delete>
+</mapper>

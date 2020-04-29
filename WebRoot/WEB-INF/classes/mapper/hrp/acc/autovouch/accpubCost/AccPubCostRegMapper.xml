@@ -1,0 +1,427 @@
+﻿<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.acc.dao.autovouch.accpubCost.AccPubCostRegMapper">
+	<resultMap id="result" type="java.util.Map">
+        <result property="group_id" column="group_id"/>
+        <result property="hos_id" column="hos_id"/>
+        <result property="copy_code" column="copy_code"/>
+        <result property="proj_code" column="proj_code"/>
+        <result property="proj_name" column="proj_name"/>
+        <result property="year_month" column="year_month"/>
+        <result property="ft_para" column="ft_para"/>
+        <result property="ft_para_name" column="ft_para_name"/>
+        <result property="ft_my" column="ft_my"/>
+        <result property="ft_bl" column="ft_bl"/>
+        <result property="state" column="state"/>
+        <result property="state_name" column="state_name"/>
+        <result property="note" column="note"/>
+		<result property="dept_id" column="dept_id"/>
+		<result property="dept_name" column="dept_name"/>
+		<result property="dept_code" column="dept_code"/>
+		<result property="dept_no" column="dept_no"/>
+		<result property="kind_name" column="kind_name"/>
+		<result property="natur_name" column="natur_name"/>
+		<result property="type_name" column="type_name"/>
+		<result property="out_name" column="out_name"/>
+		<result property="data_type" column="data_type"/>
+		<result property="data_type_name" column="data_type_name"/>
+	</resultMap>
+	
+	<select id="query" parameterType="java.util.Map" resultMap="result">
+		SELECT
+			a.proj_code,
+			b.DICT_NAME as proj_name,
+			a.year_month,
+			a.ft_para,
+			c.DICT_NAME as ft_para_name,
+			a.ft_my,
+			a.state,
+			case a.state when 1 then '新建' else '审核' end as state_name,
+			a.note 
+		FROM
+			ACC_PUB_COST a
+			LEFT JOIN HOS_DICT_TYPE b ON a.GROUP_ID = b.GROUP_ID AND a.HOS_ID = b.HOS_ID AND a.COPY_CODE = b.COPY_CODE AND a.PROJ_CODE = b.DICT_CODE AND b.TABLE_CODE = '01005'
+			LEFT JOIN INIT_ACC_DICT c ON a.FT_PARA = c.DICT_CODE AND c.TABLE_CODE = 'ACC_FT_PAPER'
+		<where>
+			a.group_id = #{group_id}
+			and a.hos_id = #{hos_id}
+			and a.copy_code = #{copy_code}
+			<if test="proj_code != null and proj_code != ''">
+				and a.proj_code = #{proj_code}
+			</if>
+			<if test="year_month != null and year_month != ''">
+				and a.year_month = #{year_month}
+			</if>
+			<if test="acc_year != null and acc_year != ''">
+				and a.year_month like #{acc_year} || '%'
+			</if>
+			<if test="ft_para != null and ft_para != ''">
+				and a.ft_para = #{ft_para}
+			</if>
+			<if test="state != null and state != ''">
+				and a.state = #{state}
+			</if>
+		</where>
+		order by a.year_month
+	</select>
+	<select id="queryByCode" parameterType="java.util.Map" resultMap="result">
+		SELECT
+			a.proj_code,
+			a.year_month,
+			a.ft_para,
+			a.ft_my,
+			a.state,
+			a.note 
+		FROM
+			ACC_PUB_COST a
+		where
+			a.group_id = #{group_id}
+			and a.hos_id = #{hos_id}
+			and a.copy_code = #{copy_code}
+			and a.proj_code = #{proj_code}
+			and a.year_month = #{year_month}
+	</select>
+	
+	<select id="queryPubCostRegOtherDeptByCode" parameterType="java.util.Map" resultMap="result">
+		SELECT a.DEPT_ID
+		<if test="main_table != null and main_table != ''">
+			FROM ${main_table} a
+		</if>
+		where
+			a.group_id = #{group_id}
+			and a.hos_id = #{hos_id}
+			and a.copy_code = #{copy_code}
+			and a.year_month = #{year_month}
+			and a.dept_id = #{dept_id}
+			and a.state = 2
+	</select>
+	<select id="queryPubCostRegDeptByCode" parameterType="java.util.Map" resultMap="result">
+		SELECT a.DEPT_ID,a.DEPT_NO,a.DATA_TYPE,a.FT_MY,a.FT_BL 
+		FROM ACC_PUB_COST_DETAIL a
+		where
+			a.group_id = #{group_id}
+			and a.hos_id = #{hos_id}
+			and a.copy_code = #{copy_code}
+			and a.year_month = #{year_month}
+			and a.proj_code = #{proj_code}
+			and a.dept_id = #{dept_id}
+	</select>
+	
+	<select id="queryAccPubCostRegDeptNoSum" parameterType="java.util.Map" resultMap="result">
+			SELECT a.GROUP_ID,a.hos_id,a.copy_code, a.PROJ_CODE,h.DICT_NAME as  proj_name ,a.YEAR_MONTH,dept_name,a.dept_id,dept_code,a.data_type,
+			case a.data_type when 1 then '计算' else '导入' end as data_type_name,a.ft_my,FT_BL,b.KIND_NAME,d.TYPE_NAME,e.OUT_NAME ,f.NATUR_NAME,i.DEPT_NO
+			FROM ACC_PUB_COST_DETAIL a
+			LEFT JOIN HOS_DICT_TYPE h ON a.GROUP_ID = h.GROUP_ID AND a.HOS_ID = h.HOS_ID AND a.COPY_CODE = h.COPY_CODE AND a.PROJ_CODE = h.DICT_CODE AND h.TABLE_CODE='01005'
+			LEFT JOIN HOS_DEPT_DICT i ON a.GROUP_ID = i.GROUP_ID AND a.HOS_ID = i.HOS_ID AND A.DEPT_ID = i.DEPT_ID AND i.IS_STOP = 0
+			LEFT JOIN HOS_DEPT_KIND b ON a.GROUP_ID = b.GROUP_ID AND a.HOS_ID = b.HOS_ID AND b.KIND_CODE = i.KIND_CODE 
+			LEFT JOIN ACC_DEPT_ATTR c ON a.GROUP_ID = c.GROUP_ID AND a.HOS_ID = c.HOS_ID AND a.DEPT_ID  = c.DEPT_ID 
+			LEFT JOIN ACC_DEPT_TYPE d ON c.TYPE_CODE = d.TYPE_CODE
+			LEFT JOIN ACC_DEPT_OUT e ON c.OUT_CODE = e.OUT_CODE
+			LEFT JOIN ACC_DEPT_NATUR f ON c.NATUR_CODE = f.NATUR_CODE
+			LEFT JOIN ACC_PUB_COST cost ON a.GROUP_ID = cost.GROUP_ID AND a.HOS_ID = cost.HOS_ID AND a.COPY_CODE = cost.COPY_CODE AND a.PROJ_CODE = cost.PROJ_CODE AND a.YEAR_MONTH = cost.YEAR_MONTH
+			<where>
+				a.group_id = #{group_id}
+				and a.hos_id = #{hos_id}
+				and a.copy_code = #{copy_code}
+				and a.year_month  = #{year_month}
+				and a.proj_code = #{proj_code}
+				and cost.FT_PARA = #{ft_para}
+				<if test="data_type != null and data_type != ''">
+					and a.data_type = #{data_type}
+				</if>
+			</where>
+			order by i.dept_code
+	</select>
+	<select id="queryAccPubCostRegDept" parameterType="java.util.Map" resultMap="result">
+		with temp as (
+			SELECT a.GROUP_ID,a.hos_id,a.copy_code, a.PROJ_CODE,h.DICT_NAME as  proj_name ,a.YEAR_MONTH,dept_name,a.dept_id,dept_code,a.data_type,
+			case a.data_type when 1 then '计算' else '导入' end as data_type_name,a.ft_my,FT_BL,b.KIND_NAME,d.TYPE_NAME,e.OUT_NAME ,f.NATUR_NAME,i.DEPT_NO
+			FROM ACC_PUB_COST_DETAIL a
+			LEFT JOIN HOS_DICT_TYPE h ON a.GROUP_ID = h.GROUP_ID AND a.HOS_ID = h.HOS_ID AND a.COPY_CODE = h.COPY_CODE AND a.PROJ_CODE = h.DICT_CODE AND h.TABLE_CODE='01005'
+			LEFT JOIN HOS_DEPT_DICT i ON a.GROUP_ID = i.GROUP_ID AND a.HOS_ID = i.HOS_ID AND A.DEPT_ID = i.DEPT_ID AND i.IS_STOP = 0
+			LEFT JOIN HOS_DEPT_KIND b ON a.GROUP_ID = b.GROUP_ID AND a.HOS_ID = b.HOS_ID AND b.KIND_CODE = i.KIND_CODE 
+			LEFT JOIN ACC_DEPT_ATTR c ON a.GROUP_ID = c.GROUP_ID AND a.HOS_ID = c.HOS_ID AND a.DEPT_ID  = c.DEPT_ID 
+			LEFT JOIN ACC_DEPT_TYPE d ON c.TYPE_CODE = d.TYPE_CODE
+			LEFT JOIN ACC_DEPT_OUT e ON c.OUT_CODE = e.OUT_CODE
+			LEFT JOIN ACC_DEPT_NATUR f ON c.NATUR_CODE = f.NATUR_CODE
+			LEFT JOIN ACC_PUB_COST cost ON a.GROUP_ID = cost.GROUP_ID AND a.HOS_ID = cost.HOS_ID AND a.COPY_CODE = cost.COPY_CODE AND a.PROJ_CODE = cost.PROJ_CODE AND a.YEAR_MONTH = cost.YEAR_MONTH
+			<where>
+				a.group_id = #{group_id}
+				and a.hos_id = #{hos_id}
+				and a.copy_code = #{copy_code}
+				and a.year_month  = #{year_month}
+				and a.proj_code = #{proj_code}
+				and cost.FT_PARA = #{ft_para}
+				<if test="data_type != null and data_type != ''">
+					and a.data_type = #{data_type}
+				</if>
+			</where>
+			order by i.dept_code
+		)
+		SELECT GROUP_ID,hos_id,copy_code, PROJ_CODE,proj_name ,YEAR_MONTH,dept_name,dept_id,dept_code,data_type,
+			data_type_name,ft_my,FT_BL,KIND_NAME,TYPE_NAME,OUT_NAME ,NATUR_NAME,DEPT_NO
+		FROM temp
+		union all
+		SELECT null,null,null, null,null ,null,'合计',null,null,null,null,sum(ft_my),null,null,null,null ,null,null from temp 
+	</select>
+	<select id="queryAccPubCostRegOtherDept" parameterType="java.util.Map" resultMap="result">
+		SELECT main.GROUP_ID,main.hos_id,main.copy_code,a.PROJ_CODE,h.DICT_NAME as  proj_name ,main.YEAR_MONTH,i.dept_name,main.dept_id,i.dept_code,1 as data_type,'计算' as data_type_name,a.ft_my,main.FT_BL,b.KIND_NAME,d.TYPE_NAME,e.OUT_NAME ,f.NATUR_NAME,i.DEPT_NO
+		FROM ${main_table} main
+		LEFT JOIN ACC_PUB_COST_DETAIL a ON main.group_id = a.group_id and main.hos_id = a.hos_id and main.copy_code = a.copy_code and main.year_month = a.year_month and main.dept_id = a.dept_id and a.proj_code = #{proj_code}
+		LEFT JOIN HOS_DICT_TYPE h ON main.GROUP_ID = h.GROUP_ID AND main.HOS_ID = h.HOS_ID AND main.COPY_CODE = h.COPY_CODE AND a.PROJ_CODE = h.DICT_CODE AND h.TABLE_CODE='01005'
+		LEFT JOIN HOS_DEPT_DICT i ON main.GROUP_ID = i.GROUP_ID AND main.HOS_ID = i.HOS_ID AND main.DEPT_ID = i.DEPT_ID AND i.IS_STOP = 0
+		LEFT JOIN HOS_DEPT_KIND b ON main.GROUP_ID = b.GROUP_ID AND main.HOS_ID = b.HOS_ID AND b.KIND_CODE = i.KIND_CODE 
+		LEFT JOIN ACC_DEPT_ATTR c ON main.GROUP_ID = c.GROUP_ID AND main.HOS_ID = c.HOS_ID AND main.DEPT_ID  = c.DEPT_ID 
+		LEFT JOIN ACC_DEPT_TYPE d ON c.TYPE_CODE = d.TYPE_CODE
+		LEFT JOIN ACC_DEPT_OUT e ON c.OUT_CODE = e.OUT_CODE
+		LEFT JOIN ACC_DEPT_NATUR f ON c.NATUR_CODE = f.NATUR_CODE
+		
+		<where>
+			main.group_id = #{group_id}
+			and main.hos_id = #{hos_id}
+			and main.copy_code = #{copy_code}
+			and main.year_month  = #{year_month}
+			and main.state = 2
+		</where>
+		order by i.dept_code
+	</select>
+	
+	<insert id="saveAccPubCostReg" parameterType="java.util.Map">
+		INSERT INTO ACC_PUB_COST(
+			GROUP_ID,HOS_ID,COPY_CODE,PROJ_CODE,YEAR_MONTH,FT_PARA,FT_MY,STATE,NOTE
+		)VALUES(
+			#{group_id},
+			#{hos_id},
+			#{copy_code},
+			#{proj_code},
+			#{year_month},
+			#{ft_para},
+			#{ft_my},
+			#{state},
+			#{note}
+		)
+	</insert>
+	
+	<insert id="extendOtherDept" parameterType="java.util.Map">
+		INSERT INTO ACC_PUB_COST_DETAIL(
+			GROUP_ID,HOS_ID,COPY_CODE,PROJ_CODE,YEAR_MONTH,DEPT_ID,DEPT_NO,DATA_TYPE,FT_MY,FT_BL
+		)
+		select main.group_id,main.hos_id,main.copy_code,#{proj_code},main.year_month,main.dept_id,i.dept_no,1,0,main.ft_bl
+		from ${main_table} main
+		LEFT JOIN HOS_DEPT_DICT i ON main.GROUP_ID = i.GROUP_ID AND main.HOS_ID = i.HOS_ID AND main.DEPT_ID = i.DEPT_ID AND i.IS_STOP = 0
+		where main.group_id = #{group_id}
+		and main.hos_id = #{hos_id}
+		and main.copy_code = #{copy_code}
+		and main.year_month = #{year_month}
+		and main.state = 2
+		and not EXISTS (
+			select 1 from 
+			ACC_PUB_COST_DETAIL a
+			where a.group_id = main.group_id
+			and a.hos_id = main.hos_id
+			and a.copy_code = main.copy_code
+			and a.year_month = main.year_month
+			and a.dept_id = main.dept_id
+			and a.PROJ_CODE  = #{proj_code}
+		)
+	</insert>
+	<insert id="saveAccPubCostRegDept" parameterType="java.util.Map">
+		INSERT INTO ACC_PUB_COST_DETAIL(
+			GROUP_ID,HOS_ID,COPY_CODE,PROJ_CODE,YEAR_MONTH,DEPT_ID,DEPT_NO,DATA_TYPE,FT_MY,FT_BL
+		)VALUES(
+			#{group_id,jdbcType=NUMERIC},
+			#{hos_id,jdbcType=NUMERIC},
+			#{copy_code,jdbcType=VARCHAR},
+			#{proj_code,jdbcType=VARCHAR},
+			#{year_month,jdbcType=VARCHAR},
+			#{dept_id,jdbcType=NUMERIC},
+			#{dept_no,jdbcType=NUMERIC},
+			#{data_type,jdbcType=NUMERIC},
+			#{ft_my,jdbcType=NUMERIC},
+			#{ft_bl,jdbcType=NUMERIC}
+		)
+	</insert>
+	<insert id="saveAccPubCostRegDeptBatch" parameterType="java.util.Map">
+		INSERT INTO ACC_PUB_COST_DETAIL(
+			GROUP_ID,HOS_ID,COPY_CODE,PROJ_CODE,YEAR_MONTH,DEPT_ID,DEPT_NO,DATA_TYPE,FT_MY,FT_BL
+		)
+		select t.* from(
+		<foreach collection="list" item="item" index="index"
+			separator=" union all ">
+			select
+			#{item.group_id,jdbcType=NUMERIC},
+			#{item.hos_id,jdbcType=NUMERIC},
+			#{item.copy_code,jdbcType=VARCHAR},
+			#{item.proj_code,jdbcType=VARCHAR},
+			#{item.year_month,jdbcType=VARCHAR},
+			#{item.dept_id,jdbcType=NUMERIC} as dept_id,
+			#{item.dept_no,jdbcType=NUMERIC} as dept_no,
+			#{item.data_type,jdbcType=NUMERIC} as data_type,
+			#{item.ft_my,jdbcType=NUMERIC} as ft_my,
+			#{item.ft_bl,jdbcType=NUMERIC} as ft_bl
+			from dual
+		</foreach>
+		)t
+		
+	</insert>
+	
+	<delete id="deleteAccPubCostReg" parameterType="java.util.Map">
+			delete ACC_PUB_COST where
+		 	group_id = #{group_id}
+			and hos_id = #{hos_id}
+			and copy_code = #{copy_code}
+			and year_month = #{year_month}
+			and proj_code = #{proj_code}
+	</delete>
+	
+	<delete id="deleteAccPubCostRegBatch" parameterType="java.util.Map">
+		<foreach collection="list" item="item" index="index" open="begin" close=";end;" separator=";" >
+			delete ACC_PUB_COST where
+		 	group_id = #{item.group_id}
+			and hos_id = #{item.hos_id}
+			and copy_code = #{item.copy_code}
+			and year_month = #{item.year_month}
+			and proj_code = #{item.proj_code}
+		</foreach>
+	</delete>
+	
+	<delete id="deleteAccPubCostRegDept" parameterType="java.util.Map">
+		<foreach collection="list" item="item" index="index" open="begin" close=";end;" separator=";" >
+			delete ACC_PUB_COST_DETAIL where
+		 	group_id = #{item.group_id}
+			and hos_id = #{item.hos_id}
+			and copy_code = #{item.copy_code}
+			and year_month = #{item.year_month}
+			and proj_code = #{item.proj_code}
+			<if test="item.dept_id != null and item.dept_id != ''">
+				and dept_id = #{item.dept_id}
+			</if>
+		</foreach>
+	</delete>
+	
+	<delete id="deleteAccPubCostRegDeptBatch" parameterType="java.util.Map">
+			delete ACC_PUB_COST_DETAIL where
+		 	group_id = #{group_id}
+			and hos_id = #{hos_id}
+			and copy_code = #{copy_code}
+			and year_month = #{year_month}
+			and proj_code = #{proj_code}
+	</delete>
+	
+	<update id="updateAccPubCostRegState" parameterType="java.util.Map">
+		update ACC_PUB_COST set state = #{state}
+		where group_id = #{group_id}
+		and hos_id = #{hos_id}
+		and copy_code = #{copy_code}
+		and proj_code = #{proj_code}
+		and year_month = #{year_month}
+	</update>
+	
+	<update id="update" parameterType="java.util.Map">
+		update ACC_PUB_COST 
+		set
+			ft_my = #{ft_my},
+			note = #{note}
+		where group_id = #{group_id}
+		and hos_id = #{hos_id}
+		and copy_code = #{copy_code}
+		and proj_code = #{proj_code}
+		and year_month = #{year_month}
+	</update>
+	
+	<update id="updateAccPubCostRegDept" parameterType="java.util.Map">
+		update ACC_PUB_COST_DETAIL 
+		<set>
+			<if test="ft_bl != null and ft_bl != ''">
+				ft_bl = #{ft_bl},
+			</if>
+			<if test="ft_my != null and ft_my != ''">
+				ft_my = #{ft_my}
+			</if>
+		</set>
+		where group_id = #{group_id}
+		and hos_id = #{hos_id}
+		and copy_code = #{copy_code}
+		and proj_code = #{proj_code}
+		and year_month = #{year_month}
+		and dept_id = #{dept_id}
+	</update>
+	
+	<update id="updateAccPubCostRegDeptBatch" parameterType="java.util.List">
+		<foreach collection="list" item="item" index="index" open="begin" close=";end;" separator=";" >
+			update ACC_PUB_COST_DETAIL 
+			set
+					ft_bl = #{item.ft_bl},
+					ft_my = #{item.ft_my}
+			where group_id = #{item.group_id}
+			and hos_id = #{item.hos_id}
+			and copy_code = #{item.copy_code}
+			and proj_code = #{item.proj_code}
+			and year_month = #{item.year_month}
+			and dept_id = #{item.dept_id}
+		</foreach>
+	</update>
+	
+	
+	<select id="queryDeptAllInfoDict" parameterType="java.util.Map" resultMap="result">
+		SELECT a.DEPT_ID ,a.DEPT_CODE,a.DEPT_CODE || ' ' ||a.DEPT_NAME as DEPT_NAME,a.dept_no,b.KIND_NAME,d.TYPE_NAME,e.OUT_NAME ,f.NATUR_NAME FROM 
+		HOS_DEPT_DICT a 
+		LEFT JOIN HOS_DEPT_KIND b ON a.GROUP_ID = b.GROUP_ID AND a.HOS_ID = b.HOS_ID AND a.KIND_CODE = b.KIND_CODE 
+		LEFT JOIN ACC_DEPT_ATTR c ON a.GROUP_ID = c.GROUP_ID AND a.HOS_ID = c.HOS_ID AND a.DEPT_ID  = c.DEPT_ID 
+		LEFT JOIN ACC_DEPT_TYPE d ON c.TYPE_CODE = d.TYPE_CODE
+		LEFT JOIN ACC_DEPT_OUT e ON c.OUT_CODE = e.OUT_CODE
+		LEFT JOIN ACC_DEPT_NATUR f ON c.NATUR_CODE = f.NATUR_CODE
+		<where>
+			a.group_id = #{group_id}
+			and a.hos_id = #{hos_id}
+			<if test="key != null and key != ''">
+				and (
+				a.dept_code like '${key}%' or
+				a.wbx_code like '${key}%' or
+				a.spell_code like '${key}%' or
+				a.dept_name like '%${key}%'
+				)
+			</if>	
+			<if test="jtkey != null and jtkey != ''">
+				and (
+				a.dept_code like '${key}%' or
+				a.wbx_code like '${key}%' or
+				a.spell_code like '${key}%' or
+				a.dept_name like '%${key}%'
+				)
+			</if>
+			<if test="is_last != null and is_last != ''">
+				and a.is_last = #{is_last}
+			</if>
+			and a.is_stop = 0
+			
+		</where>
+		ORDER BY DEPT_CODE
+	</select>
+	
+	<select id="queryIsCreateVouch" parameterType="java.util.Map" resultType="java.lang.Integer">
+		<!-- select COUNT(1) 
+		from acc_pub_cost 
+		where GROUP_ID = #{group_id}
+		AND HOS_ID = #{hos_id}
+		AND COPY_CODE = #{copy_code}
+		AND year_month = #{year_month}
+		AND proj_code = #{proj_code}
+		AND year_month||'-'||proj_code in(
+			select a.business_no 
+			from ACC_BUSI_LOG_0102 a 
+			where a.GROUP_ID = #{group_id}
+			and a.HOS_ID = #{hos_id}
+			AND a.COPY_CODE = #{copy_code}
+			AND a.busi_type_code='0102'
+		) -->
+		select count(1)
+		from ACC_BUSI_LOG_0102 a
+		    where a.GROUP_ID = #{group_id}
+			and a.HOS_ID = #{hos_id}
+			AND a.COPY_CODE = #{copy_code}     
+		      and a.busi_type_code = '0102'
+		      and a.business_no=#{year_month_proj_code}
+		 
+	</select>
+</mapper>

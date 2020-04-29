@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+
+	<sql id="wageItemSrly" type="fun" desc=""><![CDATA[
+	CREATE OR REPLACE FUNCTION wageItemSrly( prm_group_id       IN    NUMBER        --集团
+                                          ,prm_hos_id         IN    NUMBER        --医院
+                                          ,prm_copy_code      IN    VARCHAR2      --帐套
+                                          ,prm_wage_code      IN    VARCHAR2      --工资套编码
+                                          ,prm_acc_year       IN    VARCHAR2      --年度
+                                          ,prm_acc_month      IN    VARCHAR2      --月份
+                                          ,prm_item_code      IN    VARCHAR2        --项目编码
+                                         ) RETURN number
+	  IS
+	       p_column_item varchar2(200);
+	       item_money number(19,2);
+         v_sql    varchar2(4000);
+	  BEGIN
+         
+	          select column_item into p_column_item from acc_wage_item 
+            where group_id =prm_group_id and hos_id =prm_hos_id
+	          and copy_code =prm_copy_code and acc_year=prm_acc_year and item_code =upper(prm_item_code) 
+            and wage_code=upper(prm_wage_code) ;
+
+	          v_sql := 'select sum('||p_column_item||')  from acc_wage_pay 
+            where group_id ='||prm_group_id||' and hos_id ='||prm_hos_id||'
+	          and copy_code ='||prm_copy_code||' and acc_year='||prm_acc_year||' and wage_code=upper('''||prm_wage_code||''')
+	          and acc_month ='||prm_acc_month ;
+
+            execute immediate v_sql into item_money;
+
+             return item_money;
+	  EXCEPTION
+	      WHEN NO_DATA_FOUND THEN
+	         return 0;
+	      WHEN OTHERS THEN
+	         return 0;
+	
+	  END wageItemSrly;
+
+	]]></sql>
+	
+	<sql id="rf_acc_wageemp" type="fun" desc=""><![CDATA[
+		CREATE OR REPLACE FUNCTION RF_ACC_WAGEEMP( prm_group_id       IN    NUMBER        --集团
+	                                          ,prm_hos_id         IN    NUMBER        --医院
+	                                          ,prm_emp_id      IN    NUMBER        --职工名称
+	                                         ) RETURN VARCHAR2
+	    IS
+	         emp_code varchar2(200);
+	    BEGIN
+	
+	            select emp_code into emp_code from hos_emp_dict where group_id =prm_group_id and hos_id =prm_hos_id
+	            and emp_id = prm_emp_id and is_stop = '0';
+	
+	             return emp_code;
+	    EXCEPTION
+	        WHEN NO_DATA_FOUND THEN
+	           return '0';
+	        WHEN OTHERS THEN
+	           return '0';
+	
+	    END RF_ACC_WAGEEMP;
+
+	]]></sql>
+	
+	<sql id="rf_acc_wageitemsrly" type="fun" desc=""><![CDATA[
+		CREATE OR REPLACE FUNCTION RF_ACC_WAGEITEMSRLY( prm_group_id       IN    VARCHAR2        --集团
+                                          ,prm_hos_id         IN    VARCHAR2        --医院
+                                          ,prm_copy_code      IN    VARCHAR2      --帐套
+                                          ,prm_acc_year       IN    VARCHAR2      --年度
+                                          ,prm_acc_month      IN    VARCHAR2      --月份
+                                          ,prm_wage_code      IN    VARCHAR2      --工资套编码
+                                          ,prm_item_code      IN    VARCHAR2        --项目编码
+                                          ,prm_emp_code      IN    VARCHAR2        --职工编码
+                                         ) RETURN varchar2
+    IS
+          p_column_item varchar2(200);
+          p_wage_code varchar2(200);
+          item_money number(19,2);
+          v_sql    varchar2(4000);
+    BEGIN
+
+            select awi.wage_code,awi.column_item into p_wage_code,p_column_item from acc_wage_item awi
+            left join acc_wage aw on awi.group_id=aw.group_id and awi.hos_id=aw.hos_id
+            and awi.copy_code=aw.copy_code and awi.wage_code=aw.wage_code
+            where awi.group_id =prm_group_id and awi.hos_id =prm_hos_id
+            and awi.copy_code =prm_copy_code and awi.acc_year=prm_acc_year and awi.item_name =upper(''||prm_item_code||'')
+            and aw.wage_name=upper(''||prm_wage_code||'') ;
+
+            v_sql := 'select sum('||p_column_item||')  from acc_wage_pay
+            where group_id ='||prm_group_id||' and hos_id ='||prm_hos_id||'
+            and copy_code ='||prm_copy_code||' and acc_year='||prm_acc_year||' and wage_code=upper('''||p_wage_code||''')
+            and acc_month ='||prm_acc_month||'and emp_id='||prm_emp_code ;
+
+            execute immediate v_sql into item_money;
+            
+            if item_money is null then
+              return '0';
+            else
+             return to_char(item_money);
+             end if;
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+           return '0';
+        WHEN OTHERS THEN
+           return '0';
+
+    END RF_ACC_WAGEITEMSRLY;
+
+
+	]]></sql>
+	
+	<sql id="rf_acc_wageLastMonthDays" type="fun" desc=""><![CDATA[
+		create or replace function wageLastMonthDays(f_year_month in varchar2)
+		  return number is
+		  f_days numeric(10);
+		begin
+		  SELECT to_number(to_char(last_day(add_months(to_date(f_year_month, 'yyyyMM'),-1)),'DD'))
+		    into f_days
+		    from dual;
+		
+		  return f_days;
+		end;
+
+
+	]]></sql>
+	
+	<sql id="RF_WAGESUM" type="fun" desc="取累计数"><![CDATA[
+		CREATE OR REPLACE FUNCTION RF_WAGESUM( prm_group_id       IN    VARCHAR2        --集团
+                                          ,prm_hos_id         IN    VARCHAR2        --医院
+                                          ,prm_copy_code      IN    VARCHAR2      --帐套
+                                          ,prm_acc_year       IN    VARCHAR2      --年度
+                                          ,prm_acc_month      IN    VARCHAR2      --月份
+                                          ,prm_wage_code      IN    VARCHAR2      --工资套编码
+                                          ,prm_item_code      IN    VARCHAR2        --项目编码
+                                          ,prm_emp_code      IN    VARCHAR2        --职工编码
+	                                         ) RETURN varchar2
+	    IS
+	          p_column_item varchar2(200);
+	          p_wage_code varchar2(200);
+	          item_money number(19,2);
+	          v_sql    varchar2(4000);
+	    BEGIN
+
+            select awi.wage_code,awi.column_item into p_wage_code,p_column_item from acc_wage_item awi
+            left join acc_wage aw on awi.group_id=aw.group_id and awi.hos_id=aw.hos_id
+            and awi.copy_code=aw.copy_code and awi.wage_code=aw.wage_code
+            where awi.group_id =prm_group_id and awi.hos_id =prm_hos_id
+            and awi.copy_code =prm_copy_code and awi.acc_year=prm_acc_year and awi.item_name =upper(''||prm_item_code||'')
+            and aw.wage_name=upper(''||prm_wage_code||'') ;
+
+            v_sql := 'select sum(nvl('||p_column_item||',0))  from acc_wage_pay
+            where group_id ='||prm_group_id||' and hos_id ='||prm_hos_id||'
+            and copy_code ='||prm_copy_code||' and acc_year='||prm_acc_year||' and wage_code=upper('''||p_wage_code||''')
+            and (to_number(acc_month) >0 and to_number(acc_month)<=to_number('||prm_acc_month||')) and emp_id='||prm_emp_code ;
+
+            execute immediate v_sql into item_money;
+
+            if item_money is null then
+              return '0';
+            else
+             return to_char(item_money);
+             end if;
+	    EXCEPTION
+	        WHEN NO_DATA_FOUND THEN
+	           return '0';
+	        WHEN OTHERS THEN
+	           return '0';
+	
+	    END RF_WAGESUM;
+
+	]]></sql>
+	
+</root>
+

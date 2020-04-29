@@ -1,0 +1,442 @@
+﻿<!doctype html>
+<html>
+<head>
+    <title>Spread.Sheets - Custom Header CellType</title>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+
+    <link href="../../../external/spreadjs/css/gc.spread.sheets.excel2013white.10.1.0.css" rel="stylesheet" type="text/css" />
+
+    <script src="../../../external/external/jquery-1.8.2.min.js" type="text/javascript"></script>
+
+    <script type="text/javascript" src="../../../external/spreadjs/gc.spread.sheets.all.10.1.0.min.js"></script>
+
+    <script id="scriptInit" type="text/javascript">
+        /*code_begin*/
+        var spreadNS = GC.Spread.Sheets;
+
+        $(document).ready(function () {
+            var spread = new GC.Spread.Sheets.Workbook(document.getElementById("ss"));
+            initSpread(spread);
+        });
+
+        function initSpread(spread) {
+
+            // Define highlight cell types 
+            function HighlightColumnItemsCellType() {
+                this.RADIUS = 10;
+                this.HIGHLIGHT_COLOR = "rgb(40, 171, 240)";
+                this.NORMAL_COLOR = "rgb(128, 255, 255)";
+                this.HIGHLIGHT_TIP = "Remove highlight.";
+                this.NORMAL_TIP = "Highlight negative numbers.";
+
+                spreadNS.CellTypes.ColumnHeader.apply(this);
+            }
+            HighlightColumnItemsCellType.prototype = new spreadNS.CellTypes.ColumnHeader();
+            HighlightColumnItemsCellType.prototype.paint = function (ctx, value, x, y, width, height, style, context) {
+                spreadNS.CellTypes.ColumnHeader.prototype.paint.apply(this, arguments);
+
+                var tag = context.sheet.getTag(context.row, context.col, context.sheetArea);
+                var RADIUS = this.RADIUS;
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(x + width - RADIUS, y + height / 2, RADIUS / 2, 0, Math.PI * 2);
+                ctx.fillStyle = (tag && tag.color) || this.NORMAL_COLOR;
+                ctx.fill();
+                ctx.restore();
+            };
+            HighlightColumnItemsCellType.prototype.getHitInfo = function (x, y, cellStyle, cellRect, context) {
+                var RADIUS = this.RADIUS;
+                var centerX = cellRect.x + cellRect.width - RADIUS,
+                    centerY = cellRect.y + cellRect.height / 2;
+                var hitInfo = { x: x, y: y, row: context.row, col: context.col, cellRect: cellRect, sheetArea: context.sheetArea, sheet: context.sheet };
+                if (Math.abs(x - centerX) <= RADIUS && Math.abs(y - centerY) <= RADIUS) {
+                    hitInfo.isReservedLocation = true;
+                }
+                return hitInfo;
+            };
+            HighlightColumnItemsCellType.prototype.processMouseDown = function (hitInfo) {
+                this._hideTip();
+            };
+            HighlightColumnItemsCellType.prototype.processMouseMove = function (hitInfo) {
+                if (hitInfo.isReservedLocation) {
+                    var sheet = hitInfo.sheet;
+                    var offset = $(sheet.getParent().getHost()).offset();
+                    var tag = sheet.getTag(hitInfo.row, hitInfo.col, hitInfo.sheetArea);
+                    this._showTip(offset.top + hitInfo.y + 20, offset.left + hitInfo.x + 20, (tag && tag.tip) || this.NORMAL_TIP);
+                } else {
+                    this._hideTip();
+                }
+            };
+            HighlightColumnItemsCellType.prototype.processMouseUp = function (hitInfo) {
+                if (hitInfo.isReservedLocation) {
+                    var sheet = hitInfo.sheet;
+                    var tag = sheet.getTag(hitInfo.row, hitInfo.col, hitInfo.sheetArea);
+                    if (!tag) {//first time 
+                        tag = { color: this.HIGHLIGHT_COLOR, tip: this.HIGHLIGHT_TIP };
+                        sheet.setTag(hitInfo.row, hitInfo.col, tag, hitInfo.sheetArea);
+
+                        var style = new spreadNS.Style();
+                        style.foreColor = "red";
+                        var ranges = [new spreadNS.Range(-1, hitInfo.col, -1, 1)];
+
+                        var rule = sheet.conditionalFormats.addCellValueRule(spreadNS.ConditionalFormatting.ComparisonOperators.lessThan, 0, 0, style, ranges);
+
+                        tag.rule = rule;
+                        tag.isHighlighed = true;
+                    } else if (!tag.isHighlighed) {
+                        tag.color = this.HIGHLIGHT_COLOR;
+                        tag.tip = this.HIGHLIGHT_TIP;
+
+                        sheet.conditionalFormats.addRule(tag.rule);
+
+                        tag.isHighlighed = true;
+                    } else {
+                        tag.color = this.NORMAL_COLOR;
+                        tag.tip = this.NORMAL_TIP;
+
+                        sheet.conditionalFormats.removeRule(tag.rule);
+
+                        tag.isHighlighed = false;
+                    }
+
+                    var offset = $(sheet.getParent().getHost()).offset();
+                    this._showTip(offset.top + hitInfo.y + 20, offset.left + hitInfo.x + 20, (tag && tag.tip) || this.NORMAL_TIP);
+                }
+            };
+            HighlightColumnItemsCellType.prototype.processMouseEnter = function (hitInfo) {
+
+            };
+            HighlightColumnItemsCellType.prototype.processMouseLeave = function (hitInfo) {
+                this._hideTip();
+            };
+            HighlightColumnItemsCellType.prototype._showTip = function (top, left, tip) {
+                if (!this._tipElement) {
+                    var span = document.createElement("span");
+                    span.style.position = "absolute";
+                    span.style.background = "#EEEEEE";
+                    span.style.border = "1px solid black";
+                    span.style.boxShadow = "5px 5px 5px rgba(0,0,0,0.4)";
+                    span.style.fontSize = "14px";
+                    document.body.insertBefore(span, null);
+                    this._tipElement = span;
+                }
+                var tipElement = this._tipElement;
+                tipElement.textContent = tip;
+                var spanStyle = tipElement.style;
+                spanStyle.top = top + "px";
+                spanStyle.left = left + "px";
+            };
+            HighlightColumnItemsCellType.prototype._hideTip = function () {
+                if (this._tipElement) {
+                    document.body.removeChild(this._tipElement);
+                    this._tipElement = undefined;
+                }
+            };
+
+            function HighlightRowItemsCellType() {
+                this.RADIUS = 10;
+                this.HIGHLIGHT_COLOR = "rgb(40, 171, 240)";
+                this.NORMAL_COLOR = "rgb(128, 255, 255)";
+                this.HIGHLIGHT_TIP = "Remove highlight.";
+                this.NORMAL_TIP = "Highlight negative numbers.";
+
+                spreadNS.CellTypes.RowHeader.apply(this);
+            }
+            HighlightRowItemsCellType.prototype = new spreadNS.CellTypes.RowHeader();
+            HighlightRowItemsCellType.prototype.paint = function (ctx, value, x, y, width, height, style, context) {
+                spreadNS.CellTypes.RowHeader.prototype.paint.apply(this, arguments);
+
+                var tag = context.sheet.getTag(context.row, context.col, context.sheetArea);
+                var RADIUS = this.RADIUS;
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(x + width - RADIUS, y + height / 2, RADIUS / 2, 0, Math.PI * 2);
+                ctx.fillStyle = (tag && tag.color) || this.NORMAL_COLOR;
+                ctx.fill();
+                ctx.restore();
+            };
+            HighlightRowItemsCellType.prototype.getHitInfo = function (x, y, cellStyle, cellRect, context) {
+                var RADIUS = this.RADIUS;
+                var centerX = cellRect.x + cellRect.width - RADIUS,
+                    centerY = cellRect.y + cellRect.height / 2;
+                var hitInfo = { x: x, y: y, row: context.row, col: context.col, cellRect: cellRect, sheetArea: context.sheetArea, sheet: context.sheet };
+                if (Math.abs(x - centerX) <= RADIUS && Math.abs(y - centerY) <= RADIUS) {
+                    hitInfo.isReservedLocation = true;
+                }
+                return hitInfo;
+            };
+            HighlightRowItemsCellType.prototype.processMouseDown = function (hitInfo) {
+                this._hideTip();
+            };
+            HighlightRowItemsCellType.prototype.processMouseMove = function (hitInfo) {
+                if (hitInfo.isReservedLocation) {
+                    var sheet = hitInfo.sheet;
+                    var offset = $(sheet.getParent().getHost()).offset();
+                    var tag = sheet.getTag(hitInfo.row, hitInfo.col, hitInfo.sheetArea);
+                    this._showTip(offset.top + hitInfo.y + 20, offset.left + hitInfo.x + 20, (tag && tag.tip) || this.NORMAL_TIP);
+                } else {
+                    this._hideTip();
+                }
+            };
+            HighlightRowItemsCellType.prototype.processMouseUp = function (hitInfo) {
+                if (hitInfo.isReservedLocation) {
+                    var sheet = hitInfo.sheet;
+                    var tag = sheet.getTag(hitInfo.row, hitInfo.col, hitInfo.sheetArea);
+                    if (!tag) {//first time 
+                        tag = { color: this.HIGHLIGHT_COLOR, tip: this.HIGHLIGHT_TIP };
+                        sheet.setTag(hitInfo.row, hitInfo.col, tag, hitInfo.sheetArea);
+
+                        var style = new spreadNS.Style();
+                        style.foreColor = "red";
+                        var ranges = [new spreadNS.Range(hitInfo.row, -1, 1, -1)];
+
+                        var rule = sheet.conditionalFormats.addCellValueRule(spreadNS.ConditionalFormatting.ComparisonOperators.lessThan, 0, 0, style, ranges);
+
+                        tag.rule = rule;
+                        tag.isHighlighed = true;
+                    } else if (!tag.isHighlighed) {
+                        tag.color = this.HIGHLIGHT_COLOR;
+                        tag.tip = this.HIGHLIGHT_TIP;
+
+                        sheet.conditionalFormats.addRule(tag.rule);
+
+                        tag.isHighlighed = true;
+                    } else {
+                        tag.color = this.NORMAL_COLOR;
+                        tag.tip = this.NORMAL_TIP;
+
+                        sheet.conditionalFormats.removeRule(tag.rule);
+
+                        tag.isHighlighed = false;
+                    }
+
+                    var offset = $(sheet.getParent().getHost()).offset();
+                    this._showTip(offset.top + hitInfo.y + 20, offset.left + hitInfo.x + 20, (tag && tag.tip) || this.NORMAL_TIP);
+                }
+            };
+            HighlightRowItemsCellType.prototype.processMouseEnter = function (hitInfo) {
+
+            };
+            HighlightRowItemsCellType.prototype.processMouseLeave = function (hitInfo) {
+                this._hideTip();
+            };
+            HighlightRowItemsCellType.prototype._showTip = function (top, left, tip) {
+                if (!this._tipElement) {
+                    var span = document.createElement("span");
+                    span.style.position = "absolute";
+                    span.style.background = "#EEEEEE";
+                    span.style.border = "1px solid black";
+                    span.style.boxShadow = "5px 5px 5px rgba(0,0,0,0.4)";
+                    span.style.fontSize = "14px";
+                    document.body.insertBefore(span, null);
+                    this._tipElement = span;
+                }
+                var tipElement = this._tipElement;
+                tipElement.textContent = tip;
+                var spanStyle = tipElement.style;
+                spanStyle.top = top + "px";
+                spanStyle.left = left + "px";
+            };
+            HighlightRowItemsCellType.prototype._hideTip = function () {
+                if (this._tipElement) {
+                    document.body.removeChild(this._tipElement);
+                    this._tipElement = undefined;
+                }
+            };
+
+            // Define button cell type 
+            function TopItemsCellType(count) {
+                spreadNS.CellTypes.Button.apply(this);
+                count = +count || 10;
+                if (!count || isNaN(count) || count < 0) {
+                    count = 10;
+                }
+                this.count = count;
+                this.text("Top " + count);
+            }
+            TopItemsCellType.prototype = new spreadNS.CellTypes.Button();
+            TopItemsCellType.prototype.getHitInfo = function (x, y, cellStyle, cellRect, context) {
+                var self = this;
+                var leftX = cellRect.x + self.marginLeft(),
+                    rightX = cellRect.x + cellRect.width - self.marginRight(),
+                    topY = cellRect.y + self.marginTop(),
+                    bottomY = cellRect.y + cellRect.height - self.marginBottom();
+                var info = { x: x, y: y, row: context.row, col: context.col, cellRect: cellRect, sheetArea: context.sheetArea, sheet: context.sheet };
+                if (leftX <= x && x <= rightX && topY <= y && y <= bottomY) {
+                    info.isReservedLocation = true;
+                }
+                return info;
+            };
+
+            // Define checkbox cell type 
+            function HeaderCheckBoxCellType(value) {
+                spreadNS.CellTypes.CheckBox.apply(this);
+                value = +value || 100;
+                if (!value || isNaN(value) || value < 0) {
+                    value = 100;
+                }
+                this.value = value;
+                this.caption(">" + value);
+            }
+            HeaderCheckBoxCellType.prototype = new spreadNS.CellTypes.CheckBox();
+            var basePaint = spreadNS.CellTypes.CheckBox.prototype.paint;
+            HeaderCheckBoxCellType.prototype.paint = function (ctx, value, x, y, width, height, style, context) {
+                var tag = !!(context.sheet.getTag(context.row, context.col, context.sheetArea) || false);
+
+                basePaint.apply(this, [ctx, tag, x, y, width, height, style, context]);
+            };
+            HeaderCheckBoxCellType.prototype.getHitInfo = function (x, y, cellStyle, cellRect, context) {
+                if (context) {
+                    return { x: x, y: y, row: context.row, col: context.col, cellRect: cellRect, sheetArea: context.sheetArea, isReservedLocation: true, sheet: context.sheet };
+                }
+                return null;
+            };
+
+            HeaderCheckBoxCellType.prototype.processMouseDown = function (hitInfo) {
+                this._isMouseDown = true;
+            }
+            HeaderCheckBoxCellType.prototype.processMouseUp = function (hitInfo) {
+                if (this._isMouseDown) {
+                    this.doFilter(hitInfo);
+                    this._isMouseDown = false;
+                }
+                return true;
+            }
+            HeaderCheckBoxCellType.prototype.doFilter = function (hitInfo) {
+                var value = this.value, sheet = hitInfo.sheet, row = hitInfo.row, col = hitInfo.col, sheetArea = hitInfo.sheetArea;
+                var tag = sheet.getTag(row, col, sheetArea);
+                sheet.setTag(row, col, !tag, sheetArea);
+                var rowFilter = new spreadNS.Filter.HideRowFilter(new spreadNS.Range(-1, col, -1, 1));
+                sheet.rowFilter(rowFilter);
+                rowFilter.filterButtonVisible(false);
+                var condition = new spreadNS.ConditionalFormatting.Condition(spreadNS.ConditionalFormatting.ConditionType.numberCondition, {
+                    compareType: spreadNS.ConditionalFormatting.GeneralComparisonOperators.greaterThan,
+                    expected: value
+                });
+                rowFilter.addFilterItem(col, condition);
+                if (!tag) {
+                    rowFilter.filter();
+                } else {
+                    rowFilter.unfilter();
+                }
+            }
+            // Define hyperlink cell type 
+            function SortHyperlinkCellType() {
+                spreadNS.CellTypes.HyperLink.apply(this);
+                this.text("Sort");
+            }
+            SortHyperlinkCellType.prototype = new spreadNS.CellTypes.HyperLink();
+            SortHyperlinkCellType.prototype.getHitInfo = function (x, y, cellStyle, cellRect, context) {
+                if (context) {
+                    return {
+                        x: x,
+                        y: y,
+                        row: context.row,
+                        col: context.col,
+                        cellRect: cellRect,
+                        cellStyle: cellStyle,
+                        sheetArea: context.sheetArea,
+                        isReservedLocation: true,
+                        sheet: context.sheet
+                    };
+                }
+                return null;
+            };
+            SortHyperlinkCellType.prototype.processMouseDown = function (hitInfo) {
+
+            };
+            SortHyperlinkCellType.prototype.processMouseMove = function (hitInfo) {
+
+            };
+            SortHyperlinkCellType.prototype.processMouseUp = function (hitInfo) {
+                var sheet = hitInfo.sheet, sheetArea = hitInfo.sheetArea,
+                    row = hitInfo.row, col = hitInfo.col;
+
+                var tag = !(sheet.getTag(row, col, sheetArea) || false);
+
+                sheet.setTag(row, col, tag, sheetArea);
+
+                sheet.sortRange(-1, col, -1, 1, true, [{ index: col, ascending: tag }]);
+
+            };
+            SortHyperlinkCellType.prototype.processMouseEnter = function (hitInfo) {
+
+            };
+            SortHyperlinkCellType.prototype.processMouseLeave = function (hitInfo) {
+
+            };
+
+            var rowCount = 50, columnCount = 20;
+            
+            var sheet = spread.getSheet(0);
+            sheet.suspendPaint();
+
+            sheet.setRowCount(rowCount);
+            sheet.setColumnCount(columnCount);
+            sheet.setColumnWidth(0, 60, spreadNS.SheetArea.rowHeader);
+
+            fillSampleData(sheet, new spreadNS.Range(0, 0, rowCount, columnCount));
+
+            sheet.setCellType(0, 1, new HighlightColumnItemsCellType(), spreadNS.SheetArea.colHeader);
+
+            sheet.setCellType(0, 3, new TopItemsCellType(10), spreadNS.SheetArea.colHeader);
+
+            sheet.setCellType(0, 5, new HeaderCheckBoxCellType(120), spreadNS.SheetArea.colHeader);
+
+            sheet.setCellType(0, 7, new SortHyperlinkCellType(), spreadNS.SheetArea.colHeader);
+
+            sheet.setCellType(9, 0, new HighlightRowItemsCellType(), spreadNS.SheetArea.rowHeader);
+
+            sheet.resumePaint();
+
+            spread.bind(spreadNS.Events.ButtonClicked, function (e, args) {
+                var sheet = args.sheet, sheetArea = args.sheetArea,
+                    row = args.row, col = args.col,
+                    tag = sheet.getTag(row, col, sheetArea),
+                    cellType = sheet.getCellType(row, col, sheetArea);
+
+                if (cellType instanceof TopItemsCellType) {
+                    var count = cellType.count;
+
+                    sheet.setTag(row, col, !tag, sheetArea);
+
+                    var range = new spreadNS.Range(-1, col, -1, 1);
+                    var rowFilter = new spreadNS.Filter.HideRowFilter(range);
+                    sheet.rowFilter(rowFilter);
+                    rowFilter.filterButtonVisible(false);
+                    var condition = new spreadNS.ConditionalFormatting.Condition(spreadNS.ConditionalFormatting.ConditionType.top10Condition, {
+                        type: spreadNS.ConditionalFormatting.Top10ConditionType.top,
+                        expected: count
+                    });
+                    rowFilter.addFilterItem(col, condition);
+
+                    if (!tag) {
+                        rowFilter.filter();
+                    } else {
+                        rowFilter.unfilter();
+                    }
+                }
+            });
+
+        }
+        ;
+
+        function fillSampleData(sheet, range) {
+            for (var i = 0; i < range.rowCount; i++) {
+                for (var j = 0; j < range.colCount; j++) {
+                    sheet.setValue(range.row + i, range.col + j, Math.ceil(Math.random() * 300) - 100);
+                }
+            }
+        }
+        ;
+        /*code_end*/
+    </script>
+
+</head>
+<body>
+<div class="sample-turtorial">
+    <div id="ss" style="width:100%; height:520px;border: 1px solid gray;"></div>
+</div>
+</body>
+</html>

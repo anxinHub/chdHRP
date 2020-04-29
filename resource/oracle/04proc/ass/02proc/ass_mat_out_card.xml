@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+
+	<sql id="ass_mat_out_card" type="proc"><![CDATA[
+		CREATE OR REPLACE PROCEDURE ASS_MAT_OUT_CARD(ass_group_id   IN NUMBER, --集团
+                                             ass_hos_id     IN NUMBER, --医院
+                                             ass_copy_code  IN VARCHAR2, --账套
+                                             ass_acc_year   IN VARCHAR2, --年度
+                                             ass_acc_month  IN VARCHAR2, --月份
+                                             ass_inv_id     IN NUMBER, --材料ID
+                                             ass_inv_amount IN NUMBER, --出库数量
+                                             ass_out_back   IN NUMBER, --出库退库标识0出库，1退库
+                                             ass_dept_id    IN NUMBER, --出库科室ID
+                                             ass_dept_no    IN NUMBER, --出库科室NO
+                                             ass_store_id   IN NUMBER, --仓库ID
+                                             ass_store_no   IN NUMBER, --仓库NO
+                                             ass_AppCode    Out Number, --执行代码
+                                             ass_ErrTxt     Out VARCHAR2 --错误信息
+                                             ) IS
+  def_OK            CONSTANT NUMBER := 0; -- 成功
+  def_ERR           CONSTANT NUMBER := -1; -- 系统错误
+  def_WARNING       CONSTANT NUMBER := 100; -- 系统警告
+  def_CONFIRM_STATE CONSTANT NUMBER := 2; -- 确认状态
+  V_ASS_ID  ass_no_dict.ass_id%type;
+  V_IS_DEPT ass_card_other.is_dept%type;
+  V_AMOUNT  NUMBER;
+
+BEGIN
+  --初始化变量
+  ass_AppCode := def_OK;
+  ass_ErrTxt  := '确认成功!';
+  V_AMOUNT := abs(ass_inv_amount);
+  if ass_out_back = 0 then
+    V_IS_DEPT := 1;
+  else
+    V_IS_DEPT := 0;
+  end if;
+
+  --提取关系表资产ID
+  select ass_id
+    into V_ASS_ID
+    from ASS_DICT_MAT_DICT_MAP t
+   where t.group_id = ass_group_id
+     and t.hos_id = ass_hos_id
+     and t.copy_code = ass_copy_code
+     and t.inv_id = ass_inv_id;
+
+  begin
+    for card_data in (SELECT a.ass_card_no,
+                             a.store_id,
+                             a.store_no,
+                             a.dept_id,
+                             a.dept_no
+                      
+                        FROM ASS_CARD_OTHER a
+                       where a.group_id = ass_group_id
+                         AND a.hos_id = ass_hos_id
+                         AND a.copy_code = ass_copy_code
+                         AND a.ass_card_no like 'ZCKPDZ%'
+                         AND a.is_dept = ass_out_back
+                         AND a.ass_id = V_ASS_ID
+                         and rownum <= V_AMOUNT
+                         order by a.ass_card_no asc) loop
+    
+      --删除使用科室
+      DELETE FROM ASS_SHARE_DEPT_OTHER
+       WHERE GROUP_ID = ass_group_id
+         AND HOS_ID = ass_hos_id
+         AND COPY_CODE = ass_copy_code
+         AND ass_card_no = card_data.ass_card_no;
+    
+      --删除使用科室本月记录
+      DELETE FROM ASS_SHARE_DEPT_R_OTHER
+       WHERE GROUP_ID = ass_group_id
+         AND HOS_ID = ass_hos_id
+         AND COPY_CODE = ass_copy_code
+         AND ass_card_no = card_data.ass_card_no
+         AND ass_year = ass_acc_year
+         AND ass_month = ass_acc_month;
+     
+      --插入使用科室
+      INSERT INTO ASS_SHARE_DEPT_OTHER
+        (group_id, hos_id, copy_code, ass_card_no, dept_id, dept_no, area)
+        select ass_group_id,
+               ass_hos_id,
+               ass_copy_code,
+               card_data.ass_card_no,
+               ass_dept_id,
+               ass_dept_no,
+               1
+          from dual;
+      --插入使用科室本月记录
+      INSERT INTO ASS_SHARE_DEPT_R_OTHER
+        (group_id,
+         hos_id,
+         copy_code,
+         ass_card_no,
+         dept_id,
+         dept_no,
+         area,
+         ass_year,
+         ass_month)
+        select ass_group_id,
+               ass_hos_id,
+               ass_copy_code,
+               card_data.ass_card_no,
+               ass_dept_id,
+               ass_dept_no,
+               1,
+               ass_acc_year,
+               ass_acc_month
+          from dual;
+          
+          
+      --更新卡片
+      if V_IS_DEPT = 1 then--科室领用
+      
+        UPDATE ASS_CARD_OTHER
+           set is_dept  = V_IS_DEPT,
+               run_date = sysdate,
+               dept_id  = ass_dept_id,
+               dept_no  = ass_dept_no
+         where group_id = ass_group_id
+           AND hos_id = ass_hos_id
+           AND copy_code = ass_copy_code
+           AND ass_card_no = card_data.ass_card_no;
+      
+      else--科室退库
+        
+        UPDATE ASS_CARD_OTHER
+           set is_dept  = V_IS_DEPT,
+               run_date = null,
+               dept_id  = ass_dept_id,
+               dept_no  = ass_dept_no,
+               store_id = ass_store_id,
+               store_no = ass_store_no
+         where group_id = ass_group_id
+           AND hos_id = ass_hos_id
+           AND copy_code = ass_copy_code
+           AND ass_card_no = card_data.ass_card_no;
+           
+      end if;
+    
+    end loop;
+  end;
+
+EXCEPTION
+  WHEN OTHERS THEN
+    ass_AppCode := def_ERR;
+    ass_ErrTxt  := SQLERRM;
+  
+END ASS_MAT_OUT_CARD;
+	]]></sql>
+
+</root>
+

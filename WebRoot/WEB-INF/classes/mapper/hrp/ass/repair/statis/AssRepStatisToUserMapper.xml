@@ -1,0 +1,676 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper	namespace="com.chd.hrp.ass.dao.repair.statis.AssRepStatisToUserMapper">
+	<resultMap type="java.util.Map" id="teamTree">
+		<result column="id" property="id" />
+		<result column="name" property="name" />
+		<result column="pId" property="pId" />
+	</resultMap>
+
+	<select id="queryRepTeamTree" resultMap="teamTree" parameterType="java.util.Map"> 
+		select rep_team_code as id, rep_team_name as name, 0 as pId
+			  from ASS_REPAIR_TEAM_DICT
+			 where group_id = #{group_id}
+			   and hos_id = #{hos_id}
+	</select>
+	
+	<select id="queryRepCountByRepUserId" resultType="java.util.Map" parameterType="java.util.Map">
+		with taskData as ( 
+		 select a.group_id, a.hos_id, a.copy_code ,a.rep_code,b.state as endstate ,c.state as errorstate,art.task_user,su.user_name,
+		a.rep_hours,(TO_NUMBER(a.comp_time - a.app_time) * 24) as times,a.ASS_CARD_NO,
+		CASE WHEN a.state=5 and TO_NUMBER(a.comp_time - a.app_time) &lt; 1 THEN 1
+			WHEN a.state=5 and TO_NUMBER(a.comp_time - a.app_time)&gt; 1 THEN 0
+		END AS fastsum,
+		CASE WHEN   a.REP_BZ=2  AND TO_NUMBER(a.comp_time - a.app_time) &lt; 20 THEN 1
+			WHEN  a.REP_BZ=2  AND TO_NUMBER(a.comp_time - a.app_time)&gt; 20 THEN 0 
+		END AS outsum
+		, case 
+        when a.REP_BZ = 2 then 1
+        else 0
+      end as externalsum
+		 from ass_repair a
+		  left join (select group_id, hos_id, copy_code, rep_code,state,task_user
+		  from ass_repair_task 
+		  where group_id = #{group_id}
+					  and hos_id = #{hos_id}
+					  and copy_code = #{copy_code}
+		        and state = 5
+		  group by group_id, hos_id, copy_code, rep_code,state,task_user
+		 ) b 
+		 on  a.group_id = b.group_id
+		 and a.hos_id = b.hos_id
+		 and a.copy_code = b.copy_code
+		 and a.rep_code = b.rep_code
+		left join (
+		 select  group_id, hos_id, copy_code, rep_code,state,task_user
+		 from ass_repair_task
+		  where group_id = #{group_id}
+					  and hos_id = #{hos_id}
+					  and copy_code = #{copy_code}
+		        and state = 6
+		  group by group_id, hos_id, copy_code, rep_code,state,task_user
+		 )c
+		 on  a.group_id = c.group_id
+		 and a.hos_id = c.hos_id
+		 and a.copy_code = c.copy_code
+		 and a.rep_code = c.rep_code
+		 left join ass_repair_task art
+		 on  a.group_id = art.group_id
+		 and a.hos_id = art.hos_id
+		 and a.copy_code = art.copy_code
+		 and a.rep_code = art.rep_code
+		 and art.state in ('5','6')
+		 left join sys_user su 
+		    on su.group_id = art.group_id
+		    and su.hos_id = art.hos_id
+		    and su.user_id = art.task_user
+		    and su.is_stop = 0 
+		 where a.group_id = #{group_id}
+		  and a.hos_id = #{hos_id}
+		  and a.copy_code = #{copy_code}
+	       and a.order_time 
+			   between to_date('${order_time_begin} 00:00:00','yyyy-mm-dd hh24:mi:ss') 
+			   and to_date('${order_time_end} 23:59:59','yyyy-mm-dd hh24:mi:ss')
+		   <if test="rep_bz != '' and rep_bz != null">
+		  	and a.rep_bz = #{rep_bz}
+		   </if>
+	      and a.state in ('5','6')
+		  ),
+		  temp1 as
+		(select group_id,
+		        hos_id,
+		        copy_code,
+		        rep_code,
+		        endstate,
+		        errorstate,
+		        task_user,
+		        user_name,
+		        rep_hours,
+		        times,
+		        ASS_CARD_NO,
+		        fastsum,
+		        outsum,
+		        externalsum
+		   from taskData
+		  group by group_id, hos_id, copy_code, rep_code, endstate, errorstate,task_user,user_name,rep_hours,times,ASS_CARD_NO,fastsum,outsum,externalsum),
+		   temp2 as (
+        select group_id,hos_id,copy_code,ass_card_no,task_user,user_name, case 
+        when count(ass_card_no) - 1 &lt; 0 then 0
+        ELSE count(ass_card_no) - 1
+        end as amount
+        from temp1 group by group_id,hos_id,copy_code , task_user,user_name,ass_card_no
+  			)
+		   select ar.task_user,artd.rep_team_name,count(ar.endState) as endstate ,count(ar.errorstate) as errorState,ar.user_name,
+		   sum(ar.times) as rep_hours,(
+    		select sum(amount)
+    		from temp2 te
+    		where ar.task_user = te.task_user
+  			) as amount,
+		   (SELECT COUNT(1) FROM ass_repair e LEFT JOIN(
+			SELECT GROUP_ID,hos_id,copy_code,rep_code,state,task_user FROM ass_repair_task
+				WHERE
+					group_id = #{group_id}
+					and hos_id = #{hos_id}
+					and copy_code = #{copy_code}
+					AND state = 3
+			) b ON
+			e.group_id = b.group_id
+			AND e.hos_id = b.hos_id
+			AND e.copy_code = b.copy_code
+			AND e.rep_code = b.rep_code
+		WHERE
+			e.state = 3 
+			and e.order_time 
+			   between to_date('${order_time_begin} 00:00:00','yyyy-mm-dd hh24:mi:ss') 
+			   and to_date('${order_time_end} 23:59:59','yyyy-mm-dd hh24:mi:ss') 
+			AND ar.task_user = b.task_user) AS no_sum,
+			SUM(ar.fastsum) AS fast_sum,
+			count(ar.ASS_CARD_NO) AS ASS_CARD_NO,
+			sum(ar.outsum) AS out_sum,sum(ar.externalsum) as external_sum
+		   from temp1 ar
+		   left join ass_repair_user aru
+		    on  ar.group_id = aru.group_id
+			 and ar.hos_id = aru.hos_id
+			 and ar.copy_code = aru.copy_code
+			 and ar.task_user = aru.rep_user
+		   left join ass_repair_team_dict artd
+		    on  aru.group_id = artd.group_id
+			 and aru.hos_id = artd.hos_id
+			 and aru.rep_team_code = artd.rep_team_code
+			 <if test="rep_team_code != '' and rep_team_code != null">
+			 where artd.rep_team_code = #{rep_team_code}
+			 </if>
+		   group by ar.task_user,artd.rep_team_name,ar.user_name
+	</select>
+	
+	
+	<select id="queryAssRepReportCentreCenter" parameterType="java.util.Map"
+		resultType="java.util.Map">
+		select  ar.rep_code,
+			    case ar.eme_status
+			    when 1 then
+			    '非常紧急'
+			    when 2 then
+			    '紧急'
+			    when 3 then
+			    '一般'
+			    end as eme_status,
+			    ar.rep_user,
+			    su.user_name,
+			    ar.rep_dept,
+			    hd.dept_name,
+			    ar.phone,
+			    ar.fau_note,
+			    case ar.rep_bz when 1 then '内部维修' when 2 then '外部维修' end as rep_bz,
+			    to_char(ar.app_time,'yyyy-mm-dd hh24:mi:ss') as app_time,
+			    case ar.is_base
+			    when 1 then
+			    '是'
+			    when 0 then
+			    '否'
+			    end as is_base,
+			    case ar.is_card
+			    when 1 then
+			    '是'
+			    when 0 then
+			    '否'
+			    end as is_card,
+			    ar.ass_card_no,
+			    ar.ass_name,
+			    ar.rep_note,
+			    to_char(ar.order_time,'yyyy-mm-dd hh24:mi:ss') as order_time,
+			    to_char(ar.comp_time,'yyyy-mm-dd hh24:mi:ss') as comp_time,
+			    ar.rep_hours,
+			    case ar.is_urg
+			    when 0 then
+			    '否'
+			    when 1 then
+			    '是'
+			    end as is_urg,
+			    ar.urg_note,
+			    ar.score,
+			    ar.score_note,
+			    art.task_user
+			    
+			    from ass_repair ar
+			    left join sys_user su
+			    on ar.group_id = su.group_id
+			    and ar.hos_id = su.hos_id
+			    and ar.copy_code = su.copy_code
+			    and ar.rep_user = su.user_id
+			    left join hos_dept hd
+			    on ar.group_id = hd.group_id
+			    and ar.hos_id = hd.hos_id
+			    and ar.rep_dept = hd.dept_id
+			    and hd.is_stop = 0
+			    left join ass_location al
+			    on ar.group_id = al.group_id
+			    and ar.hos_id = al.hos_id
+			    and ar.copy_code = al.copy_code
+			    and ar.loc_code = al.loc_code
+			    and al.is_stop = 0
+			    left join ass_fault_type aft
+			    on ar.group_id = aft.group_id
+			    and ar.hos_id = aft.hos_id
+			    and ar.copy_code = aft.copy_code
+			    and ar.fau_code = aft.fau_code
+			    left join budg_sys_dict bsd
+			          on ar.state = bsd.value_code
+			         and bsd.F_CODE = 'ASS_REPAIR_STATE'
+			    left join   ass_repair_task   art
+			    on ar.group_id = art.group_id
+			    and ar.hos_id = art.hos_id
+			    and ar.copy_code = art.copy_code
+			    and ar.rep_code = art.rep_code
+			    inner join ass_repair_user aru
+					    on  art.group_id = aru.group_id
+						 and art.hos_id = aru.hos_id
+						 and art.copy_code = aru.copy_code
+						 and art.task_user = aru.rep_user
+					   left join ass_repair_team_dict artd
+					    on  aru.group_id = artd.group_id
+						 and aru.hos_id = artd.hos_id
+						 and aru.rep_team_code = artd.rep_team_code 
+			    where ar.group_id = #{group_id}
+					and ar.hos_id = #{hos_id}
+					and ar.copy_code = #{copy_code}
+			    and art.state = #{state}
+    <if test="rep_team_code != '' and rep_team_code != null ">
+  	  and artd.rep_team_code =  #{rep_team_code}
+    </if>
+    <if test="ass_card_no != '' and ass_card_no != null ">
+  	  and ar.ass_card_no =  #{ass_card_no}
+    </if>
+    <if test="rep_dept != '' and rep_dept != null ">
+  	  and ar.rep_dept =  #{rep_dept}
+    </if>
+    <if test="task_user != '' and task_user != null ">
+  	  and art.task_user =  #{task_user}
+    </if>
+    
+    and ar.order_time 
+     between to_date('${order_time_begin} 00:00:00','yyyy-mm-dd hh24:mi:ss') 
+			   and to_date('${order_time_end} 23:59:59','yyyy-mm-dd hh24:mi:ss')
+	</select>
+	
+	<select id="queryAssRepUnfinishedCenter" parameterType="java.util.Map"
+		resultType="java.util.Map">
+		select  ar.rep_code,
+			    case ar.eme_status
+			    when 1 then
+			    '非常紧急'
+			    when 2 then
+			    '紧急'
+			    when 3 then
+			    '一般'
+			    end as eme_status,
+			    ar.rep_user,
+			    su.user_name,
+			    ar.rep_dept,
+			    hd.dept_name,
+			    ar.phone,
+			    ar.fau_note,
+			    case ar.rep_bz when 1 then '内部维修' when 2 then '外部维修' end as rep_bz,
+			    to_char(ar.app_time,'yyyy-mm-dd hh24:mi:ss') as app_time,
+			    case ar.is_base
+			    when 1 then
+			    '是'
+			    when 0 then
+			    '否'
+			    end as is_base,
+			    case ar.is_card
+			    when 1 then
+			    '是'
+			    when 0 then
+			    '否'
+			    end as is_card,
+			    ar.ass_card_no,
+			    ar.ass_name,
+			    ar.rep_note,
+			    to_char(ar.order_time,'yyyy-mm-dd hh24:mi:ss') as order_time,
+			    to_char(ar.comp_time,'yyyy-mm-dd hh24:mi:ss') as comp_time,
+			    ar.rep_hours,
+			    case ar.is_urg
+			    when 0 then
+			    '否'
+			    when 1 then
+			    '是'
+			    end as is_urg,
+			    ar.urg_note,
+			    ar.score,
+			    ar.score_note,
+			    art.task_user
+			    
+			    from ass_repair ar
+			    left join sys_user su
+			    on ar.group_id = su.group_id
+			    and ar.hos_id = su.hos_id
+			    and ar.copy_code = su.copy_code
+			    and ar.rep_user = su.user_id
+			    left join hos_dept hd
+			    on ar.group_id = hd.group_id
+			    and ar.hos_id = hd.hos_id
+			    and ar.rep_dept = hd.dept_id
+			    and hd.is_stop = 0
+			    left join ass_location al
+			    on ar.group_id = al.group_id
+			    and ar.hos_id = al.hos_id
+			    and ar.copy_code = al.copy_code
+			    and ar.loc_code = al.loc_code
+			    and al.is_stop = 0
+			    left join ass_fault_type aft
+			    on ar.group_id = aft.group_id
+			    and ar.hos_id = aft.hos_id
+			    and ar.copy_code = aft.copy_code
+			    and ar.fau_code = aft.fau_code
+			    left join budg_sys_dict bsd
+			          on ar.state = bsd.value_code
+			         and bsd.F_CODE = 'ASS_REPAIR_STATE'
+			    left join (
+				select GROUP_ID, hos_id, copy_code, rep_code
+					, task_user
+				from ass_repair_task
+				where group_id = #{group_id}
+					and hos_id = #{hos_id}
+					and copy_code = #{copy_code}
+					and state = #{state}
+			) art
+			    on ar.group_id = art.group_id
+			    and ar.hos_id = art.hos_id
+			    and ar.copy_code = art.copy_code
+			    and ar.rep_code = art.rep_code
+			    inner join ass_repair_user aru
+					    on  art.group_id = aru.group_id
+						 and art.hos_id = aru.hos_id
+						 and art.copy_code = aru.copy_code
+						 and art.task_user = aru.rep_user
+					   left join ass_repair_team_dict artd
+					    on  aru.group_id = artd.group_id
+						 and aru.hos_id = artd.hos_id
+						 and aru.rep_team_code = artd.rep_team_code 
+			    where ar.group_id = #{group_id}
+					and ar.hos_id = #{hos_id}
+					and ar.copy_code = #{copy_code}
+			    	and ar.state = #{state}
+    <if test="ass_card_no != '' and ass_card_no != null ">
+  	  and ar.ass_card_no =  #{ass_card_no}
+    </if>
+    <if test="rep_dept != '' and rep_dept != null ">
+  	  and ar.rep_dept =  #{rep_dept}
+    </if>
+    <if test="task_user != '' and task_user != null ">
+  	  and art.task_user =  #{task_user}
+    </if>
+    
+    and ar.order_time 
+     between to_date('${order_time_begin} 00:00:00','yyyy-mm-dd hh24:mi:ss') 
+			   and to_date('${order_time_end} 23:59:59','yyyy-mm-dd hh24:mi:ss')
+	</select>
+	
+	<select id="queryAssRepReportCenter" parameterType="java.util.Map"
+		resultType="java.util.Map">
+		with taskData as(
+				select  ar.rep_code,
+			    case ar.eme_status
+			    when 1 then
+			    '非常紧急'
+			    when 2 then
+			    '紧急'
+			    when 3 then
+			    '一般'
+			    end as eme_status,
+			    ar.rep_user,
+			    su.user_name,
+			    ar.rep_dept,
+			    hd.dept_name,
+			    ar.phone,
+			    ar.fau_note,
+			    case ar.rep_bz when 1 then '内部维修' when 2 then '外部维修' end as rep_bz,
+			    to_char(ar.app_time,'yyyy-mm-dd hh24:mi:ss') as app_time,
+			    case ar.is_base
+			    when 1 then
+			    '是'
+			    when 0 then
+			    '否'
+			    end as is_base,
+			    case ar.is_card
+			    when 1 then
+			    '是'
+			    when 0 then
+			    '否'
+			    end as is_card,
+			    ar.ass_card_no,
+			    ar.ass_name,
+			    ar.rep_note,
+			    to_char(ar.order_time,'yyyy-mm-dd hh24:mi:ss') as order_time,
+			    to_char(ar.comp_time,'yyyy-mm-dd hh24:mi:ss') as comp_time,
+			    ar.rep_hours,
+			    case ar.is_urg
+			    when 0 then
+			    '否'
+			    when 1 then
+			    '是'
+			    end as is_urg,
+			    ar.urg_note,
+			    ar.score,
+			    ar.score_note,
+			    art.task_user
+			    
+			    from ass_repair ar
+			    left join sys_user su
+			    on ar.group_id = su.group_id
+			    and ar.hos_id = su.hos_id
+			    and ar.copy_code = su.copy_code
+			    and ar.rep_user = su.user_id
+			    left join hos_dept hd
+			    on ar.group_id = hd.group_id
+			    and ar.hos_id = hd.hos_id
+			    and ar.rep_dept = hd.dept_id
+			    and hd.is_stop = 0
+			    left join ass_location al
+			    on ar.group_id = al.group_id
+			    and ar.hos_id = al.hos_id
+			    and ar.copy_code = al.copy_code
+			    and ar.loc_code = al.loc_code
+			    and al.is_stop = 0
+			    left join ass_fault_type aft
+			    on ar.group_id = aft.group_id
+			    and ar.hos_id = aft.hos_id
+			    and ar.copy_code = aft.copy_code
+			    and ar.fau_code = aft.fau_code
+			    left join budg_sys_dict bsd
+			          on ar.state = bsd.value_code
+			         and bsd.F_CODE = 'ASS_REPAIR_STATE'
+			    left join   ass_repair_task   art
+			    on ar.group_id = art.group_id
+			    and ar.hos_id = art.hos_id
+			    and ar.copy_code = art.copy_code
+			    and ar.rep_code = art.rep_code
+			    inner join ass_repair_user aru
+					    on  art.group_id = aru.group_id
+						 and art.hos_id = aru.hos_id
+						 and art.copy_code = aru.copy_code
+						 and art.task_user = aru.rep_user
+					   left join ass_repair_team_dict artd
+					    on  aru.group_id = artd.group_id
+						 and aru.hos_id = artd.hos_id
+						 and aru.rep_team_code = artd.rep_team_code 
+			    where ar.group_id = #{group_id}
+					and ar.hos_id = #{hos_id}
+					and ar.copy_code = #{copy_code}
+			    and art.state = #{state}
+    <if test="rep_team_code != '' and rep_team_code != null ">
+  	  and artd.rep_team_code =  #{rep_team_code}
+    </if>
+    <if test="ass_card_no != '' and ass_card_no != null ">
+  	  and ar.ass_card_no =  #{ass_card_no}
+    </if>
+    <if test="rep_dept != '' and rep_dept != null ">
+  	  and ar.rep_dept =  #{rep_dept}
+    </if>
+    <if test="task_user != '' and task_user != null ">
+  	  and art.task_user =  #{task_user}
+    </if>
+    
+    and ar.order_time 
+     between to_date('${order_time_begin} 00:00:00','yyyy-mm-dd hh24:mi:ss') 
+			   and to_date('${order_time_end} 23:59:59','yyyy-mm-dd hh24:mi:ss'))
+	select * from taskData td where td.ass_card_no in (select t.ass_card_no from  taskData t group by t.ass_card_no having count(t.ass_card_no) > 1)
+	</select>
+	
+	<select id="queryAssRepairByCode" resultType="java.util.Map" parameterType="java.util.Map">
+		select a.group_id,
+		       a.hos_id,
+		       a.copy_code,
+		       a.rep_code,
+		       a.fau_code,
+		       a.loc_code,
+		       a.eme_status,
+		       a.rep_user,
+		       a.rep_dept || '@' || b.dept_no as rep_dept,
+		       a.phone,
+		       a.fau_note,
+		       a.app_time,
+		       a.rep_bz,
+		       a.is_base,
+		       a.is_card,
+		       a.rep_comp,
+		       a.rep_comp_user,
+		       a.ass_card_no,
+		       a.ass_name,
+		       a.rep_note,
+		       a.order_time,
+		       a.comp_time,
+		       a.rep_hours,
+		       a.is_urg,
+		       a.urg_note,
+		       a.state,
+		       a.voice,
+		       a.flag,
+		       a.score,
+		       a.score_note
+		  from ass_repair a 
+		  left join HOS_DEPT_DICT b 
+		  on a.group_id = b.group_id
+		  and a.hos_id = b.hos_id
+		  and a.rep_dept = b.dept_id
+		  and b.is_stop = 0 
+		 where a.group_id = #{group_id}
+		   and a.hos_id = #{hos_id}
+		   and a.copy_code = #{copy_code}
+		   and a.rep_code = #{rep_code}
+	</select>
+	
+	
+	<!-- 卡片明细页查询SQL -->
+	<select id="queryCardDataByCode" parameterType="java.util.Map" resultType="java.util.Map">
+		select  vc.ASS_CARD_NO,
+				an.ass_name,
+				hf.fac_name,
+				hsd.sup_name,
+				vc.ass_spec,
+				vc.ass_brand,
+				hf.fac_name,
+				hsd.sup_name,
+				acd.contract_no,
+				aam.accept_date,
+				hed.emp_name,
+				vc.run_date,
+				an.usage_code,
+				hdd.dept_name,
+				vc.ass_seq_no
+			from v_ass_card vc
+			left join ass_no_dict an
+				on an.group_id = vc.group_id
+				and an.hos_id = vc.hos_id
+				and an.ass_id = vc.ass_id
+			left join hos_fac_dict hf
+				on hf.group_id = vc.group_id
+				and hf.hos_id = vc.hos_id
+				and hf.fac_id = vc.fac_id
+				and hf.fac_no = vc.fac_no
+			left join hos_sup_dict hsd
+				on hsd.group_id = vc.group_id
+				and hsd.hos_id = vc.hos_id
+				and hsd.sup_id = vc.ven_id
+				and hsd.sup_no = vc.ven_no
+			left join ass_contract_detail acd
+				on acd.group_id = vc.group_id
+				and acd.hos_id = vc.hos_id
+				and acd.copy_code = vc.copy_code
+				and acd.ass_id = vc.ass_id
+			left join ass_accept_main aam
+				on acd.group_id = aam.group_id
+				and acd.hos_id = aam.hos_id
+				and acd.copy_code = aam.copy_code
+				and acd.contract_id = aam.contract_id
+			left join hos_emp_dict hed
+				on hed.group_id = aam.group_id
+				and hed.hos_id = aam.hos_id
+				and hed.emp_id = aam.accept_emp
+				and hed.is_stop = 0
+			left join hos_dept_dict hdd
+				on hdd.group_id = vc.group_id
+				and hdd.hos_id = vc.hos_id
+				and hdd.dept_id = vc.dept_id
+				and hdd.dept_no = vc.dept_no
+			where vc.group_id = #{group_id}
+				and vc.hos_id = #{hos_id}
+				and vc.copy_code = #{copy_code}
+				and vc.ass_card_no = #{ass_card_no}
+				order by vc.ass_card_no
+	</select>
+	
+	
+	<select id="queryTimeLineRender"  resultType="java.util.Map" parameterType="java.util.Map">
+ 		select    to_char(a.task_time,'yyyy-mm-dd hh24:mi:ss') as "task_time",
+		          b.user_name as "user_name",
+		          bsd.value_name as "state_name",      
+				      d.rep_team_name as "team_name",
+				      c.phone1 as "phone1",
+		          c.phone2 as "phone2"
+		      from ass_repair_task a
+		      left join sys_user b 
+		      on a.group_id = b.group_id
+		      and a.hos_id = b.hos_id
+		      and a.copy_code = b.copy_code
+		      and a.task_user = b.user_id
+		      left join ass_repair_user c
+		       on a.group_id = c.group_id
+		      and a.hos_id = c.hos_id
+		      and a.copy_code = c.copy_code
+		      and a.task_user = c.rep_user
+		      left join ASS_REPAIR_TEAM_DICT d
+		      on c.group_id = d.group_id
+		       and c.hos_id = d.hos_id
+		       and c.rep_team_code = d.rep_team_code
+		       left join budg_sys_dict bsd
+	          on a.state = bsd.value_code
+	         and bsd.F_CODE = 'ASS_REPAIR_STATE'
+		   where a.group_id =  #{group_id}
+		   and a.hos_id =  #{hos_id}
+		   and a.copy_code =  #{copy_code}
+		   and a.rep_code =  #{rep_code}
+ 	</select>
+	
+	<select id="queryImgUrlByRepCode" parameterType="java.util.Map" resultType="java.util.Map">
+		select  ara.att_path,
+				ara.att_name_n
+			from ass_repair_att ara
+			where ara.group_id = #{group_id}
+				and ara.hos_id = #{hos_id}
+				and ara.copy_code = #{copy_code}
+				and ara.rep_code = #{rep_code}
+	</select>
+	
+	<select id="queryRepCountByRepDeptId" parameterType="java.util.Map" resultType="java.util.Map">
+		select  t.rep_dept, hdd.dept_name,case  when t.state = 5 then count(t.state) else 0 end as endstate,  
+		case when t.state = 6 then count(t.state) else 0 end as errorstate
+			from ass_repair t
+			left join hos_dept_dict hdd
+			on t.group_id = hdd.group_id
+		       and t.hos_id = hdd.hos_id
+		       and t.rep_dept = hdd.dept_id
+			where t.group_id = #{group_id}
+				and t.hos_id = #{hos_id}
+				and t.copy_code = #{copy_code}
+				and t.state in ('5','6')
+				<if test="order_time != null and order_time != '' ">
+				 and t.order_time 
+     between to_date('${order_time_begin} 00:00:00','yyyy-mm-dd hh24:mi:ss') 
+			   and to_date('${order_time_end} 23:59:59','yyyy-mm-dd hh24:mi:ss')
+			   </if>
+				<if test="dept_id != '' and dept_id != null">
+					and t.rep_dept = #{dept_id}
+				</if>
+	group by  t.state,t.rep_dept, hdd.dept_name
+	</select>
+	
+		<select id="queryRepCountByRepCardNo" parameterType="java.util.Map" resultType="java.util.Map">
+		select  t.ass_card_no, ass.ass_name,case  when t.state = 5 then count(t.state) else 0 end as endstate,  
+	    case when t.state = 6 then count(t.state) else 0 end as errorstate
+	      from ass_repair t
+	      left join v_ass_card vac
+	       on t.group_id = vac.group_id
+	      and t.hos_id = vac.hos_id
+	      and t.ass_card_no = vac.ass_card_no
+	      left join ass_no_dict ass
+	      on vac.group_id = ass.group_id
+	      and vac.hos_id = ass.hos_id
+	      and vac.ass_id = ass.ass_id
+	      and vac.ASS_NO = ass.ass_no
+	      where t.group_id = #{group_id}
+			and t.hos_id = #{hos_id}
+			and t.copy_code = #{copy_code}
+			and t.state in ('5','6')
+		<if test="order_time != null and order_time != '' ">
+		 	and t.order_time 
+	     between to_date('${order_time_begin} 00:00:00','yyyy-mm-dd hh24:mi:ss') 
+		   and to_date('${order_time_end} 23:59:59','yyyy-mm-dd hh24:mi:ss')
+		</if>
+		<if test="ass_card_no != '' and ass_card_no != null ">
+			and t.ass_card_no = #{ass_card_no}
+		</if>
+	  group by  t.ass_card_no, ass.ass_name, t.state
+		</select>
+</mapper>

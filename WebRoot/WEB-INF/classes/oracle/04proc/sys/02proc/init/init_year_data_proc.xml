@@ -1,0 +1,467 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+
+	<sql id="init_year_data_proc" type="proc"><![CDATA[
+  create or replace procedure init_year_data_proc(GROUP_ID  IN number,
+                                                HOS_ID    IN number,
+                                                COPY_CODE IN varchar2,
+                                                ACC_YEAR  IN varchar2)
+------------------------------------------
+  --初始化数据
+  ------------------------------------------
+ is
+  V_GROUP_ID  number(18, 0);
+  V_HOS_ID    number(18, 0);
+  V_COPY_CODE varchar2(20);
+  V_ACC_YEAR  varchar2(4);
+  v_num       number(4, 0);
+begin
+  V_GROUP_ID  := GROUP_ID;
+  V_HOS_ID    := HOS_ID;
+  V_COPY_CODE := COPY_CODE;
+  V_ACC_YEAR  := ACC_YEAR;
+  v_num       := 0;
+  begin
+    -----------------------------------------------
+    --建年度账的时候需要初始化的数据
+    -----------------------------------------------
+  
+    --币种规则内置
+    insert when
+      (not exists (select 1
+          from ACC_CUR
+         WHERE GROUP_ID = V_GROUP_ID
+           AND HOS_ID = V_HOS_ID
+           AND COPY_CODE = V_COPY_CODE
+           AND ACC_YEAR = V_ACC_YEAR)) then into ACC_CUR
+      (GROUP_ID,
+       HOS_ID,
+       COPY_CODE,
+       ACC_YEAR,
+       CUR_CODE,
+       CUR_NAME,
+       WBX_CODE,
+       SPELL_CODE,
+       CUR_NUM,
+       CUR_RATE,
+       CUR_PLAN,
+       IS_SELF,
+       IS_STOP)
+      SELECT V_GROUP_ID,
+             V_HOS_ID,
+             V_COPY_CODE,
+             V_ACC_YEAR,
+             CUR_CODE,
+             CUR_NAME,
+             WBX_CODE,
+             SPELL_CODE,
+             CUR_NUM,
+             CUR_RATE,
+             CUR_PLAN,
+             IS_SELF,
+             IS_STOP
+        FROM ACC_CUR
+       where group_id = v_group_id
+         and hos_id = v_hos_id
+         and copy_code = v_copy_code
+         and acc_year = to_number(v_acc_year) - 1;
+  end;
+
+  --期末处理结转模板 ACC_TERMEND_TEMPLATE        
+  SELECT COUNT(1)
+    INTO v_num
+    FROM ACC_TERMEND_TEMPLATE
+   WHERE GROUP_ID = V_GROUP_ID
+     AND HOS_ID = V_HOS_ID
+     AND COPY_CODE = V_COPY_CODE
+     AND ACC_YEAR = V_ACC_YEAR;
+  IF v_num = 0 THEN
+    insert into ACC_TERMEND_TEMPLATE
+      (template_id,
+       GROUP_ID,
+       HOS_ID,
+       COPY_CODE,
+       acc_year,
+       template_name,
+       template_type_code,
+       RATE)
+      SELECT ACC_TERMEND_TEMPLATE_SEQ.nextval,
+             V_GROUP_ID,
+             V_HOS_ID,
+             V_COPY_CODE,
+             V_ACC_YEAR,
+             template_name,
+             template_type_code,
+             0
+        FROM acc_termend_template
+       where group_id = v_group_id
+         and hos_id = v_hos_id
+         and copy_code = v_copy_code
+         and acc_year = to_number(v_acc_year) - 1;
+  END IF;
+
+  --处理自动凭证模板
+  SELECT count(1)
+    INTO v_num
+    FROM acc_busi_template
+   WHERE group_id = v_group_id
+     AND hos_id = v_hos_id
+     AND copy_code = v_copy_code
+     AND acc_year = v_acc_year;
+  IF v_num = 0 and v_acc_year <> '2019' THEN
+    --复制自动凭证模板
+    INSERT INTO acc_busi_template
+      (group_id,
+       hos_id,
+       copy_code,
+       acc_year,
+       mod_code,
+       busi_type_code,
+       template_code,
+       template_name,
+       vouch_type_code,
+       summary,
+       is_detail_summary)
+      select group_id,
+             hos_id,
+             copy_code,
+             V_ACC_YEAR,
+             mod_code,
+             busi_type_code,
+             template_code,
+             template_name,
+             vouch_type_code,
+             summary,
+             is_detail_summary
+        from acc_busi_template
+       where group_id = v_group_id
+         and hos_id = v_hos_id
+         and copy_code = v_copy_code
+         and acc_year = to_number(v_acc_year) - 1;
+  
+    --复制自动凭证模板明细数据
+    INSERT INTO acc_busi_template_detail
+      (group_id,
+       hos_id,
+       copy_code,
+       acc_year,
+       mod_code,
+       busi_type_code,
+       template_code,
+       template_detail_id,
+       summary,
+       vouch_row,
+       meta_code,
+       direction,
+       kind_code)
+      select group_id,
+             hos_id,
+             copy_code,
+             v_acc_year,
+             mod_code,
+             busi_type_code,
+             template_code,
+             acc_busi_template_detail_seq.nextval,
+             summary,
+             vouch_row,
+             meta_code,
+             direction,
+             nvl(kind_code, '01')
+        from acc_busi_template_detail
+       where group_id = v_group_id
+         and hos_id = v_hos_id
+         and copy_code = v_copy_code
+         and acc_year = to_number(v_acc_year) - 1;
+  END IF;
+
+  --复制自动凭证元素科目配置表
+  SELECT count(1)
+    INTO v_num
+    FROM acc_busi_map
+   WHERE group_id = v_group_id
+     AND hos_id = v_hos_id
+     AND copy_code = v_copy_code
+     AND acc_year = v_acc_year;
+  IF v_num = 0 and v_acc_year <> '2019' THEN
+    INSERT INTO acc_busi_map
+      (group_id,
+       hos_id,
+       copy_code,
+       acc_year,
+       mod_code,
+       meta_code,
+       type_id,
+       sub_type_id,
+       out_code,
+       source_nature_code,
+       store_id,
+       subj_code)
+      select m.group_id,
+             m.hos_id,
+             m.copy_code,
+             v_acc_year,
+             m.mod_code,
+             m.meta_code,
+             m.type_id,
+             m.sub_type_id,
+             m.out_code,
+             m.source_nature_code,
+             m.store_id,
+             s.subj_code
+        from acc_busi_map m
+       inner join acc_subj s
+          on s.group_id = v_group_id
+         and s.hos_id = v_hos_id
+         and s.copy_code = v_copy_code
+         and s.acc_year = to_number(v_acc_year) - 1
+         and s.subj_code = m.subj_code
+       where m.group_id = v_group_id
+         and m.hos_id = v_hos_id
+         and m.copy_code = v_copy_code
+         and m.acc_year = to_number(v_acc_year) - 1;
+  END IF;
+
+  --预算方案
+
+  insert into budg_c_plan
+    (GROUP_ID,
+     HOS_ID,
+     COPY_CODE,
+     BUDG_YEAR,
+     PLAN_CODE,
+     PLAN_NAME,
+     ITEM_TAB_CODE,
+     ITEM_TAB_NAME,
+     ITEM_SQL,
+     IS_STOP,
+     IS_INIT)
+    select v_group_id,
+           V_HOS_ID,
+           V_COPY_CODE,
+           v_acc_year,
+           p.PLAN_CODE,
+           p.PLAN_NAME,
+           p.ITEM_TAB_CODE,
+           p.ITEM_TAB_NAME,
+           p.ITEM_SQL,
+           p.IS_STOP,
+           1
+      from init_budg_c_plan p
+     where not exists (select 1
+              from budg_c_plan a
+             where a.group_id = v_group_id
+               and a.hos_id = V_HOS_ID
+               and a.copy_code = V_COPY_CODE
+               and a.BUDG_YEAR = v_acc_year
+               and a.plan_code = p.plan_code);
+
+  --预算表
+  insert into budg_c_tab
+    (GROUP_ID,
+     HOS_ID,
+     COPY_CODE,
+     BUDG_YEAR,
+     TAB_CODE,
+     TAB_NAME,
+     PLAN_CODE,
+     FUN_CODE,
+     IS_STOP,
+     IS_DEF,
+     IS_INIT)
+    select v_group_id,
+           V_HOS_ID,
+           V_COPY_CODE,
+           v_acc_year,
+           p.TAB_CODE,
+           p.TAB_NAME,
+           p.PLAN_CODE,
+           p.FUN_CODE,
+           p.IS_STOP,
+           p.IS_DEF,
+           1
+      from init_budg_c_tab p
+     where not exists (select 1
+              from budg_c_tab a
+             where a.group_id = v_group_id
+               and a.hos_id = V_HOS_ID
+               and a.copy_code = V_COPY_CODE
+               and a.BUDG_YEAR = v_acc_year
+               and a.TAB_CODE = p.TAB_CODE);
+
+  --预算表可支持的控制方式
+  insert into budg_c_tab_w
+    (GROUP_ID,
+     HOS_ID,
+     COPY_CODE,
+     BUDG_YEAR,
+     TAB_CODE,
+     CONT_M,
+     CONT_L,
+     CONT_P,
+     IS_STOP,
+     IS_DEF,
+     IS_INIT)
+    select v_group_id,
+           V_HOS_ID,
+           V_COPY_CODE,
+           v_acc_year,
+           p.TAB_CODE,
+           p.CONT_M,
+           p.CONT_L,
+           p.CONT_P,
+           p.IS_STOP,
+           p.IS_DEF,
+           1
+      from init_budg_c_tab_w p
+     where not exists (select 1
+              from budg_c_tab_w a
+             where a.group_id = v_group_id
+               and a.hos_id = V_HOS_ID
+               and a.copy_code = V_COPY_CODE
+               and a.BUDG_YEAR = v_acc_year
+               and a.TAB_CODE = p.TAB_CODE
+               and a.CONT_M = p.cont_m
+               and a.CONT_L = p.cont_l
+               and a.CONT_P = p.cont_p);
+
+  --预算控制环节
+  insert into budg_c_link
+    (GROUP_ID,
+     HOS_ID,
+     COPY_CODE,
+     BUDG_YEAR,
+     MOD_CODE,
+     LINK_CODE,
+     MOD_NAME,
+     LINK_NAME,
+     FUN_CODE,
+     IS_STOP,
+     IS_INIT)
+    select v_group_id,
+           V_HOS_ID,
+           V_COPY_CODE,
+           v_acc_year,
+           p.MOD_CODE,
+           p.LINK_CODE,
+           p.MOD_NAME,
+           p.LINK_NAME,
+           p.FUN_CODE,
+           p.IS_STOP,
+           1
+      from init_budg_c_link p
+     where not exists (select 1
+              from budg_c_link a
+             where a.group_id = v_group_id
+               and a.hos_id = V_HOS_ID
+               and a.copy_code = V_COPY_CODE
+               and a.BUDG_YEAR = v_acc_year
+               and a.MOD_CODE = p.MOD_CODE
+               and a.LINK_CODE = p.LINK_CODE);
+
+  --预算控制节点
+  insert into budg_c_note
+    (GROUP_ID,
+     HOS_ID,
+     COPY_CODE,
+     BUDG_YEAR,
+     MOD_CODE,
+     LINK_CODE,
+     NOTE_CODE,
+     NOTE_NAME,
+     IS_STOP,
+     IS_DEF,
+     IS_INIT)
+    select v_group_id,
+           V_HOS_ID,
+           V_COPY_CODE,
+           v_acc_year,
+           p.MOD_CODE,
+           p.LINK_CODE,
+           p.NOTE_CODE,
+           p.NOTE_NAME,
+           p.IS_STOP,
+           p.IS_DEF,
+           1
+      from init_budg_c_note p
+     where not exists (select 1
+              from budg_c_note a
+             where a.group_id = v_group_id
+               and a.hos_id = V_HOS_ID
+               and a.copy_code = V_COPY_CODE
+               and a.BUDG_YEAR = v_acc_year
+               and a.MOD_CODE = p.MOD_CODE
+               and a.LINK_CODE = p.LINK_CODE
+               and a.note_code = p.note_code);
+
+  --预算控制占用状态
+  insert into budg_c_state
+    (GROUP_ID,
+     HOS_ID,
+     COPY_CODE,
+     BUDG_YEAR,
+     MOD_CODE,
+     LINK_CODE,
+     STATE_CODE,
+     STATE_NAME,
+     IS_STOP,
+     IS_DEF,
+     IS_INIT)
+    select v_group_id,
+           V_HOS_ID,
+           V_COPY_CODE,
+           v_acc_year,
+           p.MOD_CODE,
+           p.LINK_CODE,
+           p.STATE_CODE,
+           p.STATE_NAME,
+           p.IS_STOP,
+           p.IS_DEF,
+           1
+      from init_budg_c_state p
+     where not exists (select 1
+              from budg_c_state a
+             where a.group_id = v_group_id
+               and a.hos_id = V_HOS_ID
+               and a.copy_code = V_COPY_CODE
+               and a.BUDG_YEAR = v_acc_year
+               and a.MOD_CODE = p.MOD_CODE
+               and a.LINK_CODE = p.LINK_CODE
+               and a.STATE_CODE = p.STATE_CODE);
+
+  --预算控制方案与环节
+  insert into budg_c_p_l
+    (GROUP_ID,
+     HOS_ID,
+     COPY_CODE,
+     BUDG_YEAR,
+     MOD_CODE,
+     LINK_CODE,
+     PLAN_CODE,
+     IS_STOP,
+     IS_INIT)
+    select v_group_id,
+           V_HOS_ID,
+           V_COPY_CODE,
+           v_acc_year,
+           p.MOD_CODE,
+           p.LINK_CODE,
+           p.PLAN_CODE,
+           p.IS_STOP,
+           1
+      from init_budg_c_p_l p
+     where not exists (select 1
+              from budg_c_p_l a
+             where a.group_id = v_group_id
+               and a.hos_id = V_HOS_ID
+               and a.copy_code = V_COPY_CODE
+               and a.BUDG_YEAR = v_acc_year
+               and a.MOD_CODE = p.MOD_CODE
+               and a.LINK_CODE = p.LINK_CODE
+               and a.PLAN_CODE = p.PLAN_CODE);
+
+end init_year_data_proc;
+
+	]]></sql>
+	
+</root>
+

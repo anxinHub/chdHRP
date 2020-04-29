@@ -1,0 +1,302 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+
+	<sql id="acc_vouch_accounting" type="proc"><![CDATA[
+	create or replace procedure acc_vouch_accounting
+(
+  p_group_id number,  --集团ID
+  p_hos_id number,  --医院ID
+  p_copy_code varchar2,  --账套编码
+  p_user_id number,  --当前操作用户
+  p_acc_year varchar2,  --会计年度
+  p_acc_month varchar2 , --会计期间
+  p_vouch_id varchar2
+)
+is
+      strsql CLOB;
+      pre_acc_month varchar2(20);
+      p_check_item varchar2(4000) := '';----从acc_check_type取出有多少字段包括自定义和内置的
+      p_check_item2 varchar2(4000) := '';
+      p_check_item3 varchar2(4000) := '';
+      p_check_item4 varchar2(4000) := '';
+      p_check_item5 varchar2(4000) := '';
+
+
+begin
+
+
+
+
+  ---取上月份
+  select max(acc_month) into pre_acc_month from acc_leder
+  where group_id=p_group_id
+  and hos_id=p_hos_id
+  and copy_code=p_copy_code
+  and acc_year=p_acc_year
+  and acc_month<p_acc_month;
+
+  -------acc_leder 记账处理begin
+
+  -----1.删除本月acc_leder数据
+  delete from acc_leder where group_id=p_group_id
+  and hos_id=p_hos_id
+  and copy_code=p_copy_code
+  and acc_year=p_acc_year
+  and acc_month=p_acc_month;
+
+
+  insert into  ACC_LEDER
+(
+  group_id  ,
+  hos_id    ,
+  copy_code ,
+  acc_year  ,
+  acc_month ,
+  subj_code   ,
+  bal_os    ,
+  this_od   ,
+  this_oc   ,
+  sum_od    ,
+  sum_oc    ,
+  end_os    ,
+  bal_os_w  ,
+  this_od_w ,
+  this_oc_w ,
+  sum_od_w  ,
+  sum_oc_w  ,
+  end_os_w
+)
+select
+p_group_id,
+p_hos_id,
+p_copy_code,
+p_acc_year,
+p_acc_month,
+a.subj_code,
+nvl(b.end_os,0) as bal_os,
+nvl(c.sum_debit,0) as this_od,
+nvl(c.sum_credit,0) as this_oc,
+nvl(c.sum_debit,0)+nvl(b.sum_od,0) as sum_od,
+nvl(c.sum_credit,0)+nvl(b.sum_oc,0) as sum_oc,
+case when d.subj_dire=1 then nvl(b.end_os,0)+nvl(c.sum_credit,0)-nvl(c.sum_debit,0) else nvl(b.end_os,0)-nvl(c.sum_credit,0)+nvl(c.sum_debit,0) end as end_os,
+nvl(b.end_os_w,0) as bal_os_w,
+nvl(c.sum_debit_w,0) as this_od_w,
+nvl(c.sum_credit_w,0) as this_oc_w,
+nvl(c.sum_debit_w,0)+nvl(b.sum_od_w,0) as sum_od_w,
+nvl(c.sum_credit_w,0)+nvl(b.sum_oc_w,0) as sum_oc_w,
+case when d.subj_dire=1 then nvl(b.end_os_w,0)+nvl(c.sum_credit_w,0)-nvl(c.sum_debit_w,0) else nvl(b.end_os_w,0)-nvl(c.sum_credit_w,0)+nvl(c.sum_debit_w,0) end as end_os_w
+
+
+ from
+(
+select subj_code from acc_leder
+where group_id=p_group_id and hos_id=p_hos_id and copy_code=p_copy_code
+and  acc_year=p_acc_year and acc_month=pre_acc_month
+union
+select b.subj_code from acc_vouch a ,acc_vouch_detail b
+where a.vouch_id=b.vouch_id
+and a.group_id=p_group_id and a.hos_id=p_hos_id and a.copy_code=p_copy_code
+and a.acc_year=p_acc_year and a.acc_month=p_acc_month
+) a
+left join
+(
+select subj_code,sum_od,sum_oc,end_os,sum_od_w,sum_oc_w,end_os_w from acc_leder
+where group_id=p_group_id and hos_id=p_hos_id and copy_code=p_copy_code
+and acc_year=p_acc_year and acc_month =pre_acc_month
+) b on a.subj_code =b.subj_code
+left join
+(
+select b.subj_code,
+sum(b.debit) sum_debit,sum(b.credit) sum_credit,
+sum(b.debit_w) sum_debit_w,sum(b.credit_w) sum_credit_w
+ from
+acc_vouch a,acc_vouch_detail b
+where a.vouch_id=b.vouch_id
+and a.group_id=p_group_id and a.hos_id=p_hos_id and a.copy_code=p_copy_code
+and a.acc_year=p_acc_year and a.acc_month=p_acc_month
+group by b.subj_code
+) c on a.subj_code=c.subj_code
+left join acc_subj d
+on d.group_id=p_group_id and d.hos_id=p_hos_id and d.copy_code=p_copy_code and d.acc_year=p_acc_year
+and a.subj_code=d.subj_code;
+
+  ------acc_leder 记账处理end
+
+  -------acc_leder_check 记账处理begin
+
+
+
+  --------取出辅助字段
+  declare
+   cursor ys_cur_jz1
+   is
+   select distinct column_check from acc_check_type where column_id='CHECK_ITEM_ID';
+   c_row ys_cur_jz1%rowtype;
+   begin
+       for c_row in ys_cur_jz1 loop
+
+         p_check_item:=c_row.column_check||','||p_check_item;
+         p_check_item2:='nvl(a.'||c_row.column_check||',0)=nvl(b.'||c_row.column_check||',0) and  '||p_check_item2;
+         p_check_item3:='nvl(a.'||c_row.column_check||',0)=nvl(c.'||c_row.column_check||',0) and  '||p_check_item3;
+         p_check_item4:='c.'||c_row.column_check||','||p_check_item4;
+         p_check_item5:='a.'||c_row.column_check||','||p_check_item5;
+
+       end loop;
+   end;
+
+   -----加上内置辅助核算项
+   p_check_item:='check1_id,check1_no,check2_id,check2_no,check3_id,check3_no,check4_id,check4_no,
+   check5_id,check5_no,check6_id,check6_no,check7_id
+   '||','||p_check_item;
+   p_check_item2:='nvl(a.check1_id,0)=nvl(b.check1_id,0) and nvl(a.check1_no,0)=nvl(b.check1_no,0) and
+   nvl(a.check2_id,0)=nvl(b.check2_id,0) and nvl(a.check2_no,0)=nvl(b.check2_no,0) and
+   nvl(a.check3_id,0)=nvl(b.check3_id,0) and nvl(a.check3_no,0)=nvl(b.check3_no,0) and
+   nvl(a.check4_id,0)=nvl(b.check4_id,0) and nvl(a.check4_no,0)=nvl(b.check4_no,0) and
+   nvl(a.check5_id,0)=nvl(b.check5_id,0) and nvl(a.check5_no,0)=nvl(b.check5_no,0) and
+   nvl(a.check6_id,0)=nvl(b.check6_id,0) and nvl(a.check6_no,0)=nvl(b.check6_no,0) and
+   nvl(a.check7_id,0)=nvl(b.check7_id,0)'||'  and   '||p_check_item2;
+   p_check_item3:='nvl(a.check1_id,0)=nvl(c.check1_id,0) and nvl(a.check1_no,0)=nvl(c.check1_no,0) and
+   nvl(a.check2_id,0)=nvl(c.check2_id,0) and nvl(a.check2_no,0)=nvl(c.check2_no,0) and
+   nvl(a.check3_id,0)=nvl(c.check3_id,0) and nvl(a.check3_no,0)=nvl(c.check3_no,0) and
+   nvl(a.check4_id,0)=nvl(c.check4_id,0) and nvl(a.check4_no,0)=nvl(c.check4_no,0) and
+   nvl(a.check5_id,0)=nvl(c.check5_id,0) and nvl(a.check5_no,0)=nvl(c.check5_no,0) and
+   nvl(a.check6_id,0)=nvl(c.check6_id,0) and nvl(a.check6_no,0)=nvl(c.check6_no,0) and
+   nvl(a.check7_id,0)=nvl(c.check7_id,0) '||'  and   '||p_check_item3;
+   p_check_item4:='c.check1_id,c.check1_no,c.check2_id,c.check2_no,c.check3_id,c.check3_no,c.check4_id,c.check4_no,
+   c.check5_id,c.check5_no,c.check6_id,c.check6_no,c.check7_id'||','||p_check_item4;
+   p_check_item5:='a.check1_id,a.check1_no,a.check2_id,a.check2_no,a.check3_id,a.check3_no,a.check4_id,a.check4_no,
+   a.check5_id,a.check5_no,a.check6_id,a.check6_no,a.check7_id'||','||p_check_item5;
+
+
+  ----------删除Acc_Leder_Check 本月数据
+  delete from Acc_Leder_Check where group_id=p_group_id
+  and hos_id=p_hos_id
+  and copy_code=p_copy_code
+  and acc_year=p_acc_year
+  and acc_month=p_acc_month;
+
+
+  ----动态拼接sql
+  strsql:='
+   insert into  Acc_Leder_Check
+('||p_check_item||'
+  group_id  ,
+  hos_id    ,
+  copy_code ,
+  acc_year  ,
+  acc_month ,
+  subj_code   ,
+  bal_os    ,
+  this_od   ,
+  this_oc   ,
+  sum_od    ,
+  sum_oc    ,
+  end_os    ,
+  bal_os_w  ,
+  this_od_w ,
+  this_oc_w ,
+  sum_od_w  ,
+  sum_oc_w  ,
+  end_os_w
+)
+
+
+select '||p_check_item5||'
+:1,
+:2,
+:3,
+:4,
+:5,
+a.subj_code,
+nvl(b.end_os,0) as bal_os,
+nvl(c.sum_debit,0) as this_od,
+nvl(c.sum_credit,0) as this_oc,
+nvl(c.sum_debit,0)+nvl(b.sum_od,0) as sum_od,
+nvl(c.sum_credit,0)+nvl(b.sum_oc,0) as sum_oc,
+case when d.subj_dire=1 then nvl(b.end_os,0)+nvl(c.sum_credit,0)-nvl(c.sum_debit,0) else nvl(b.end_os,0)-nvl(c.sum_credit,0)+nvl(c.sum_debit,0) end as end_os,
+nvl(b.end_os_w,0) as bal_os_w,
+nvl(c.sum_debit_w,0) as this_od_w,
+nvl(c.sum_credit_w,0) as this_oc_w,
+nvl(c.sum_debit_w,0)+nvl(b.sum_od_w,0) as sum_od_w,
+nvl(c.sum_credit_w,0)+nvl(b.sum_oc_w,0) as sum_oc_w,
+case when d.subj_dire=1 then nvl(b.end_os_w,0)+nvl(c.sum_credit_w,0)-nvl(c.sum_debit_w,0) else nvl(b.end_os_w,0)-nvl(c.sum_credit_w,0)+nvl(c.sum_debit_w,0) end as end_os_w
+ from
+(
+select distinct  '||p_check_item||'subj_code from Acc_Leder_Check
+where group_id=:1 and hos_id=:2 and copy_code=:3
+and  acc_year=:4 and acc_month=:5
+union
+select distinct  '||p_check_item4||'c.subj_code from acc_vouch a ,acc_vouch_detail b,acc_vouch_check c,
+acc_subj d
+where a.vouch_id=b.vouch_id and b.vouch_detail_id=c.vouch_detail_id
+and a.acc_year=d.acc_year
+and c.group_id=d.group_id
+and c.hos_id=d.hos_id
+and c.copy_code=d.copy_code
+and c.subj_code=d.subj_code
+and d.is_check=1
+and a.group_id=:1 and a.hos_id=:2 and a.copy_code=:3
+and a.acc_year=:4 and a.acc_month=:5
+) a
+left join
+(
+select '||p_check_item||'subj_code,
+sum(nvl(sum_od,0)) as sum_od,
+sum(nvl(sum_oc,0)) as sum_oc,
+sum(nvl(end_os,0)) as end_os,
+sum(nvl(sum_od_w,0)) as sum_od_w,
+sum(nvl(sum_oc_w,0)) as sum_oc_w,
+sum(nvl(end_os_w,0)) as end_os_w
+from Acc_Leder_Check
+where group_id=:1 and hos_id=:2 and copy_code=:3
+and acc_year=:4 and acc_month =:6
+group by  '||p_check_item||'subj_code
+) b on '||p_check_item2||'  a.subj_code =b.subj_code
+left join
+(
+select '||p_check_item4||'c.subj_code,
+sum(c.debit) sum_debit,sum(c.credit) sum_credit,
+sum(c.debit_w) sum_debit_w,sum(c.credit_w) sum_credit_w
+ from
+acc_vouch a,acc_vouch_detail b,acc_vouch_check c
+where a.vouch_id=b.vouch_id and b.vouch_detail_id=c.vouch_detail_id
+and a.group_id=:1 and a.hos_id=:2 and a.copy_code=:3
+and a.acc_year=:4 and a.acc_month=:5
+group by '||p_check_item4||'c.subj_code
+) c on '||p_check_item3||'a.subj_code=c.subj_code
+left join acc_subj d
+on d.group_id=:1 and d.hos_id=:2 and d.copy_code=:3 and d.acc_year=:4
+and a.subj_code=d.subj_code ';
+
+ dbms_output.put_line(strsql);
+
+Begin
+ Execute Immediate strsql Using
+ p_group_id, p_hos_id, p_copy_code, p_acc_year ,  p_acc_month,
+ p_group_id, p_hos_id, p_copy_code, p_acc_year ,  pre_acc_month,
+ p_group_id, p_hos_id, p_copy_code, p_acc_year ,  p_acc_month,
+ p_group_id, p_hos_id, p_copy_code, p_acc_year ,  pre_acc_month,
+ p_group_id, p_hos_id, p_copy_code, p_acc_year ,  p_acc_month,
+ p_group_id, p_hos_id, p_copy_code, p_acc_year ;
+
+
+end;
+
+  -------acc_leder_check 记账处理end
+
+
+        --根据勾选凭证id更新凭证的状态
+         strsql:='update acc_vouch set state = 99,acc_user=:1,acc_date=sysdate where group_id =:2 and hos_id =:3
+         and copy_code =:4 and acc_year=:5 and acc_month=:6';
+         dbms_output.put_line(strsql);
+        execute immediate strsql using p_user_id,p_group_id, p_hos_id, p_copy_code,p_acc_year,p_acc_month;
+
+
+
+  end;
+
+
+	]]></sql>
+	
+</root>
+

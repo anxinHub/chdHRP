@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="UTF-8" ?>  
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.hpm.dao.AphiCustomReportMapper">
+
+	<resultMap id="deptTargetData" type="com.chd.hrp.hpm.entity.AphiDeptTargetData">
+		<result property="target_code" column="target_code" />
+		<result property="target_name" column="target_name" />
+	</resultMap>
+	
+	<!-- 注:此查询共用 -->
+	<!-- 自定义指标页面 查询表头 -->
+	<!-- 职能科室考核明细表  查询表头 -->
+	<!--  财务其它考核明细表 查询表头 -->
+	<select id="queryAphiCustomReportHead" parameterType="java.util.Map"
+		resultMap="deptTargetData">
+		select
+		adtd.target_code,
+		t.target_name
+		from aphi_dept_target_data adtd
+		left join aphi_target t 
+			on adtd.group_id = t.group_id 
+			and adtd.copy_code = t.copy_code
+		and adtd.target_code = t.target_code and adtd.hos_id = t.hos_id
+		left join aphi_dept_dict ad on adtd.group_id = ad.group_id and
+		adtd.copy_code = ad.copy_code
+		and adtd.dept_id = ad.dept_id and adtd.dept_no = ad.dept_no and
+		adtd.hos_id = ad.hos_id
+		left join aphi_target_method atm on adtd.group_id = atm.group_id and
+		adtd.copy_code = atm.copy_code
+		and adtd.target_code = atm.target_code and adtd.hos_id = atm.hos_id
+		<where>
+				adtd.group_id = #{group_id}
+				and adtd.hos_id = #{hos_id}
+				AND adtd.copy_code = #{copy_code}
+				and t.target_name is not null
+			<if test="dept_id != null and dept_id != '' and dept_id != 'undefined'">
+				AND adtd.dept_id = #{dept_id}
+			</if>
+
+			<if test="dept_no != null and dept_no != '' and dept_no != 'undefined' ">
+				AND adtd.dept_no = #{dept_no}
+			</if>
+
+			<if test="acct_year != null and acct_year != ''">
+				AND adtd.acct_year = #{acct_year}
+			</if>
+			<if test="acct_month != null and acct_month != ''">
+				AND adtd.acct_month = #{acct_month}
+			</if>
+			<if test="dept_kind_code != null and dept_kind_code != ''">
+				AND ad.dept_kind_code = #{dept_kind_code}
+			</if>
+			<if test="target_code != null and target_code != ''">
+				AND adtd.target_code = #{target_code}
+			</if>
+			
+			<!-- deptSql 和  targetSql为自定义指标表 查询条件-->
+			<if test="deptSql != null and deptSql != '' ">
+				${deptSql}
+			</if>
+			
+			<if test="targetSql != null and targetSql != '' ">
+				${targetSql}
+			</if>
+			
+			<!-- where_sql为职能科室考核明细表 和 财务其它考核明细表查询条件 -->
+			<if test="where_sql != null and where_sql != ''">
+				${where_sql}
+			</if>
+			
+			<!-- 不包含值为0指标 -->
+			<if test="is_containsZero == 0">
+				AND adtd.target_value != 0  
+			</if>
+			
+			<!-- 自定义指标表 区间查询 -->
+			<if test="begin_date != null and begin_date != '' and end_date != null and end_date != '' ">
+				and (
+					to_date(adtd.acct_year || adtd.acct_month,'yyyyMM') 
+					between  to_date(#{begin_date},'yyyyMM') and to_date(#{end_date},'yyyyMM')
+				)
+			</if>
+			and exists(
+						select 1 from v_user_data_perm sys where sys.group_id = #{group_id}
+						and sys.hos_id = #{hos_id} and sys.copy_code = #{copy_code}
+						and sys.user_id = #{user_id}
+						and sys.mod_code = '09' and sys.table_code = 'APHI_DEPT_DICT'
+						and sys.perm_code = adtd.dept_id and sys.is_read = 1 and sys.is_write = 1
+					)
+		</where>
+		group by adtd.target_code,t.target_name
+		order by adtd.target_code
+	</select>
+
+	<select id="queryAphiCustomReport" resultType="java.util.TreeMap">
+
+		select
+		ad.dept_code,
+		<if test="sql_case != null and sql_case != ''">${sql_case}</if>
+		ad.dept_name
+		from aphi_dept_target_data adtd
+		left join aphi_target t on adtd.group_id = t.group_id and adtd.copy_code
+		= t.copy_code
+		and adtd.target_code = t.target_code and adtd.hos_id = t.hos_id
+		left join aphi_dept_dict ad on adtd.group_id = ad.group_id and
+		adtd.copy_code = ad.copy_code
+		and adtd.dept_id = ad.dept_id and adtd.dept_no = ad.dept_no and
+		adtd.hos_id = ad.hos_id
+		left join aphi_target_method atm on adtd.group_id = atm.group_id and
+		adtd.copy_code = atm.copy_code
+		and adtd.target_code = atm.target_code and adtd.hos_id = atm.hos_id
+		<where>
+				AND adtd.group_id = #{group_id}
+				and adtd.hos_id = #{hos_id}
+				AND adtd.copy_code = #{copy_code}
+			<if test="acct_year != null and acct_year != ''">
+				AND adtd.acct_year = #{acct_year}
+			</if>
+			<if test="acct_month != null and acct_month != ''">
+				AND adtd.acct_month = #{acct_month}
+			</if>
+			<if test="dept_id != null and dept_id != '' and dept_id != 'undefined'">
+				AND adtd.dept_id = #{dept_id}
+			</if>
+			<if test="dept_no != null and dept_no != '' and dept_no != 'undefined' ">
+				AND adtd.dept_no = #{dept_no}
+			</if>
+			<if test="dept_kind_code != null and dept_kind_code != ''">
+				AND ad.dept_kind_code = #{dept_kind_code}
+			</if>
+			<if test="target_code != null and target_code != ''">
+				AND adtd.target_code = #{target_code}
+			</if>
+			
+			<!-- deptSql 和  targetSql为自定义指标表 查询条件-->
+			<if test="deptSql != null and deptSql != '' ">
+				${deptSql}
+			</if>
+			
+			<if test="targetSql != null and targetSql != '' ">
+				${targetSql}
+			</if>
+			
+			<!-- where_sql为职能科室考核明细表 和 财务其它考核明细表查询条件 -->
+			<if test="where_sql != null and where_sql != ''">
+				${where_sql}
+			</if>
+			
+			<!-- 自定义指标表 区间查询 -->
+			<if test="begin_date != null and begin_date != '' and end_date != null and end_date != '' ">
+				and (
+					to_date(adtd.acct_year || adtd.acct_month,'yyyyMM') 
+					between  to_date(#{begin_date},'yyyyMM') and to_date(#{end_date},'yyyyMM')
+				)
+			</if>
+			
+			<!-- 不包含值为0指标 -->
+			<if test="is_containsZero == 0">
+				AND adtd.target_value != 0 
+			</if>
+			
+			and exists(
+						select 1 from v_user_data_perm sys where sys.group_id = #{group_id}
+						and sys.hos_id = #{hos_id} and sys.copy_code = #{copy_code}
+						and sys.user_id = #{user_id}
+						and sys.mod_code = '09' and sys.table_code = 'APHI_DEPT_DICT'
+						and sys.perm_code = adtd.dept_id and sys.is_read = 1 and sys.is_write = 1
+					)
+		</where>
+		group by ad.dept_code,ad.dept_name
+		order by ad.dept_code
+	
+	</select>
+	
+	
+	<select id="queryAphiCustomReportPrint" resultType="java.util.TreeMap">
+
+		select
+		ad.dept_code,
+		<if test="sql_case != null and sql_case != ''">${sql_case}</if>
+		ad.dept_name
+		from aphi_dept_target_data adtd
+		left join aphi_target t on adtd.group_id = t.group_id and adtd.copy_code
+		= t.copy_code
+		and adtd.target_code = t.target_code and adtd.hos_id = t.hos_id
+		left join aphi_dept_dict ad on adtd.group_id = ad.group_id and
+		adtd.copy_code = ad.copy_code
+		and adtd.dept_id = ad.dept_id and adtd.dept_no = ad.dept_no and
+		adtd.hos_id = ad.hos_id
+		left join aphi_target_method atm on adtd.group_id = atm.group_id and
+		adtd.copy_code = atm.copy_code
+		and adtd.target_code = atm.target_code and adtd.hos_id = atm.hos_id
+		<where>
+				AND adtd.group_id = #{group_id}
+				and adtd.hos_id = #{hos_id}
+				AND adtd.copy_code = #{copy_code}
+			<if test="acct_year != null and acct_year != ''">
+				AND adtd.acct_year = #{acct_year}
+			</if>
+			<if test="acct_month != null and acct_month != ''">
+				AND adtd.acct_month = #{acct_month}
+			</if>
+			<if test="dept_id != null and dept_id != '' and dept_id != 'undefined'">
+				AND adtd.dept_id = #{dept_id}
+			</if>
+			<if test="dept_no != null and dept_no != '' and dept_no != 'undefined' ">
+				AND adtd.dept_no = #{dept_no}
+			</if>
+			<if test="dept_kind_code != null and dept_kind_code != ''">
+				AND ad.dept_kind_code = #{dept_kind_code}
+			</if>
+			<if test="target_code != null and target_code != ''">
+				AND adtd.target_code = #{target_code}
+			</if>
+			
+			<!-- deptSql 和  targetSql为自定义指标表 查询条件-->
+			<if test="deptSql != null and deptSql != '' ">
+				${deptSql}
+			</if>
+			
+			<if test="targetSql != null and targetSql != '' ">
+				${targetSql}
+			</if>
+			
+			<!-- where_sql为职能科室考核明细表 和 财务其它考核明细表查询条件 -->
+			<if test="where_sql != null and where_sql != ''">
+				${where_sql}
+			</if>
+			
+			<!-- 自定义指标表 区间查询 -->
+			<if test="begin_date != null and begin_date != '' and end_date != null and end_date != '' ">
+				and (
+					to_date(adtd.acct_year || adtd.acct_month,'yyyyMM') 
+					between  to_date(#{begin_date},'yyyyMM') and to_date(#{end_date},'yyyyMM')
+				)
+			</if>
+			
+			<!-- 不包含值为0指标 -->
+			<if test="is_containsZero == 0">
+				AND adtd.target_value != 0 
+			</if>
+			
+			and exists(
+						select 1 from v_user_data_perm sys where sys.group_id = #{group_id}
+						and sys.hos_id = #{hos_id} and sys.copy_code = #{copy_code}
+						and sys.user_id = #{user_id}
+						and sys.mod_code = '09' and sys.table_code = 'APHI_DEPT_DICT'
+						and sys.perm_code = adtd.dept_id and sys.is_read = 1 and sys.is_write = 1
+					)
+		</where>
+		group by ad.dept_code,ad.dept_name
+		order by ad.dept_code
+	
+	</select>
+</mapper>

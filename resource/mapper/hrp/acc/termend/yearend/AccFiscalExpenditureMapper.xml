@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.acc.dao.termend.yearend.AccFiscalExpenditureMapper">
+	<select id="addAccFiscalExpenditureVouch" statementType="CALLABLE" parameterType="java.util.Map" resultType="String"> 
+		<![CDATA[
+			{call acc_yearend_fiscalexpenditure(#{group_id,jdbcType=INTEGER}, #{hos_id,jdbcType=INTEGER}, 
+				#{copy_code,jdbcType=VARCHAR}, #{user_id,jdbcType=INTEGER}, #{acc_year,jdbcType=VARCHAR}, 
+				#{acc_month,jdbcType=VARCHAR}, #{template_id,jdbcType=INTEGER}, #{vouch_id,jdbcType=INTEGER}, 
+				#{vouch_no,jdbcType=VARCHAR}, #{msg, mode=OUT, jdbcType=VARCHAR})}
+		]]>
+	</select>
+	
+	<!-- 获取财政收入科目本年发生总金额 -->
+	<select id="querySumCreditMoney" parameterType="java.util.Map" resultType="java.lang.Double"> 
+		select sum(nvl(b.credit, 0)) money_sum
+		from acc_termend_template_detail a
+		left join acc_vouch_detail b
+			on a.group_id = b.group_id and a.hos_id = b.hos_id
+			and a.copy_code = b.copy_code and a.subj_code = b.subj_code
+		left join acc_vouch c
+			on b.group_id = c.group_id and b.hos_id = c.hos_id
+			and b.copy_code = c.copy_code and b.vouch_id = c.vouch_id
+		left join acc_subj d
+			on a.group_id = d.group_id and a.hos_id = d.hos_id
+			and a.copy_code = d.copy_code and c.acc_year = d.acc_year
+			and a.subj_code = d.subj_code
+		where a.group_id = #{group_id,jdbcType=INTEGER} 
+			and a.hos_id = #{hos_id,jdbcType=INTEGER}
+			and a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			and c.acc_year = #{acc_year,jdbcType=VARCHAR}
+			and c.state = 99 and d.is_last = 1 and d.is_stop = 0
+	</select>
+	
+	<!-- 获取财政支出科目本年发生总金额 -->
+	<select id="querySumDebitMoney" parameterType="java.util.Map" resultType="java.lang.Double"> 
+		select sum(nvl(debit, 0)) money_sum
+		from acc_termend_template_detail a
+		left join acc_fina_sub b
+			on a.group_id = b.group_id and a.hos_id = b.hos_id
+			and a.copy_code = b.copy_code and a.subj_code = b.subj_code
+		left join acc_subj c
+			on a.group_id = c.group_id and a.hos_id = c.hos_id
+			and a.copy_code = c.copy_code and b.acc_year = c.acc_year
+			and a.subj_code = c.subj_code
+		where a.group_id = #{group_id,jdbcType=INTEGER} 
+			and a.hos_id = #{hos_id,jdbcType=INTEGER}
+			and a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			and b.acc_year = #{acc_year,jdbcType=VARCHAR}
+			and (c.subj_code like '5001%' or c.subj_code like '5301%')
+			and c.is_last = 1 and c.is_stop = 0
+	</select>
+</mapper>
+

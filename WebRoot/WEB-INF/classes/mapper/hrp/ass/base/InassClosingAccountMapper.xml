@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.ass.dao.base.InassClosingAccountMapper">
+	<resultMap id="inassClosingAccountMap" type="java.util.Map">
+	</resultMap>
+	<insert id="copyShareDeptRInassets" useGeneratedKeys="false">
+		insert into
+		ass_share_dept_r_inassets(group_id,hos_id,copy_code,ass_year,ass_month,ass_card_no,dept_id,dept_no,area,note)
+		select
+		t1.group_id,
+		t1.hos_id,
+		t1.copy_code,
+		#{cur_ass_year} ass_year,
+		#{cur_ass_month}  ass_month,
+		t1.ass_card_no,
+		t1.dept_id,
+		t1.dept_no,
+		t1.area,
+		t1.note
+		from ass_share_dept_inassets t1
+		left join ass_card_inassets t2
+		on
+		t1.group_id = t2.group_id
+		and t1.hos_id = t2.hos_id
+		and t1.copy_code =
+		t2.copy_code
+		and t1.ass_card_no = t2.ass_card_no
+		where
+		t1.group_id = #{group_id}
+		and t1.hos_id = #{hos_id}
+		and
+		t1.copy_code = #{copy_code}
+		and to_char(t2.in_date,'yyyyMM') &lt;=#{cur_ass_year} || #{cur_ass_month}
+		and t2.use_state in
+		(1,2,3,4,5,6,7)
+		and not exists(
+			select 1 from ass_share_dept_r_inassets t 
+			where 
+				t.group_id = t1.group_id
+		      and t.hos_id = t1.hos_id
+		      and t.copy_code = t1.copy_code
+		    
+		      and t.ass_card_no = t1.ass_card_no
+		      and t.ass_year = #{cur_ass_year}
+		      and t.ass_month = #{cur_ass_month}
+		)
+	</insert>
+
+	<insert id="copyShareDeptRLand" useGeneratedKeys="false">
+		insert into
+		ass_share_dept_r_land(group_id,hos_id,copy_code,ass_year,ass_month,ass_card_no,dept_id,dept_no,area,note)
+		select
+		t1.group_id,
+		t1.hos_id,
+		t1.copy_code,
+		#{cur_ass_year} ass_year,
+		#{cur_ass_month}  ass_month,
+		t1.ass_card_no,
+		t1.dept_id,
+		t1.dept_no,
+		t1.area,
+		t1.note
+		from ass_share_dept_land t1
+		left join ass_card_land t2 on
+		t1.group_id = t2.group_id
+		and t1.hos_id = t2.hos_id
+		and t1.copy_code =
+		t2.copy_code
+		and t1.ass_card_no = t2.ass_card_no
+		where
+		t1.group_id = #{group_id}
+		and t1.hos_id = #{hos_id}
+		and
+		t1.copy_code = #{copy_code}
+		and to_char(t2.in_date,'yyyyMM') &lt;=#{cur_ass_year} || #{cur_ass_month}
+		and t2.use_state in
+		(1,2,3,4,5,6,7)
+		and not exists(
+			select 1 from ass_share_dept_r_land t 
+			where 
+				t.group_id = t1.group_id
+		      and t.hos_id = t1.hos_id
+		      and t.copy_code = t1.copy_code
+		     
+		      and t.ass_card_no = t1.ass_card_no
+		      and t.ass_year = #{cur_ass_year}
+		      and t.ass_month = #{cur_ass_month}
+		)
+	</insert>
+
+
+	<select id="checkInassBillConfirm" statementType="CALLABLE"
+		parameterType="java.util.Map" resultType="java.util.Map">
+		<![CDATA[ {call ASS_BILL_CONFIRM_CHECK(
+			#{group_id,jdbcType=INTEGER, mode=IN},  
+	        #{hos_id,jdbcType=INTEGER, mode=IN},  
+	        #{copy_code,jdbcType=VARCHAR, mode=IN},
+	        #{cur_ass_year,jdbcType=VARCHAR, mode=IN},
+	        #{cur_ass_month,jdbcType=VARCHAR, mode=IN},
+	        #{ass_AppCode,jdbcType=INTEGER,mode=OUT},
+	        #{ass_ErrTxt,jdbcType=VARCHAR,mode=OUT}
+        )} 
+		 ]]>
+	</select>
+	<!-- 资产折旧 -->
+	<select id="collectInassDepreALL" statementType="CALLABLE"
+		parameterType="java.util.Map">
+		<![CDATA[ {call PKG_ASS_APP.prc_CalcDepreALLAssOrInass(
+			#{group_id,jdbcType=INTEGER, mode=IN},  
+	        #{hos_id,jdbcType=INTEGER, mode=IN},  
+	        #{copy_code,jdbcType=VARCHAR, mode=IN},  
+	        #{cur_ass_year,jdbcType=VARCHAR, mode=IN},
+	        #{cur_ass_month,jdbcType=VARCHAR, mode=IN},
+	        #{operator,jdbcType=VARCHAR, mode=IN},
+	        '1',
+	        #{ass_AppCode,jdbcType=INTEGER,mode=OUT},
+	        #{ass_ErrTxt,jdbcType=VARCHAR,mode=OUT}
+        )} 
+		 ]]>
+	</select>
+
+	<!-- 资产回退 -->
+	<select id="collectInassDelDepreALL" statementType="CALLABLE"
+		parameterType="java.util.Map">
+		<![CDATA[ {call PKG_ASS_APP.prc_DelDepreALLAssOrInass(
+			#{group_id,jdbcType=INTEGER, mode=IN},  
+	        #{hos_id,jdbcType=INTEGER, mode=IN},  
+	        #{copy_code,jdbcType=VARCHAR, mode=IN},  
+	        #{top_ass_year,jdbcType=VARCHAR, mode=IN},
+	        #{top_ass_month,jdbcType=VARCHAR, mode=IN},
+	        '1',
+	        #{ass_AppCode,jdbcType=INTEGER,mode=OUT},
+	        #{ass_ErrTxt,jdbcType=VARCHAR,mode=OUT}
+        )} 
+		 ]]>
+	</select>
+	
+	<!-- 写报表数据 -->
+	<select id="collectInassGenerate" statementType="CALLABLE"
+		parameterType="java.util.Map">
+		<![CDATA[ {call pkg_ass_report.prc_ass_collect_generate(
+			#{group_id,jdbcType=INTEGER, mode=IN},  
+	        #{hos_id,jdbcType=INTEGER, mode=IN},  
+	        #{copy_code,jdbcType=VARCHAR, mode=IN},  
+	        #{cur_ass_year,jdbcType=VARCHAR, mode=IN},
+	        #{cur_ass_month,jdbcType=VARCHAR, mode=IN}
+        )} 
+		 ]]>
+	</select>
+	<!-- 写报表数据 -->
+	<select id="collectInassGenerateStore" statementType="CALLABLE"
+		parameterType="java.util.Map">
+		<![CDATA[ {call pkg_ass_report_store.prc_ass_collect_generate(
+			#{group_id,jdbcType=INTEGER, mode=IN},  
+	        #{hos_id,jdbcType=INTEGER, mode=IN},  
+	        #{copy_code,jdbcType=VARCHAR, mode=IN},  
+	        #{cur_ass_year,jdbcType=VARCHAR, mode=IN},
+	        #{cur_ass_month,jdbcType=VARCHAR, mode=IN}
+        )} 
+		 ]]>
+	</select>
+	
+	<select id="collectInassReportApp" statementType="CALLABLE"
+		parameterType="java.util.Map">
+		<![CDATA[ {call pkg_ass_report_app.prc_rep_submit(
+			#{group_id,jdbcType=INTEGER, mode=IN},  
+	        #{hos_id,jdbcType=INTEGER, mode=IN},  
+	        #{copy_code,jdbcType=VARCHAR, mode=IN},  
+	        #{cur_ass_year,jdbcType=VARCHAR, mode=IN},
+	        #{cur_ass_month,jdbcType=VARCHAR, mode=IN}
+        )} 
+		 ]]>
+	</select>
+	
+</mapper>

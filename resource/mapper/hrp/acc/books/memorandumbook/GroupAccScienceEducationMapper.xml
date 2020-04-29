@@ -1,0 +1,930 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.acc.dao.books.memorandumbook.GroupAccScienceEducationMapper">
+	<resultMap id="accScienceEducation" type="com.chd.hrp.acc.entity.AccScienceEducation">
+        <result property="proj_id" column="proj_id"/>
+        <result property="proj_no" column="proj_no"/>
+        <result property="proj_code" column="proj_code"/>
+        <result property="proj_name" column="proj_name"/>
+        <result property="emp_name" column="emp_name"/>
+        <result property="bal_os" column="bal_os"/>
+        <result property="bal_sr" column="bal_sr"/>
+        <result property="bal_ot" column="bal_ot"/>
+        <result property="bal_od" column="bal_od"/>
+        <result property="match_os" column="match_os"/>
+        <result property="match_sr" column="match_sr"/>
+        <result property="match_ot" column="match_ot"/>
+        <result property="match_od" column="match_od"/>
+	</resultMap>
+	  <resultMap id="accDataMining" type="java.util.Map">
+        <result property="group_id" column="group_id"/>
+        <result property="hos_id" column="hos_id"/>
+        <result property="copy_code" column="copy_code"/>
+        <result property="vouch_id" column="vouch_id"/>
+        <result property="vouch_no" column="vouch_no"/>
+        <result property="summary" column="summary"/>
+        <result property="subj_name" column="subj_name"/>
+        <result property="debit" column="debit"/>
+        <result property="credit" column="credit"/>
+        <result property="income_id" column="income_id"/>
+        <result property="acc_year" column="acc_year"/>
+        <result property="proj_id" column="proj_id"/>
+        <result property="proj_no" column="proj_no"/>
+        <result property="proj_code" column="proj_code"/>
+        <result property="proj_name" column="proj_name"/>
+        <result property="emp_name" column="emp_name"/>
+        <result property="business_no" column="business_no"/>
+        <result property="reply_date" column="reply_date"/>
+        <result property="reply_money" column="reply_money"/>
+        <result property="note" column="note"/>
+        <result property="reply_no" column="reply_no"/>
+         <result property="out_id" column="out_id"/>
+        <result property="occur_date" column="occur_date"/>
+        <result property="subj_id" column="subj_id"/>
+        <result property="subj_code" column="subj_code"/>
+        <result property="subj_name" column="subj_name"/>
+        <result property="business_no" column="business_no"/>
+        <result property="vouch_check_id" column="vouch_check_id"/>
+        <result property="create_user" column="create_user"/>
+        <result property="create_date" column="create_date"/>
+	</resultMap>
+	
+	<select id="queryGroupAccScienceEducation"  parameterType="java.util.Map" resultMap="accScienceEducation">
+				select a.proj_id,a.proj_no,
+		a.group_id,a.hos_id,a.proj_code,a.proj_name,
+		hed.emp_name as emp_name,
+		
+		      nvl(b.wbnc,0) + nvl(c.wbncin,0) - nvl(d.wbncout,0) + nvl(g.ptnc,0) + nvl(h.ptncin,0) - nvl(i.ptncout,0) AS total_os, 
+		      nvl(e.wbin,0) + nvl(j.ptin,0) AS total_sr, 
+		      nvl(f.wbout,0) + nvl(k.ptout,0) AS total_ot, 
+		      nvl(b.wbnc,0) + nvl(c.wbncin,0) - nvl(d.wbncout,0) + nvl(g.ptnc,0) + nvl(h.ptncin,0) - nvl(i.ptncout,0) + nvl(e.wbin,0) + nvl(j.ptin,0) - nvl(f.wbout,0) - nvl(k.ptout,0) AS total_od,
+		      nvl(b.wbnc,0) + nvl(c.wbncin,0) -  nvl(d.wbncout,0) AS bal_os, 
+		      nvl(e.wbin,0) AS bal_sr, 
+		      nvl(f.wbout,0) AS bal_ot,
+		      nvl(b.wbnc,0) + nvl(c.wbncin,0) - nvl(d.wbncout,0) +nvl( e.wbin,0) - nvl(f.wbout,0) AS bal_od, 
+		      nvl(g.ptnc,0) + nvl(h.ptncin,0) - nvl(i.ptncout,0) AS match_os, 
+		      nvl(j.ptin,0) AS match_sr, 
+		      nvl(k.ptout,0) AS match_ot, 
+		      nvl(g.ptnc,0) + nvl(h.ptncin,0) - nvl(i.ptncout,0) + nvl(j.ptin,0) - nvl(k.ptout,0) AS match_od
+		 from HOS_PROJ_DICT a
+			 left join acc_proj_attr apa 
+		 	 on apa.group_id = a.group_id
+		  and apa.hos_id = a.hos_id
+		  and apa.proj_id = a.proj_id
+		  left join hos_emp_dict hed
+		  on hed.group_id = apa.group_id
+		  and hed.hos_id = apa.hos_id
+		  and hed.emp_id = apa.con_emp_id
+		  and hed.is_stop = 0
+		--外拨年初
+		left join 
+		(select a1.check3_id as proj_id ,a1.check3_no  as proj_no ,
+		sum(a1.end_os) wbnc
+		 from acc_leder_check a1
+		where  a1.group_id=#{group_id}
+		and a1.hos_id=#{hos_id}
+		and a1.copy_code=#{copy_code}
+		and a1.acc_year=#{acc_year}
+		and a1.acc_month ='00'
+		and a1.subj_id in 
+		(
+		select subj_id from acc_subj b4 where 
+		  b4.subj_code like '3302%' and is_last=1  and b4.group_id=#{group_id} 
+		  and b4.hos_id=#{hos_id} and b4.copy_code=#{copy_code} 
+		  and b4.acc_year=#{acc_year}
+		)
+		group by a1.check3_id,a1.check3_no
+		 )
+		  b on a.proj_id=b.proj_id and a.proj_no=b.proj_no
+		 
+		 --外拨小于日期收入
+		left join 
+		(
+		select 
+		b1.check3_id as proj_id, b1.check3_no as proj_no,
+		sum(b1.credit-b1.debit) wbncin
+		 from acc_vouch_check b1
+		left join acc_vouch_detail b2 on b1.vouch_detail_id =b2.vouch_detail_id
+		left join acc_vouch b3 on b2.vouch_id =b3.vouch_id
+		where  b1.subj_id  in 
+		 (
+		 select subj_id from acc_subj b4 where 
+		  b4.subj_code like '4201%' and is_last=1  
+		  and b4.group_id=#{group_id} and b4.hos_id=#{hos_id} and b4.copy_code=#{copy_code} 
+		  and b4.acc_year=#{acc_year}
+		 )
+		 and b3.vouch_id not in 
+		 (
+		 select vouch_id from acc_vouch_check b5 where  b5.group_id=#{group_id} and b5.hos_id=#{hos_id} and b5.copy_code=#{copy_code} 
+		 and b5.subj_id in 
+		        (
+		          select subj_id from acc_subj b4 where 
+		          b4.subj_code like '3%' and is_last=1  
+		          and b4.group_id=#{group_id} and b4.hos_id=#{hos_id} and b4.copy_code=#{copy_code}
+		          and b4.acc_year=#{acc_year}
+		        )
+		 )
+		 and b1.group_id=#{group_id} and b1.hos_id=#{hos_id} and b1.copy_code=#{copy_code}
+		and b1.acc_year=#{acc_year}
+		 <if test="year_month1 != null and year_month1 != ''">
+		         and b3.vouch_date  &lt;  to_date('${year_month1}','yyyy-mm-dd')
+		  </if>
+		
+		 group by b1.check3_id, b1.check3_no
+		
+		) 
+		c on a.proj_id=c.proj_id and a.proj_no=c.proj_no 
+		
+		--外拨小于日期支出
+		left join 
+		(
+		select 
+		b1.check3_id as proj_id, b1.check3_no as proj_no,
+		sum(b1.debit - b1.credit) wbncout
+		 from acc_vouch_check b1
+		left join acc_vouch_detail b2 on b1.vouch_detail_id =b2.vouch_detail_id
+		left join acc_vouch b3 on b2.vouch_id =b3.vouch_id
+		where  b1.subj_id  in 
+		 (
+		 select subj_id from acc_subj b4 where 
+		  b4.subj_code like '5201%' and is_last=1  
+		  and b4.group_id=#{group_id} and b4.hos_id=#{hos_id} and b4.copy_code=#{copy_code} 
+		  and b4.acc_year=#{acc_year}
+		 )
+		 and b3.vouch_id not in 
+		 (
+		 select vouch_id from acc_vouch_check b5 where  b5.group_id=#{group_id} 
+		 and b5.hos_id=#{hos_id} and b5.copy_code=#{copy_code} 
+		 and b5.acc_year=#{acc_year}
+		 and b5.subj_id in 
+		        (
+		          select subj_id from acc_subj b4 where 
+		          b4.subj_code like '3%' and is_last=1  and b4.group_id=#{group_id} 
+		          and b4.hos_id=#{hos_id} and b4.copy_code=#{copy_code}
+		          and b4.acc_year=#{acc_year}
+		        )
+		 )
+		 and b1.group_id=#{group_id} and b1.hos_id=#{hos_id} and b1.copy_code=#{copy_code}
+		and b1.acc_year=#{acc_year}
+		 <if test="year_month1 != null and year_month1 != ''">
+		       and b3.vouch_date  &lt;  to_date('${year_month1}','yyyy-mm-dd')
+		  </if>
+		 group by b1.check3_id, b1.check3_no
+		) d on a.proj_id=d.proj_id and a.proj_no=d.proj_no 
+		
+		
+		--外拨本期收入
+		left join 
+		(
+		select 
+		b1.check3_id as proj_id, b1.check3_no as proj_no,
+		sum( b1.credit -b1.debit ) wbin
+		 from acc_vouch_check b1
+		left join acc_vouch_detail b2 on b1.vouch_detail_id =b2.vouch_detail_id
+		left join acc_vouch b3 on b2.vouch_id =b3.vouch_id
+		where  b1.subj_id  in 
+		 (
+		 select subj_id from acc_subj b4 where 
+		  b4.subj_code like '4201%' and is_last=1  and b4.group_id=#{group_id} 
+		  and b4.hos_id=#{hos_id} and b4.copy_code=#{copy_code} 
+		   and b4.acc_year=#{acc_year}
+		 )
+		 and b3.vouch_id not in 
+		 (
+		 select vouch_id from acc_vouch_check b5 where  b5.group_id=#{group_id} 
+		 and b5.hos_id=#{hos_id} and b5.copy_code=#{copy_code} 
+		 and b5.acc_year=#{acc_year}
+		 and b5.subj_id in 
+		        (
+		          select subj_id from acc_subj b4 where 
+		          b4.subj_code like '3%' and is_last=1  and b4.group_id=#{group_id} 
+		          and b4.hos_id=#{hos_id} and b4.copy_code=#{copy_code}
+		          and b4.acc_year=#{acc_year}
+		        )
+		 )
+		 and b1.group_id=#{group_id} and b1.hos_id=#{hos_id} and b1.copy_code=#{copy_code}
+		 and b1.acc_year=#{acc_year}
+		 <if test="year_month1 != null and year_month1 != ''">
+		       and b3.vouch_date  &gt;=  to_date('${year_month1}','yyyy-mm-dd')
+		  </if>
+		   <if test="year_month2 != null and year_month2 != ''">
+		       and b3.vouch_date  &lt; =  to_date('${year_month2}','yyyy-mm-dd')
+		  </if>
+		 group by b1.check3_id, b1.check3_no
+		) e on a.proj_id=e.proj_id and a.proj_no=e.proj_no 
+		
+		
+		--外拨本期支出
+		left join 
+		(
+		select 
+		b1.check3_id as proj_id, b1.check3_no as proj_no,
+		sum(b1.debit - b1.credit) wbout
+		 from acc_vouch_check b1
+		left join acc_vouch_detail b2 on b1.vouch_detail_id =b2.vouch_detail_id
+		left join acc_vouch b3 on b2.vouch_id =b3.vouch_id
+		where  b1.subj_id  in 
+		 (
+		 select subj_id from acc_subj b4 where 
+		  b4.subj_code like '5201%' and is_last=1  and b4.group_id=#{group_id} 
+		  and b4.hos_id=#{hos_id} and b4.copy_code=#{copy_code} 
+		  and b4.acc_year=#{acc_year}
+		
+		 )
+		 and b3.vouch_id not in 
+		 (
+		 select vouch_id from acc_vouch_check b5 where  b5.group_id=#{group_id} 
+		 and b5.hos_id=#{hos_id} and b5.copy_code=#{copy_code} 
+		 and b5.acc_year=#{acc_year}
+		 and b5.subj_id in 
+		        (
+		          select subj_id from acc_subj b4 where 
+		          b4.subj_code like '3%' and is_last=1  and b4.group_id=#{group_id} 
+		          and b4.hos_id=#{hos_id} and b4.copy_code=#{copy_code}
+		          and b4.acc_year=#{acc_year}
+		        )
+		 )
+		 and b1.group_id=#{group_id} and b1.hos_id=#{hos_id} and b1.copy_code=#{copy_code}
+		 and b1.acc_year=#{acc_year}
+		 <if test="year_month1 != null and year_month1 != ''">
+		       and b3.vouch_date  &gt;=  to_date('${year_month1}','yyyy-mm-dd')
+		  </if>
+		   <if test="year_month2 != null and year_month2 != ''">
+		       and b3.vouch_date  &lt; =  to_date('${year_month2}','yyyy-mm-dd')
+		  </if>
+		 group by b1.check3_id, b1.check3_no
+		) f on a.proj_id=f.proj_id and a.proj_no=f.proj_no 
+		
+		
+		--配套年初
+		left join 
+		(
+		select 
+		g1.proj_id,g1.proj_no,
+		sum(g1.end_os) ptnc
+		from ACC_MATCH_INIT g1
+		where g1.group_id=#{group_id}
+		and g1.hos_id=#{hos_id}
+		and g1.copy_code=#{copy_code}
+		and g1.acc_year=#{acc_year}
+		group by g1.proj_id,g1.proj_no
+		) g
+		on a.proj_id=g.proj_id and a.proj_no=g.proj_no 
+		
+		--配套年初收入
+		left join 
+		(
+		select 
+		h1.proj_id,h1.proj_no,
+		sum(h1.reply_money) ptncin
+		from ACC_MATCH_INCOME h1
+		where h1.group_id=#{group_id}
+		and h1.hos_id=#{hos_id}
+		and h1.copy_code=#{copy_code}
+		and h1.acc_year=#{acc_year}
+		<if test="year_month1 != null and year_month1 != ''">
+		       and h1.reply_date  &lt;   to_date('${year_month1}','yyyy-mm-dd')
+		  </if>
+		group by h1.proj_id,h1.proj_no
+		) h
+		on a.proj_id=h.proj_id and a.proj_no=h.proj_no 
+		--配套年初支出
+		left join 
+		(
+		select i1.proj_id,i1.proj_no,
+		sum(i1.debit) ptncout 
+		from 
+		ACC_MATCH_OUT i1
+		where i1.group_id=#{group_id}
+		and i1.hos_id=#{hos_id}
+		and i1.copy_code=#{copy_code}
+		and i1.acc_year=#{acc_year}
+		<if test="year_month1 != null and year_month1 != ''">
+		       and i1.occur_date  &lt;   to_date('${year_month1}','yyyy-mm-dd')
+		 </if>
+		group by i1.proj_id,i1.proj_no
+		) i
+		on a.proj_id=i.proj_id and a.proj_no=i.proj_no 
+		
+		
+		--配套本期收入
+		left join 
+		(
+		select 
+		j1.proj_id,j1.proj_no,
+		sum(j1.reply_money) ptin
+		from ACC_MATCH_INCOME j1
+		where j1.group_id=#{group_id}
+		and j1.hos_id=#{hos_id}
+		and j1.copy_code=#{copy_code}
+		and j1.acc_year=#{acc_year}
+		<if test="year_month1 != null and year_month1 != ''">
+		       and j1.reply_date  &gt; =  to_date('${year_month1}','yyyy-mm-dd')
+		 </if>
+		 <if test="year_month2 != null and year_month2 != ''">
+		       and j1.reply_date  &lt; =  to_date('${year_month2}','yyyy-mm-dd')
+		 </if>
+		group by j1.proj_id,j1.proj_no
+		) j
+		on a.proj_id=j.proj_id and a.proj_no=j.proj_no 
+		--配套本期支出
+		left join 
+		(
+		select i1.proj_id,i1.proj_no,
+		sum(i1.debit) ptout 
+		from 
+		ACC_MATCH_OUT i1
+		where i1.group_id=#{group_id}
+		and i1.hos_id=#{hos_id}
+		and i1.copy_code=#{copy_code}
+		and i1.acc_year=#{acc_year}
+		<if test="year_month1 != null and year_month1 != ''">
+		       and i1.occur_date  &gt; =  to_date('${year_month1}','yyyy-mm-dd')
+		 </if>
+		 <if test="year_month2 != null and year_month2 != ''">
+		       and i1.occur_date  &lt; =  to_date('${year_month2}','yyyy-mm-dd')
+		 </if>
+		group by i1.proj_id,i1.proj_no
+		) k
+		on a.proj_id=k.proj_id and a.proj_no=k.proj_no 
+		
+		
+		where a.group_id=#{group_id}
+		and a.hos_id=#{hos_id}
+		  and 
+		      ( 
+		      nvl(b.wbnc,0) + nvl(c.wbncin,0) - nvl(d.wbncout,0) + nvl(g.ptnc,0) + nvl(h.ptncin,0) - nvl(i.ptncout,0) !=0
+		      or nvl(e.wbin,0) + nvl(j.ptin,0) !=0
+		      or nvl(f.wbout,0) + nvl(k.ptout,0) !=0
+		      or nvl(b.wbnc,0) + nvl(c.wbncin,0) - nvl(d.wbncout,0) + nvl(g.ptnc,0) + nvl(h.ptncin,0) - nvl(i.ptncout,0) + nvl(e.wbin,0) + nvl(j.ptin,0) - nvl(f.wbout,0) - nvl(k.ptout,0) !=0
+		      or nvl(b.wbnc,0) + nvl(c.wbncin,0) -  nvl(d.wbncout,0) !=0
+		      or nvl(e.wbin,0) !=0
+		      or nvl(f.wbout,0) !=0
+		      or nvl(b.wbnc,0) + nvl(c.wbncin,0) - nvl(d.wbncout,0) +nvl( e.wbin,0) - nvl(f.wbout,0) !=0
+		      or nvl(g.ptnc,0) + nvl(h.ptncin,0) - nvl(i.ptncout,0) !=0 
+		      or nvl(j.ptin,0) !=0
+		      or nvl(k.ptout,0) !=0 
+		      or nvl(g.ptnc,0) + nvl(h.ptncin,0) - nvl(i.ptncout,0) + nvl(j.ptin,0) - nvl(k.ptout,0) !=0
+		       )
+		 <if test="proj_id != null and proj_id != ''">
+		       and a.proj_id=#{proj_id}
+		 </if>
+   order by a.proj_code
+	</select>
+	<!-- 	外拨资金 本期支出 -->
+	 <select id="queryGroupAccScienceEducationDataMiningbalsr"  parameterType="java.util.Map" resultMap="accDataMining">			     
+	     				        
+			with temp as (
+            select av.group_id, av.hos_id, av.copy_code, av.vouch_id,
+             avt.vouch_type_short || '-' || av.vouch_no as vouch_no,
+             avd.summary, asj.subj_code || ' ' || asj.subj_name_all as subj_name, avc.debit, avc.credit,avc.check7_id
+				from acc_vouch_check avc
+				left join acc_vouch_detail avd on avc.group_id = avd.group_id
+				and avc.hos_id = avd.hos_id
+				and avc.copy_code = avd.copy_code
+				and avc.vouch_detail_id = avd.vouch_detail_id 
+				left join acc_vouch av on av.group_id = avd.group_id
+				and av.hos_id = avd.hos_id
+				and av.copy_code = avd.copy_code
+				and av.vouch_id = avd.vouch_id 
+				left join acc_subj asj on asj.group_id = avd.group_id
+				and asj.hos_id = avd.hos_id
+				and asj.copy_code = avd.copy_code
+				and asj.subj_id = avd.subj_id
+				and asj.acc_year = avd.acc_year 
+			    left join acc_vouch_type avt on avt.group_id = av.group_id
+				and avt.hos_id = av.hos_id
+				and avt.copy_code = av.copy_code
+				and avt.vouch_type_code = av.vouch_type_code 
+				where avc.group_id = #{group_id}
+					   and avc.hos_id = #{hos_id}
+					   and avc.copy_code = #{copy_code}
+					   and avc.acc_year = #{acc_year}
+					   and av.vouch_date &gt;= to_date(#{year_month1},'yyyy-mm-dd')
+					   and av.vouch_date &lt;= to_date(#{year_month2},'yyyy-mm-dd')
+					   and avc.check3_id = #{proj_id}
+					   and avc.check3_no = #{proj_no}
+					and exists (
+						select 1
+		        from acc_subj asj
+		        where asj.group_id = avd.group_id
+		          and asj.hos_id = avd.hos_id
+		          and asj.copy_code = avd.copy_code
+		          and asj.subj_id = avd.subj_id
+		          and asj.acc_year = avd.acc_year
+		          and asj.subj_code like '4201%'
+		          and asj.is_last = 1
+		        )
+		      and not exists (
+		        select 1
+		        from acc_vouch_check avd
+		        where avd.group_id = av.group_id
+		          and avd.hos_id = av.hos_id
+		          and avd.copy_code = av.copy_code
+		          and avd.vouch_id = av.vouch_id
+		          and avd.acc_year = av.acc_year
+		          and exists (
+		            select 1
+		            from acc_subj asj
+		            where asj.group_id = avd.group_id
+		              and asj.hos_id = avd.hos_id
+		              and asj.copy_code = avd.copy_code
+		              and asj.subj_id = avd.subj_id
+		              and asj.acc_year = avd.acc_year
+		              and asj.subj_code like '3%'
+		              and asj.is_last = 1
+		            )
+		        )
+		        order by avt.vouch_type_short || '-' || av.vouch_no
+		 )         
+		      select * from (
+		      select null group_id,null hos_id,null copy_code,null as vouch_id,null as vouch_no,s.source_name as summary,
+		       null as subj_name, sum(debit) as debit, sum(credit) as credit
+		       from  temp t 
+		       left join hos_source s 
+		       on t.group_id = s.group_id
+		       and t.hos_id=s.hos_id
+		       and t.check7_id=s.source_id  
+		       group by source_name
+		      )
+		     union all
+		     select null group_id,null hos_id,null copy_code,null vouch_id,null vouch_no,to_char('合计') summary,null subj_name,sum(debit) debit,sum(credit) credit from temp
+		    union all
+		    select group_id,hos_id,copy_code,vouch_id,vouch_no,summary,subj_name,debit,credit from temp
+	
+	 </select>
+	  <!-- 	配套资金本期收入-->
+	  <select id="queryGroupAccScienceEducationDataMiningbalot"  parameterType="java.util.Map" resultMap="accDataMining">			     
+	              with temp as (
+			select av.group_id, av.hos_id, av.copy_code, av.vouch_id, avt.vouch_type_short || '-' || av.vouch_no as vouch_no
+			      , avd.summary, asj.subj_code || ' ' || asj.subj_name_all as subj_name, avc.debit, avc.credit,check7_id
+			    from acc_vouch_check avc
+			    left join acc_vouch_detail avd on avc.group_id = avd.group_id
+			    and avc.hos_id = avd.hos_id
+			    and avc.copy_code = avd.copy_code
+			    and avc.vouch_detail_id = avd.vouch_detail_id 
+			    left join acc_vouch av on av.group_id = avd.group_id
+			    and av.hos_id = avd.hos_id
+			    and av.copy_code = avd.copy_code
+			    and av.vouch_id = avd.vouch_id 
+			    left join acc_subj asj on asj.group_id = avd.group_id
+			    and asj.hos_id = avd.hos_id
+			    and asj.copy_code = avd.copy_code
+			    and asj.subj_id = avd.subj_id
+			    and asj.acc_year = avd.acc_year 
+			      left join acc_vouch_type avt on avt.group_id = av.group_id
+			    and avt.hos_id = av.hos_id
+			    and avt.copy_code = av.copy_code
+			    and avt.vouch_type_code = av.vouch_type_code 
+			    where avc.group_id = #{group_id}
+					   and avc.hos_id = #{hos_id}
+					   and avc.copy_code = #{copy_code}
+					   and avc.acc_year = #{acc_year}
+					   and av.vouch_date &gt;= to_date('${year_month1}','yyyy-mm-dd')
+					   and av.vouch_date &lt;= to_date('${year_month2}','yyyy-mm-dd')
+					   and avc.check3_id = #{proj_id}
+					   and avc.check3_no = #{proj_no}
+			      and exists (
+			        select 1
+			        from acc_subj asj
+			        where asj.group_id = avd.group_id
+			          and asj.hos_id = avd.hos_id
+			          and asj.copy_code = avd.copy_code
+			          and asj.subj_id = avd.subj_id
+			          and asj.acc_year = avd.acc_year
+			          and asj.subj_code like '5201%'
+			          and asj.is_last = 1
+			        )
+			      and not exists (
+			        select 1
+			        from acc_vouch_detail avd
+			        where avd.group_id = av.group_id
+			          and avd.hos_id = av.hos_id
+			          and avd.copy_code = av.copy_code
+			          and avd.vouch_id = av.vouch_id
+			          and avd.acc_year = av.acc_year
+			          and exists (
+			            select 1
+			            from acc_subj asj
+			            where asj.group_id = avd.group_id
+			              and asj.hos_id = avd.hos_id
+			              and asj.copy_code = avd.copy_code
+			              and asj.subj_id = avd.subj_id
+			              and asj.acc_year = avd.acc_year
+			              and asj.subj_code like '3%'
+			              and asj.is_last = 1
+			            )
+			        )
+			       order by avt.vouch_type_short || '-' || av.vouch_no
+			) 
+			select * from (
+		      select null group_id,null hos_id,null copy_code,null as vouch_id,null as vouch_no,s.source_name as summary,
+		       null as subj_name, sum(debit) as debit, sum(credit) as credit
+		       from  temp t 
+		       left join hos_source s 
+		       on t.group_id = s.group_id
+		       and t.hos_id=s.hos_id
+		       and t.check7_id=s.source_id  
+		       group by source_name
+		      )
+		     union all
+			select null group_id,null hos_id,null copy_code,null vouch_id,null vouch_no,to_char('合计') summary,null subj_name,sum(debit) debit,sum(credit) credit from temp
+				union all
+		    select group_id,hos_id,copy_code,vouch_id,vouch_no,summary,subj_name,debit,credit from temp
+	
+	 </select>
+	 <!-- 	配套 资金本期收入 -->
+	  <select id="queryGroupAccScienceEducationDataMiningmatchsr"  parameterType="java.util.Map" resultMap="accDataMining">			     
+					             	 with temp as (
+							    select ami.income_id, ami.group_id, ami.hos_id, ami.copy_code, ami.acc_year
+								      , ami.proj_id, ami.proj_no, hpd.proj_code, hpd.proj_name, he.emp_name
+								      , ami.business_no, ami.reply_date, ami.reply_money, ami.note, ami.reply_no
+								    from acc_match_income ami
+								    left join hos_proj_dict hpd on ami.group_id = hpd.group_id
+								    and ami.hos_id = hpd.hos_id
+								    and ami.proj_id = hpd.proj_id
+								    and hpd.is_stop = 0 
+								    left join acc_proj_attr apa on ami.group_id = apa.group_id
+								    and ami.hos_id = apa.hos_id
+								    and ami.proj_id = apa.proj_id 
+								      left join hos_emp he on apa.group_id = he.group_id
+								    and apa.hos_id = he.hos_id
+								    and apa.con_emp_id = he.emp_id 
+								    where ami.group_id = #{group_id}
+								      and ami.hos_id =  #{hos_id}
+								      and ami.copy_code =  #{copy_code}
+								      and ami.acc_year =  #{acc_year}
+								      and ami.proj_id =  #{proj_id}
+								      and ami.proj_no =  #{proj_no}
+								      and ami.reply_date between to_date('${year_month1}','yyyy-mm-dd') and to_date('${year_month2}','yyyy-mm-dd')
+								    order by ami.proj_id asc
+								    
+					) select null income_id, null group_id, null hos_id, null copy_code,null acc_year, null proj_id, null proj_no,null proj_code, 
+				    null proj_name,null emp_name,
+				    null business_no,null reply_date,sum(reply_money) reply_money,null note,null reply_no
+				    from temp
+				    union all
+				    select income_id,group_id,hos_id,copy_code,acc_year,proj_id,proj_no,proj_code,proj_name,emp_name,
+				    business_no,reply_date,reply_money,note,reply_no from temp
+	  
+	 </select>
+	 <!-- 	配套 资金本期支出 -->
+	  <select id="queryGroupAccScienceEducationDataMiningmatchot"  parameterType="java.util.Map" resultMap="accDataMining">	
+		    		          with temp as (
+					    select ami.out_id, ami.group_id, ami.hos_id, ami.copy_code, ami.acc_year
+					      , ami.proj_id, ami.proj_no, hpd.proj_code, hpd.proj_name, ami.occur_date
+					      , ami.summary, ami.subj_id, asj.subj_code || ' ' || asj.subj_name as subj_name, ami.debit, ami.business_no
+					      , ami.vouch_id, ami.vouch_check_id, ami.note, ami.create_user, ami.create_date
+					      , ami.vouch_no, ami.is_import
+					    from ACC_MATCH_OUT ami
+					    left join HOS_PROJ_DICT hpd on ami.group_id = hpd.group_id
+					    and ami.hos_id = hpd.hos_id
+					    and ami.proj_id = hpd.proj_id
+					    and hpd.is_stop = 0 
+					    left join ACC_PROJ_ATTR apa on ami.group_id = apa.group_id
+					    and ami.hos_id = apa.hos_id
+					    and ami.proj_id = apa.proj_id 
+					      left join acc_subj asj on ami.group_id = asj.group_id
+					    and ami.hos_id = asj.hos_id
+					    and ami.copy_code = asj.copy_code
+					    and ami.subj_id = asj.subj_id 
+					    where ami.group_id = #{group_id}
+					      and ami.hos_id = #{hos_id}
+					      and ami.copy_code = #{copy_code}
+					      and ami.acc_year = #{acc_year}
+					      and ami.proj_id = #{proj_id}
+					      and ami.proj_no = #{proj_no}
+					      and ami.occur_date  between to_date('${year_month1}','yyyy-mm-dd') and to_date('${year_month2}','yyyy-mm-dd')
+					    order by ami.proj_id asc
+					  ) select null proj_code,null proj_name, null occur_date, null summary,sum(debit) debit,null subj_name,
+	    null business_no,null note,null create_user,null create_date,null vouch_no,null is_import 
+	      from temp
+	      union all
+	      select proj_code,proj_name ,occur_date,summary,debit,subj_name,business_no,note,create_user,create_date,vouch_no,is_import
+	       from temp
+	 </select>
+	 
+	 
+	 <select id="queryGroupAccScienceEducationPrint"  parameterType="java.util.Map" resultType="java.util.Map" >
+				select a.proj_id,a.proj_no,
+		a.group_id,a.hos_id,a.proj_code,a.proj_name,
+		hed.emp_name as emp_name,
+		
+		      nvl(b.wbnc,0) + nvl(c.wbncin,0) - nvl(d.wbncout,0) + nvl(g.ptnc,0) + nvl(h.ptncin,0) - nvl(i.ptncout,0) AS total_os, 
+		      nvl(e.wbin,0) + nvl(j.ptin,0) AS total_sr, 
+		      nvl(f.wbout,0) + nvl(k.ptout,0) AS total_ot, 
+		      nvl(b.wbnc,0) + nvl(c.wbncin,0) - nvl(d.wbncout,0) + nvl(g.ptnc,0) + nvl(h.ptncin,0) - nvl(i.ptncout,0) + nvl(e.wbin,0) + nvl(j.ptin,0) - nvl(f.wbout,0) - nvl(k.ptout,0) AS total_od,
+		      nvl(b.wbnc,0) + nvl(c.wbncin,0) -  nvl(d.wbncout,0) AS bal_os, 
+		      nvl(e.wbin,0) AS bal_sr, 
+		      nvl(f.wbout,0) AS bal_ot,
+		      nvl(b.wbnc,0) + nvl(c.wbncin,0) - nvl(d.wbncout,0) +nvl( e.wbin,0) - nvl(f.wbout,0) AS bal_od, 
+		      nvl(g.ptnc,0) + nvl(h.ptncin,0) - nvl(i.ptncout,0) AS match_os, 
+		      nvl(j.ptin,0) AS match_sr, 
+		      nvl(k.ptout,0) AS match_ot, 
+		      nvl(g.ptnc,0) + nvl(h.ptncin,0) - nvl(i.ptncout,0) + nvl(j.ptin,0) - nvl(k.ptout,0) AS match_od
+		 from HOS_PROJ_DICT a
+			 left join acc_proj_attr apa 
+		 	 on apa.group_id = a.group_id
+		  and apa.hos_id = a.hos_id
+		  and apa.proj_id = a.proj_id
+		  left join hos_emp_dict hed
+		  on hed.group_id = apa.group_id
+		  and hed.hos_id = apa.hos_id
+		  and hed.emp_id = apa.con_emp_id
+		  and hed.is_stop = 0
+		--外拨年初
+		left join 
+		(select a1.check3_id as proj_id ,a1.check3_no  as proj_no ,
+		sum(a1.end_os) wbnc
+		 from acc_leder_check a1
+		where  a1.group_id=#{group_id}
+		and a1.hos_id=#{hos_id}
+		and a1.copy_code=#{copy_code}
+		and a1.acc_year=#{acc_year}
+		and a1.acc_month ='00'
+		and a1.subj_id in 
+		(
+		select subj_id from acc_subj b4 where 
+		  b4.subj_code like '3302%' and is_last=1  and b4.group_id=#{group_id} 
+		  and b4.hos_id=#{hos_id} and b4.copy_code=#{copy_code} 
+		  and b4.acc_year=#{acc_year}
+		)
+		group by a1.check3_id,a1.check3_no
+		 )
+		  b on a.proj_id=b.proj_id and a.proj_no=b.proj_no
+		 
+		 --外拨小于日期收入
+		left join 
+		(
+		select 
+		b1.check3_id as proj_id, b1.check3_no as proj_no,
+		sum(b1.credit-b1.debit) wbncin
+		 from acc_vouch_check b1
+		left join acc_vouch_detail b2 on b1.vouch_detail_id =b2.vouch_detail_id
+		left join acc_vouch b3 on b2.vouch_id =b3.vouch_id
+		where  b1.subj_id  in 
+		 (
+		 select subj_id from acc_subj b4 where 
+		  b4.subj_code like '4201%' and is_last=1  
+		  and b4.group_id=#{group_id} and b4.hos_id=#{hos_id} and b4.copy_code=#{copy_code} 
+		  and b4.acc_year=#{acc_year}
+		 )
+		 and b3.vouch_id not in 
+		 (
+		 select vouch_id from acc_vouch_detail b5 where  b5.group_id=#{group_id} and b5.hos_id=#{hos_id} and b5.copy_code=#{copy_code} 
+		 and b5.subj_id in 
+		        (
+		          select subj_id from acc_subj b4 where 
+		          b4.subj_code like '3%' and is_last=1  
+		          and b4.group_id=#{group_id} and b4.hos_id=#{hos_id} and b4.copy_code=#{copy_code}
+		          and b4.acc_year=#{acc_year}
+		        )
+		 )
+		 and b1.group_id=#{group_id} and b1.hos_id=#{hos_id} and b1.copy_code=#{copy_code}
+		and b1.acc_year=#{acc_year}
+		 <if test="year_month1 != null and year_month1 != ''">
+		         and b3.vouch_date  &lt;  to_date('${year_month1}','yyyy-mm-dd')
+		  </if>
+		
+		 group by b1.check3_id, b1.check3_no
+		
+		) 
+		c on a.proj_id=c.proj_id and a.proj_no=c.proj_no 
+		
+		--外拨小于日期支出
+		left join 
+		(
+		select 
+		b1.check3_id as proj_id, b1.check3_no as proj_no,
+		sum(b1.debit - b1.credit) wbncout
+		 from acc_vouch_check b1
+		left join acc_vouch_detail b2 on b1.vouch_detail_id =b2.vouch_detail_id
+		left join acc_vouch b3 on b2.vouch_id =b3.vouch_id
+		where  b1.subj_id  in 
+		 (
+		 select subj_id from acc_subj b4 where 
+		  b4.subj_code like '5201%' and is_last=1  
+		  and b4.group_id=#{group_id} and b4.hos_id=#{hos_id} and b4.copy_code=#{copy_code} 
+		  and b4.acc_year=#{acc_year}
+		 )
+		 and b3.vouch_id not in 
+		 (
+		 select vouch_id from acc_vouch_detail b5 where  b5.group_id=#{group_id} 
+		 and b5.hos_id=#{hos_id} and b5.copy_code=#{copy_code} 
+		 and b5.acc_year=#{acc_year}
+		 and b5.subj_id in 
+		        (
+		          select subj_id from acc_subj b4 where 
+		          b4.subj_code like '3%' and is_last=1  and b4.group_id=#{group_id} 
+		          and b4.hos_id=#{hos_id} and b4.copy_code=#{copy_code}
+		          and b4.acc_year=#{acc_year}
+		        )
+		 )
+		 and b1.group_id=#{group_id} and b1.hos_id=#{hos_id} and b1.copy_code=#{copy_code}
+		and b1.acc_year=#{acc_year}
+		 <if test="year_month1 != null and year_month1 != ''">
+		       and b3.vouch_date  &lt;  to_date('${year_month1}','yyyy-mm-dd')
+		  </if>
+		 group by b1.check3_id, b1.check3_no
+		) d on a.proj_id=d.proj_id and a.proj_no=d.proj_no 
+		
+		
+		--外拨本期收入
+		left join 
+		(
+		select 
+		b1.check3_id as proj_id, b1.check3_no as proj_no,
+		sum( b1.credit -b1.debit ) wbin
+		 from acc_vouch_check b1
+		left join acc_vouch_detail b2 on b1.vouch_detail_id =b2.vouch_detail_id
+		left join acc_vouch b3 on b2.vouch_id =b3.vouch_id
+		where  b1.subj_id  in 
+		 (
+		 select subj_id from acc_subj b4 where 
+		  b4.subj_code like '4201%' and is_last=1  and b4.group_id=#{group_id} 
+		  and b4.hos_id=#{hos_id} and b4.copy_code=#{copy_code} 
+		   and b4.acc_year=#{acc_year}
+		 )
+		 and b3.vouch_id not in 
+		 (
+		 select vouch_id from acc_vouch_detail b5 where  b5.group_id=#{group_id} 
+		 and b5.hos_id=#{hos_id} and b5.copy_code=#{copy_code} 
+		 and b5.acc_year=#{acc_year}
+		 and b5.subj_id in 
+		        (
+		          select subj_id from acc_subj b4 where 
+		          b4.subj_code like '3%' and is_last=1  and b4.group_id=#{group_id} 
+		          and b4.hos_id=#{hos_id} and b4.copy_code=#{copy_code}
+		          and b4.acc_year=#{acc_year}
+		        )
+		 )
+		 and b1.group_id=#{group_id} and b1.hos_id=#{hos_id} and b1.copy_code=#{copy_code}
+		 and b1.acc_year=#{acc_year}
+		 <if test="year_month1 != null and year_month1 != ''">
+		       and b3.vouch_date  &gt;=  to_date('${year_month1}','yyyy-mm-dd')
+		  </if>
+		   <if test="year_month2 != null and year_month2 != ''">
+		       and b3.vouch_date  &lt; =  to_date('${year_month2}','yyyy-mm-dd')
+		  </if>
+		 group by b1.check3_id, b1.check3_no
+		) e on a.proj_id=e.proj_id and a.proj_no=e.proj_no 
+		
+		
+		--外拨本期支出
+		left join 
+		(
+		select 
+		b1.check3_id as proj_id, b1.check3_no as proj_no,
+		sum(b1.debit - b1.credit) wbout
+		 from acc_vouch_check b1
+		left join acc_vouch_detail b2 on b1.vouch_detail_id =b2.vouch_detail_id
+		left join acc_vouch b3 on b2.vouch_id =b3.vouch_id
+		where  b1.subj_id  in 
+		 (
+		 select subj_id from acc_subj b4 where 
+		  b4.subj_code like '5201%' and is_last=1  and b4.group_id=#{group_id} 
+		  and b4.hos_id=#{hos_id} and b4.copy_code=#{copy_code} 
+		  and b4.acc_year=#{acc_year}
+		
+		 )
+		 and b3.vouch_id not in 
+		 (
+		 select vouch_id from acc_vouch_detail b5 where  b5.group_id=#{group_id} 
+		 and b5.hos_id=#{hos_id} and b5.copy_code=#{copy_code} 
+		 and b5.acc_year=#{acc_year}
+		 and b5.subj_id in 
+		        (
+		          select subj_id from acc_subj b4 where 
+		          b4.subj_code like '3%' and is_last=1  and b4.group_id=#{group_id} 
+		          and b4.hos_id=#{hos_id} and b4.copy_code=#{copy_code}
+		          and b4.acc_year=#{acc_year}
+		        )
+		 )
+		 and b1.group_id=#{group_id} and b1.hos_id=#{hos_id} and b1.copy_code=#{copy_code}
+		 and b1.acc_year=#{acc_year}
+		 <if test="year_month1 != null and year_month1 != ''">
+		       and b3.vouch_date  &gt;=  to_date('${year_month1}','yyyy-mm-dd')
+		  </if>
+		   <if test="year_month2 != null and year_month2 != ''">
+		       and b3.vouch_date  &lt; =  to_date('${year_month2}','yyyy-mm-dd')
+		  </if>
+		 group by b1.check3_id, b1.check3_no
+		) f on a.proj_id=f.proj_id and a.proj_no=f.proj_no 
+		
+		
+		--配套年初
+		left join 
+		(
+		select 
+		g1.proj_id,g1.proj_no,
+		sum(g1.end_os) ptnc
+		from ACC_MATCH_INIT g1
+		where g1.group_id=#{group_id}
+		and g1.hos_id=#{hos_id}
+		and g1.copy_code=#{copy_code}
+		and g1.acc_year=#{acc_year}
+		group by g1.proj_id,g1.proj_no
+		) g
+		on a.proj_id=g.proj_id and a.proj_no=g.proj_no 
+		
+		--配套年初收入
+		left join 
+		(
+		select 
+		h1.proj_id,h1.proj_no,
+		sum(h1.reply_money) ptncin
+		from ACC_MATCH_INCOME h1
+		where h1.group_id=#{group_id}
+		and h1.hos_id=#{hos_id}
+		and h1.copy_code=#{copy_code}
+		and h1.acc_year=#{acc_year}
+		<if test="year_month1 != null and year_month1 != ''">
+		       and h1.reply_date  &lt;   to_date('${year_month1}','yyyy-mm-dd')
+		  </if>
+		group by h1.proj_id,h1.proj_no
+		) h
+		on a.proj_id=h.proj_id and a.proj_no=h.proj_no 
+		--配套年初支出
+		left join 
+		(
+		select i1.proj_id,i1.proj_no,
+		sum(i1.debit) ptncout 
+		from 
+		ACC_MATCH_OUT i1
+		where i1.group_id=#{group_id}
+		and i1.hos_id=#{hos_id}
+		and i1.copy_code=#{copy_code}
+		and i1.acc_year=#{acc_year}
+		<if test="year_month1 != null and year_month1 != ''">
+		       and i1.create_date  &lt;   to_date('${year_month1}','yyyy-mm-dd')
+		 </if>
+		group by i1.proj_id,i1.proj_no
+		) i
+		on a.proj_id=i.proj_id and a.proj_no=i.proj_no 
+		
+		
+		--配套本期收入
+		left join 
+		(
+		select 
+		j1.proj_id,j1.proj_no,
+		sum(j1.reply_money) ptin
+		from ACC_MATCH_INCOME j1
+		where j1.group_id=#{group_id}
+		and j1.hos_id=#{hos_id}
+		and j1.copy_code=#{copy_code}
+		and j1.acc_year=#{acc_year}
+		<if test="year_month1 != null and year_month1 != ''">
+		       and j1.reply_date  &gt; =  to_date('${year_month1}','yyyy-mm-dd')
+		 </if>
+		 <if test="year_month2 != null and year_month2 != ''">
+		       and j1.reply_date  &lt; =  to_date('${year_month2}','yyyy-mm-dd')
+		 </if>
+		group by j1.proj_id,j1.proj_no
+		) j
+		on a.proj_id=j.proj_id and a.proj_no=j.proj_no 
+		--配套本期支出
+		left join 
+		(
+		select i1.proj_id,i1.proj_no,
+		sum(i1.debit) ptout 
+		from 
+		ACC_MATCH_OUT i1
+		where i1.group_id=#{group_id}
+		and i1.hos_id=#{hos_id}
+		and i1.copy_code=#{copy_code}
+		and i1.acc_year=#{acc_year}
+		<if test="year_month1 != null and year_month1 != ''">
+		       and i1.create_date  &gt; =  to_date('${year_month1}','yyyy-mm-dd')
+		 </if>
+		 <if test="year_month2 != null and year_month2 != ''">
+		       and i1.create_date  &lt; =  to_date('${year_month2}','yyyy-mm-dd')
+		 </if>
+		group by i1.proj_id,i1.proj_no
+		) k
+		on a.proj_id=k.proj_id and a.proj_no=k.proj_no 
+		
+		
+		where a.group_id=#{group_id}
+		and a.hos_id=#{hos_id}
+		  and 
+		      (
+		      nvl(b.wbnc,0) + nvl(c.wbncin,0) - nvl(d.wbncout,0) + nvl(g.ptnc,0) + nvl(h.ptncin,0) - nvl(i.ptncout,0) !=0
+		      or nvl(e.wbin,0) + nvl(j.ptin,0) !=0
+		      or nvl(f.wbout,0) + nvl(k.ptout,0) !=0
+		      or nvl(b.wbnc,0) + nvl(c.wbncin,0) - nvl(d.wbncout,0) + nvl(g.ptnc,0) + nvl(h.ptncin,0) - nvl(i.ptncout,0) + nvl(e.wbin,0) + nvl(j.ptin,0) - nvl(f.wbout,0) - nvl(k.ptout,0) !=0
+		      or nvl(b.wbnc,0) + nvl(c.wbncin,0) -  nvl(d.wbncout,0) !=0
+		      or nvl(e.wbin,0) !=0
+		      or nvl(f.wbout,0) !=0
+		      or nvl(b.wbnc,0) + nvl(c.wbncin,0) - nvl(d.wbncout,0) +nvl( e.wbin,0) - nvl(f.wbout,0) !=0
+		      or nvl(g.ptnc,0) + nvl(h.ptncin,0) - nvl(i.ptncout,0) !=0 
+		      or nvl(j.ptin,0) !=0
+		      or nvl(k.ptout,0) !=0 
+		      or nvl(g.ptnc,0) + nvl(h.ptncin,0) - nvl(i.ptncout,0) + nvl(j.ptin,0) - nvl(k.ptout,0) !=0
+		       )
+		 <if test="proj_id != null and proj_id != ''">
+		       and a.proj_id=#{proj_id}
+		 </if>
+ 
+	</select>
+</mapper>

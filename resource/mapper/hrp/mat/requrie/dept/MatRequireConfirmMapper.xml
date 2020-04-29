@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.mat.dao.requrie.dept.MatRequireConfirmMapper">
+
+	<resultMap id="matReqMains" type="java.util.Map">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="req_id" column="req_id" />
+		<result property="req_code" column="req_code" />
+		<result property="brif" column="brif" />
+		
+		<result property="dept_no" column="dept_no" />
+		<result property="dept_id" column="dept_id" />
+		<result property="dept_code" column="dept_code" />
+		<result property="dept_name" column="dept_name" />
+		<result property="dept_names" column="dept_names" />
+		
+		<result property="stock_no" column="stock_no" />
+		<result property="stock_id" column="stock_id" />
+		<result property="store_code" column="store_code" />
+		<result property="store_name" column="store_name" />
+		
+		<result property="maker" column="maker" />
+		<result property="make_date" column="make_date" />
+		<result property="rdate" column="rdate" />
+		<result property="checker" column="checker" />
+		<result property="check_date" column="check_date" />
+		<result property="state" column="state" />
+		<result property="return_reason" column="return_reason" />
+		<result property="other_inv" column="other_inv" />
+		<result property="come_from" column="come_from"/>
+		
+		
+	</resultMap>
+	
+	<!-- 审核 -->
+	<update id="updateAudit" parameterType="java.util.List">
+		<foreach collection="list" item="item" index="index" open="begin" close=";end;" separator=";">
+			UPDATE mat_require_main 
+			SET  state = 3,
+				checker = #{item.user_id,jdbcType=INTEGER},
+				check_date = #{item.check_date,jdbcType=DATE}
+			WHERE	group_id =	#{item.group_id,jdbcType=INTEGER}
+				and	hos_id = #{item.hos_id,jdbcType=INTEGER}
+				and	copy_code = #{item.copy_code,jdbcType=VARCHAR}
+				and	req_id =#{item.req_id,jdbcType=INTEGER}
+				and req_code = #{item.req_code,jdbcType=VARCHAR}
+
+		</foreach>
+	</update>
+	
+	<!-- 取消审核 -->
+	<update id="updateAuditCancle" parameterType="java.util.List">
+		<foreach collection="list" item="item" index="index" open="begin" close=";end;" separator=";">
+			UPDATE mat_require_main 
+			SET  state = 2 ,
+				checker = '',
+				check_date = ''
+			WHERE	group_id =	#{item.group_id,jdbcType=INTEGER}
+				and	hos_id = #{item.hos_id,jdbcType=INTEGER}
+				and	copy_code = #{item.copy_code,jdbcType=VARCHAR}
+				and	req_id =#{item.req_id,jdbcType=INTEGER}
+				and req_code = #{item.req_code,jdbcType=VARCHAR}
+
+		</foreach>
+	</update>
+	
+	<!-- 退回科室 -->
+	<update id="updateReturn" parameterType="java.util.List">
+		<foreach collection="list" item="item" index="index" open="begin" close=";end;" separator=";">
+			UPDATE mat_require_main 
+			SET  state = 1,
+				 checker = '',
+				 check_date = '',
+				 return_reason = #{item.return_reason,jdbcType=VARCHAR}
+			WHERE	group_id =	#{item.group_id,jdbcType=INTEGER}
+				and	hos_id = #{item.hos_id,jdbcType=INTEGER}
+				and	copy_code = #{item.copy_code,jdbcType=VARCHAR}
+				and	req_id = #{item.req_id,jdbcType=INTEGER}
+		</foreach>		
+	</update>
+	
+	
+	<!-- 审核页面查询 -->
+	<select id="query" parameterType="java.util.Map" resultMap="matReqMains">
+		SELECT
+	      a.group_id,
+	      a.hos_id,
+	      a.copy_code,
+	      a.req_id,
+	      a.req_code,
+	      a.dept_no,
+	      a.dept_id,
+	      a.stock_no,
+	      a.stock_id,
+	      hsd.store_code||' '||hsd.store_name store_name,
+	      hdd.dept_code||' '||hdd.dept_name dept_names,
+	      a.brif,
+	      hdd.dept_name,
+	      c.user_name maker,
+	      a.make_date make_date,
+	      su.user_name checker,
+	      a.check_date,
+	      a.state,
+	      a.other_inv,
+	      a.return_reason,
+	      mdd.field_desc as come_from
+	    FROM  MAT_REQUIRE_MAIN a
+	    left join hos_dept_dict hdd on a.dept_id = hdd.dept_id 
+		     and a.group_id = hdd.group_id
+		     and a.hos_id = hdd.hos_id
+		    <if test="show_history == 1">
+				and a.dept_no = hdd.dept_no
+			</if>
+			<if test="show_history == 0">
+				and hdd.is_stop = 0
+			</if>
+		<!-- join v_user_data_perm b  on hdd.group_id = b.group_id 
+			and hdd.hos_id = b.hos_id
+			and b.user_id = #{user_id,jdbcType=INTEGER} 
+			and b.table_code = 'HOS_DEPT_DICT' 
+			and b.perm_code = hdd.dept_id 
+			and b.is_read = 1 
+			and b.is_write = 1 -->
+		left join hos_store_dict hsd on hsd.store_id = a.stock_id
+			and hsd.group_id = a.group_id
+			and hsd.hos_id = a.hos_id
+			<if test="show_history == 1">
+				and a.stock_no = hsd.store_no
+			</if>
+			<if test="show_history == 0">
+				and hsd.is_stop = 0
+			</if>
+	    left join sys_user c    
+	         on c.user_id = a.maker  
+	         and c.hos_id = a.hos_id
+	         and c.group_id = a.group_id
+	    left join sys_user su
+	         on su.user_id = a.checker 
+	         and su.hos_id = a.hos_id
+	         and su.group_id = a.group_id
+	    left join mat_data_dict mdd
+	    on
+	    	a.come_from = mdd.field_value
+	    	and mdd.data_code = '04003'
+	    <where>
+	    
+	    hdd.dept_id  in (select b.perm_code from  v_user_data_perm b  where b.group_id =#{group_id,jdbcType=INTEGER} 
+						and b.hos_id = #{hos_id,jdbcType=INTEGER} 
+						and b.user_id = #{user_id,jdbcType=INTEGER} 
+						and b.table_code = 'HOS_DEPT_DICT' 
+						and b.is_read = 1 
+						and b.is_write = 1
+						)
+	    	<if test="group_id != null and group_id != ''">
+				a.group_id = #{group_id,jdbcType=INTEGER}	
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and a.hos_id = #{hos_id,jdbcType=INTEGER}	
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				and a.copy_code = #{copy_code,jdbcType=VARCHAR}	
+			</if>
+			<if test="begin_date != null and begin_date != ''">
+				AND a.make_date &gt;=  to_date(#{begin_date},'yyyy/MM/dd') 
+			</if>
+			<if test="end_date != null and end_date != ''">
+				AND  a.make_date &lt;= to_date(#{end_date},'yyyy/MM/dd')
+			</if>
+			<if test="dept_id != null and dept_id != ''">
+				AND a.dept_id = #{dept_id,jdbcType=INTEGER}
+			</if>
+			<if test="dept_no != null and dept_no != ''">
+				AND a.dept_no = #{dept_no,jdbcType=INTEGER}
+			</if>
+			<if test="brif != null and brif != ''">
+				AND a.brif  like  '%'||#{brif,jdbcType=VARCHAR}||'%'
+			</if>
+			<if test="store_no != null and store_no != ''">
+				AND a.stock_no = #{store_no,jdbcType=INTEGER}
+			</if>
+			<if test="store_id != null and store_id != ''">
+				AND a.stock_id = #{store_id,jdbcType=INTEGER}
+			</if>
+			<if test="state != null and state != ''">
+				AND state = #{state,jdbcType=INTEGER}
+			</if>
+			<if test="req_code != null and req_code != ''">
+				and a.req_code  like '${req_code}%'
+			</if>
+			and a.state &gt; 1
+	    </where>
+		order by a.req_id desc
+	</select>
+	
+</mapper>
+

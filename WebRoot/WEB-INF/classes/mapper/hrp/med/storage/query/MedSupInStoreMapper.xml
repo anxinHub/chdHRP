@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.med.dao.storage.query.MedSupInStoreMapper">
+
+	<resultMap id="queryMedStorageQueryMedInSupCountMap" type="java.util.Map">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="sup_code" column="sup_code" />
+		<result property="sup_name" column="sup_name" />
+		<result property="amount_money" column="amount_money" />
+		<result property="med_type_count" column="med_type_count" />
+		<result property="in_id_count" column="in_id_count" />
+		<result property="store_name" column="store_name"/>
+		<result property="set_name" column="set_name"/>
+		<result property="money" column="money"/>
+		<result property="med_type_code" column="med_type_code"/>
+		<result property="bus_type_name" column="bus_type_name"/>
+		<result property="is_last" column="is_last"/>
+		<result property="type_level" column="type_level"/>
+	</resultMap>
+
+
+	<select id="queryMedSupInStore" parameterType="java.util.Map"
+		resultMap="queryMedStorageQueryMedInSupCountMap">
+    with med_in_type as(
+       select a.med_type_code,b.sup_code,b.sup_name,sum(b.money) money  ,a.is_last,a.type_level
+       from med_type_dict  a
+       left join 
+       (
+        select hsd.sup_code,hsd.sup_name, sum(mid.amount_money) as money ,mtd.med_type_code
+        from MED_IN_MAIN mim
+        left join med_in_detail mid on mim.group_id = mid.group_id
+        and mim.hos_id = mid.hos_id
+        and mim.copy_code = mid.copy_code
+        and mim.in_id = mid.in_id 
+        left join med_inv_dict midd on midd.group_id = mim.group_id
+        and midd.hos_id = mim.hos_id
+        and midd.copy_code = mim.copy_code
+        and midd.inv_id = mid.inv_id
+        and midd.inv_no = mid.inv_no 
+        left join med_type_dict mtd on midd.med_type_id = mtd.med_type_id
+        and mim.group_id = mtd.group_id
+        and mim.hos_id = mtd.hos_id
+        and mim.copy_code = mtd.copy_code
+        and mtd.is_stop = 0 
+        left join hos_sup_dict hsd on mim.sup_id=hsd.sup_id
+        and hsd.is_stop=0
+         and hsd.group_id = mim.group_id
+        and hsd.hos_id = mim.hos_id
+        left join med_bus_type mbt 
+                  on mim.group_id = mid.group_id
+                 and mim.hos_id = mid.hos_id
+                 and mim.copy_code = mid.copy_code
+                 and mim.bus_type_code = mbt.bus_type_code
+        where mim.state = '3'
+          and mim.bus_type_code in  (select bus_type_code   from med_bus_type where bus_type_code ='2' or bus_type_code ='12' or bus_type_code ='47' or bus_type_code ='48')
+          and mim.group_id = #{group_id}
+          and mim.hos_id = #{hos_id}
+          and mim.copy_code = #{copy_code}
+         
+		<if test="begin_confirm_date != null and begin_confirm_date != '' and  end_confirm_date != null and end_confirm_date != ''">
+			 and mim.confirm_date
+         		 between to_date(#{begin_confirm_date}, 'yyyy-MM-dd') 
+         		 and to_date(#{end_confirm_date}, 'yyyy-MM-dd')
+		</if>
+		<if test="med_type_code !=null and med_type_code != ''">
+				and mtd.med_type_code like '%${med_type_code}'
+		</if>
+		<if test="set_id==null or set_id == ''"> 
+			<if test="store_id != null and store_id != ''">
+				and mim.store_id = #{store_id}
+			</if>
+		</if>
+			<if test="set_id!=null and set_id!=''">
+					and mim.store_id in (select distinct store_id from MED_STORE_DETAIL  where set_id = #{set_id})
+			</if>
+			<if test="sup_id != null and sup_id != ''">
+				and mim.sup_id = #{sup_id}
+			</if>
+			<if test="sup_no !=null and sup_no != ''">
+				and mim.sup_no= #{sup_no}
+			</if>
+			<if test="is_charge !=null and is_charge != ''">
+				and midd.is_charge= #{is_charge}
+			</if>
+			
+        group by   hsd.sup_code,hsd.sup_name,mtd.med_type_code 
+        
+        )
+        b on b.med_type_code like a.med_type_code||'%'
+        <where>
+			a.is_stop=0		
+			
+			 and b.money != 0
+		</where>
+            group by  a.med_type_code,b.sup_code,b.sup_name,a.is_last,a.type_level  
+    	      ) 
+    	        select med_type_code,sup_code, to_char(sup_name) as sup_name, money, is_last, type_level 
+				from med_in_type 
+				union all
+	         select med_type_code, '总合计', to_char('') as sup_name, sum(money), is_last, type_level
+	           from med_in_type
+	          group by med_type_code,   is_last, type_level
+	          order by sup_code 
+    </select>
+</mapper>
+

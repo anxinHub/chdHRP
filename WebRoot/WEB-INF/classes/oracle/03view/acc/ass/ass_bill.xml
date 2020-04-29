@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+
+	<sql id="v_ass_bill_main" type="view" desc="发票主表视图"><![CDATA[
+	CREATE OR REPLACE VIEW V_ASS_BILL_MAIN AS
+SELECT
+      RS.GROUP_ID,  --集团ID
+      RS.HOS_ID,    --医院ID
+      RS.COPY_CODE, --账套编码
+      RS.BILL_NO AS BUSINESS_ID,     --发票单流水号
+      RS.INVOICE_NO AS BUSINESS_NO,     --发票号
+      RS.VEN_ID AS SUP_ID,  --供应商ID
+      RS.VEN_NO AS SUP_NO,  --供应商变更ID
+      HSD.SUP_CODE,    --供应商编码
+      HSD.SUP_NAME,    --供应商名称
+      RS.NOTE,    --摘要
+      RS.BILL_MONEY AS AMOUNT_MONEY,  --发票金额
+      RS.CREATE_EMP MAKER,    --制单人ID
+      SM.USER_NAME AS MAKER_NAME, --制单人名称
+      RS.BILL_DATE AS BUSI_DATE,    --发票日期
+      RS.AUDIT_EMP CHECKER,    --审核人ID
+      SC.USER_NAME AS CHECKER_NAME,    --审核人名称
+      RS.AUDIT_DATE,    --审核日期
+      RS.STATE,       --状态
+      RS.STORE_ID,
+      RS.ASS_IN_NO    --入库单号
+   FROM
+      (SELECT
+         MBM.GROUP_ID,  --集团ID
+         MBM.HOS_ID,    --医院ID
+         MBM.COPY_CODE, --账套编码
+         MBM.BILL_NO ,     --发票单流水号
+         MBM.INVOICE_NO ,     --发票号
+         MBM.VEN_ID,  --供应商ID
+         MBM.VEN_NO,  --供应商变更ID
+         MBM.PACT_CODE,  --合同ID
+         SUM(MBD.BILL_MONEY) AS BILL_MONEY ,  --发票金额
+         MBM.CREATE_EMP,    --制单人ID
+         MBM.BILL_DATE,    --发票日期
+         MBM.AUDIT_EMP,    --审核人ID
+         MBM.AUDIT_DATE,    --审核日期
+         MBM.STATE,       --状态
+         MBM.NOTE,    --摘要
+         MBM.STORE_ID,
+         VAC.ASS_IN_NO  --入库单号        
+      FROM ASS_BILL_MAIN MBM
+      LEFT JOIN ASS_BILL_DETAIL MBD
+      ON
+        MBM.GROUP_ID=MBD.GROUP_ID
+        AND MBM.HOS_ID=MBD.HOS_ID
+        AND MBM.COPY_CODE=MBD.COPY_CODE
+        AND MBM.BILL_NO=MBD.BILL_NO
+      LEFT JOIN V_ASS_CARD VAC
+      ON
+        MBD.GROUP_ID=VAC.GROUP_ID
+        AND MBD.HOS_ID=VAC.HOS_ID
+        AND MBD.COPY_CODE=VAC.COPY_CODE
+        AND MBD.ASS_CARD_NO=VAC.ASS_CARD_NO
+
+      WHERE MBM.STATE=2
+            AND MBD.NATURS_CODE IN ('01','02','03','04')
+      GROUP BY MBM.GROUP_ID,
+         MBM.HOS_ID,
+         MBM.COPY_CODE,
+         MBM.BILL_NO ,
+         MBM.INVOICE_NO ,
+         MBM.VEN_ID,
+         MBM.VEN_NO,
+         MBM.PACT_CODE,
+         MBM.CREATE_EMP,
+         MBM.BILL_DATE,
+         MBM.AUDIT_EMP,
+         MBM.AUDIT_DATE,
+         MBM.STATE,
+         MBM.NOTE,
+         VAC.ASS_IN_NO,MBM.STORE_ID
+      UNION ALL
+      SELECT
+         MBBM.GROUP_ID,  --集团ID
+         MBBM.HOS_ID,    --医院ID
+         MBBM.COPY_CODE, --账套编码
+         MBBM.BILL_NO ,     --发票单ID
+         MBBM.INVOICE_NO ,     --发票号
+         MBBM.VEN_ID,  --供应商ID
+         MBBM.VEN_NO,  --供应商变更ID
+         MBBM.PACT_CODE,  --合同ID
+         SUM(MBBD.BILL_MONEY) BILL_MONEY,  --发票金额
+         MBBM.CREATE_EMP,    --制单人ID
+         MBBM.BILL_DATE,    --发票日期
+         MBBM.AUDIT_EMP,    --审核人ID
+         MBBM.AUDIT_DATE,    --审核日期
+         MBBM.STATE,       --状态
+         MBBM.NOTE,    --摘要
+         MBBM.STORE_ID,
+         VAC.ASS_IN_NO  --入库单号
+      FROM ASS_BACK_BILL_MAIN MBBM
+      LEFT JOIN ASS_BILL_DETAIL MBBD
+      ON
+        MBBM.GROUP_ID=MBBD.GROUP_ID
+        AND MBBM.HOS_ID=MBBD.HOS_ID
+        AND MBBM.COPY_CODE=MBBD.COPY_CODE
+        AND MBBM.BILL_NO=MBBD.BILL_NO
+      LEFT JOIN V_ASS_CARD VAC
+      ON
+        MBBD.GROUP_ID=VAC.GROUP_ID
+        AND MBBD.HOS_ID=VAC.HOS_ID
+        AND MBBD.COPY_CODE=VAC.COPY_CODE
+        AND MBBD.ASS_CARD_NO=VAC.ASS_CARD_NO
+
+      WHERE MBBM.STATE=2
+            AND MBBD.NATURS_CODE IN ('01','02','03','04')
+      GROUP BY MBBM.GROUP_ID,
+         MBBM.HOS_ID,
+         MBBM.COPY_CODE,
+         MBBM.BILL_NO ,
+         MBBM.INVOICE_NO ,
+         MBBM.VEN_ID,
+         MBBM.VEN_NO,
+         MBBM.PACT_CODE,
+         MBBM.CREATE_EMP,
+         MBBM.BILL_DATE,
+         MBBM.AUDIT_EMP,
+         MBBM.AUDIT_DATE,
+         MBBM.STATE,
+         MBBM.NOTE,
+         VAC.ASS_IN_NO,MBBM.STORE_ID
+      ) RS
+   LEFT JOIN HOS_SUP_DICT HSD --供应商
+   ON
+      RS.GROUP_ID=HSD.GROUP_ID
+      AND RS.HOS_ID=HSD.HOS_ID
+      AND RS.VEN_ID=HSD.SUP_ID
+      AND RS.VEN_NO=HSD.SUP_NO
+   LEFT JOIN SYS_USER SM  --制单人
+   ON
+      RS.GROUP_ID=SM.GROUP_ID
+      AND RS.HOS_ID=SM.HOS_ID
+      AND RS.COPY_CODE=SM.COPY_CODE
+      AND RS.CREATE_EMP=SM.USER_ID
+   LEFT JOIN SYS_USER SC   --审核人
+   ON
+      RS.GROUP_ID=SC.GROUP_ID
+      AND RS.HOS_ID=SC.HOS_ID
+      AND RS.COPY_CODE=SC.COPY_CODE
+      AND RS.AUDIT_EMP=SC.USER_ID
+   WHERE RS.STATE=2
+   ORDER BY BUSINESS_ID
+ 
+	]]></sql>
+	<sql id="v_ass_bill_detail" type="view" desc="发票明细视图"><![CDATA[
+	CREATE OR REPLACE VIEW v_ass_bill_detail AS
+	SELECT 
+     RS.GROUP_ID,  --集团ID
+     RS.HOS_ID,    --单位ID
+     RS.COPY_CODE, --账套编码
+     RS.BILL_NO AS BUSINESS_ID,     --发票ID
+     RS.INVOICE_NO  AS BUSINESS_NO,     --发票号
+     RS.NATURS_CODE,--资产性质
+     RS.ASS_CARD_NO, --卡片ID
+     RS.BILL_MONEY AS AMOUNT_MONEY, --发票金额
+     ATD.ASS_TYPE_ID AS SUB_TYPE_ID --分类ID
+     FROM
+      ( 
+      SELECT 
+       ABD.GROUP_ID,  --集团ID
+       ABD.HOS_ID,    --单位ID
+       ABD.COPY_CODE, --账套编码
+       ABD.BILL_NO ,  --发票流水号
+       ABM.INVOICE_NO, --发票号
+       ABD.NATURS_CODE,--资产性质
+       ABD.ASS_CARD_NO, --卡片ID
+       ABD.BILL_MONEY    --发票金额
+      FROM ASS_BILL_DETAIL ABD
+      LEFT JOIN ASS_BILL_MAIN ABM
+      ON
+           ABD.GROUP_ID=ABM.GROUP_ID
+        AND ABD.HOS_ID=ABM.HOS_ID
+        AND ABD.COPY_CODE=ABM.COPY_CODE
+        AND ABD.BILL_NO=ABM.BILL_NO
+      WHERE ABM.STATE=2 
+           AND ABD.NATURS_CODE IN ('01','02','03','04')
+     UNION ALL
+      SELECT 
+       ABBD.GROUP_ID,  --集团ID
+       ABBD.HOS_ID,    --单位ID
+       ABBD.COPY_CODE, --账套编码
+       ABBD.BILL_NO ,  --发票流水号
+       ABBM.INVOICE_NO, --发票号
+       ABBD.NATURS_CODE,--发票号
+       ABBD.ASS_CARD_NO, --卡片ID
+       ABBD.BILL_MONEY   --发票金额
+      FROM ASS_BACK_BILL_DETAIL ABBD
+      LEFT JOIN ASS_BACK_BILL_MAIN ABBM
+      ON
+           ABBD.GROUP_ID=ABBM.GROUP_ID
+        AND ABBD.HOS_ID=ABBM.HOS_ID
+        AND ABBD.COPY_CODE=ABBM.COPY_CODE
+        AND ABBD.BILL_NO=ABBM.BILL_NO
+      WHERE ABBM.STATE=2
+           AND ABBD.NATURS_CODE IN ('01','02','03','04')
+     ) RS
+     LEFT JOIN V_ACC_ASS_CARD VC  --卡片
+      ON
+        RS.GROUP_ID=VC.GROUP_ID
+        AND RS.HOS_ID=VC.HOS_ID
+        AND RS.COPY_CODE=VC.COPY_CODE
+        AND RS.ASS_CARD_NO=VC.ASS_CARD_NO
+      LEFT JOIN ASS_NO_DICT AD --资产字典
+      ON
+         VC.GROUP_ID=AD.GROUP_ID
+         AND VC.HOS_ID=AD.HOS_ID
+         AND VC.COPY_CODE=AD.COPY_CODE
+         AND VC.ASS_ID=AD.ASS_ID
+         AND VC.ASS_NO=AD.ASS_NO
+      LEFT JOIN ASS_TYPE_DICT ATD --资产分类
+      ON
+         RS.GROUP_ID=ATD.GROUP_ID
+         AND RS.HOS_ID=ATD.HOS_ID
+         AND RS.COPY_CODE=ATD.COPY_CODE
+         AND AD.ASS_TYPE_ID=ATD.ASS_TYPE_ID
+   
+	]]></sql>
+	
+</root>
+

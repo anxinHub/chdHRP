@@ -1,0 +1,613 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+	
+	<sql id="PRC_ACC_BOOKS" type="proc"><![CDATA[
+		create or replace procedure PRC_ACC_BOOKS(
+             p_group_id                 IN  NUMBER      --集团
+            ,p_hos_id                   IN  NUMBER      --医院
+            ,p_copy_code                 IN  VARCHAR2    --账套
+            ,p_acc_year_b               IN  VARCHAR2    --起始年
+            ,p_acc_month_b              IN  VARCHAR2    --起始月
+            ,p_acc_year_e               IN  VARCHAR2    --结束年
+            ,p_acc_month_e              IN  VARCHAR2    --结束月
+            ,p_state                    IN  NUMBER      --记账状态
+            ,p_subj_select_flag         IN  NUMBER      --选择方式
+            ,p_is_show                  IN  NUMBER      --显示无发生
+            ,p_subj_code                IN  VARCHAR2    --科目编码
+            ,p_summary                  IN  VARCHAR2    --摘要
+            ,p_vouch_no_begin           IN  VARCHAR2    --起始凭证号
+            ,p_vouch_no_end             IN  VARCHAR2    --结束凭证号
+            ,p_subj_level               IN  VARCHAR2    --科目级次
+            ,p_flag                     IN  VARCHAR2    --标识
+            ,p_obj_select_flag          IN  VARCHAR2    --项目查询方式
+            ,p_obj_code                 IN  VARCHAR2    --项目条件
+            ,p_source_id                IN  NUMBER      --资金来源ID
+            ,p_table_flag               IN  NUMBER      --辅助核算类型
+            ,p_cur_code                 IN  VARCHAR2    --币种
+            ,p_emp_code                 IN  VARCHAR2    --项目负责人
+            ,p_sch_id                   IN  NUMBER      --方案ID
+            ,p_check_item_type1         IN  NUMBER      --核算类ID
+            ,p_check_item_code1_b       IN  VARCHAR2    --辅助核算项
+            ,p_check_item_code1_e       IN  VARCHAR2    --辅助核算项
+            ,p_check_item_type2         IN  NUMBER      --核算类ID
+            ,p_check_item_code2_b       IN  VARCHAR2    --辅助核算项
+            ,p_check_item_code2_e       IN  VARCHAR2    --辅助核算项
+            ,p_check_item_type3         IN  NUMBER      --核算类ID
+            ,p_check_item_code3_b       IN  VARCHAR2    --辅助核算项
+            ,p_check_item_code3_e       IN  VARCHAR2    --辅助核算项
+            ,p_check_item_type4         IN  NUMBER      --核算类ID
+            ,p_check_item_code4_b       IN  VARCHAR2    --辅助核算项
+            ,p_check_item_code4_e       IN  VARCHAR2    --辅助核算项
+            ,p_show_zero                IN  NUMBER      --是否显示零余额
+            ,p_pagesize                 IN  NUMBER      --显示条数
+            ,p_page                     IN  NUMBER      --当前页码
+            ,p_isLastChk                IN  NUMBER      --是否显示非末级
+            ,p_tcount                   OUT NUMBER      --总页码
+            ,error_msg                      OUT VARCHAR2    --错误信息
+            ,p_rst                      OUT ACC_BOOKS.recursor
+        )
+          as
+            ddl_sql varchar2(4000);
+
+          begin
+            /*-------------------------------------------------------------------------
+              ||            km1001       科目总账按月
+              ||            km1002       科目总账按天
+              ||            km1003       三栏明细账
+              ||-------------------------------------------------------------------------*/
+            error_msg := '';
+
+            --判断
+            if p_flag = 'km1001' then   --科目总账按月
+
+                PRC_KMZZY(
+                    p_group_id, p_hos_id, p_copy_code, p_acc_year_b, p_acc_month_b,
+                    p_acc_year_e, p_acc_month_e, p_sch_id, p_subj_code, p_isLastChk, 
+                    p_pagesize, p_page, p_tcount, p_rst
+                );
+
+            elsif p_flag = 'km1002' then  --科目总账按天
+
+                PRC_KMZZT(
+                    p_group_id, p_hos_id, p_copy_code, p_acc_year_b, p_acc_month_b,
+                    p_acc_year_e, p_acc_month_e, p_sch_id, p_subj_code, p_isLastChk, 
+                    p_pagesize, p_page, p_tcount, p_rst
+                );
+
+            elsif p_flag = 'km1003' then --三栏明细账
+
+                PRC_SLMXZ(
+                    p_group_id , p_hos_id ,p_copy_code ,p_acc_year_b ,p_acc_month_b ,p_acc_year_e , p_acc_month_e ,
+                    p_sch_id ,p_subj_code ,p_summary , p_vouch_no_begin, p_vouch_no_end ,
+                    p_pagesize ,p_page ,p_isLastChk,p_tcount ,p_rst
+                );
+          end if;
+
+     end PRC_ACC_BOOKS;
+
+	]]></sql>
+
+	<!-- 账簿方案公用科目临时表 -->
+	<sql id="T_ACC_BOOKS_SUBJ" type="sql" desc="账簿科目临时表"><![CDATA[
+	  	declare num number(4);
+	  	begin
+		   	select count(1) into num from USER_tables where TABLE_NAME = 'T_ACC_BOOKS_SUBJ'; 
+		   	if num>0 then
+		       execute immediate 'drop table T_ACC_BOOKS_SUBJ cascade constraints';
+		   	end if; 
+  
+  			execute immediate '
+  			create global temporary table T_ACC_BOOKS_SUBJ  (
+			    SUBJ_CODE  VARCHAR2(20) NULL,
+			    SUBJ_NAME VARCHAR2(100) NULL,  
+			    SUBJ_NAME_ALL VARCHAR2(200) NULL, 
+				SUBJ_DIRE NUMERIC(2,0)
+  			)on COMMIT DELETE ROWS
+  			';
+		  	--on COMMIT PRESERVE ROWS 会话性临时表，on COMMIT DELETE ROWS 事务性临时表
+		  	execute immediate 'comment on table T_ACC_BOOKS_SUBJ is ''账簿科目临时表''';
+		  	execute immediate 'comment on column T_ACC_BOOKS_SUBJ.SUBJ_CODE is ''科目编码''';
+		  	execute immediate 'comment on column T_ACC_BOOKS_SUBJ.SUBJ_NAME is ''科目名称''';
+		  	execute immediate 'comment on column T_ACC_BOOKS_SUBJ.SUBJ_NAME_ALL is ''科目全称''';
+			execute immediate 'comment on column T_ACC_BOOKS_SUBJ.SUBJ_DIRE is ''余额方向''';
+  
+  		end;
+	]]></sql>
+
+	<!-- 账簿方案公用解析方法 -->
+	<sql id="PRC_ACC_BOOKS_SCH" type="sql" desc="账簿方案公用解析方法"><![CDATA[
+	  	create or replace procedure PRC_ACC_BOOKS_SCH(
+		  p_group_id               in  number,   --集团
+		  p_hos_id                 in  number,   --单位
+		  p_copy_code              in  varchar2, --账套
+		  p_acc_year_b             in  varchar2, --开始年份
+		  p_acc_year_e             in  varchar2, --结束年份
+		  p_subj_code              in  varchar2, --科目
+		  p_sch_id                 in  integer,  --方案ID
+		  p_check_item_type1       in  integer,  --辅助核算类1
+		  p_check_item_code_b1     in  varchar2, --辅助核算项1开始编码
+		  p_check_item_code_e1     in  varchar2, --辅助核算项1结束编码
+		  p_check_item_type2       in  integer,  --辅助核算类2
+		  p_check_item_code_b2     in  varchar2, --辅助核算项2开始编码
+		  p_check_item_code_e2     in  varchar2, --辅助核算项2结束编码
+		  p_check_item_type3       in  integer,  --辅助核算类3
+		  p_check_item_code_b3     in  varchar2, --辅助核算项3开始编码
+		  p_check_item_code_e3     in  varchar2, --辅助核算项3结束编码
+		  p_check_item_type4       in  integer,  --辅助核算类4
+		  p_check_item_code_b4     in  varchar2, --辅助核算项4开始编码
+		  p_check_item_code_e4     in  varchar2, --辅助核算项4结束编码
+		  p_copy_codes             out varchar2, --方案中的多选账套，格式为'001,002,003'
+		  p_cur_code               out varchar2, --币种
+		  p_state                  out number,   --包含未记账:1,99
+		  p_is_bqwfs               out number,   --无本期发生是否显示
+		  p_insertSql              out varchar2, --插入的动态字段
+		  p_selectSql              out varchar2, --查询的动态字段
+		  p_leftJoinSql            out varchar2, --动态表连接
+		  p_whereSql               out varchar2, --动态where判断
+		  p_groupSql               out varchar2, --动态group by语句
+		  p_is_error               out number,   --1：存在错误
+		  p_error                  out varchar2  --错误信息
+		)
+		as
+		  p_is_sys                 NUMBER(1,0);
+		  p_is_change              NUMBER(1,0);
+		  p_column_check           varchar2(20);
+		  p_check_table            varchar2(50);
+		  p_column_id              varchar2(50);
+		  p_column_code            varchar2(50);
+		  p_column_name            varchar2(50);
+		  p_is_nacc                number;
+		  p_subj_level_b           number;        --科目开始级次
+		  p_subj_level_e           number;        --科目结束级次
+		  p_subj_code_b            varchar2(20);  --开始科目
+		  p_subj_code_e            varchar2(20);  --结束科目
+		  p_is_last                number;
+		  p_is_fw                  number;
+		  p_is_sch                 number;
+		  subj_code_begin          varchar2(200); --开始科目编码
+		  subj_code_end            varchar2(200); --结束科目编码
+		  v_check_item_type        number;        --辅助核算类1
+		  v_check_item_code_b      varchar2(200); --辅助核算项1开始编码
+		  v_check_item_code_e      varchar2(200); --辅助核算项1结束编码
+		  v_check_item_type1       number;        --辅助核算类1
+		  v_check_item_code_b1     varchar2(200); --辅助核算项1开始编码
+		  v_check_item_code_e1     varchar2(200); --辅助核算项1结束编码
+		  v_check_item_type2       number;        --辅助核算类2
+		  v_check_item_code_b2     varchar2(200); --辅助核算项2开始编码
+		  v_check_item_code_e2     varchar2(200); --辅助核算项2结束编码
+		  v_check_item_type3       number;        --辅助核算类3
+		  v_check_item_code_b3     varchar2(200); --辅助核算项3开始编码
+		  v_check_item_code_e3     varchar2(200); --辅助核算项3结束编码
+		  v_check_item_type4       number;        --辅助核算类4
+		  v_check_item_code_b4     varchar2(200); --辅助核算项4开始编码
+		  v_check_item_code_e4     varchar2(200); --辅助核算项4结束编码
+		  v_count                  number;
+		begin
+		
+		  p_insertSql := '';
+		  p_selectSql := '';
+		  p_leftJoinSql := '';
+		  p_whereSql := '';
+		  p_groupSql := '';
+		  p_is_error := 0;
+		  p_error := '';
+		  v_check_item_type1 := p_check_item_type1;
+		  v_check_item_code_b1 := p_check_item_code_b1;
+		  v_check_item_code_e1 := p_check_item_code_e1;
+		  v_check_item_type2 := p_check_item_type2;
+		  v_check_item_code_b2 := p_check_item_code_b2;
+		  v_check_item_code_e2 := p_check_item_code_e2;
+		  v_check_item_type3 := p_check_item_type3;
+		  v_check_item_code_b3 := p_check_item_code_b3;
+		  v_check_item_code_e3 := p_check_item_code_e3;
+		  v_check_item_type4 := p_check_item_type4;
+		  v_check_item_code_b4 := p_check_item_code_b4;
+		  v_check_item_code_e4 := p_check_item_code_e4;
+		
+		  /*方案条件*/
+		  if nvl(p_sch_id, '00') <> '00' then
+		    select ';' || b.che_copy_code || ';', b.is_nacc, b.is_bqwfs,
+		      b.is_last, b.cur_code, b.subj_level_begin, b.subj_level_end,
+		      b.is_fw, b.subj_code_begin, b.subj_code_end
+		    into p_copy_codes, p_is_nacc, p_is_bqwfs, p_is_last, p_cur_code,
+		      p_subj_level_b, p_subj_level_e, p_is_fw, p_subj_code_b, p_subj_code_e
+		    from acc_book_sch a
+		    left join acc_book_sch_con b
+		      on a.group_id = b.group_id
+		      and a.hos_id = b.hos_id
+		      and a.copy_code = b.copy_code
+		      and a.sch_id = b.sch_id
+		    where a.group_id = p_group_id
+		      and a.hos_id = p_hos_id
+		      and a.copy_code = p_copy_code
+		      and a.sch_id = p_sch_id;
+		
+		    p_is_sch := 1;
+		  else
+		    p_copy_codes := ';' || p_copy_code || ';';
+		    p_is_nacc := 1;
+		    p_is_bqwfs := 0;
+		    p_is_last := 0;
+		    p_cur_code := '';
+		    p_subj_level_b := 0;
+		    p_subj_level_e := 0;
+		    p_is_fw := 0;
+		    p_subj_code_b := '';
+		    p_subj_code_e := '';
+		    p_is_sch := 0;
+		  end if;
+		
+		  /*处理是否含未记账*/
+		  if p_is_nacc = 1 then
+		    p_state := 1;
+		  else
+		    p_state := 99;
+		  end if;
+		  /*处理范围查询的最大科目最小科目*/
+		  if p_is_fw = 1 then
+		    select min(subj_code)
+		    into subj_code_begin
+		    from acc_subj
+		    where group_id = p_group_id
+		      and hos_id = p_hos_id
+		      and instr(p_copy_codes, ';' || copy_code || ';') > 0
+		      and acc_year between p_acc_year_b and p_acc_year_e
+		      and subj_code like p_subj_code_b || '%';
+		    select max(subj_code)
+		    into subj_code_end
+		    from acc_subj
+		    where group_id = p_group_id
+		      and hos_id = p_hos_id
+		      and instr(p_copy_codes, ';' || copy_code || ';') > 0
+		      and acc_year between p_acc_year_b and p_acc_year_e
+		      and subj_code like p_subj_code_e || '%';
+		  end if;
+		
+		
+		  /*根据方案科目或者页面科目得到科目临时表*/
+		  insert into t_acc_books_subj(
+		    subj_code, subj_name, subj_name_all, subj_dire
+		  )
+		  select distinct subj_code, subj_name, subj_name_all, subj_dire
+		  from acc_subj
+		  where group_id = p_group_id
+		    and hos_id = p_hos_id
+		    and instr(p_copy_codes, ';' || copy_code || ';') > 0
+		    and acc_year between p_acc_year_b and p_acc_year_e
+		    and (p_subj_level_b = 0 or subj_level >= p_subj_level_b)
+		    and (p_subj_level_e = 0 or subj_level <= p_subj_level_e)
+		    and (
+		      (p_is_fw = 1 and subj_code between subj_code_begin and subj_code_end)
+		      or
+		      (p_is_fw = 0 and (
+		          (p_is_sch <> 0 and subj_code in(
+		            select distinct b.subj_code
+		            from acc_book_sch_subj a
+		            left join acc_subj b
+		              on a.group_id = b.group_id
+		              and a.hos_id = b.hos_id
+		              and a.copy_code = b.copy_code
+		              and b.acc_year between p_acc_year_b and p_acc_year_e
+		              and a.subj_code like b.subj_code || '%'
+		            where a.group_id = p_group_id
+		              and a.hos_id = p_hos_id
+		              and a.copy_code = p_copy_code
+		              and sch_id = p_sch_id
+		          ))
+		          or
+		          (p_is_sch = 0 and subj_code like p_subj_code || '%')
+		        )
+		      )
+		    );
+		
+		  /*追加末级*/
+		  if p_is_last = 1 then
+		    insert into t_acc_books_subj(
+		      subj_code, subj_name, subj_name_all, subj_dire
+		    )
+		    select subj_code, subj_name, subj_name_all, subj_dire
+		    from acc_subj
+		    where group_id = p_group_id
+		      and hos_id = p_hos_id
+		      and instr(p_copy_codes, ';' || copy_code || ';') > 0
+		      and acc_year between p_acc_year_b and p_acc_year_e
+		      and is_last = 1
+		      and (
+		        (p_is_fw = 1 and subj_code between subj_code_begin and subj_code_end)
+		        or
+		        (p_is_fw = 0 and (
+		            (p_is_sch <> 0 and subj_code in(
+		              select b.subj_code
+		              from acc_book_sch_subj a
+		              left join acc_subj b
+		                on a.group_id = b.group_id
+		                and a.hos_id = b.hos_id
+		                and a.copy_code = b.copy_code
+		                and b.acc_year between p_acc_year_b and p_acc_year_e
+		                and a.subj_code like b.subj_code || '%'
+		              where a.group_id = p_group_id
+		                and a.hos_id = p_hos_id
+		                and a.copy_code = p_copy_code
+		                and sch_id = p_sch_id
+		            ))
+		            or
+		            (p_is_sch = 0 and subj_code like p_subj_code || '%')
+		          )
+		        )
+		      )
+		      and not exists(
+		        select 1 from t_acc_books_subj
+		        where acc_subj.subj_code = t_acc_books_subj.subj_code
+		      );
+		  end if;
+		
+		  /*辅助核算类1---BEGIN----*/
+		  v_check_item_type := 0;
+		  v_check_item_code_b := '';
+		  v_check_item_code_e := '';
+		  v_count := 0;
+		  
+		  select count(1)
+		  into v_count
+		  from acc_book_sch_check
+		  where group_id = p_group_id
+		    and hos_id = p_hos_id
+		    and copy_code = p_copy_code
+		    and sch_id = p_sch_id
+		    and sort_code = 1;
+		    
+		  if v_count <> 0 then 
+		    select check_type_id, check_item_code_b, check_item_code_e
+		    into v_check_item_type, v_check_item_code_b, v_check_item_code_e
+		    from acc_book_sch_check
+		    where group_id = p_group_id
+		      and hos_id = p_hos_id
+		      and copy_code = p_copy_code
+		      and sch_id = p_sch_id
+		      and sort_code = 1;
+		  end if;
+		
+		  /*规则页面参数优先级最高其次为方案条件*/
+		  if nvl(v_check_item_type1, 0) = 0 and nvl(v_check_item_type, 0) <> 0 then
+		    v_check_item_type1 := v_check_item_type;
+		  end if;
+		  if nvl(v_check_item_code_b1, '空') = '空' and nvl(v_check_item_code_b, '空') <> '空' then
+		    v_check_item_code_b1 := v_check_item_code_b;
+		  end if;
+		  if nvl(v_check_item_code_e1, '空') = '空' and nvl(v_check_item_code_e, '空') <> '空' then
+		    v_check_item_code_e1 := v_check_item_code_e;
+		  end if;
+		
+		  if nvl(v_check_item_type1, 0) <> 0 then
+		    select is_sys, is_change, case is_sys when 1 then column_check || '_id' else column_check end,
+		      check_table, column_id, column_code, column_name
+		    into p_is_sys, p_is_change, p_column_check, p_check_table,
+		      p_column_id, p_column_code, p_column_name
+		    from acc_check_type
+		    where group_id = p_group_id
+		      and hos_id = p_hos_id
+		      and copy_code = p_copy_code
+		      and check_type_id = v_check_item_type1;
+		    p_insertSql := 'check1, check1_name, ';
+		    p_selectSql := 'check0.' || p_column_check || ' check1, check1.' || p_column_code || ' || '' '' || check1.' || p_column_name || ' check1_name, ';
+		    p_groupSql := 'check0.' || p_column_check || ', check1.' || p_column_code || ', check1.' || p_column_name || ', ';
+		    p_leftJoinSql := 'LEFT JOIN ' || p_check_table || ' check1
+		      ON check0.group_id = check1.group_id
+		      AND check0.hos_id = check1.hos_id
+		      ' || case p_is_sys when 0 then 'AND check0.copy_code = check1.copy_code ' else '' end
+		      || 'AND check0.' || p_column_check || ' = check1.' || p_column_id
+		      || case p_is_change when 1 then ' AND check1.is_stop = 0' else '' end;
+		    p_whereSql := ' AND nvl(check0.' || p_column_check || ', 0) <> 0';
+		    if nvl(v_check_item_code_b1, '空') <> '空' then
+		      p_whereSql := p_whereSql || ' AND check1.' || p_column_code || ' >= ''' || v_check_item_code_b1 || '''';
+		    end if;
+		    if nvl(v_check_item_code_e1, '空') <> '空' then
+		      p_whereSql := p_whereSql || ' AND check1.' || p_column_code || ' <= ''' || v_check_item_code_e1 || '''';
+		    end if;
+		  else
+		    p_error := '请选择核算项！';
+		    return;
+		  end if;
+		  /*辅助核算类1---END----*/
+		
+		  /*辅助核算类2---BEGIN----*/
+		  v_check_item_type := 0;
+		  v_check_item_code_b := '';
+		  v_check_item_code_e := '';
+		  v_count := 0;
+		  
+		  select count(1)
+		  into v_count
+		  from acc_book_sch_check
+		  where group_id = p_group_id
+		    and hos_id = p_hos_id
+		    and copy_code = p_copy_code
+		    and sch_id = p_sch_id
+		    and sort_code = 2;
+		    
+		  if v_count <> 0 then 
+		    select check_type_id, check_item_code_b, check_item_code_e
+		    into v_check_item_type, v_check_item_code_b, v_check_item_code_e
+		    from acc_book_sch_check
+		    where group_id = p_group_id
+		      and hos_id = p_hos_id
+		      and copy_code = p_copy_code
+		      and sch_id = p_sch_id
+		      and sort_code = 2;
+		  end if;
+		
+		  /*规则页面参数优先级最高其次为方案条件*/
+		  if nvl(v_check_item_type2, 0) = 0 and nvl(v_check_item_type, 0) <> 0 then
+		    v_check_item_type2 := v_check_item_type;
+		  end if;
+		  if nvl(v_check_item_code_b2, '空') = '空' and nvl(v_check_item_code_b, '空') <> '空' then
+		    v_check_item_code_b2 := v_check_item_code_b;
+		  end if;
+		  if nvl(v_check_item_code_e2, '空') = '空' and nvl(v_check_item_code_e, '空') <> '空' then
+		    v_check_item_code_e2 := v_check_item_code_e;
+		  end if;
+		
+		  if nvl(v_check_item_type2, 0) <> 0 then
+		    select is_sys, is_change, case is_sys when 1 then column_check || '_id' else column_check end,
+		      check_table, column_id, column_code, column_name
+		    into p_is_sys, p_is_change, p_column_check, p_check_table,
+		      p_column_id, p_column_code, p_column_name
+		    from acc_check_type
+		    where group_id = p_group_id
+		      and hos_id = p_hos_id
+		      and copy_code = p_copy_code
+		      and check_type_id = v_check_item_type2;
+		    p_insertSql := p_insertSql || 'check2, check2_name, ';
+		    p_selectSql := p_selectSql || 'check0.' || p_column_check || ' check2, check2.' || p_column_code || ' || '' '' || check2.' || p_column_name || ' check2_name, ';
+		    p_groupSql := p_groupSql || 'check0.' || p_column_check || ', check2.' || p_column_code || ', check2.' || p_column_name || ', ';
+		    p_leftJoinSql := p_leftJoinSql || 'LEFT JOIN ' || p_check_table || ' check2
+		      ON check0.group_id = check2.group_id
+		      AND check0.hos_id = check2.hos_id
+		      ' || case p_is_sys when 0 then 'AND check0.copy_code = check2.copy_code ' else '' end
+		      || 'AND check0.' || p_column_check || ' = check2.' || p_column_id
+		      || case p_is_change when 1 then ' AND check2.is_stop = 0' else '' end;
+		    p_whereSql := p_whereSql || ' AND nvl(check0.' || p_column_check || ', 0) <> 0';
+		    if nvl(v_check_item_code_b2, '空') <> '空' then
+		      p_whereSql := p_whereSql || ' AND check2.' || p_column_code || ' >= ''' || v_check_item_code_b2 || '''';
+		    end if;
+		    if nvl(v_check_item_code_e2, '空') <> '空' then
+		      p_whereSql := p_whereSql || ' AND check2.' || p_column_code || ' <= ''' || v_check_item_code_e2 || '''';
+		    end if;
+		  end if;
+		  /*辅助核算类2---END----*/
+		
+		  /*辅助核算类3---BEGIN----*/
+		  v_check_item_type := 0;
+		  v_check_item_code_b := '';
+		  v_check_item_code_e := '';
+		  v_count := 0;
+		  
+		  select count(1)
+		  into v_count
+		  from acc_book_sch_check
+		  where group_id = p_group_id
+		    and hos_id = p_hos_id
+		    and copy_code = p_copy_code
+		    and sch_id = p_sch_id
+		    and sort_code = 3;
+		    
+		  if v_count <> 0 then 
+		    select check_type_id, check_item_code_b, check_item_code_e
+		    into v_check_item_type, v_check_item_code_b, v_check_item_code_e
+		    from acc_book_sch_check
+		    where group_id = p_group_id
+		      and hos_id = p_hos_id
+		      and copy_code = p_copy_code
+		      and sch_id = p_sch_id
+		      and sort_code = 3;
+		  end if;
+		
+		  /*规则页面参数优先级最高其次为方案条件*/
+		  if nvl(v_check_item_type3, 0) = 0 and nvl(v_check_item_type, 0) <> 0 then
+		    v_check_item_type3 := v_check_item_type;
+		  end if;
+		  if nvl(v_check_item_code_b3, '空') = '空' and nvl(v_check_item_code_b, '空') <> '空' then
+		    v_check_item_code_b3 := v_check_item_code_b;
+		  end if;
+		  if nvl(v_check_item_code_e3, '空') = '空' and nvl(v_check_item_code_e, '空') <> '空' then
+		    v_check_item_code_e3 := v_check_item_code_e;
+		  end if;
+		
+		  if nvl(v_check_item_type3, 0) <> 0 then
+		    select is_sys, is_change, case is_sys when 1 then column_check || '_id' else column_check end,
+		      check_table, column_id, column_code, column_name
+		    into p_is_sys, p_is_change, p_column_check, p_check_table,
+		      p_column_id, p_column_code, p_column_name
+		    from acc_check_type
+		    where group_id = p_group_id
+		      and hos_id = p_hos_id
+		      and copy_code = p_copy_code
+		      and check_type_id = v_check_item_type3;
+		    p_insertSql := p_insertSql || 'check3, check3_name, ';
+		    p_selectSql := p_selectSql || 'check0.' || p_column_check || ' check3, check3.' || p_column_code || ' || '' '' || check3.' || p_column_name || ' check3_name, ';
+		    p_groupSql := p_groupSql || 'check0.' || p_column_check || ', check3.' || p_column_code || ', check3.' || p_column_name || ', ';
+		    p_leftJoinSql := p_leftJoinSql || 'LEFT JOIN ' || p_check_table || ' check3
+		      ON check0.group_id = check3.group_id
+		      AND check0.hos_id = check3.hos_id
+		      ' || case p_is_sys when 0 then 'AND check0.copy_code = check3.copy_code ' else '' end
+		      || 'AND check0.' || p_column_check || ' = check3.' || p_column_id
+		      || case p_is_change when 1 then ' AND check3.is_stop = 0' else '' end;
+		    p_whereSql := p_whereSql || ' AND nvl(check0.' || p_column_check || ', 0) <> 0';
+		    if nvl(v_check_item_code_b3, '空') <> '空' then
+		      p_whereSql := p_whereSql || ' AND check3.' || p_column_code || ' >= ''' || v_check_item_code_b3 || '''';
+		    end if;
+		    if nvl(v_check_item_code_e3, '空') <> '空' then
+		      p_whereSql := p_whereSql || ' AND check3.' || p_column_code || ' <= ''' || v_check_item_code_e3 || '''';
+		    end if;
+		  end if;
+		  /*辅助核算类3---END----*/
+		
+		  /*辅助核算类4---BEGIN----*/
+		  v_check_item_type := 0;
+		  v_check_item_code_b := '';
+		  v_check_item_code_e := '';
+		  v_count := 0;
+		  
+		  select count(1)
+		  into v_count
+		  from acc_book_sch_check
+		  where group_id = p_group_id
+		    and hos_id = p_hos_id
+		    and copy_code = p_copy_code
+		    and sch_id = p_sch_id
+		    and sort_code = 4;
+		    
+		  if v_count <> 0 then 
+		    select check_type_id, check_item_code_b, check_item_code_e
+		    into v_check_item_type, v_check_item_code_b, v_check_item_code_e
+		    from acc_book_sch_check
+		    where group_id = p_group_id
+		      and hos_id = p_hos_id
+		      and copy_code = p_copy_code
+		      and sch_id = p_sch_id
+		      and sort_code = 4;
+		  end if;
+		
+		  /*规则页面参数优先级最高其次为方案条件*/
+		  if nvl(v_check_item_type4, 0) = 0 and nvl(v_check_item_type, 0) <> 0 then
+		    v_check_item_type4 := v_check_item_type;
+		  end if;
+		  if nvl(v_check_item_code_b4, '空') = '空' and nvl(v_check_item_code_b, '空') <> '空' then
+		    v_check_item_code_b4 := v_check_item_code_b;
+		  end if;
+		  if nvl(v_check_item_code_e3, '空') = '空' and nvl(v_check_item_code_e, '空') <> '空' then
+		    v_check_item_code_e4 := v_check_item_code_e;
+		  end if;
+		
+		  if nvl(v_check_item_type4, 0) <> 0 then
+		    select is_sys, is_change, case is_sys when 1 then column_check || '_id' else column_check end,
+		      check_table, column_id, column_code, column_name
+		    into p_is_sys, p_is_change, p_column_check, p_check_table,
+		      p_column_id, p_column_code, p_column_name
+		    from acc_check_type
+		    where group_id = p_group_id
+		      and hos_id = p_hos_id
+		      and copy_code = p_copy_code
+		      and check_type_id = v_check_item_type4;
+		    p_insertSql := p_insertSql || 'check4, check4_name, ';
+		    p_selectSql := p_selectSql || 'check0.' || p_column_check || ' check4, check4.' || p_column_code || ' || '' '' || check4.' || p_column_name || ' check4_name, ';
+		    p_groupSql := p_groupSql || 'check0.' || p_column_check || ', check4.' || p_column_code || ', check4.' || p_column_name || ', ';
+		    p_leftJoinSql := p_leftJoinSql || 'LEFT JOIN ' || p_check_table || ' check4
+		      ON check0.group_id = check4.group_id
+		      AND check0.hos_id = check4.hos_id
+		      ' || case p_is_sys when 0 then 'AND check0.copy_code = check4.copy_code ' else '' end
+		      || 'AND check0.' || p_column_check || ' = check4.' || p_column_id
+		      || case p_is_change when 1 then ' AND check4.is_stop = 0' else '' end;
+		    p_whereSql := p_whereSql || ' AND nvl(check0.' || p_column_check || ', 0) <> 0';
+		    if nvl(v_check_item_code_b4, '空') <> '空' then
+		      p_whereSql := p_whereSql || ' AND check4.' || p_column_code || ' >= ''' || v_check_item_code_b4 || '''';
+		    end if;
+		    if nvl(v_check_item_code_e4, '空') <> '空' then
+		      p_whereSql := p_whereSql || ' AND check4.' || p_column_code || ' <= ''' || v_check_item_code_e4 || '''';
+		    end if;
+		  end if;
+		
+		end PRC_ACC_BOOKS_SCH;
+	]]></sql>
+</root>
+

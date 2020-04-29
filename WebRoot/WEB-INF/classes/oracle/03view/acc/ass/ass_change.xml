@@ -1,0 +1,249 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+	<sql ID="v_acc_ass_change_m" TYPE="VIEW" DESC="原值变动主表信息"><![CDATA[
+	CREATE OR REPLACE VIEW V_ACC_ASS_CHANGE_M AS
+	  SELECT 
+        RS.GROUP_ID,  --集团ID
+        RS.HOS_ID,    --医院ID
+        RS.COPY_CODE, --账套编码
+        RS.CHANGE_NO AS BUSINESS_ID,     --单据ID
+        RS.CHANGE_NO AS BUSINESS_NO,     --单据号
+        RS.VEN_ID SUP_ID,  --供应商ID
+	    HSD.SUP_NO,  --供应商变更ID
+	    HSD.SUP_CODE,    --供应商编码
+	    HSD.SUP_NAME,    --供应商名称     
+        RS.CREATE_EMP MAKER,    --制单人ID
+        SM.USER_NAME AS MAKER_NAME, --制单人名称      
+        RS.CREATE_DATE AS MAKE_DATE,    --编制日期
+        RS.CHANGE_DATE AS BUSI_DATE,    --业务日期
+        RS.AUDIT_EMP CONFIRMER,    --确认人ID
+        SF.USER_NAME AS CONFIRMER_NAME,    --确认人
+        RS.STATE       --状态
+	     FROM (
+		  SELECT
+		    T.GROUP_ID,
+		    T.HOS_ID,
+		    T.COPY_CODE,
+		    T.CHANGE_NO,
+		    T.VEN_ID,
+		    T.VEN_NO,
+		    T.CREATE_EMP,
+		    T.CREATE_DATE,
+		    T.AUDIT_EMP,
+		    T.CHANGE_DATE,
+		    T.STATE,
+		    T.NOTE
+		  FROM ASS_CHANGE_HOUSE T
+		  WHERE T.STATE=2
+		  UNION ALL
+		  SELECT
+		    T.GROUP_ID,
+		    T.HOS_ID,
+		    T.COPY_CODE,
+		    T.CHANGE_NO,
+		    T.VEN_ID,
+		    T.VEN_NO,
+		    T.CREATE_EMP,
+		    T.CREATE_DATE,
+		    T.AUDIT_EMP,
+		    T.CHANGE_DATE,
+		    T.STATE,
+		    T.NOTE
+		  FROM ASS_CHANGE_SPECIAL T
+		  WHERE T.STATE=2
+		  UNION ALL
+		  SELECT
+		    T.GROUP_ID,
+		    T.HOS_ID,
+		    T.COPY_CODE,
+		    T.CHANGE_NO,
+		    T.VEN_ID,
+		    T.VEN_NO,
+		    T.CREATE_EMP,
+		    T.CREATE_DATE,
+		    T.AUDIT_EMP,
+		    T.CHANGE_DATE,
+		    T.STATE,
+		    T.NOTE
+		  FROM ASS_CHANGE_GENERAL T
+		  WHERE T.STATE=2
+		  UNION ALL
+		  SELECT
+		    T.GROUP_ID,
+		    T.HOS_ID,
+		    T.COPY_CODE,
+		    T.CHANGE_NO,
+		    T.VEN_ID,
+		    T.VEN_NO,
+		    T.CREATE_EMP,
+		    T.CREATE_DATE,
+		    T.AUDIT_EMP,
+		    T.CHANGE_DATE,
+		    T.STATE,
+		    T.NOTE
+		  FROM ASS_CHANGE_OTHER T
+		  WHERE T.STATE=2
+		  ) RS
+     LEFT JOIN HOS_SUP_DICT HSD 
+	 ON 
+	        RS.GROUP_ID=HSD.GROUP_ID 
+	    AND RS.HOS_ID=HSD.HOS_ID
+	    AND RS.VEN_ID=HSD.SUP_ID
+	    AND RS.VEN_NO=HSD.SUP_NO
+	 LEFT JOIN SYS_USER SM  --制单人
+	 ON 
+	        RS.GROUP_ID=SM.GROUP_ID
+	    AND RS.HOS_ID=SM.HOS_ID
+	    AND RS.COPY_CODE=SM.COPY_CODE
+	    AND RS.CREATE_EMP=SM.USER_ID
+	 LEFT JOIN SYS_USER SF   --确认人
+	 ON 
+	        RS.GROUP_ID=SF.GROUP_ID
+	    AND RS.HOS_ID=SF.HOS_ID
+	    AND RS.COPY_CODE=SF.COPY_CODE
+	    AND RS.AUDIT_EMP=SF.USER_ID
+	]]></sql>
+	<sql ID="v_acc_ass_change_d" TYPE="VIEW" DESC="原值变动明细表信息"><![CDATA[
+	CREATE OR REPLACE VIEW V_ACC_ASS_CHANGE_D AS
+	  SELECT
+         RS.GROUP_ID,--集团ID
+         RS.HOS_ID,  --单位ID
+         RS.COPY_CODE, --账套编码
+         RS.CHANGE_NO AS BUSINESS_ID,  --单据ID
+         RS.CHANGE_NO AS BUSINESS_NO,  --单据号
+         RS.ASS_ID ,    --资产ID
+         ATD.ASS_TYPE_ID AS SUB_TYPE_ID, --分类ID
+         ATD.ASS_TYPE_CODE, --分类编码
+         ATD.ASS_TYPE_NAME, --分类名称
+         RS.ASS_CARD_NO, --卡片号
+         RS.SOURCE_ID,  --资金来源ID
+         HS.SOURCE_CODE,    --资金来源编码
+         HS.SOURCE_NAME,    --资金来源名称
+         HS.SOURCE_ATTR FUND_SOURCE_ATTR,--资金来源性质
+         HSN.NATURE_CODE AS SOURCE_NATURE_CODE, --资金来源属性
+         HSN.NATURE_NAME AS SOURCE_NATURE_NAME, --资金来源性质名称
+         RS.CHANGE_PRICE AMOUNT_MONEY  --变动金额
+       FROM(
+         SELECT 
+           T.GROUP_ID,
+           T.HOS_ID,
+           T.COPY_CODE,
+           T.CHANGE_NO,
+           T.ASS_CARD_NO,
+           S.SOURCE_ID,
+           S.CHANGE_PRICE,
+           R.ASS_ID,
+           R.ASS_NO
+         FROM ASS_CHANGE_DETAIL_HOUSE T
+         LEFT JOIN ASS_CHANGE_SOURCE_HOUSE S
+         ON 
+           T.GROUP_ID=S.GROUP_ID 
+           AND T.HOS_ID=S.HOS_ID 
+           AND T.COPY_CODE=S.COPY_CODE
+           AND T.CHANGE_NO=S.CHANGE_NO
+           AND T.ASS_CARD_NO=S.ASS_CARD_NO 
+         LEFT JOIN ASS_CARD_HOUSE R
+         ON 
+               T.GROUP_ID=R.GROUP_ID 
+           AND T.HOS_ID=R.HOS_ID 
+           AND T.COPY_CODE=R.COPY_CODE
+           AND T.ASS_CARD_NO=R.ASS_CARD_NO 
+         UNION ALL
+         SELECT 
+           T.GROUP_ID,
+           T.HOS_ID,
+           T.COPY_CODE,
+           T.CHANGE_NO,
+           T.ASS_CARD_NO,
+           S.SOURCE_ID,
+           S.CHANGE_PRICE,
+           R.ASS_ID,
+           R.ASS_NO
+         FROM ASS_CHANGE_DETAIL_SPECIAL T
+         LEFT JOIN ASS_CHANGE_SOURCE_SPECIAL S
+         ON 
+           T.GROUP_ID=S.GROUP_ID 
+           AND T.HOS_ID=S.HOS_ID 
+           AND T.COPY_CODE=S.COPY_CODE
+           AND T.CHANGE_NO=S.CHANGE_NO
+           AND T.ASS_CARD_NO=S.ASS_CARD_NO
+         LEFT JOIN ASS_CARD_SPECIAL R
+         ON 
+               T.GROUP_ID=R.GROUP_ID 
+           AND T.HOS_ID=R.HOS_ID 
+           AND T.COPY_CODE=R.COPY_CODE
+           AND T.ASS_CARD_NO=R.ASS_CARD_NO 
+         UNION ALL
+         SELECT 
+           T.GROUP_ID,
+           T.HOS_ID,
+           T.COPY_CODE,
+           T.CHANGE_NO,
+           T.ASS_CARD_NO,
+           S.SOURCE_ID,
+           S.CHANGE_PRICE,
+           R.ASS_ID,
+           R.ASS_NO
+         FROM ASS_CHANGE_DETAIL_GENERAL T
+         LEFT JOIN ASS_CHANGE_SOURCE_GENERAL S
+         ON 
+           T.GROUP_ID=S.GROUP_ID 
+           AND T.HOS_ID=S.HOS_ID 
+           AND T.COPY_CODE=S.COPY_CODE
+           AND T.CHANGE_NO=S.CHANGE_NO
+           AND T.ASS_CARD_NO=S.ASS_CARD_NO
+         LEFT JOIN ASS_CARD_GENERAL R
+         ON 
+               T.GROUP_ID=R.GROUP_ID 
+           AND T.HOS_ID=R.HOS_ID 
+           AND T.COPY_CODE=R.COPY_CODE
+           AND T.ASS_CARD_NO=R.ASS_CARD_NO
+         UNION ALL
+         SELECT 
+           T.GROUP_ID,
+           T.HOS_ID,
+           T.COPY_CODE,
+           T.CHANGE_NO,
+           T.ASS_CARD_NO,
+           S.SOURCE_ID,
+           S.CHANGE_PRICE,
+           R.ASS_ID,
+           R.ASS_NO
+         FROM ASS_CHANGE_DETAIL_OTHER T
+         LEFT JOIN ASS_CHANGE_SOURCE_OTHER S
+         ON 
+           T.GROUP_ID=S.GROUP_ID 
+           AND T.HOS_ID=S.HOS_ID 
+           AND T.COPY_CODE=S.COPY_CODE
+           AND T.CHANGE_NO=S.CHANGE_NO
+           AND T.ASS_CARD_NO=S.ASS_CARD_NO
+         LEFT JOIN ASS_CARD_OTHER R
+         ON 
+               T.GROUP_ID=R.GROUP_ID 
+           AND T.HOS_ID=R.HOS_ID 
+           AND T.COPY_CODE=R.COPY_CODE
+           AND T.ASS_CARD_NO=R.ASS_CARD_NO
+      ) RS
+      LEFT JOIN HOS_SOURCE HS
+      ON 
+         RS.GROUP_ID=HS.GROUP_ID
+         AND RS.HOS_ID=HS.HOS_ID
+         AND RS.SOURCE_ID=HS.SOURCE_ID
+      LEFT JOIN HOS_SOURCE_NATURE HSN
+      ON 
+         HS.SOURCE_ATTR=HSN.NATURE_CODE
+      LEFT JOIN ASS_NO_DICT AD
+      ON 
+         RS.GROUP_ID=AD.GROUP_ID
+         AND RS.HOS_ID=AD.HOS_ID
+         AND RS.COPY_CODE=AD.COPY_CODE
+         AND RS.ASS_ID=AD.ASS_ID
+         AND RS.ASS_NO=AD.ASS_NO
+      LEFT JOIN ASS_TYPE_DICT ATD
+      ON 
+         RS.GROUP_ID=ATD.GROUP_ID
+         AND RS.HOS_ID=ATD.HOS_ID
+         AND RS.COPY_CODE=ATD.COPY_CODE
+         AND AD.ASS_TYPE_ID=ATD.ASS_TYPE_ID
+   ]]></sql>
+</root>        

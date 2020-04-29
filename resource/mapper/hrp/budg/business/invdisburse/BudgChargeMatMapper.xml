@@ -1,0 +1,693 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.budg.dao.business.invdisburse.BudgChargeMatMapper">
+	
+	<resultMap id="budgChargeMat" type="com.chd.hrp.budg.entity.BudgChargeMat">
+	<result property="group_id" column="group_id"/>
+	<result property="hos_id" column="hos_id"/>
+	<result property="copy_code" column="copy_code"/>
+	<result property="year" column="year"/>
+	<result property="month" column="month"/>
+	<result property="dept_id" column="dept_id"/>
+	<result property="mat_type_id" column="mat_type_id"/>
+	<result property="last_cost" column="last_cost"/>
+	<result property="grow_rate" column="grow_rate"/>
+	<result property="count_value" column="count_value"/>
+	<result property="adj_rate" column="adj_rate"/>
+	<result property="cost_budg" column="cost_budg"/>
+	<result property="remark" column="remark"/>
+	</resultMap>
+		
+	<resultMap id="budgChargeMatMap" type="java.util.Map">
+	<result property="group_id" column="group_id"/>
+	<result property="hos_id" column="hos_id"/>
+	<result property="copy_code" column="copy_code"/>
+	<result property="year" column="year"/>
+	<result property="month" column="month"/>
+	<result property="dept_id" column="dept_id"/>
+	<result property="dept_name" column="dept_name"/>
+	<result property="mat_type_id" column="mat_type_id"/>
+	<result property="mat_type_name" column="mat_type_name"/>
+	<result property="last_cost" column="last_cost"/>
+	<result property="grow_rate" column="grow_rate"/>
+	<result property="count_value" column="count_value"/>
+	<result property="adj_rate" column="adj_rate"/>
+	<result property="cost_budg" column="cost_budg"/>
+	<result property="remark" column="remark"/>
+	<result property="subj_code" column="subj_code"/>
+	<result property="budg_value" column="budg_value"/>
+	<result property="amount" column="amount"/>
+	</resultMap>
+	
+	<select id="queryInsertData" parameterType="java.util.Map" resultMap="budgChargeMatMap">
+		with t as( <!-- 科室月份 历史执行数据  信息 -->
+			select  a.group_id , a.hos_id , a.copy_code , a.year ,a.month , a.dept_id , a.subj_code , b.dept_code ,
+				sum(amount) amount 
+			from BUDG_MED_INCOME_EXECUTE a
+			Left join hos_dept_dict  b
+				on	
+					a.group_id  = b.group_id
+					and a.hos_id  = b.hos_id
+					and a.dept_id  = b.dept_id
+					and b.is_stop = 0
+			where 
+				a.group_id = #{group_id,jdbcType=INTEGER}
+				AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+				AND a.year = ${year}-1
+			group by a.group_id , a.hos_id , a.copy_code , a.year ,a.month , a.dept_id , a.subj_code , b.dept_code
+		),
+		deptData as ( <!-- 筛选 预算科室 信息  -->
+			select  ada.group_id , ada.hos_id , ada.dept_id , hdd.dept_code
+			from acc_dept_attr  ada
+			left  join hos_dept_dict  hdd
+				on	
+					ada.group_id  = hdd.group_id
+					and ada.hos_id  = hdd.hos_id
+					and ada.dept_id  = hdd.dept_id
+					and hdd.is_stop = 0
+			where 
+				ada.group_id = #{group_id,jdbcType=INTEGER}
+				AND ada.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND ada.is_budg = 1
+		),
+		
+		dataBase as ( <!-- 从t 及 deptData  临时表中  归集  预算科室 末级科目 历史执行数据  -->
+			select a.group_id , a.hos_id , t.copy_code , t.year , t.month , a.dept_id , t.subj_code , sum(t.amount) amount
+			from deptData a
+			left join t 
+				on
+					a.group_id = t.group_id
+					and a.hos_id = t.hos_id
+					and t.dept_code like (a.dept_code || '%')
+			group by  a.group_id , a.hos_id , t.copy_code , t.year , t.month , a.dept_id , t.subj_code
+		) ,
+		temp as
+			 (select income_subj_code
+			    from budg_mat_type_income
+			   where group_id = #{group_id,jdbcType=INTEGER}
+			     and hos_id = #{hos_id,jdbcType=INTEGER}
+			     and copy_code = #{copy_code,jdbcType=VARCHAR}
+			     and budg_year = #{year,jdbcType=VARCHAR}),
+			
+		  temp2 as
+			  (select bmidm.group_id,
+			       bmidm.hos_id,
+			       bmidm.copy_code,
+			       bmidm.year,
+			       bmidm.dept_id,
+			       bmidm.month,
+			       bmti.mat_type_id,
+			       nvl(sum(a.amount),0) as last_income,
+			       case nvl(sum(a.amount),0) when 0 then 0 else round((sum(bmidm.budg_value)/nvl(sum(a.amount),0)-1)*100,2) end as grow_rate 
+			  from budg_med_income_dept_month bmidm
+			  left join dataBase a
+			  on   bmidm.group_id = a.group_id and
+			       bmidm.hos_id = a.hos_id and
+			       bmidm.copy_code = a.copy_code and
+			       bmidm.year = a.year+1 and
+			       bmidm.dept_id = a.dept_id and
+			       bmidm.month = a.month and
+			       a.subj_code like (bmidm.subj_code || '%') and 
+			       bmidm.subj_code in (select income_subj_code from temp)
+			  left join budg_mat_type_income bmti
+			  on bmidm.group_id = bmti.group_id and
+			       bmidm.hos_id = bmti.hos_id and
+			       bmidm.copy_code = bmti.copy_code and
+			       bmidm.year = bmti.budg_year and
+			       bmidm.subj_code = bmti.income_subj_code
+			 where bmidm.group_id = #{group_id,jdbcType=INTEGER}
+			   and bmidm.hos_id = #{hos_id,jdbcType=INTEGER}
+			   and bmidm.copy_code = #{copy_code,jdbcType=VARCHAR}
+			   and bmidm.year = #{year,jdbcType=VARCHAR}
+			   and a.year is not null
+			   and bmidm.subj_code in (select income_subj_code from temp)
+			 group by bmidm.group_id,
+			          bmidm.hos_id,
+			          bmidm.copy_code,
+			          bmidm.dept_id,
+			          bmidm.year,
+			          bmti.mat_type_id,
+			          bmidm.month )
+		 select 
+	         bcmc.group_id,
+	         bcmc.hos_id,
+	         bcmc.copy_code,
+	         (bcmc.year+1) as year,
+	         bcmc.month,
+	         bcmc.dept_id,
+	         bcmc.mat_type_id,
+	         nvl(bcmc.amount,0) last_cost,
+	         nvl(temp2.grow_rate,0) grow_rate
+	      from budg_charge_mat_cost bcmc 
+	      left join temp2
+	        on bcmc.group_id = temp2.group_id
+	        and bcmc.hos_id =  temp2.hos_id
+	        and bcmc.copy_code =  temp2.copy_code
+	        and bcmc.year+1 =  temp2.year
+	        and bcmc.month =  temp2.month
+	        and bcmc.dept_id =  temp2.dept_id
+	        and bcmc.mat_type_id = temp2.mat_type_id
+	        and bcmc.mat_type_id in (
+	         select 
+	             mat_type_id
+	         from budg_mat_type_subj
+	         where group_id = #{group_id,jdbcType=INTEGER}
+			     and hos_id = #{hos_id,jdbcType=INTEGER}
+			     and copy_code = #{copy_code,jdbcType=VARCHAR}
+			     and budg_year = #{year,jdbcType=VARCHAR})
+	      left join hos_dept_dict hdd
+	        on bcmc.group_id = hdd.group_id
+	       and bcmc.hos_id = hdd.hos_id
+	       and bcmc.dept_id = hdd.dept_id
+	       and hdd.is_stop = 0
+	      left join acc_dept_attr ada
+	        on hdd.group_id = ada.group_id
+	       and hdd.hos_id = ada.hos_id
+	       and hdd.dept_id = ada.dept_id
+	       and ada.is_budg = 1
+	      
+	      where bcmc.group_id = #{group_id,jdbcType=INTEGER}
+	       and bcmc.hos_id = #{hos_id,jdbcType=INTEGER}
+	       and bcmc.copy_code = #{copy_code,jdbcType=VARCHAR}
+	       and bcmc.year = #{year}-1
+	</select>
+	
+<!-- 	查询预算年度对应关系是否为空 -->
+	<select id="queryIncomeSubj" parameterType="java.util.Map" resultType="java.lang.Integer">
+		  select 
+	      	count(mat_type_id)
+	      from budg_mat_type_subj
+	      where group_id = #{group_id}
+	          and hos_id = #{hos_id}
+	          and copy_code = #{copy_code}
+	          and budg_year = #{year}
+	</select>
+	
+	<select id="querySubjCodebyYearOrMatTypeId" resultMap="budgChargeMatMap" parameterType="java.util.Map">
+		select 
+		   bcmc.group_id,
+	       bcmc.hos_id,
+	       bcmc.copy_code,
+	       bcmc.year,
+	       bcmc.month,
+	       bcmc.dept_id,
+	       bcmc.mat_type_id,
+	       nvl(bcmc.amount,0) amount
+	    from budg_charge_mat_cost bcmc
+	    left join hos_dept_dict hdd
+		    on bcmc.group_id = hdd.group_id
+		   and bcmc.hos_id = hdd.hos_id
+		   and bcmc.dept_id = hdd.dept_id
+		   and hdd.is_stop = 0
+	    left join acc_dept_attr ada
+		    on hdd.group_id = ada.group_id
+		   and hdd.hos_id = ada.hos_id
+		   and hdd.dept_id = ada.dept_id
+		   and ada.is_budg = 1
+	    where bcmc.group_id = #{group_id}
+		   and bcmc.hos_id = #{hos_id}
+		   and bcmc.copy_code = #{copy_code}
+		   and bcmc.year = #{year}-1
+		   and bcmc.mat_type_id in (
+		   select 
+		       mat_type_id
+		    from budg_mat_type_subj
+		    where group_id = #{group_id}
+		          and hos_id = #{hos_id}
+		          and copy_code = #{copy_code}
+		          and budg_year = #{year})
+	</select>
+	
+	<insert id="add" useGeneratedKeys="true" >
+	
+		INSERT INTO BUDG_CHARGE_MAT (
+			group_id
+			,
+			hos_id
+			,
+			copy_code
+			,
+			year
+			,
+			month
+			,
+			dept_id
+			,
+			mat_type_id
+			,
+			last_cost
+			,
+			grow_rate
+			,
+			count_value
+			,
+			<if test="adj_rate != null and adj_rate != ''">
+			adj_rate
+			,
+			</if>
+			<if test="cost_budg != null and cost_budg != ''">
+			cost_budg
+			,
+			</if>
+			<if test="remark != null and remark != ''">
+			remark
+			</if>
+		) VALUES (
+			#{group_id,jdbcType=INTEGER}
+			,
+			#{hos_id,jdbcType=INTEGER}
+			,
+			#{copy_code,jdbcType=VARCHAR}
+			,
+			#{year,jdbcType=VARCHAR}
+			,
+			#{month,jdbcType=VARCHAR}
+			,
+			#{dept_id,jdbcType=INTEGER}
+			,
+			#{mat_type_id,jdbcType=INTEGER}
+			,
+			#{last_cost,jdbcType=INTEGER}
+			,
+			#{grow_rate,jdbcType=INTEGER}
+			,
+			#{count_value,jdbcType=INTEGER}
+			,
+			<if test="adj_rate != null and adj_rate != ''">
+			#{adj_rate,jdbcType=INTEGER}
+			,
+			</if>
+			<if test="cost_budg != null and cost_budg != ''">
+			#{cost_budg,jdbcType=INTEGER}
+			,
+			</if>
+			<if test="remark != null and remark != ''">
+			#{remark,jdbcType=VARCHAR}
+			</if>
+		)
+	
+	</insert>
+	<insert id="addBatch" parameterType="java.util.List" >
+	
+		INSERT INTO BUDG_CHARGE_MAT (
+			group_id
+			,
+			hos_id
+			,
+			copy_code
+			,
+			year
+			,
+			month
+			,
+			dept_id
+			,
+			mat_type_id
+			,
+			last_cost
+			,
+			grow_rate
+			,
+			count_value
+			,
+			adj_rate
+			,
+			cost_budg
+			,
+			remark
+		) select t.* from(
+		<foreach collection="list" item="item" index="index" separator=" union all " >
+			select 		
+				#{item.group_id,jdbcType=INTEGER}
+				,
+				#{item.hos_id,jdbcType=INTEGER}
+				,
+				#{item.copy_code,jdbcType=VARCHAR}
+				,
+				#{item.year,jdbcType=VARCHAR}
+				,
+				#{item.month,jdbcType=VARCHAR}
+				,
+				#{item.dept_id,jdbcType=INTEGER}
+				,
+				#{item.mat_type_id,jdbcType=INTEGER}
+				,
+				#{item.last_cost,jdbcType=INTEGER}
+				,
+				#{item.grow_rate,jdbcType=INTEGER}
+				,
+				#{item.count_value,jdbcType=INTEGER}
+				,
+				#{item.adj_rate,jdbcType=INTEGER}
+				,
+				#{item.cost_budg,jdbcType=INTEGER}
+				,
+				#{item.remark,jdbcType=VARCHAR}
+		    from dual
+		</foreach>
+		)t
+	</insert>
+	
+	<insert id="generateAddBatch" parameterType="java.util.List" >
+	
+		INSERT INTO BUDG_CHARGE_MAT (
+			group_id
+			,
+			hos_id
+			,
+			copy_code
+			,
+			year
+			,
+			month
+			,
+			dept_id
+			,
+			mat_type_id
+			,
+			last_cost
+			,
+			grow_rate
+			,
+			count_value
+			,
+			adj_rate
+			,
+			cost_budg
+			,
+			remark
+		) select t.* from(
+		<foreach collection="list" item="item" index="index" separator=" union all " >
+			select 		
+				#{item.group_id,jdbcType=INTEGER}
+				,
+				#{item.hos_id,jdbcType=INTEGER}
+				,
+				#{item.copy_code,jdbcType=VARCHAR}
+				,
+				#{item.year,jdbcType=VARCHAR}
+				,
+				#{item.month,jdbcType=VARCHAR}
+				,
+				#{item.dept_id,jdbcType=INTEGER}
+				,
+				#{item.mat_type_id,jdbcType=INTEGER}
+				,
+				#{item.last_cost,jdbcType=INTEGER}
+				,
+				#{item.grow_rate,jdbcType=INTEGER}
+				,
+				(#{item.last_cost}*( 1+#{item.grow_rate})) count_value
+				,
+				0 adj_rate<!-- 默认调整比例 为 0 -->
+				,
+				(#{item.last_cost}*( 1+#{item.grow_rate})) cost_budg
+				,
+				null reamrk
+		    from dual
+		</foreach>
+		)t
+	</insert>
+	
+	<update id="update" parameterType="java.util.Map">
+	
+		UPDATE budg_charge_mat 
+		SET
+			<if test="cost_budg != null and cost_budg != ''">
+			cost_budg = #{cost_budg,jdbcType=INTEGER}
+			,
+			</if>
+			<if test="remark != null and remark != ''">
+			remark = #{remark,jdbcType=VARCHAR}
+			</if>
+		WHERE                    
+		    group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND year = #{year,jdbcType=VARCHAR}
+			AND month = #{month,jdbcType=VARCHAR}
+			AND dept_id = #{dept_id,jdbcType=INTEGER}
+			AND mat_type_id = #{mat_type_id,jdbcType=INTEGER}
+	</update>
+	
+	<update id="budgChargeMatUpdateAdjRate" parameterType="java.util.List">
+	
+		<foreach collection="list" item="item" index="index" open="begin" close=";end;" separator=";" >
+			UPDATE budg_charge_mat 
+			SET
+				grow_rate = #{item.grow_rate,jdbcType=INTEGER},
+				count_value = #{item.count_value,jdbcType=INTEGER},
+				adj_rate = #{item.adj_rate,jdbcType=INTEGER},
+				cost_budg = #{item.cost_budg,jdbcType=INTEGER},
+				remark = #{item.remark,jdbcType=VARCHAR}
+			where                     
+				 group_id = #{item.group_id,jdbcType=INTEGER}
+				AND hos_id = #{item.hos_id,jdbcType=INTEGER}
+				AND copy_code = #{item.copy_code,jdbcType=VARCHAR}
+				AND year = #{item.year,jdbcType=VARCHAR}
+				AND month = #{item.month,jdbcType=VARCHAR}
+				AND dept_id = #{item.dept_id,jdbcType=INTEGER}
+				AND mat_type_id = #{item.mat_type_id,jdbcType=INTEGER}
+			
+		</foreach>
+		
+	</update>
+	
+	<delete id="delete" parameterType="java.util.Map">
+	
+		DELETE FROM budg_charge_mat 
+		WHERE                     
+		group_id = #{group_id,jdbcType=INTEGER}
+		
+		AND hos_id = #{hos_id,jdbcType=INTEGER}
+		
+		AND copy_code = #{copy_code,jdbcType=VARCHAR}
+		
+		AND year = #{year,jdbcType=VARCHAR}
+		<if test="month != null and month != ''"> 
+		AND month = #{month,jdbcType=VARCHAR}
+		</if>
+		<if test="dept_id != null and dept_id != ''"> 
+		AND dept_id = #{dept_id,jdbcType=INTEGER}
+		</if>
+		<if test="mat_type_id != null and mat_type_id != ''">
+		AND mat_type_id = #{mat_type_id,jdbcType=INTEGER}
+		</if>
+	</delete>
+	
+	<delete id="deleteBatch" parameterType="java.util.List">
+		DELETE FROM budg_charge_mat 
+		where
+			<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+				group_id = #{item.group_id,jdbcType=INTEGER}
+				AND hos_id = #{item.hos_id,jdbcType=INTEGER}
+				AND copy_code = #{item.copy_code,jdbcType=VARCHAR}
+				AND year = #{item.year,jdbcType=VARCHAR}
+				AND month = #{item.month,jdbcType=VARCHAR}
+				AND dept_id = #{item.dept_id,jdbcType=INTEGER}
+				AND mat_type_id = #{item.mat_type_id,jdbcType=INTEGER}
+			</foreach>
+	</delete>
+	<select id="query" parameterType="java.util.Map" resultMap="budgChargeMatMap" >
+	
+		SELECT 
+			    bcm.group_id,
+			    bcm.hos_id,
+			    bcm.copy_code,
+			    bcm.year,
+			    bcm.month,
+			    bcm.dept_id,
+			    hdd.dept_name,
+			    bcm.mat_type_id,
+			    mtd.mat_type_name,
+			    bcm.last_cost,
+			    nvl(bcm.grow_rate,0) grow_rate,
+			    nvl(bcm.count_value,0) count_value,
+			    nvl(bcm.adj_rate,0) adj_rate,
+			    nvl(bcm.cost_budg,0) cost_budg,
+			    bcm.remark
+		    FROM BUDG_CHARGE_MAT bcm
+		    left join hos_dept_dict hdd
+		    on bcm.group_id = hdd.group_id
+			   and bcm.hos_id = hdd.hos_id
+			   and bcm.dept_id = hdd.dept_id
+			   and hdd.is_stop = 0 
+			   and hdd.is_disable = 0 
+		    left join mat_type_dict mtd
+		    on bcm.group_id = mtd.group_id
+			   and bcm.hos_id = mtd.hos_id
+			   and bcm.copy_code = mtd.copy_code
+			   and bcm.mat_type_id = mtd.mat_type_id
+			   and mtd.is_stop = 0
+		WHERE                     
+			 bcm.group_id = #{group_id,jdbcType=INTEGER}
+			 AND  bcm.hos_id = #{hos_id,jdbcType=INTEGER}
+			 AND  bcm.copy_code = #{copy_code,jdbcType=VARCHAR}
+		<if test="year != null and year != ''">
+		AND  bcm.year = #{year,jdbcType=VARCHAR}
+		</if>
+		<if test="month != null and month != ''">
+		AND  bcm.month = #{month,jdbcType=VARCHAR}
+		</if>
+		<if test="dept_id != null and dept_id != ''">
+		AND  bcm.dept_id = #{dept_id,jdbcType=INTEGER}
+		</if>
+		<if test="mat_type_id != null and mat_type_id != ''">
+		AND  bcm.mat_type_id = #{mat_type_id,jdbcType=INTEGER}
+		</if>
+		order by bcm.mat_type_id， bcm.month asc
+	</select>
+	
+	<select id="queryByCode" resultMap="budgChargeMatMap"  parameterType="java.util.Map" >
+	
+			SELECT 
+			    bcm.group_id,
+			    bcm.hos_id,
+			    bcm.copy_code,
+			    bcm.year,
+			    bcm.month,
+			    bcm.dept_id,
+			    hdd.dept_name,
+			    bcm.mat_type_id,
+			    mtd.mat_type_name,
+			    bcm.last_cost,
+			    bcm.grow_rate,
+			    bcm.count_value,
+			    bcm.adj_rate,
+			    bcm.cost_budg,
+			    bcm.remark
+		    FROM BUDG_CHARGE_MAT bcm
+		    left join hos_dept_dict hdd
+		    on bcm.group_id = hdd.group_id
+			   and bcm.hos_id = hdd.hos_id
+			   and bcm.dept_id = hdd.dept_id
+			   and hdd.is_stop = 0 
+			   and hdd.is_disable = 0 
+		    left join mat_type_dict mtd
+		    on bcm.group_id = mtd.group_id
+			   and bcm.hos_id = mtd.hos_id
+			   and bcm.copy_code = mtd.copy_code
+			   and bcm.mat_type_id = mtd.mat_type_id
+			   and mtd.is_stop = 0
+		WHERE 
+		bcm.group_id = #{group_id,jdbcType=INTEGER}   and 
+		bcm.hos_id = #{hos_id,jdbcType=INTEGER}   and 
+		bcm.copy_code = #{copy_code,jdbcType=VARCHAR}   and 
+		bcm.year = #{year,jdbcType=VARCHAR}   and 
+		bcm.month = #{month,jdbcType=VARCHAR}   and 
+		bcm.dept_id = #{dept_id,jdbcType=INTEGER}   and 
+		bcm.mat_type_id = #{mat_type_id,jdbcType=INTEGER} 
+	
+	</select>
+	<select id="queryByUniqueness" resultMap="budgChargeMat"  parameterType="java.util.Map" >
+	
+		SELECT 
+		group_id,
+		hos_id,
+		copy_code,
+		year,
+		month,
+		dept_id,
+		mat_type_id,
+		last_cost,
+		grow_rate,
+		count_value,
+		adj_rate,
+		cost_budg,
+		remark
+		FROM BUDG_CHARGE_MAT 
+		<where>                     
+		<if test="group_id != null and group_id != ''">
+		AND group_id = #{group_id,jdbcType=INTEGER}
+		</if>
+		<if test="hos_id != null and hos_id != ''">
+		AND hos_id = #{hos_id,jdbcType=INTEGER}
+		</if>
+		<if test="copy_code != null and copy_code != ''">
+		AND copy_code = #{copy_code,jdbcType=VARCHAR}
+		</if>
+		<if test="year != null and year != ''">
+		AND year = #{year,jdbcType=VARCHAR}
+		</if>
+		<if test="month != null and month != ''">
+		AND month = #{month,jdbcType=VARCHAR}
+		</if>
+		<if test="dept_id != null and dept_id != ''">
+		AND dept_id = #{dept_id,jdbcType=INTEGER}
+		</if>
+		<if test="mat_type_id != null and mat_type_id != ''">
+		AND mat_type_id = #{mat_type_id,jdbcType=INTEGER}
+		</if>
+		<if test="last_cost != null and last_cost != ''">
+		AND last_cost = #{last_cost,jdbcType=INTEGER}
+		</if>
+		<if test="grow_rate != null and grow_rate != ''">
+		AND grow_rate = #{grow_rate,jdbcType=INTEGER}
+		</if>
+		<if test="count_value != null and count_value != ''">
+		AND count_value = #{count_value,jdbcType=INTEGER}
+		</if>
+		<if test="adj_rate != null and adj_rate != ''">
+		AND adj_rate = #{adj_rate,jdbcType=INTEGER}
+		</if>
+		<if test="cost_budg != null and cost_budg != ''">
+		AND cost_budg = #{cost_budg,jdbcType=INTEGER}
+		</if>
+		<if test="remark != null and remark != ''">
+		AND remark = #{remark,jdbcType=VARCHAR}
+		</if>
+		</where>   
+		order by group_id asc
+	</select>
+	<select id="queryExists" resultMap="budgChargeMat"  parameterType="java.util.Map" >
+	
+		SELECT 
+			group_id,
+			hos_id,
+			copy_code,
+			year,
+			month,
+			dept_id,
+			mat_type_id,
+			last_cost,
+			grow_rate,
+			count_value,
+			adj_rate,
+			cost_budg,
+			remark
+		FROM BUDG_CHARGE_MAT 
+		WHERE                     
+		 	group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND year = #{year,jdbcType=VARCHAR}
+			<if test="month != null and month != ''">
+			AND month = #{month,jdbcType=VARCHAR}
+			</if>
+			<if test="dept_id != null and dept_id != ''">
+			AND dept_id = #{dept_id,jdbcType=INTEGER}
+			</if>
+			<if test="mat_type_id != null and mat_type_id != ''">
+			AND mat_type_id = #{mat_type_id,jdbcType=INTEGER}
+			</if>
+		order by group_id asc
+	</select>
+	
+	<!-- 校验数据 是否存在-->
+	<select id="queryDataExist" resultType="java.lang.Integer"  parameterType="java.util.Map" >
+	
+		SELECT count(1)
+		FROM BUDG_CHARGE_MAT 
+		where 
+			group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND year = #{year,jdbcType=VARCHAR}
+			AND month = #{month,jdbcType=VARCHAR}
+			AND dept_id = #{dept_id,jdbcType=INTEGER}
+			AND mat_type_id = #{mat_type_id,jdbcType=INTEGER}
+		
+	</select>
+</mapper>
+

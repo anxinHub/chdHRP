@@ -1,0 +1,682 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.ass.dao.tongJiReports.AssInAndOutSummaryMapper">  
+
+	<resultMap id="assInAndOutSummaryMap" type="java.util.Map">
+		<result property="ass_code" column="ass_code" />
+		<result property="ass_name" column="ass_name" />
+		<result property="acc_spec" column="acc_spec" />
+		<result property="ass_model" column="ass_model" />
+		<result property="unit_name" column="unit_name" />
+		<result property="sup_name" column="sup_name" />
+		<result property="fac_name" column="fac_name" />
+		<result property="price" column="price" />
+		<result property="in_amount" column="in_amount" />
+		<result property="in_money" column="in_money" />
+		<result property="out_amount" column="out_amount" />
+		<result property="out_money" column="out_money" />
+	</resultMap>
+	
+	<resultMap id="assInDetail" type="java.util.Map">
+		<result property="ass_in_no" column="ass_in_no" />
+		<result property="note" column="note" />
+		<result property="store_name" column="store_name" />
+		<result property="ass_code" column="ass_code" />
+		<result property="ass_name" column="ass_name" />
+		<result property="ASS_SPEC" column="ass_spec" />
+		<result property="ASS_MODEL" column="ass_model" />
+		<result property="unit_name" column="unit_name" />
+		<result property="price" column="price" />
+		<result property="in_amount" column="in_amount" />
+		<result property="fac_name" column="fac_name" />
+		<result property="sup_name" column="sup_name" />
+	</resultMap>
+	
+	<resultMap id="assOutDetail" type="java.util.Map">
+		<result property="OUT_NO" column="out_no" />
+		<result property="ASS_CARD_NO" column="ass_card_no" />
+		<result property="store_name" column="store_name" />
+		<result property="dept_code" column="dept_code" />
+		<result property="dept_name" column="dept_name" />
+		<result property="ass_code" column="ass_code" />
+		<result property="ass_name" column="ass_name" />
+		<result property="ASS_SPEC" column="ass_spec" />
+		<result property="ASS_MODEL" column="ass_model" />
+		<result property="unit_name" column="unit_name" />
+		<result property="price" column="price" />
+		<result property="out_amount" column="out_amount" />
+		<result property="fac_name" column="fac_name" />
+		<result property="sup_name" column="sup_name" />
+		<result property="CREATE_DATE" column="create_date" />
+		<result property="create_emp" column="create_emp" />
+		<result property="AUDIT_DATE" column="audit_date" />
+		<result property="audit_emp" column="audit_emp" />
+	</resultMap>
+	
+	<select id="queryAssInAndOutSummary" parameterType="java.util.Map"
+		resultMap="assInAndOutSummaryMap">
+		with out_temp as
+		 (select ac.GROUP_ID,
+		         ac.HOS_ID,
+		         ac.COPY_CODE,
+		         ac.ass_id,
+		         ac.ass_no,
+		         ac.ASS_SPEC,
+		         ac.ASS_MONDL,
+		         ac.UNIT_CODE,
+		         ac.FAC_ID,
+		         ac.FAC_NO,
+		         ac.PRICE,
+		         ac.ass_naturs,
+		         ac.VEN_ID,
+		         ac.VEN_NO,
+		         count(1) out_amount
+		    from v_ass_out_detail aod
+		    left join v_ass_card ac
+		      on aod.ASS_CARD_NO = ac.ASS_CARD_NO
+		     and aod.group_id = ac.group_id
+		     and aod.hos_id = ac.hos_id
+		     and aod.copy_code = ac.copy_code 
+		   <where>
+		   			ac.GROUP_ID = #{group_id}
+		   		and ac.hos_id = #{hos_id}
+		   		and ac.copy_code = #{copy_code}
+		   		<if test="startDate != null and startDate != ''">
+		   			and to_char(ac.in_date, 'yyyy-MM-dd') &gt;= #{startDate}
+		   		</if>
+		   		<if test="endDate != null and endDate != ''">
+		   			and to_char(ac.in_date, 'yyyy-MM-dd') &lt;= #{endDate}
+		   		</if>
+		   		<if test="store_id != null and store_id != ''">
+		   			and ac.store_id = #{store_id}
+		   		</if>
+		   		<if test="store_no != null and store_no != ''">
+		   			and ac.store_no = #{store_no}
+		   		</if>
+		   		<if test="sup_id != null and sup_id != ''">
+		   			and ac.ven_id = #{sup_id}
+		   		</if>
+		   		<if test="fac_id != null and fac_id != ''">
+		   			and ac.fac_id = #{fac_id}
+		   		</if>
+		   </where>
+		   group by ac.GROUP_ID,
+		            ac.HOS_ID,
+		            ac.COPY_CODE,
+		            ac.ass_id,
+		            ac.ass_no,
+		            ac.ASS_SPEC,
+		            ac.ASS_MONDL,
+		            ac.UNIT_CODE,
+		            ac.FAC_ID,
+		            ac.FAC_NO,
+		            ac.PRICE,
+		            ac.ass_naturs,
+		            ac.VEN_ID,
+		            ac.VEN_NO),
+		in_temp as
+		 (select aid.group_id,
+		         aid.hos_id,
+		         aid.copy_code,
+		         aid.ass_id,
+		         aid.ass_no,
+		         aid.ASS_SPEC,
+		         aid.ASS_MODEL,
+		         aid.FAC_ID,
+		         aid.FAC_NO,
+		         aid.UNIT_CODE,
+		         sum(aid.in_amount) in_amount,
+		         aid.price,
+		         aim.ven_id,
+		         aim.ven_no
+		    from v_ass_in_detail aid
+		    left join v_ass_in_main aim
+		      on aid.ass_naturs = aim.ass_naturs
+		     and aid.ass_in_no = aim.ass_in_no
+		     and aid.group_id = aim.group_id
+		     and aid.hos_id = aim.hos_id
+		     and aid.copy_code = aim.copy_code
+		   <where>
+		   			aid.GROUP_ID = #{group_id}
+		   		and aid.hos_id = #{hos_id}
+		   		and aid.copy_code = #{copy_code}
+		   		<if test="startDate != null and startDate != ''">
+		   			and to_char(aim.in_date, 'yyyy-MM-dd') &gt;= #{startDate}
+		   		</if>
+		   		<if test="endDate != null and endDate != ''">
+		   			and to_char(aim.in_date, 'yyyy-MM-dd') &lt;= #{endDate}
+		   		</if>
+		   		<if test="store_id != null and store_id != ''">
+		   			and aim.store_id = #{store_id}
+		   		</if>
+		   		<if test="store_no != null and store_no != ''">
+		   			and aim.store_no = #{store_no}
+		   		</if>
+		   		<if test="sup_id != null and sup_id != ''">
+		   			and aim.ven_id = #{sup_id}
+		   		</if>
+		   		<if test="fac_id != null and fac_id != ''">
+		   			and aid.fac_id = #{fac_id}
+		   		</if>
+		   </where>
+		   group by aid.group_id,
+		            aid.hos_id,
+		            aid.copy_code,
+		            aid.ass_id,
+		            aid.ass_no,
+		            aid.ASS_SPEC,
+		            aid.ASS_MODEL,
+		            aid.FAC_ID,
+		            aid.FAC_NO,
+		            aid.UNIT_CODE,
+		            aid.price,
+		            aim.ven_id,
+		            aim.ven_no)
+		select it.ass_id,
+			   inv.ass_code,
+		       inv.ass_name,
+		       it.ASS_SPEC,
+		       it.ASS_MODEL,
+		       hu.unit_name,
+		       it.ven_id,
+		       hsd.sup_name,
+		       it.fac_id,
+		       hfd.fac_name,
+		       it.price,
+		       it.in_amount,
+		       it.price * it.in_amount in_money,
+		       nvl(ot.out_amount, 0) out_amount,
+		       it.price * nvl(ot.out_amount, 0) out_money
+		  from in_temp it
+		  left join out_temp ot
+		    on it.group_id = ot.group_id
+		   and it.hos_id = ot.hos_id
+		   and it.copy_code = ot.copy_code
+		   and it.ass_id = ot.ass_id
+		   and it.ass_no = ot.ass_no
+		   and it.ASS_SPEC = ot.ASS_SPEC
+		   and it.ASS_MODEL = ot.ASS_MONDL
+		   and it.UNIT_CODE = ot.UNIT_CODE
+		   and it.price = ot.price
+		  
+		  left join ass_no_dict inv
+		    on it.group_id = inv.group_id
+		   and it.hos_id = inv.hos_id
+		   and it.copy_code = inv.copy_code
+		   and it.ass_id = inv.ass_id
+		   and it.ass_no = inv.ass_no
+		   
+		  left join hos_unit hu
+		    on it.group_id = hu.group_id
+		   and it.hos_id = hu.hos_id
+		   and it.unit_code = hu.unit_code
+		  left join hos_sup_dict hsd
+		    on it.group_id = hsd.group_id
+		   and it.hos_id = hsd.hos_id
+		   and it.ven_id = hsd.sup_id
+		   and it.ven_no = hsd.sup_no
+		  left join hos_fac_dict hfd
+		    on it.group_id = hfd.group_id
+		   and it.hos_id = hfd.hos_id
+		   and it.FAC_ID = hfd.fac_id
+		   and it.FAC_NO = hfd.fac_no
+		 <where>
+		   	<if test="ass_code != null and ass_code != ''">
+		   		and (
+		   			inv.ass_code like '%${ass_code}%'
+		   		 or inv.ass_name like '%${ass_code}%'	
+		   		 or inv.ass_spec like '%${ass_code}%'	
+		   		 or inv.ass_model like '%${ass_code}%'	
+		   		 or hu.unit_name like '%${ass_code}%'	
+		   		 or inv.spell_code like upper('%${ass_code}%')	
+		   		 or inv.wbx_code like upper('%${ass_code}%')
+		   		 or inv.spell_code like lower('%${ass_code}%')	
+		   		 or inv.wbx_code like lower('%${ass_code}%')
+		   		)
+		   	</if>
+		   	<if test="ass_type_id != null and ass_type_id != ''">
+		   		and inv.ass_type_id = #{ass_type_id}	
+		   	</if>
+		 </where>
+		 union all
+		 select null as ass_id,
+			   null as ass_code,
+		       '总计' as ass_name,
+		       null as ASS_SPEC,
+		       null as ASS_MODEL,
+		       null as unit_name,
+		       null as ven_id,
+		       null as sup_name,
+		       null as fac_id,
+		       null as fac_name,
+		       null as price,
+		       sum(it.in_amount) in_amount,
+		       sum(it.price * it.in_amount) in_money,
+		       sum(nvl(ot.out_amount, 0)) out_amount,
+		       sum(it.price * nvl(ot.out_amount, 0)) out_money
+		  from in_temp it
+		  left join out_temp ot
+		    on it.group_id = ot.group_id
+		   and it.hos_id = ot.hos_id
+		   and it.copy_code = ot.copy_code
+		   and it.ass_id = ot.ass_id
+		   and it.ass_no = ot.ass_no
+		   and it.ASS_SPEC = ot.ASS_SPEC
+		   and it.ASS_MODEL = ot.ASS_MONDL
+		   and it.UNIT_CODE = ot.UNIT_CODE
+		   and it.price = ot.price
+		  
+		  left join ass_no_dict inv
+		    on it.group_id = inv.group_id
+		   and it.hos_id = inv.hos_id
+		   and it.copy_code = inv.copy_code
+		   and it.ass_id = inv.ass_id
+		   and it.ass_no = inv.ass_no
+		   
+		  left join hos_unit hu
+		    on it.group_id = hu.group_id
+		   and it.hos_id = hu.hos_id
+		   and it.unit_code = hu.unit_code
+		  left join hos_sup_dict hsd
+		    on it.group_id = hsd.group_id
+		   and it.hos_id = hsd.hos_id
+		   and it.ven_id = hsd.sup_id
+		   and it.ven_no = hsd.sup_no
+		  left join hos_fac_dict hfd
+		    on it.group_id = hfd.group_id
+		   and it.hos_id = hfd.hos_id
+		   and it.FAC_ID = hfd.fac_id
+		   and it.FAC_NO = hfd.fac_no
+		 <where>
+		   	<if test="ass_code != null and ass_code != ''">
+		   		and (
+		   			inv.ass_code like '%${ass_code}%'
+		   		 or inv.ass_name like '%${ass_code}%'	
+		   		 or inv.ass_spec like '%${ass_code}%'	
+		   		 or inv.ass_model like '%${ass_code}%'	
+		   		 or hu.unit_name like '%${ass_code}%'	
+		   		 or inv.spell_code like upper('%${ass_code}%')	
+		   		 or inv.wbx_code like upper('%${ass_code}%')
+		   		 or inv.spell_code like lower('%${ass_code}%')	
+		   		 or inv.wbx_code like lower('%${ass_code}%')
+		   		)
+		   	</if>
+		   	<if test="ass_type_id != null and ass_type_id != ''">
+		   		and inv.ass_type_id = #{ass_type_id}	
+		   	</if>
+		 </where>
+	</select>
+	
+	<select id="queryAssInDetail" parameterType="java.util.Map" resultMap="assInDetail">
+		select aim.ass_in_no,
+		       aim.note,
+		       hsd.store_name,
+		       inv.ass_code,
+		       inv.ass_name,
+		       aid.ASS_SPEC,
+		       aid.ASS_MODEL,
+		       hu.unit_name,
+		       aid.price,
+		       aid.in_amount,
+		       hfd.fac_name,
+		       sup.sup_name
+		  from v_ass_in_detail aid
+		  left join v_ass_in_main aim
+		    on aid.ass_naturs = aim.ass_naturs
+		   and aid.ass_in_no = aim.ass_in_no
+		   and aid.group_id = aim.group_id
+		   and aid.hos_id = aim.hos_id
+		   and aid.copy_code = aim.copy_code
+		  left join hos_store_dict hsd
+		    on aid.group_id = hsd.group_id
+		   and aid.hos_id = hsd.hos_id
+		   and aim.store_id = hsd.store_id
+		   and aim.store_no = hsd.store_no
+		  left join ass_no_dict inv
+		    on aid.group_id = inv.group_id
+		   and aid.hos_id = inv.hos_id
+		   and aid.copy_code = inv.copy_code
+		   and aid.ass_id = inv.ass_id
+		   and aid.ass_no = inv.ass_no
+		  left join hos_sup_dict sup
+		    on aid.group_id = sup.group_id
+		   and aid.hos_id = sup.hos_id
+		   and aim.ven_id = sup.sup_id
+		   and aim.ven_no = sup.sup_no
+		  left join hos_fac_dict hfd
+		    on aid.group_id = hfd.group_id
+		   and aid.hos_id = hfd.hos_id
+		   and aid.FAC_ID = hfd.fac_id
+		   and aid.FAC_NO = hfd.fac_no
+		  left join hos_unit hu
+		  	on aid.group_id = hu.group_id
+		   and aid.hos_id = hu.hos_id
+		   and aid.UNIT_CODE = hu.unit_code  
+		<where>
+		  		aid.GROUP_ID = #{group_id}
+		   	and aid.hos_id = #{hos_id}
+		   	and aid.copy_code = #{copy_code}
+		   	<if test="startDate != null and startDate != ''">
+		   		and to_char(aim.in_date, 'yyyy-MM-dd') &gt;= #{startDate}
+		   	</if>
+		   	<if test="endDate != null and endDate != ''">
+		   		and to_char(aim.in_date, 'yyyy-MM-dd') &lt;= #{endDate}
+		   	</if>
+		   	<if test="store_id != null and store_id != ''">
+				and aim.store_id = #{store_id}
+			</if>
+			<if test="store_no != null and store_no != ''">
+				and aim.store_no = #{store_no}
+			</if>
+			<if test="sup_id != null and sup_id != ''">
+				and aim.ven_id = #{sup_id}
+			</if>
+			<if test="fac_id != null and fac_id != ''">
+				and aid.FAC_ID = #{fac_id}
+			</if>
+			<if test="ass_id != null and ass_id != ''">
+				and aid.ass_id = #{ass_id}
+			</if>
+			<if test="ass_spec != null and ass_spec != ''">
+				and aid.ASS_SPEC = #{ass_spec}
+			</if>
+			<if test="ass_model != null and ass_model != ''">
+				and aid.ass_model = #{ass_model}
+			</if>
+		</where>
+	</select>
+	
+	<select id="queryAssOutDetail" parameterType="java.util.Map" resultMap="assOutDetail">
+		select aod.OUT_NO,
+		       aod.ASS_CARD_NO,
+		       hsd.store_name,
+		       hdd.dept_code,
+		       hdd.dept_name,
+		       inv.ass_code,
+		       inv.ass_name,
+		       ac.ASS_SPEC,
+		       ac.ASS_MONDL ASS_MODEL,
+		       hu.unit_name,
+		       ac.PRICE,
+		       1 out_amount,
+		       hfd.fac_name,
+		       sup.sup_name,
+		       aom.CREATE_DATE,
+		       create_u.user_name create_emp,
+		       aom.AUDIT_DATE,
+		       audit_u.user_name audit_emp
+		  from v_ass_out_detail aod
+		  left join v_ass_card ac
+		    on aod.ASS_CARD_NO = ac.ASS_CARD_NO
+		   and aod.group_id = ac.group_id
+		   and aod.hos_id = ac.hos_id
+		   and aod.copy_code = ac.copy_code
+		  left join v_ass_out_main aom
+		    on aod.GROUP_ID = aom.GROUP_ID
+		   and aod.HOS_ID = aom.HOS_ID
+		   and aod.COPY_CODE = aom.COPY_CODE
+		   and aom.OUT_NO = aod.OUT_NO
+		  left join hos_store_dict hsd
+		    on ac.group_id = hsd.group_id
+		   and ac.hos_id = hsd.hos_id
+		   and ac.store_id = hsd.store_id
+		   and ac.store_no = hsd.store_no
+		  left join ass_no_dict inv
+		    on ac.group_id = inv.group_id
+		   and ac.hos_id = inv.hos_id
+		   and ac.copy_code = inv.copy_code
+		   and ac.ass_id = inv.ass_id
+		   and ac.ass_no = inv.ass_no
+		  left join hos_sup_dict sup
+		    on ac.group_id = sup.group_id
+		   and ac.hos_id = sup.hos_id
+		   and ac.ven_id = sup.sup_id
+		   and ac.ven_no = sup.sup_no
+		  left join hos_fac_dict hfd
+		    on ac.group_id = hfd.group_id
+		   and ac.hos_id = hfd.hos_id
+		   and ac.FAC_ID = hfd.fac_id
+		   and ac.FAC_NO = hfd.fac_no
+		  left join hos_unit hu
+		    on ac.UNIT_CODE = hu.unit_code
+		   and ac.GROUP_ID = hu.group_id
+		   and ac.HOS_ID = hu.hos_id
+		  left join hos_dept_dict hdd
+		    on hdd.group_id = ac.GROUP_ID
+		   and hdd.hos_id = ac.HOS_ID
+		   and hdd.dept_id = ac.DEPT_ID
+		   and hdd.dept_no = ac.DEPT_NO
+		  left join sys_user create_u
+		    on ac.GROUP_ID = create_u.group_id
+		   and ac.HOS_ID = create_u.hos_id
+		   and aom.CREATE_EMP = create_u.user_id
+		  left join sys_user audit_u
+		    on ac.GROUP_ID = audit_u.group_id
+		   and ac.HOS_ID = audit_u.hos_id
+		   and aom.CREATE_EMP = audit_u.user_id
+		<where>
+				ac.GROUP_ID = #{group_id}
+			and ac.hos_id = #{hos_id}
+		   	and ac.copy_code = #{copy_code}
+		   	<if test="startDate != null and startDate != ''">
+		   		and to_char(ac.in_date, 'yyyy-MM-dd') &gt;= #{startDate}
+		   	</if>
+		   	<if test="endDate != null and endDate != ''">
+		   		and to_char(ac.in_date, 'yyyy-MM-dd') &lt;= #{endDate}
+		   	</if>
+			<if test="store_id != null and store_id != ''">
+				and ac.store_id = #{store_id}
+			</if>
+			<if test="store_no != null and store_no != ''">
+				and ac.store_no = #{store_no}
+			</if>
+			<if test="sup_id != null and sup_id != ''">
+				and ac.ven_id = #{sup_id}
+			</if>
+			<if test="fac_id != null and fac_id != ''">
+				and ac.FAC_ID = #{fac_id}
+			</if>
+			<if test="ass_id != null and ass_id != ''">
+				and ac.ass_id = #{ass_id}
+			</if>
+			<if test="ass_spec != null and ass_spec != ''">
+				and ac.ASS_SPEC = #{ass_spec}
+			</if>
+			<if test="ass_model != null and ass_model != ''">
+				and ac.ASS_MONDL = #{ass_model}
+			</if>
+		</where>	
+	</select>
+	
+	<select id="queryAssInAndOutSummaryPrint" parameterType="java.util.Map"
+		resultMap="assInAndOutSummaryMap">
+		with out_temp as
+		 (select ac.GROUP_ID,
+		         ac.HOS_ID,
+		         ac.COPY_CODE,
+		         ac.ass_id,
+		         ac.ass_no,
+		         ac.ASS_SPEC,
+		         ac.ASS_MONDL,
+		         ac.UNIT_CODE,
+		         ac.FAC_ID,
+		         ac.FAC_NO,
+		         ac.PRICE,
+		         ac.ass_naturs,
+		         ac.VEN_ID,
+		         ac.VEN_NO,
+		         count(1) out_amount
+		    from v_ass_out_detail aod
+		    left join v_ass_card ac
+		      on aod.ASS_CARD_NO = ac.ASS_CARD_NO
+		     and aod.group_id = ac.group_id
+		     and aod.hos_id = ac.hos_id
+		     and aod.copy_code = ac.copy_code 
+		   <where>
+		   			ac.GROUP_ID = #{group_id}
+		   		and ac.hos_id = #{hos_id}
+		   		and ac.copy_code = #{copy_code}
+		   		<if test="startDate != null and startDate != ''">
+		   			and to_char(ac.in_date, 'yyyy-MM-dd') &gt;= #{startDate}
+		   		</if>
+		   		<if test="endDate != null and endDate != ''">
+		   			and to_char(ac.in_date, 'yyyy-MM-dd') &lt;= #{endDate}
+		   		</if>
+		   		<if test="store_id != null and store_id != ''">
+		   			and ac.store_id = #{store_id}
+		   		</if>
+		   		<if test="store_no != null and store_no != ''">
+		   			and ac.store_no = #{store_no}
+		   		</if>
+		   		<if test="sup_id != null and sup_id != ''">
+		   			and ac.ven_id = #{sup_id}
+		   		</if>
+		   		<if test="fac_id != null and fac_id != ''">
+		   			and ac.fac_id = #{fac_id}
+		   		</if>
+		   </where>
+		   group by ac.GROUP_ID,
+		            ac.HOS_ID,
+		            ac.COPY_CODE,
+		            ac.ass_id,
+		            ac.ass_no,
+		            ac.ASS_SPEC,
+		            ac.ASS_MONDL,
+		            ac.UNIT_CODE,
+		            ac.FAC_ID,
+		            ac.FAC_NO,
+		            ac.PRICE,
+		            ac.ass_naturs,
+		            ac.VEN_ID,
+		            ac.VEN_NO),
+		in_temp as
+		 (select aid.group_id,
+		         aid.hos_id,
+		         aid.copy_code,
+		         aid.ass_id,
+		         aid.ass_no,
+		         aid.ASS_SPEC,
+		         aid.ASS_MODEL,
+		         aid.FAC_ID,
+		         aid.FAC_NO,
+		         aid.UNIT_CODE,
+		         sum(aid.in_amount) in_amount,
+		         aid.price,
+		         aim.ven_id,
+		         aim.ven_no
+		    from v_ass_in_detail aid
+		    left join v_ass_in_main aim
+		      on aid.ass_naturs = aim.ass_naturs
+		     and aid.ass_in_no = aim.ass_in_no
+		     and aid.group_id = aim.group_id
+		     and aid.hos_id = aim.hos_id
+		     and aid.copy_code = aim.copy_code
+		   <where>
+		   			aid.GROUP_ID = #{group_id}
+		   		and aid.hos_id = #{hos_id}
+		   		and aid.copy_code = #{copy_code}
+		   		<if test="startDate != null and startDate != ''">
+		   			and to_char(aim.in_date, 'yyyy-MM-dd') &gt;= #{startDate}
+		   		</if>
+		   		<if test="endDate != null and endDate != ''">
+		   			and to_char(aim.in_date, 'yyyy-MM-dd') &lt;= #{endDate}
+		   		</if>
+		   		<if test="store_id != null and store_id != ''">
+		   			and aim.store_id = #{store_id}
+		   		</if>
+		   		<if test="store_no != null and store_no != ''">
+		   			and aim.store_no = #{store_no}
+		   		</if>
+		   		<if test="sup_id != null and sup_id != ''">
+		   			and aim.ven_id = #{sup_id}
+		   		</if>
+		   		<if test="fac_id != null and fac_id != ''">
+		   			and aid.fac_id = #{fac_id}
+		   		</if>
+		   </where>
+		   group by aid.group_id,
+		            aid.hos_id,
+		            aid.copy_code,
+		            aid.ass_id,
+		            aid.ass_no,
+		            aid.ASS_SPEC,
+		            aid.ASS_MODEL,
+		            aid.FAC_ID,
+		            aid.FAC_NO,
+		            aid.UNIT_CODE,
+		            aid.price,
+		            aim.ven_id,
+		            aim.ven_no)
+		select it.ass_id,
+			   inv.ass_code,
+		       inv.ass_name,
+		       it.ASS_SPEC,
+		       it.ASS_MODEL,
+		       hu.unit_name,
+		       it.ven_id,
+		       hsd.sup_name,
+		       it.fac_id,
+		       hfd.fac_name,
+		       it.price,
+		       it.in_amount,
+		       it.price * it.in_amount in_money,
+		       nvl(ot.out_amount, 0) out_amount,
+		       it.price * nvl(ot.out_amount, 0) out_money
+		  from in_temp it
+		  left join out_temp ot
+		    on it.group_id = ot.group_id
+		   and it.hos_id = ot.hos_id
+		   and it.copy_code = ot.copy_code
+		   and it.ass_id = ot.ass_id
+		   and it.ass_no = ot.ass_no
+		   and it.ASS_SPEC = ot.ASS_SPEC
+		   and it.ASS_MODEL = ot.ASS_MONDL
+		   and it.UNIT_CODE = ot.UNIT_CODE
+		   and it.price = ot.price
+		   and it.FAC_ID = ot.FAC_ID
+		   and it.FAC_NO = ot.FAC_NO
+		   and it.ven_id = ot.ven_id
+		   and it.ven_no = ot.ven_no
+		  left join ass_no_dict inv
+		    on it.group_id = inv.group_id
+		   and it.hos_id = inv.hos_id
+		   and it.copy_code = inv.copy_code
+		   and it.ass_id = inv.ass_id
+		   and it.ass_no = inv.ass_no
+		  left join hos_unit hu
+		    on it.group_id = hu.group_id
+		   and it.hos_id = hu.hos_id
+		   and it.unit_code = hu.unit_code
+		  left join hos_sup_dict hsd
+		    on it.group_id = hsd.group_id
+		   and it.hos_id = hsd.hos_id
+		   and it.ven_id = hsd.sup_id
+		   and it.ven_no = hsd.sup_no
+		  left join hos_fac_dict hfd
+		    on it.group_id = hfd.group_id
+		   and it.hos_id = hfd.hos_id
+		   and it.FAC_ID = hfd.fac_id
+		   and it.FAC_NO = hfd.fac_no
+		 <where>
+		   	<if test="ass_code != null and ass_code != ''">
+		   		and (
+		   			inv.ass_code like '%${ass_code}%'
+		   		 or inv.ass_name like '%${ass_code}%'	
+		   		 or inv.ass_spec like '%${ass_code}%'	
+		   		 or inv.ass_model like '%${ass_code}%'	
+		   		 or hu.unit_name like '%${ass_code}%'	
+		   		 or inv.spell_code like upper('%${ass_code}%')	
+		   		 or inv.wbx_code like upper('%${ass_code}%')
+		   		 or inv.spell_code like lower('%${ass_code}%')	
+		   		 or inv.wbx_code like lower('%${ass_code}%')
+		   		)
+		   	</if>
+		   	<if test="ass_type_id != null and ass_type_id != ''">
+		   		and inv.ass_type_id = #{ass_type_id}	
+		   	</if>
+		 </where>  
+		 order by inv.ass_code
+	</select>
+	
+</mapper>
+

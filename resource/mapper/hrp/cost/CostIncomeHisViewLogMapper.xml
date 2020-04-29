@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.cost.dao.CostIncomeHisViewLogMapper">
+
+	<resultMap id="costHisView" type="java.util.Map">
+        <result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="his_log_code" column="his_log_code" />
+		<result property="his_log_name" column="his_log_name" />
+		<result property="acc_year" column="acc_year" />
+		<result property="acc_month" column="acc_month" />
+		<result property="is_stop" column="is_stop" />
+		<result property="g_day" column="g_day" />
+		<result property="sort_code" column="sort_code" />
+	</resultMap>
+	 
+	 <insert id="addCostHisViewLog" useGeneratedKeys="true">
+	 
+	      insert into cost_his_log_main
+			  (group_id,
+			   hos_id,
+			   copy_code,
+			   his_log_code,
+			   his_log_name,
+			   is_stop,
+			   g_day,
+			   sort_code)
+			values
+			  (#{group_id},
+			   #{hos_id},
+			   #{copy_code},
+			   #{his_log_code},
+			   #{his_log_name},
+			   #{is_stop},
+			   #{g_day},
+			   #{sort_code})
+	 </insert>
+   
+   	<insert id="addBatchDetailCostHisViewLog" parameterType="java.util.List" >
+		<foreach collection="list" item="item" index="index" open="begin" close=";end;" separator=";" >
+			INSERT INTO cost_his_log_detail (
+				group_id, 
+				hos_id, 
+				copy_code, 
+				his_log_code, 
+				acc_year,
+				acc_month
+			) VALUES (
+				#{item.group_id},
+				#{item.hos_id},
+				#{item.copy_code},
+				#{item.his_log_code},
+				#{item.acc_year},
+				#{item.acc_month}
+			)
+		</foreach>
+	</insert>
+	
+   	 <update id="updateCostHisViewLog" parameterType="java.util.Map" >
+		UPDATE cost_his_log_main
+		SET is_stop = #{is_stop},
+		g_day = #{g_day}
+		WHERE group_id = #{group_id}
+			AND hos_id = #{hos_id}
+			AND copy_code = #{copy_code}
+			and his_log_code = #{his_log_code}
+	 </update>
+	
+	<delete id="deleteBatchDetailCostHisViewLogMain" parameterType="java.util.Map" >
+	
+			delete  from cost_his_log_detail d
+			 where exists (
+			   select 1 from cost_his_log_main m
+				 where m.is_stop = '1'
+				 and m.group_id = d.group_id
+				 and m.hos_id = d.hos_id
+				 and m.copy_code = d.copy_code
+				 and m.his_log_code = d.his_log_code
+			 )
+	
+	</delete>
+	
+	<delete id="deleteBatchDetailCostHisViewLog" parameterType="java.util.List" >
+		DELETE FROM cost_his_log_detail
+		WHERE 
+		<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+			group_id = #{item.group_id}
+			and hos_id = #{item.hos_id}
+			and copy_code = #{item.copy_code}
+			and his_log_code = #{item.his_log_code}
+			and acc_year = #{item.acc_year}
+			and acc_month = #{item.acc_month}
+		</foreach>
+	</delete>
+	
+	 <select id="queryCostHisViewLog" parameterType="java.util.Map" resultMap="costHisView">
+		        select 
+					 chld.group_id,
+					 chld.hos_id,
+					 chld.copy_code,
+					 chld.his_log_code,
+					 chlm.his_log_name,
+					 chld.acc_year,
+					 chld.acc_month
+				 from 
+				 cost_his_log_detail chld
+				 left join cost_his_log_main chlm
+				 on chld.group_id = chlm.group_id
+				 and chld.hos_id = chlm.hos_id
+				 and chld.copy_code = chlm.copy_code
+				 and chld.his_log_code = chlm.his_log_code
+				 where chld.group_id = #{group_id}
+				 and   chld.hos_id =  #{hos_id}
+				 and   chld.copy_code = #{copy_code}
+			     <if test="his_log_code != null and his_log_code != ''">
+			     and chld.his_log_code like '%'||#{his_log_code}||'%'
+	             </if>
+			     order by chlm.sort_code,chld.his_log_code, chld.acc_year,chld.acc_month
+	</select>
+	
+  <select id="queryCostIncomeHisViewSetting" parameterType="java.util.Map" resultMap="costHisView">
+			select 
+			      chlm.group_id,
+		           chlm.hos_id,
+		           chlm.copy_code,
+		           ichlm.his_log_code,
+		           ichlm.his_log_name,
+		           chlm.is_stop,
+		           chlm.g_day,
+		           ichlm.sort_code
+			from init_cost_his_log_main ichlm
+			left join cost_his_log_main chlm
+			on ichlm.his_log_code = chlm.his_log_code
+			where chlm.group_id = #{group_id}
+			and chlm.hos_id = #{hos_id}
+			and chlm.copy_code = #{copy_code}
+			order by ichlm.sort_code
+	</select>
+	
+	
+	<select id="queryCostHisViewLogById" resultType="Integer" parameterType="java.util.Map">
+		select count(*)
+		from cost_his_log_main
+		where group_id = #{group_id,jdbcType=INTEGER}
+			and hos_id = #{hos_id,jdbcType=INTEGER}
+			and copy_code = #{copy_code,jdbcType=VARCHAR}
+			and his_log_code = #{his_log_code,jdbcType=VARCHAR}
+	</select>
+	
+	
+    <select id="queryCostHisViewInitByCode" parameterType="java.util.Map" resultMap="costHisView">
+		select
+		      his_log_code,
+		      his_log_name
+		 	from init_cost_his_log_main 
+		 where his_log_code = #{his_log_code,jdbcType=VARCHAR}
+	</select>
+	
+	<select id="queryCostHisViewdetailByCode" resultType="Integer" parameterType="java.util.Map">
+		select count(*)
+		from cost_his_log_detail
+		where group_id = #{group_id}
+			and hos_id = #{hos_id}
+			and copy_code = #{copy_code}
+			and his_log_code = #{his_log_code}
+			and acc_year = #{acc_year}
+			and acc_month = #{acc_month}
+	</select>
+	
+</mapper>
+

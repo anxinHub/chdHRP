@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.mat.dao.initial.MatInitChargeMapper">
+	
+	<resultMap id="matInitStatus" type="java.util.Map">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="store_id" column="store_id"/>
+		<result property="store_code" column="store_code"/>
+		<result property="store_name" column="store_name"/>
+		<result property="status" column="status"/>
+		<result property="acc_date" column="acc_date"/>
+	</resultMap>
+	
+	<select id="query" parameterType="java.util.Map" resultMap="matInitStatus" >
+		select a.store_code, a.store_name, c.status, c.acc_date
+		from HOS_STORE_DICT a 
+		left join mat_init_status c
+			on a.group_id = c.group_id
+			and a.hos_id = c.hos_id
+			and c.copy_code = #{copy_code,jdbcType=VARCHAR}
+			and a.store_id = c.store_id
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER} 
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER} 
+			and a.is_stop = 0
+			and a.store_id in (
+				select perm_code from (
+					select perm_code from sys_user_perm_data
+					where group_id = #{group_id,jdbcType=INTEGER} 
+						and hos_id = #{hos_id,jdbcType=INTEGER} 
+						and user_id = #{user_id,jdbcType=INTEGER}
+						and table_code = 'HOS_STORE_DICT'
+						and IS_READ = 1 and IS_WRITE = 1 
+					union
+					<!-- 角色权限表 -->
+					select r.perm_code from sys_role_perm_data r
+					inner join SYS_ROLE_USER ru on r.role_id=ru.user_id
+					where r.group_id = #{group_id,jdbcType=INTEGER} 
+						and r.hos_id = #{hos_id,jdbcType=INTEGER} 
+						and ru.user_id = #{user_id,jdbcType=INTEGER}
+						and r.table_code = 'HOS_STORE_DICT'
+						and r.IS_READ = 1 and r.IS_WRITE = 1 
+				)
+			) 
+		order by  a.store_code
+	</select>
+	
+	<insert id="add" parameterType="java.util.Map">
+		INSERT INTO MAT_INIT_STATUS (
+			group_id, hos_id, copy_code, store_id, status, acc_date
+		) VALUES (
+			#{group_id,jdbcType=INTEGER},
+			#{hos_id,jdbcType=INTEGER},
+			#{copy_code,jdbcType=VARCHAR},
+			#{store_id,jdbcType=INTEGER},
+			1,
+			#{acc_date,jdbcType=VARCHAR}
+		)
+	</insert>
+	<select id="existsStoreIsAccount" resultType="Integer" parameterType="java.util.Map" >
+		SELECT count(*) 
+		FROM mat_init_status
+		WHERE group_id = #{group_id,jdbcType=INTEGER} 
+			and hos_id = #{hos_id,jdbcType=INTEGER} 
+			and copy_code = #{copy_code,jdbcType=VARCHAR} 
+			<if test="store_id != null and store_id !=''">
+				and store_id = #{store_id,jdbcType=INTEGER} 
+			</if>
+			<if test="store_id == null or store_id == ''">
+				and store_id in (select perm_code from (
+						select perm_code from sys_user_perm_data
+						where group_id = #{group_id,jdbcType=INTEGER} 
+							and hos_id = #{hos_id,jdbcType=INTEGER} 
+							and user_id = #{user_id,jdbcType=INTEGER}
+							and table_code = 'HOS_STORE_DICT'
+							and IS_READ = 1 and IS_WRITE = 1 
+						union
+						<!-- 角色权限表 -->
+						select r.perm_code from sys_role_perm_data r
+						inner join SYS_ROLE_USER ru on r.role_id=ru.user_id
+						where r.group_id = #{group_id,jdbcType=INTEGER} 
+							and r.hos_id = #{hos_id,jdbcType=INTEGER} 
+							and ru.user_id = #{user_id,jdbcType=INTEGER}
+							and r.table_code = 'HOS_STORE_DICT'
+							and r.IS_READ = 1 and r.IS_WRITE = 1 
+						)
+					)
+			</if>
+	</select>
+	
+	<select id="existsInitNotConfirmBill" resultType="Integer" parameterType="java.util.Map" >
+		SELECT count(*) 
+		FROM mat_in_main
+		WHERE group_id = #{group_id,jdbcType=INTEGER} 
+			and hos_id = #{hos_id,jdbcType=INTEGER} 
+			and copy_code = #{copy_code,jdbcType=VARCHAR} 
+			and bus_type_code = '1'
+			and state = 1
+			<if test="store_id != null and store_id !=''">
+				and store_id = #{store_id,jdbcType=INTEGER} 
+			</if>
+			<if test="store_id == null or store_id == ''">
+				and store_id in (select perm_code from (
+						select perm_code from sys_user_perm_data
+						where group_id = #{group_id,jdbcType=INTEGER} 
+							and hos_id = #{hos_id,jdbcType=INTEGER} 
+							and user_id = #{user_id,jdbcType=INTEGER}
+							and table_code = 'HOS_STORE_DICT'
+							and IS_READ = 1 and IS_WRITE = 1 
+						union
+						<!-- 角色权限表 -->
+						select r.perm_code from sys_role_perm_data r
+						inner join SYS_ROLE_USER ru on r.role_id=ru.user_id
+						where r.group_id = #{group_id,jdbcType=INTEGER} 
+							and r.hos_id = #{hos_id,jdbcType=INTEGER} 
+							and ru.user_id = #{user_id,jdbcType=INTEGER}
+							and r.table_code = 'HOS_STORE_DICT'
+							and r.IS_READ = 1 and r.IS_WRITE = 1 
+						)
+					)
+			</if>
+	</select>
+	<select id="existsNotInitBill" resultType="Integer" parameterType="java.util.Map" >
+		SELECT count(*) 
+		FROM mat_in_main
+		WHERE group_id = #{group_id,jdbcType=INTEGER} 
+			and hos_id = #{hos_id,jdbcType=INTEGER} 
+			and copy_code = #{copy_code,jdbcType=VARCHAR} 
+			and bus_type_code &lt;&gt; '1'
+			and in_date &lt;= #{acc_date,jdbcType=DATE}
+			<if test="store_id != null and store_id !=''">
+				and store_id = #{store_id,jdbcType=INTEGER} 
+			</if>
+			<if test="store_id == null or store_id == ''">
+				and store_id in (select perm_code from (
+						select perm_code from sys_user_perm_data
+						where group_id = #{group_id,jdbcType=INTEGER} 
+							and hos_id = #{hos_id,jdbcType=INTEGER} 
+							and user_id = #{user_id,jdbcType=INTEGER}
+							and table_code = 'HOS_STORE_DICT'
+							and IS_READ = 1 and IS_WRITE = 1 
+						union
+						<!-- 角色权限表 -->
+						select r.perm_code from sys_role_perm_data r
+						inner join SYS_ROLE_USER ru on r.role_id=ru.user_id
+						where r.group_id = #{group_id,jdbcType=INTEGER} 
+							and r.hos_id = #{hos_id,jdbcType=INTEGER} 
+							and ru.user_id = #{user_id,jdbcType=INTEGER}
+							and r.table_code = 'HOS_STORE_DICT'
+							and r.IS_READ = 1 and r.IS_WRITE = 1 
+						)
+					)
+			</if>
+	</select>
+</mapper>
+

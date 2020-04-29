@@ -1,0 +1,547 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.prm.dao.PrmEmpMapper">
+
+	<resultMap id="PrmEmp" type="com.chd.hrp.prm.entity.PrmEmp">
+		<result property="group_id" column="group_id" jdbcType="NUMERIC" />
+		<result property="hos_id" column="hos_id" jdbcType="NUMERIC" />
+		<result property="copy_code" column="copy_code" jdbcType="VARCHAR" />
+		<result property="emp_id" column="emp_id" jdbcType="NUMERIC" />
+		<result property="emp_no" column="emp_no" jdbcType="NUMERIC" />
+		<result property="emp_code" column="emp_code" jdbcType="VARCHAR" />
+		<result property="emp_name" column="emp_name" jdbcType="VARCHAR" />
+		<result property="duty_code" column="duty_code" jdbcType="VARCHAR" />
+		<result property="dept_code" column="dept_code" jdbcType="VARCHAR" />
+		<result property="duty_name" column="duty_name" jdbcType="VARCHAR" />
+		<result property="dept_name" column="dept_name" jdbcType="VARCHAR" />
+		<result property="spell_code" column="spell_code" jdbcType="VARCHAR" />
+		<result property="wbx_code" column="wbx_code" jdbcType="VARCHAR" />
+		<result property="is_stop" column="is_stop" jdbcType="NUMERIC" />
+		<result property="dept_id" column="dept_id" jdbcType="NUMERIC" />
+		<result property="dept_no" column="dept_no" jdbcType="NUMERIC" />
+		<result property="is_acc" column="is_acc" jdbcType="NUMERIC" />
+	</resultMap>
+
+	<!-- useGeneratedKeys="true" keyProperty="xxx" for sqlserver and mysql -->
+	<insert id="addPrmEmp" useGeneratedKeys="true">
+
+			INSERT INTO prm_emp (
+		group_id ,
+		hos_id ,
+		copy_code ,
+		emp_id,
+		emp_code ,
+		emp_name ,
+		duty_code ,
+		dept_no ,
+		dept_id ,
+		spell_code ,
+		wbx_code ,
+		is_stop,
+		is_acc
+		) VALUES (
+
+		#{group_id,jdbcType=INTEGER} ,
+		#{hos_id,jdbcType=INTEGER} ,
+		#{copy_code,jdbcType=VARCHAR},
+		#{emp_id,jdbcType=INTEGER},
+		#{emp_code,jdbcType=VARCHAR},
+		#{emp_name,jdbcType=VARCHAR} ,
+		#{duty_code,jdbcType=VARCHAR} ,
+		#{dept_no,jdbcType=INTEGER} ,
+		#{dept_id,jdbcType=INTEGER} ,
+		#{spell_code,jdbcType=VARCHAR} ,
+		#{wbx_code,jdbcType=VARCHAR} ,
+		#{is_stop,jdbcType=INTEGER} ,
+		#{is_acc,jdbcType=INTEGER}
+		)
+
+	</insert>
+	<insert id="addBatchPrmEmp" parameterType="java.util.List">
+
+		INSERT INTO Prm_emp (
+		emp_id,
+		group_id ,
+		hos_id ,
+		copy_code ,
+		emp_code ,
+		emp_name ,
+		duty_code ,
+		dept_no ,
+		dept_id ,
+		spell_code ,
+		wbx_code ,
+		is_stop,
+		is_acc
+
+		)
+		select PRM_EMP_SEQ.nextval , t.* from(
+		<foreach collection="list" item="item" index="index"
+			separator=" union all ">
+			select
+			#{item.group_id} ,
+			#{item.hos_id} ,
+			#{item.copy_code},
+			#{item.emp_code},
+			#{item.emp_name} ,
+			#{item.duty_code} ,
+			#{item.dept_no} ,
+			#{item.dept_id} ,
+			#{item.spell_code} ,
+			#{item.wbx_code} ,
+			#{item.is_stop},
+			#{item.is_acc}
+			from dual
+		</foreach>
+		) t
+	</insert>
+	
+	
+	<insert id="initBatchPrmEmp" parameterType="java.util.Map">
+
+		INSERT INTO Prm_emp (
+		    group_id ,
+		    hos_id ,
+		    copy_code ,
+		    emp_id,
+		    emp_code ,
+		    emp_name ,
+		    duty_code ,
+		    dept_no ,
+		    dept_id ,
+		    spell_code ,
+		    wbx_code ,
+		    is_stop,
+		    is_acc
+		
+		    )select 
+		      #{group_id} group_id,
+		      #{hos_id} hos_id, 
+		      #{copy_code} copy_code,
+		      a.emp_id,
+		      a.emp_code,
+		      a.emp_name,
+		      '' duty_code,
+		      c.dept_no,
+		      c.dept_id,
+		      a.spell_code,
+		      a.wbx_code,
+		      a.is_stop,
+		      1 is_acc
+				from hos_emp a 
+		    left join Prm_dept_maping b on
+		    a.group_id = b.group_id
+		    and a.hos_id = b.hos_id
+		    and a.dept_id = b.sys_dept_id
+		    left join Prm_dept_dict c on
+		    b.group_id = c.group_id
+		    and b.hos_id = c.hos_id
+		    and b.copy_code = c.copy_code
+		    and b.dept_id = c.dept_id
+		    and c.is_stop = 0
+		where 
+		a.group_id = #{group_id} and a.hos_id = #{hos_id}
+		<if test="is_zl == 1">
+			and not exists (select 1 from Prm_emp d where group_id = #{group_id} and hos_id = #{hos_id} and copy_code = #{copy_code} and a.emp_id = d.emp_id)
+		</if>
+	</insert>
+
+
+	<select id="queryPrmEmp" parameterType="java.util.Map"
+		resultMap="PrmEmp">
+
+		SELECT
+		pe.group_id,
+		pe.hos_id,
+		pe.copy_code,
+		pe.emp_id,
+		hed.emp_no,
+		pe.emp_code,
+		pe.emp_name,
+		pe.duty_code,
+		ped.duty_name,
+		pe.dept_no,
+		pe.dept_id,
+		apdd.dept_code,
+		apdd.dept_name ,
+		pe.spell_code,
+		pe.wbx_code,
+		pe.is_stop ,
+		pe.is_acc
+		FROM Prm_emp pe
+		left join Prm_dept_dict apdd on 
+		pe.group_id = apdd.group_id 
+		and pe.hos_id=apdd.hos_id
+		and pe.copy_code=apdd.copy_code
+		and pe.dept_id=apdd.dept_id
+		and apdd.is_stop = 0
+		left join Prm_emp_duty ped on 
+		pe.group_id = ped.group_id 
+		and pe.hos_id=ped.hos_id
+		and pe.copy_code=ped.copy_code
+		and pe.duty_code = ped.duty_code
+		left join hos_emp_dict hed on 
+		pe.group_id = hed.group_id 
+		and pe.hos_id = hed.hos_id
+		and pe.emp_id = hed.emp_id
+		and hed.is_stop = 0
+		<where>
+			<if test="group_id != null and group_id != ''">
+				AND pe.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND pe.hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				AND pe.copy_code = #{copy_code}
+			</if>
+			<if test="emp_id != null and emp_id != ''">
+				AND pe.emp_id = #{emp_id}
+			</if>
+			<if test="emp_code != null and emp_code != ''">
+				AND pe.emp_code = #{emp_code}
+			</if>
+			<if test="emp_name != null and emp_name != ''">
+				AND pe.emp_name = #{emp_name}
+			</if>
+			<if test="duty_code != null and duty_code != ''">
+				AND pe.duty_code = #{duty_code}
+			</if>
+			<if test="dept_no != null and dept_no != ''">
+				AND pe.dept_no = #{dept_no}
+			</if>
+			<if test="dept_kind_code != null and dept_kind_code != ''">
+				AND apdd.dept_kind_code = #{dept_kind_code}
+			</if>
+			<if test="nature_code != null and nature_code != ''">
+				AND apdd.nature_code = #{nature_code}
+			</if>
+			<if test="dept_id != null and dept_id != ''">
+				AND pe.dept_id = #{dept_id}
+			</if>
+			<if test="spell_code != null and spell_code != ''">
+				AND pe.spell_code = #{spell_code}
+			</if>
+			<if test="wbx_code != null and wbx_code != ''">
+				AND pe.wbx_code = #{wbx_code}
+			</if>
+			<if test="is_stop != null and is_stop != ''">
+				AND pe.is_stop = #{is_stop}
+			</if>
+			<if test="is_acc == 1">
+				AND pe.is_acc = 1
+			</if>
+			<if test="is_dept == 1">
+				AND pe.dept_id is not null
+			</if>
+		</where>
+		order by pe.emp_code asc
+	</select>
+	<select id="queryPrmEmpByCode" parameterType="java.util.Map"
+		resultMap="PrmEmp">
+		SELECT
+		pe.group_id,
+		pe.hos_id,
+		pe.copy_code,
+		pe.emp_id,
+		hed.emp_no,
+		pe.emp_code,
+		pe.emp_name,
+		pe.duty_code,
+		ped.duty_name,
+		pe.dept_no,
+		pe.dept_id,
+		apdd.dept_code,
+		apdd.dept_name ,
+		pe.spell_code,
+		pe.wbx_code,
+		pe.is_stop ,
+		pe.is_acc
+		FROM Prm_emp pe
+		left join Prm_dept_dict apdd on 
+		pe.group_id = apdd.group_id 
+		and pe.hos_id=apdd.hos_id
+		and pe.copy_code=apdd.copy_code
+		and pe.dept_id=apdd.dept_id
+		and apdd.is_stop = 0
+		left join Prm_emp_duty ped on 
+		pe.group_id = ped.group_id 
+		and pe.hos_id=ped.hos_id
+		and pe.copy_code=ped.copy_code
+		and pe.duty_code = ped.duty_code
+		left join hos_emp_dict hed on 
+		pe.group_id = hed.group_id 
+		and pe.hos_id = hed.hos_id
+		and pe.emp_id = hed.emp_id
+		and hed.is_stop = 0
+		WHERE
+		pe.group_id = #{group_id} and
+		pe.hos_id = #{hos_id} and
+		pe.copy_code = #{copy_code} and
+		pe.emp_id = #{emp_id}
+
+	</select>
+	<select id="queryPrmEmpSeqNextVal" resultType="Integer"
+		flushCache="true">
+		SELECT prm_emp_seq.NEXTVAL FROM DUAL
+	</select>
+	<select id="queryPrmEmpByCodeEmp" parameterType="java.util.Map"
+		resultMap="PrmEmp">
+		SELECT
+		pe.group_id,
+		pe.hos_id,
+		pe.copy_code,
+		pe.emp_id,
+		hed.emp_no,
+		pe.emp_code,
+		pe.emp_name,
+		pe.duty_code,
+		ped.duty_name,
+		pe.dept_no,
+		pe.dept_id,
+		apdd.dept_code,
+		apdd.dept_name ,
+		pe.spell_code,
+		pe.wbx_code,
+		pe.is_stop ,
+		pe.is_acc
+		FROM Prm_emp pe
+		left join Prm_dept_dict apdd on 
+		pe.group_id = apdd.group_id 
+		and pe.hos_id=apdd.hos_id
+		and pe.copy_code=apdd.copy_code
+		and pe.dept_id=apdd.dept_id
+		and apdd.is_stop = 0
+		left join Prm_emp_duty ped on 
+		pe.group_id = ped.group_id 
+		and pe.hos_id=ped.hos_id
+		and pe.copy_code=ped.copy_code
+		and pe.duty_code = ped.duty_code
+		left join hos_emp_dict hed on 
+		pe.group_id = hed.group_id 
+		and pe.hos_id = hed.hos_id
+		and pe.emp_id = hed.emp_id
+		and hed.is_stop = 0
+		WHERE
+		pe.group_id = #{group_id} and
+		pe.hos_id = #{hos_id} and
+		pe.copy_code = #{copy_code} and
+		pe.emp_code = #{emp_code}
+
+	</select>
+	<update id="updatePrmEmp" parameterType="java.util.Map">
+
+		UPDATE Prm_emp SET
+		dept_no = #{dept_no}
+		,
+		dept_id = #{dept_id},
+		emp_name =
+		#{emp_name}
+		,
+		emp_code =
+		#{emp_code},
+		duty_code = #{duty_code}
+		,
+		is_stop = #{is_stop},
+
+		is_acc = #{is_acc}
+
+
+		WHERE
+		group_id = #{group_id}
+		and
+		hos_id = #{hos_id}
+		and
+		copy_code = #{copy_code}
+		and
+		emp_id = #{emp_id}
+
+
+	</update>
+
+
+	<delete id="deleteBatchPrmEmp" parameterType="java.util.List">
+		DELETE FROM Prm_emp WHERE
+		<foreach collection="list" index="index" item="item" open="("
+			separator="or" close=")">
+			group_id = #{item.group_id}
+			and
+			hos_id = #{item.hos_id}
+			and
+			copy_code = #{item.copy_code}
+			and
+			emp_id = #{item.emp_id}
+
+		</foreach>
+
+	</delete>
+	
+	<delete id="delete" parameterType="java.util.Map">
+		DELETE FROM Prm_emp WHERE
+			group_id = #{group_id}
+			and
+			hos_id = #{hos_id}
+			and
+			copy_code = #{copy_code}
+
+	</delete>
+
+	<update id="updateBatchPrmEmp" parameterType="java.util.List">
+
+		<foreach collection="list" item="item" index="index" open="begin"
+			close=";end;" separator=";">
+			UPDATE Prm_emp
+			<trim prefix="SET" suffixOverrides=",">
+				<if test="item.emp_name != null and item.emp_name!= ''">
+					emp_name = #{item.emp_name},
+				</if>
+				<if test="item.duty_code!= null and item.duty_code != ''">
+					duty_code = #{item.duty_code},
+				</if>
+				<if test="item.dept_id != null and item.dept_id != ''">
+					dept_id = #{item.dept_id},
+				</if>
+				<if test="item.dept_no!= null and item.dept_no!= ''">
+					dept_no = #{item.dept_no},
+				</if>
+
+				<if test="item.spell_code != null and item.spell_code != ''">
+					spell_code = #{item.spell_code},
+				</if>
+				<if test="item.wbx_code != null and item.wbx_code != ''">
+					wbx_code = #{item.wbx_code},
+				</if>
+				<if test="item.is_stop != null and item.is_stop != ''">
+					is_stop = #{item.is_stop},
+				</if>
+				<if test="item.is_acc != null and item.is_acc != ''">
+					is_acc = #{item.is_acc},
+				</if>
+			</trim>
+			<where>
+				<if test="item.group_id != null and item.group_id != ''">
+					AND group_id = #{item.group_id}
+				</if>
+				<if test="item.hos_id != null and item.hos_id != ''">
+					AND hos_id = #{item.hos_id}
+				</if>
+				<if test="item.copy_code != null and item.copy_code != ''">
+					AND copy_code = #{item.copy_code}
+				</if>
+				<if test="item.acc_year != null and item.acc_year != ''">
+					AND acc_year = #{item.acc_year}
+				</if>
+				<if test="item.emp_id != null and item.emp_id != ''">
+					AND emp_id = #{item.emp_id}
+				</if>
+			</where>
+		</foreach>
+	</update>
+	
+	<!-- 查询所有职工 -->
+	<select id="queryPrmEmpAll" parameterType="java.util.Map"
+		resultMap="PrmEmp">
+		SELECT
+		ae.group_id,
+		ae.hos_id,
+		ae.copy_code,
+		ae.emp_id,
+		ae.emp_code,
+		ae.emp_name,
+		ae.dept_id,
+		ae.dept_no,
+		ae.duty_code,
+		ae.spell_code,
+		ae.wbx_code,
+		ae.is_stop,
+		ae.is_acc
+		FROM Prm_EMP ae
+		WHERE
+		group_id = #{group_id}
+		and hos_id = #{hos_id}
+		and copy_code =
+		#{copy_code}
+	</select>
+<select id="queryPrmEmpDict" parameterType="java.util.Map"
+		resultMap="PrmEmp">
+		select ae.group_id,
+		ae.hos_id,
+		ae.copy_code,
+		ae.emp_id,
+		ae.emp_no,
+		ae.emp_code,
+		ae.emp_name,
+		ad.dept_code,
+		ad.dept_name,
+		ae.duty_code,
+		duty.duty_name,
+		ae.dept_no,
+		ae.dept_id,
+		ae.spell_code,
+		ae.wbx_code,
+		ae.is_stop,
+		ae.is_acc
+		from prm_emp_dict ae
+		left join prm_emp_duty duty
+		on ae.group_id = duty.group_id
+		and ae.hos_id = duty.hos_id
+		and ae.copy_code = duty.copy_code
+		and ae.duty_code = duty.duty_code
+		left join prm_dept_dict ad
+		on ae.group_id = ad.group_id
+		and ae.hos_id = ad.hos_id
+		and ae.dept_id = ad.dept_id
+		and ae.dept_no = ad.dept_no
+		<where>
+			and ae.is_stop='0'
+			<if test="group_id != null and group_id != ''">
+				AND ae.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND ae.hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				AND ae.copy_code = #{copy_code}
+			</if>
+			<if test="emp_id != null and emp_id != ''">
+				AND ae.emp_id = #{emp_id}
+			</if>
+			<if test="emp_no != null and emp_no != ''">
+				AND ae.emp_no = #{emp_no}
+			</if>
+			<if test="emp_code != null and emp_code != ''">
+				AND ae.emp_code = #{emp_code}
+			</if>
+			<if test="emp_name != null and emp_name != ''">
+				AND ae.emp_name = #{emp_name}
+			</if>
+			<if test="duty_code != null and duty_code != ''">
+				AND ae.duty_code = #{duty_code}
+			</if>
+			<if test="dept_id != null and dept_id != ''">
+				AND ae.dept_id = #{dept_id}
+			</if>
+			<if test="dept_no != null and dept_no != ''">
+				AND ae.dept_no = #{dept_no}
+			</if>
+			<if test="dept_kind_code != null and dept_kind_code != ''">
+				AND ad.dept_kind_code = #{dept_kind_code}
+			</if>
+			<if test="nature_code != null and nature_code != ''">
+				AND ad.nature_code = #{nature_code}
+			</if>
+			<if test="is_stop != null">
+				AND ae.is_stop = #{is_stop}
+			</if>
+			<if test="is_acc != null">
+				AND ae.is_acc = #{is_acc}
+			</if>
+			<if test="sql != null and sql != ''">
+				${sql}
+			</if>
+		</where>
+		order by ae.emp_code,ad.dept_code asc
+	</select>
+</mapper>
+
+ 

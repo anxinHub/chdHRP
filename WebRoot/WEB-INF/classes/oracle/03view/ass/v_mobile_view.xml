@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+	<sql id="v_mobile_dept_dict" type="view" desc="移动盘点用科室字典 "><![CDATA[
+		create or replace view v_mobile_dept_dict as
+		select group_id,hos_id,dept_id,dept_no,dept_code,dept_name,spell_code,wbx_code from hos_dept_dict
+
+	]]></sql>
+	<sql id="v_mobile_card" type="view" desc="移动盘点用科室字典 "><![CDATA[
+		create or replace view v_mobile_card as
+		select ass_naturs,group_id,hos_id,copy_code,dept_id,dept_no,store_id,store_no,ass_id,ass_no,sum(ass_amount) ass_amount from v_ass_card
+		group by ass_naturs,group_id,hos_id,copy_code,dept_id,dept_no,store_id,store_no,ass_id,ass_no
+
+	]]></sql>
+	<sql id="v_mobile_check_results" type="view" desc="移动盘点用科室字典 "><![CDATA[
+		create or replace view v_mobile_check_results as
+		select dept_id,ass_id,count(bar_code) check_amount from ass_card_check_mobile group by dept_id,ass_id
+
+	]]></sql>
+	<sql id="v_ass_check_store" type="view" desc="在库盘点单查询 "><![CDATA[
+		create or replace view v_ass_check_store as
+		select '03' ass_naturs, group_id, hos_id, copy_code, check_plan_no, check_no, store_id, store_no, ass_card_no, ass_id, ass_no, acc_amount, check_amount, pl_amount, pl_reason from ass_check_s_detail_general
+		union all
+		select '02'ass_naturs, group_id, hos_id, copy_code, check_plan_no, check_no, store_id, store_no, ass_card_no, ass_id, ass_no, acc_amount, check_amount, pl_amount, pl_reason from ass_check_s_detail_general
+		union all
+		select '05' ass_naturs, group_id, hos_id, copy_code, check_plan_no, check_no, store_id, store_no, ass_card_no, ass_id, ass_no, acc_amount, check_amount, pl_amount, pl_reason from ass_check_s_detail_inassets
+		union all
+		select '04' ass_naturs, group_id, hos_id, copy_code, check_plan_no, check_no, store_id, store_no, ass_card_no, ass_id, ass_no, acc_amount, check_amount, pl_amount, pl_reason from ass_check_s_detail_other
+
+
+	]]></sql>
+	<sql id="v_ass_check_dept" type="view" desc="在用盘点单查询 "><![CDATA[
+		create or replace view v_ass_check_dept as
+		select '03' ass_naturs, group_id, hos_id, copy_code, check_plan_no, check_no, dept_id, dept_no, ass_card_no, ass_id, ass_no, acc_amount, check_amount, pl_amount, pl_reason from ass_check_d_detail_general
+		union all
+		select '02' ass_naturs, group_id, hos_id, copy_code, check_plan_no, check_no, dept_id, dept_no, ass_card_no, ass_id, ass_no, acc_amount, check_amount, pl_amount, pl_reason from ass_check_d_detail_special
+		union all
+		select '05' ass_naturs, group_id, hos_id, copy_code, check_plan_no, check_no, dept_id, dept_no, ass_card_no, ass_id, ass_no, acc_amount, check_amount, pl_amount, pl_reason from  ass_check_d_detail_inassets
+		union all
+		select '04' ass_naturs, group_id, hos_id, copy_code, check_plan_no, check_no, dept_id, dept_no, ass_card_no, ass_id, ass_no, acc_amount, check_amount, pl_amount, pl_reason from  ass_check_d_detail_other
+
+	]]></sql>
+	<sql id="v_ass_check_house_land" type="view" desc="房屋与土地盘点单查询 "><![CDATA[
+		create or replace view v_ass_check_house_land as
+		select '01' ass_naturs,group_id, hos_id, copy_code, check_plan_no, check_no, ass_card_no, ass_id, ass_no, acc_amount, check_amount, pl_amount, pl_reason from ass_check_detail_house
+		union all
+		select '06' ass_naturs,group_id, hos_id, copy_code, check_plan_no, check_no, ass_card_no, ass_id, ass_no, acc_amount, check_amount, pl_amount, pl_reason from  ass_check_detail_land
+
+	]]></sql>
+	<sql id="v_ass_check_data" type="view" desc="按资产汇总查询盘点单 "><![CDATA[
+		create or replace view v_ass_check_data as
+		select  ass_naturs, group_id, hos_id, copy_code,check_plan_no,ass_id, ass_no, sum(nvl(acc_amount,0)) acc_amount, sum(nvl(check_amount,0)) check_amount from v_ass_check_store
+		group by ass_naturs, group_id, hos_id, copy_code,check_plan_no,ass_id, ass_no
+		union all
+		select  ass_naturs, group_id, hos_id, copy_code,check_plan_no,ass_id, ass_no, sum(nvl(acc_amount,0)) acc_amount, sum(nvl(check_amount,0)) check_amount from v_ass_check_dept
+		group by ass_naturs, group_id, hos_id, copy_code,check_plan_no,ass_id, ass_no
+		union all
+		select  ass_naturs, group_id, hos_id, copy_code,check_plan_no,ass_id, ass_no, sum(nvl(acc_amount,0)) acc_amount, sum(nvl(check_amount,0)) check_amount from v_ass_check_house_land
+		group by ass_naturs, group_id, hos_id, copy_code,check_plan_no,ass_id, ass_no
+	]]></sql>
+	<sql id="v_ass_check_plan_no" type="view" desc="查询当期盘点计划单号 "><![CDATA[
+		create or replace view v_ass_check_plan_no as
+		SELECT '03' naturs_code,check_plan_no ,group_id,hos_id,copy_code
+		  FROM Ass_Check_Plan_General
+		 WHERE nvl(state, 0) < 2
+		UNION ALL
+		SELECT '02' naturs_code,check_plan_no,group_id,hos_id,copy_code
+		  FROM ass_check_plan_special
+		 WHERE nvl(state, 0) < 2
+		UNION ALL
+		SELECT '01' naturs_code,check_plan_no ,group_id,hos_id,copy_code
+		  FROM ass_check_plan_house
+		UNION ALL
+		SELECT '05' naturs_code,check_plan_no ,group_id,hos_id,copy_code
+		  FROM ass_check_plan_inassets
+		 WHERE nvl(state, 0) < 2
+		UNION ALL
+		SELECT '04' naturs_code,check_plan_no ,group_id,hos_id,copy_code
+		  FROM ass_check_plan_other
+		 WHERE nvl(state, 0) < 2
+		UNION ALL
+		SELECT '06' naturs_code,check_plan_no ,group_id,hos_id,copy_code
+		  FROM ass_check_plan_land
+		 WHERE nvl(state, 0) < 2
+ 	]]></sql>
+	<sql id="v_mobile_ass_card" type="view" desc="移动盘点用卡片视图 "><![CDATA[
+		CREATE OR REPLACE VIEW V_MOBILE_ASS_CARD AS
+SELECT ASS_CARD_NO
+      ,ASS_ORI_CARD_NO
+      ,t1.ASS_ID
+      ,t1.ASS_NO
+      ,ASS_CODE
+      ,ASS_NAME
+      ,t1.DEPT_ID
+      ,t1.DEPT_NO
+      ,DEPT_CODE
+      ,DEPT_NAME
+      ,use_state
+	  ,t1.group_id
+              ,t1.hos_id
+              ,t1.copy_code
+  FROM (SELECT ASS_CARD_NO
+              ,bar_code ASS_ORI_CARD_NO
+              ,ASS_ID
+              ,ASS_NO
+              ,DEPT_ID
+              ,DEPT_NO
+              ,group_id
+              ,hos_id
+              ,copy_code
+              ,use_state
+          FROM ASS_CARD_GENERAL t where use_state!=0 and use_state!=7
+        UNION ALL
+        SELECT ASS_CARD_NO
+              ,bar_code ASS_ORI_CARD_NO
+              ,ASS_ID
+              ,ASS_NO
+              ,DEPT_ID
+              ,DEPT_NO
+              ,group_id
+              ,hos_id
+              ,copy_code
+              ,use_state
+          FROM ASS_CARD_SPECIAL where use_state!=0 and use_state!=7
+        UNION ALL
+        SELECT ASS_CARD_NO
+              ,ASS_ORI_CARD_NO
+              ,ASS_ID
+              ,ASS_NO
+              ,DEPT_ID
+              ,DEPT_NO
+              ,group_id
+              ,hos_id
+              ,copy_code
+              ,use_state
+          FROM ASS_CARD_HOUSE where use_state!=0 and use_state!=7
+        UNION ALL
+        SELECT ASS_CARD_NO
+              ,ASS_ORI_CARD_NO
+              ,ASS_ID
+              ,ASS_NO
+              ,DEPT_ID
+              ,DEPT_NO
+              ,group_id
+              ,hos_id
+              ,copy_code
+              ,use_state
+          FROM ASS_CARD_LAND where use_state!=0 and use_state!=7
+        UNION ALL
+        SELECT ASS_CARD_NO
+              ,ASS_ORI_CARD_NO
+              ,ASS_ID
+              ,ASS_NO
+              ,DEPT_ID
+              ,DEPT_NO
+              ,group_id
+              ,hos_id
+              ,copy_code
+              ,use_state
+          FROM ASS_CARD_INASSETS where use_state!=0 and use_state!=7
+        UNION ALL
+        SELECT ASS_CARD_NO
+              ,bar_code ASS_ORI_CARD_NO
+              ,ASS_ID
+              ,ASS_NO
+              ,DEPT_ID
+              ,DEPT_NO
+              ,group_id
+              ,hos_id
+              ,copy_code
+              ,use_state
+          FROM ASS_CARD_OTHER where use_state!=0 and use_state!=7) t1
+  LEFT JOIN hos_dept_dict t2
+    ON t1.dept_id = t2.dept_id
+   AND t1.dept_no = t2.dept_no
+   AND t1.group_id = t2.group_id
+   AND t1.hos_id = t2.hos_id
+  LEFT JOIN ass_no_dict t3
+    ON t1.group_id = t3.group_id
+   AND t1.hos_id = t3.hos_id
+   AND t1.copy_code = t3.copy_code
+   AND t1.ass_id = t3.ass_id
+   AND t1.ass_no = t3.ass_no
+
+	]]></sql>
+	
+	<sql id="v_mobile_user" type="view" desc="移动盘点用户信息 "><![CDATA[
+		create or replace view v_mobile_user as
+		select group_id,hos_id,user_id,user_code,user_name,spell_code,wbx_code from sys_user  where type_code=0 and is_stop=0
+
+	]]></sql>
+	
+	<sql id="v_mobile_info" type="view" desc="移动盘点系统信息 "><![CDATA[
+		create or replace view v_mobile_info as
+		SELECT t1.group_id
+      ,group_name
+      ,t1.hos_id
+      ,hos_name
+      ,t1.copy_code
+      ,t1.copy_name
+  FROM hos_copy t1
+  LEFT JOIN hos_info_dict t2
+    ON t1.group_id = t2.group_id
+   AND t1.hos_id = t2.hos_id
+  LEFT JOIN sys_group_dict t3
+    ON t1.group_id = t3.group_id
+    where t2.is_stop=0 and t3.is_stop=0
+
+
+	]]></sql>
+</root>

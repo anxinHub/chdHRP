@@ -1,0 +1,296 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.acc.dao.autovouch.AccBudgTpMapper">
+
+	<resultMap id="accBudgTp" type="java.util.Map">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="tp_code" column="tp_code"/>
+		<result property="tp_name" column="tp_name"/>
+		<result property="vouch_type_code" column="vouch_type_code"/>
+		<result property="vouch_type_name" column="vouch_type_name"/>
+		<result property="sort_code" column="sort_code"/>
+		<result property="user_id" column="user_id"/>
+		<result property="user_name" column="user_name"/>
+		<result property="note" column="note"/>
+	</resultMap>
+	
+	<resultMap id="accBudgTpDetail" type="java.util.Map">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="tp_code" column="tp_code"/>
+		<result property="did" column="did"/>
+		<result property="subj_code" column="subj_code"/>
+		<result property="subj_name" column="subj_name"/>
+		<result property="kind_code" column="kind_code"/>
+		<result property="sort_code" column="sort_code"/>
+		<result property="summary" column="summary"/>
+		<result property="dire" column="dire"/>
+		<result property="dire_name" column="dire_name"/>
+		<result property="cal" column="cal"/>
+	</resultMap>
+
+	<!-- 列表查询 -->
+	<select id="queryList" parameterType="java.util.Map" resultMap="accBudgTp">
+		SELECT a.group_id, a.hos_id, a.copy_code, a.tp_code, a.tp_name, a.vouch_type_code, 
+			b.vouch_type_name, a.user_id, c.user_name, a.sort_code, a.note 
+		FROM acc_budg_tp a 
+		LEFT JOIN acc_vouch_type b 
+			ON a.group_id = b.group_id 
+			AND a.hos_id = b.hos_id 
+			AND a.copy_code = b.copy_code 
+			AND a.vouch_type_code = b.vouch_type_code 
+		LEFT JOIN sys_user c 
+			ON a.group_id = c.group_id 
+			AND a.hos_id = c.hos_id 
+			AND a.user_id = c.user_id 
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER} 
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			<if test="tp_code != null and tp_code != ''">
+				AND a.tp_code like '${tp_code}%'
+			</if> 
+			<if test="tp_name != null and tp_name != ''">
+				AND a.tp_name like '%${tp_name}%'
+			</if>
+			<if test="user_id != null and user_id != ''">
+				AND a.user_id = #{user_id,jdbcType=INTEGER}
+			</if>
+		ORDER BY a.sort_code, a.tp_code
+	</select>
+	
+	<!-- 主表精准查询 -->
+	<select id="queryMainByCode" parameterType="java.util.Map" resultMap="accBudgTp">
+		SELECT a.group_id, a.hos_id, a.copy_code, a.tp_code, a.tp_name, a.vouch_type_code, 
+			b.vouch_type_name, a.user_id, c.user_name, a.sort_code, a.note 
+		FROM acc_budg_tp a 
+		LEFT JOIN acc_vouch_type b 
+			ON a.group_id = b.group_id 
+			AND a.hos_id = b.hos_id 
+			AND a.copy_code = b.copy_code 
+			AND a.vouch_type_code = b.vouch_type_code 
+		LEFT JOIN sys_user c 
+			ON a.group_id = c.group_id 
+			AND a.hos_id = c.hos_id 
+			AND a.user_id = c.user_id 
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER} 
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR} 
+			AND a.tp_code = #{tp_code,jdbcType=VARCHAR} 
+	</select>
+	
+	<!-- 明细表精准查询 -->
+	<select id="queryDetailByCode" parameterType="java.util.Map" resultMap="accBudgTpDetail">
+		SELECT a.group_id, a.hos_id, a.copy_code, a.tp_code, a.sort_code, a.subj_code, 
+			a.subj_code || ' ' || case when b.subj_name is null then '本年度没有该会计科目' else b.subj_name end as subj_name, 
+			a.summary, a.dire, a.kind_code, a.did, a.cal, 
+			case a.dire when 1 then '贷方' when 0 then '借方' end dire_name
+		FROM acc_budg_tp_detail a 
+		LEFT JOIN acc_subj b 
+			ON a.group_id = b.group_id 
+			AND a.hos_id = b.hos_id 
+			AND a.copy_code = b.copy_code
+			AND b.acc_year = #{acc_year,jdbcType=VARCHAR} 
+			AND a.subj_code = b.subj_code 
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER} 
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR} 
+			AND a.tp_code = #{tp_code,jdbcType=VARCHAR} 
+			AND a.kind_code = #{kind_code,jdbcType=VARCHAR}
+		ORDER BY a.did 
+	</select>
+	
+	<!-- 主表添加 -->
+	<insert id="addMain" parameterType="java.util.Map">
+		INSERT INTO acc_budg_tp(
+			group_id, hos_id, copy_code, tp_code, tp_name, 
+			vouch_type_code, user_id, sort_code, note 
+		)
+		VALUES(
+			#{group_id,jdbcType=INTEGER}, 
+			#{hos_id,jdbcType=INTEGER}, 
+			#{copy_code,jdbcType=VARCHAR}, 
+			#{tp_code,jdbcType=VARCHAR}, 
+			#{tp_name,jdbcType=VARCHAR}, 
+			#{vouch_type_code,jdbcType=VARCHAR}, 
+			#{user_id,jdbcType=INTEGER}, 
+			#{sort_code,jdbcType=INTEGER}, 
+			#{note,jdbcType=VARCHAR} 
+		)
+	</insert>
+	
+	<!-- 明细表添加 -->
+	<insert id="addDetail" parameterType="java.util.List">
+		INSERT INTO acc_budg_tp_detail(
+			group_id, hos_id, copy_code, tp_code, did, sort_code, subj_code, kind_code, summary, dire, cal 
+		)
+		SELECT group_id, hos_id, copy_code, tp_code, did, sort_code, subj_code, kind_code, summary, dire, cal 
+		FROM(
+			<foreach collection="list" item="item" index="index" separator=" union all ">
+				SELECT 
+					#{item.group_id,jdbcType=INTEGER} group_id, 
+					#{item.hos_id,jdbcType=INTEGER} hos_id, 
+					#{item.copy_code,jdbcType=VARCHAR} copy_code, 
+					#{item.tp_code,jdbcType=VARCHAR} tp_code, 
+					#{item.did,jdbcType=INTEGER} did, 
+					#{item.sort_code,jdbcType=VARCHAR} sort_code, 
+					#{item.subj_code,jdbcType=VARCHAR} subj_code, 
+					#{item.kind_code,jdbcType=VARCHAR} kind_code, 
+					#{item.summary,jdbcType=VARCHAR} summary, 
+					#{item.dire,jdbcType=INTEGER} dire, 
+					#{item.cal,jdbcType=VARCHAR} cal 
+				FROM dual
+			</foreach>
+		) tmp
+	</insert>
+	
+	<!-- 主表修改 -->
+	<update id="updateMain" parameterType="java.util.Map">
+		UPDATE acc_budg_tp 
+		SET tp_name = #{tp_name,jdbcType=VARCHAR}, 
+			
+			<if test="vouch_type_code != null">
+				vouch_type_code = #{vouch_type_code,jdbcType=VARCHAR}, 
+			</if>
+			<if test="sort_code != null">
+				sort_code = #{sort_code,jdbcType=VARCHAR}, 
+			</if>
+			<if test="note != null">
+				note = #{note,jdbcType=VARCHAR},
+			</if>
+			user_id = #{user_id,jdbcType=INTEGER}
+		WHERE group_id = #{group_id,jdbcType=INTEGER} 
+			AND hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND copy_code = #{copy_code,jdbcType=VARCHAR} 
+			AND tp_code = #{tp_code,jdbcType=VARCHAR} 
+	</update>
+	
+	<!-- 删除明细 -->
+	<delete id="deleteDetailByCode" parameterType="java.util.Map">
+		DELETE FROM acc_budg_tp_detail 
+		WHERE group_id = #{group_id,jdbcType=INTEGER} 
+			AND hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND copy_code = #{copy_code,jdbcType=VARCHAR} 
+			AND tp_code = #{tp_code,jdbcType=VARCHAR} 
+	</delete>
+	
+	<!-- 删除所有数据 -->
+	<delete id="deleteAll" parameterType="java.util.Map">
+		BEGIN 
+			DELETE FROM acc_budg_tp_detail 
+			WHERE group_id = #{group_id,jdbcType=INTEGER} 
+				AND hos_id = #{hos_id,jdbcType=INTEGER} 
+				AND copy_code = #{copy_code,jdbcType=VARCHAR} 
+				AND tp_code in (${tp_codes});
+				
+			DELETE FROM acc_budg_tp 
+			WHERE group_id = #{group_id,jdbcType=INTEGER} 
+				AND hos_id = #{hos_id,jdbcType=INTEGER} 
+				AND copy_code = #{copy_code,jdbcType=VARCHAR} 
+				AND tp_code in (${tp_codes});
+		END;
+	</delete>
+	
+	<!-- 校验编码是否重复 -->
+	<select id="existsByCode" parameterType="java.util.Map" resultType="java.lang.Integer">
+		SELECT count(0) 
+		FROM acc_budg_tp 
+		WHERE group_id = #{group_id,jdbcType=INTEGER} 
+			AND hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND copy_code = #{copy_code,jdbcType=VARCHAR} 
+			AND tp_code = #{tp_code,jdbcType=VARCHAR}
+	</select>
+	
+	<!-- 校验名称是否重复 -->
+	<select id="existsByName" parameterType="java.util.Map" resultType="java.lang.Integer">
+		SELECT count(0) 
+		FROM acc_budg_tp 
+		WHERE group_id = #{group_id,jdbcType=INTEGER} 
+			AND hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			<if test="is_update != null and is_update == 1">
+				AND tp_code &lt;&gt; #{tp_code,jdbcType=VARCHAR}
+			</if>
+			AND tp_name  = #{tp_name,jdbcType=VARCHAR}
+	</select>
+	
+	<!-- 获取最大排序号 -->
+	<select id="getMaxSortCode" parameterType="java.util.Map" resultType="java.lang.Integer">
+		SELECT nvl(max(sort_code),0) sort_code 
+		FROM acc_budg_tp 
+		WHERE group_id = #{group_id,jdbcType=INTEGER} 
+			AND hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND copy_code = #{copy_code,jdbcType=VARCHAR} 
+	</select>
+	
+	<!-- 用科目下拉列表 -->
+	<select id="querySubjSelect" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT subj_code as "id", subj_code || ' ' || subj_name as "label"
+		FROM acc_subj 
+		WHERE group_id = #{group_id,jdbcType=INTEGER} 
+			AND hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND acc_year = #{acc_year,jdbcType=VARCHAR}
+			AND is_last = 1 
+			AND is_stop = 0
+			<if test="kind_code != null and kind_code != ''">
+				AND kind_code = #{kind_code,jdbcType=VARCHAR}
+			</if>
+			<if test="key != null and key != ''">
+				AND (
+					subj_code like '${key}%'
+					OR subj_name like '%${key}%'
+				)
+			</if>
+			AND rownum &lt;= 50
+	</select>
+	
+	<!-- 用户下拉列表 -->
+	<select id="queryUserSelect" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT user_id as "id", user_code || ' ' || user_name as "text"
+		FROM sys_user 
+		WHERE group_id = #{group_id,jdbcType=INTEGER} 
+			AND hos_id = #{hos_id,jdbcType=INTEGER} 
+			<if test="key != null and key != ''">
+				AND (
+					user_code like '${key}%'
+					OR user_name like '%${key}%'
+				)
+			</if>
+			AND rownum &lt;= 50
+	</select>
+	
+	<!-- 凭证页面查询明细 -->
+	<select id="queryDetailByCodeVouch" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT a.tp_code "tp_code", a.sort_code "sort_code",a.did "did", a.subj_code "subj_code", 
+		a.subj_code || ' ' || case when b.subj_name is null then '本年度没有该会计科目' else b.subj_name end "subj_name", 
+		a.subj_code || ' ' || case when b.subj_name_all is null then '本年度没有该会计科目' else b.subj_name_all end "subj_name_all", 
+		a.summary "summary", a.dire "dire", a.kind_code "kind_code", a.cal "cal", 
+		case a.dire when 1 then '贷方' when 0 then '借方' end "dire_name",
+		b.subj_nature_code "nature_code",b.is_bill "is_bill",b.is_cash "is_cash",
+		(select lower(t.column_check) from acc_check_type t
+		where t.group_id=b.group_id and t.hos_id=b.hos_id and t.copy_code=b.copy_code and t.check_type_id=b.check1) "check1",
+	    (select lower(t.column_check) from acc_check_type t
+		where t.group_id=b.group_id and t.hos_id=b.hos_id and t.copy_code=b.copy_code and t.check_type_id=b.check2) "check2",
+	    (select lower(t.column_check) from acc_check_type t
+		where t.group_id=b.group_id and t.hos_id=b.hos_id and t.copy_code=b.copy_code and t.check_type_id=b.check3) "check3",
+	    (select lower(t.column_check) from acc_check_type t
+		where t.group_id=b.group_id and t.hos_id=b.hos_id and t.copy_code=b.copy_code and t.check_type_id=b.check4) "check4"
+		FROM acc_budg_tp_detail a 
+		inner JOIN acc_subj b 
+			ON a.group_id = b.group_id 
+			AND a.hos_id = b.hos_id 
+			AND a.copy_code = b.copy_code
+			AND b.acc_year = #{acc_year,jdbcType=VARCHAR} 
+			AND a.subj_code = b.subj_code 
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER} 
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR} 
+			AND a.tp_code = #{tp_code,jdbcType=VARCHAR} 
+			AND a.kind_code = #{kind_code,jdbcType=VARCHAR}
+			order by a.sort_code
+	</select>
+</mapper>
+

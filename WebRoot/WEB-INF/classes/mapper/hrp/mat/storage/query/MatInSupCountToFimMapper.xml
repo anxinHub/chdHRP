@@ -1,0 +1,291 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.mat.dao.storage.query.MatInSupCountToFimMapper">
+
+	<resultMap id="queryMatInSupCountMap" type="java.util.Map">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="sup_code" column="sup_code" />
+		<result property="sup_name" column="sup_name" />
+		<result property="amount_money" column="amount_money" />
+		<result property="mat_type_count" column="mat_type_count" />
+		<result property="in_id_count" column="in_id_count" />
+		<result property="store_name" column="store_name"/>
+		<result property="set_name" column="set_name"/>
+		<result property="money" column="money"/>
+		<result property="mat_type_code" column="mat_type_code"/>
+		<result property="is_last" column="is_last"/>
+		<result property="fim_type_code" column="fim_type_code"/>
+		<result property="fim_type_name" column="fim_type_name"/>
+		<result property="bus_amount" column="bus_amount"/><!-- 发生的业务数量 -->
+	</resultMap>
+
+
+	<select id="queryMatInSupCount" parameterType="java.util.Map"
+		resultMap="queryMatInSupCountMap"> 
+    with sup_fim_type as (
+       select a.fim_type_code,b.sup_code,b.sup_name,sum(b.money) money  ,a.is_last
+       from mat_type  a
+       left join  
+       (
+        select   sup_code,sup_name, sum(money) as money ,mat_type_code
+       	from (
+       		select   hsd.sup_code,hsd.sup_name, sum(mid.amount_money) as money ,mtd.mat_type_code,mim.in_id
+	        from MAT_IN_MAIN mim
+	        left join mat_in_detail mid on mim.group_id = mid.group_id
+	        and mim.hos_id = mid.hos_id
+	        and mim.copy_code = mid.copy_code
+	        and mim.in_id = mid.in_id 
+	        left join mat_inv midd on midd.group_id = mim.group_id
+	        and midd.hos_id = mim.hos_id
+	        and midd.copy_code = mim.copy_code
+	        and midd.inv_id = mid.inv_id
+	        left join mat_type mtd on midd.mat_type_id = mtd.mat_type_id
+	        and mim.group_id = mtd.group_id
+	        and mim.hos_id = mtd.hos_id
+	        and mim.copy_code = mtd.copy_code
+	        left join hos_sup hsd on mim.sup_id=hsd.sup_id
+	         and hsd.group_id = mim.group_id
+	        and hsd.hos_id = mim.hos_id
+	        where mim.state = '3'
+			  and mim.bus_type_code in  (select bus_type_code   from mat_bus_type where bus_type_code ='2' or bus_type_code ='12' or bus_type_code ='47' or bus_type_code ='48')
+	          and mim.group_id = #{group_id}
+	          and mim.hos_id = #{hos_id}
+	          and mim.copy_code = #{copy_code}
+	         
+			<if test="begin_confirm_date != null and begin_confirm_date != '' and 
+					end_confirm_date != null and end_confirm_date != ''">
+				 and to_char(mim.confirm_date, 'yyyy-MM-dd') 
+	         		 between #{begin_confirm_date} and
+					#{end_confirm_date}
+			</if>
+			<if test="mat_type_code !=null and mat_type_code != ''">
+					and mtd.mat_type_code like '%${mat_type_code}'
+			</if>
+			<if test="mat_type_code == null and mat_type_code == ''">
+				and to_char(mtd.mat_type_id) in (
+					select perm_code from v_user_data_perm  
+					where group_id = #{group_id,jdbcType=INTEGER}
+						and hos_id = #{hos_id,jdbcType=INTEGER}
+						and table_code = 'MAT_TYPE_DICT'
+						and user_id = #{user_id,jdbcType=INTEGER}
+						and is_read = 1 and is_write = 1 
+				)
+			</if>
+			<!-- 只显示有权限的库房信息 -->
+			and to_char(mim.store_id) in (
+				select perm_code from v_user_data_perm  
+				where group_id = #{group_id,jdbcType=INTEGER}
+					and hos_id = #{hos_id,jdbcType=INTEGER}
+					and table_code = 'HOS_STORE_DICT'
+					and user_id = #{user_id,jdbcType=INTEGER}
+					and is_read = 1 and is_write = 1 
+			)
+			<if test="set_id==null or set_id == ''"> 
+				<if test="store_id != null and store_id != ''">
+					and mim.store_id = #{store_id}
+				</if>
+			</if>
+				<if test="set_id!=null and set_id!=''">
+						and mim.store_id in (select distinct store_id from MAT_STORE_DETAIL  where set_id = #{set_id})
+				</if>
+				<if test="begin_in_date != null and begin_in_date != '' and end_in_date != null and end_in_date != ''">
+					AND mim.in_date between to_date(#{begin_in_date},'yyyy-MM-dd') and to_date(#{end_in_date},'yyyy-MM-dd')
+				</if>
+				<if test="sup_id != null and sup_id != ''">
+					and mim.sup_id = #{sup_id}
+				</if>
+				
+				<if test="is_charge !=null and is_charge != ''">
+					and midd.is_charge= #{is_charge}
+				</if>
+				
+	        	group by  hsd.sup_code,hsd.sup_name,mtd.mat_type_code,mim.in_id
+       	)
+        group by  sup_code,sup_name,mat_type_code
+        
+        )
+        b on b.mat_type_code like a.mat_type_code||'%'
+        <where>
+			a.is_stop=0		
+			 and b.money != 0
+			 and a.fim_type_code!=' '
+			 and  a.is_last='1'
+		</where>
+            group by a.fim_type_code,b.sup_code,b.sup_name,a.is_last
+    	      order by sup_code
+    	      )
+    	      select fim_type_code, sup_code, to_char(sup_name) as sup_name,money from sup_fim_type
+    	      where sup_code!= ' '
+				union all 
+				select  fim_type_code ,'', '总合计' as sup_name,sum(money) from sup_fim_type
+				group by fim_type_code
+    </select>
+    <!-- 查询发生业务的供应商对应的财务类型 -->
+    <select id="queryOccurMatFimTypeDict" parameterType="java.util.Map" resultMap="queryMatInSupCountMap">
+          
+	    select distinct mft.fim_type_code,mft.fim_type_name
+	      from MAT_IN_MAIN mim
+	      left join mat_in_detail mid
+	        on mim.group_id = mid.group_id
+	       and mim.hos_id = mid.hos_id
+	       and mim.copy_code = mid.copy_code
+	       and mim.in_id = mid.in_id
+	      left join mat_inv midd
+	        on midd.group_id = mim.group_id
+	       and midd.hos_id = mim.hos_id
+	       and midd.copy_code = mim.copy_code
+	       and midd.inv_id = mid.inv_id
+	      left join mat_type mtd
+	        on midd.mat_type_id = mtd.mat_type_id
+	       and mim.group_id = mtd.group_id
+	       and mim.hos_id = mtd.hos_id
+	       and mim.copy_code = mtd.copy_code
+	      left join hos_sup hsd
+	        on mim.sup_id = hsd.sup_id
+	       and hsd.group_id = mim.group_id
+	       and hsd.hos_id = mim.hos_id
+	      left join mat_fim_type mft
+	      on mft.group_id=mim.group_id
+	      and mft.hos_id=mim.hos_id
+	      and mft.copy_code=mim.copy_code
+	      and mft.fim_type_code=mtd.fim_type_code
+	     where mim.state = '3'
+	       and mim.bus_type_code in ('2', '12', '47', '48')
+	       and mim.group_id = #{group_id}
+	       and mim.hos_id = #{hos_id}
+	       and mim.copy_code = #{copy_code}
+	    <if test="begin_confirm_date != null and begin_confirm_date != '' and end_confirm_date != null and end_confirm_date != ''">
+	       and to_char(mim.confirm_date, 'yyyy-MM-dd') between #{begin_confirm_date} and #{end_confirm_date}
+	    </if>
+	    <if test="mat_type_code !=null and mat_type_code != ''">
+	       and mtd.mat_type_code like '%${mat_type_code}'
+	    </if>
+	    <if test="mat_type_code == null and mat_type_code == ''">
+	      and to_char(mtd.mat_type_id) in (
+	        select perm_code from v_user_data_perm  
+	        where group_id = #{group_id,jdbcType=INTEGER}
+	          and hos_id = #{hos_id,jdbcType=INTEGER}
+	          and table_code = 'MAT_TYPE_DICT'
+	          and user_id = #{user_id,jdbcType=INTEGER}
+	          and is_read = 1 and is_write = 1 
+	      )
+	    </if>
+	    <!-- 只显示有权限的库房信息 -->
+	    and to_char(mim.store_id) in (
+	      select perm_code from v_user_data_perm  
+	      where group_id = #{group_id,jdbcType=INTEGER}
+	        and hos_id = #{hos_id,jdbcType=INTEGER}
+	        and table_code = 'HOS_STORE_DICT'
+	        and user_id = #{user_id,jdbcType=INTEGER}
+	        and is_read = 1 and is_write = 1 
+	    )
+	    <if test="set_id==null or set_id == ''"> 
+	      <if test="store_id != null and store_id != ''">
+	        and mim.store_id = #{store_id}
+	      </if>
+	    </if>
+	    <if test="set_id!=null and set_id!=''">
+	        and mim.store_id in (select distinct store_id from MAT_STORE_DETAIL  where set_id = #{set_id})
+	    </if>
+	    <if test="begin_in_date != null and begin_in_date != '' and end_in_date != null and end_in_date != ''">
+	      AND mim.in_date between to_date(#{begin_in_date},'yyyy-MM-dd') and to_date(#{end_in_date},'yyyy-MM-dd')
+	    </if>
+	    <if test="sup_id != null and sup_id != ''">
+	      and mim.sup_id = #{sup_id}
+	    </if>
+	    <if test="is_charge !=null and is_charge != ''">
+	      and midd.is_charge= #{is_charge}
+	    </if>
+   
+   		order by mft.fim_type_code
+  
+    </select>
+    
+    
+    <select id="queryMatInSupCountAmount" parameterType="java.util.Map"
+		resultMap="queryMatInSupCountMap"> 
+    with sup_fim_type as (
+       		select sup_code,sup_name,count(*) as bus_amount
+            from 
+       		(select   distinct hsd.sup_code, hsd.sup_name,mim.in_id
+	        from MAT_IN_MAIN mim
+	        left join mat_in_detail mid on mim.group_id = mid.group_id
+	        and mim.hos_id = mid.hos_id
+	        and mim.copy_code = mid.copy_code
+	        and mim.in_id = mid.in_id 
+	        left join mat_inv midd on midd.group_id = mim.group_id
+	        and midd.hos_id = mim.hos_id
+	        and midd.copy_code = mim.copy_code
+	        and midd.inv_id = mid.inv_id
+	        left join mat_type mtd on midd.mat_type_id = mtd.mat_type_id
+	        and mim.group_id = mtd.group_id
+	        and mim.hos_id = mtd.hos_id
+	        and mim.copy_code = mtd.copy_code
+	        left join hos_sup hsd on mim.sup_id=hsd.sup_id
+	         and hsd.group_id = mim.group_id
+	        and hsd.hos_id = mim.hos_id
+	        where mim.state = '3'
+			  and mim.bus_type_code in  (select bus_type_code   from mat_bus_type where bus_type_code ='2' or bus_type_code ='12' or bus_type_code ='47' or bus_type_code ='48')
+	          and mim.group_id = #{group_id}
+	          and mim.hos_id = #{hos_id}
+	          and mim.copy_code = #{copy_code}
+	         
+			<if test="begin_confirm_date != null and begin_confirm_date != '' and 
+					end_confirm_date != null and end_confirm_date != ''">
+				 and to_char(mim.confirm_date, 'yyyy-MM-dd') 
+	         		 between #{begin_confirm_date} and
+					#{end_confirm_date}
+			</if>
+			<if test="mat_type_code !=null and mat_type_code != ''">
+					and mtd.mat_type_code like '%${mat_type_code}'
+			</if>
+			<if test="mat_type_code == null and mat_type_code == ''">
+				and to_char(mtd.mat_type_id) in (
+					select perm_code from v_user_data_perm  
+					where group_id = #{group_id,jdbcType=INTEGER}
+						and hos_id = #{hos_id,jdbcType=INTEGER}
+						and table_code = 'MAT_TYPE_DICT'
+						and user_id = #{user_id,jdbcType=INTEGER}
+						and is_read = 1 and is_write = 1 
+				)
+			</if>
+			<!-- 只显示有权限的库房信息 -->
+			and to_char(mim.store_id) in (
+				select perm_code from v_user_data_perm  
+				where group_id = #{group_id,jdbcType=INTEGER}
+					and hos_id = #{hos_id,jdbcType=INTEGER}
+					and table_code = 'HOS_STORE_DICT'
+					and user_id = #{user_id,jdbcType=INTEGER}
+					and is_read = 1 and is_write = 1 
+			)
+			<if test="set_id==null or set_id == ''"> 
+				<if test="store_id != null and store_id != ''">
+					and mim.store_id = #{store_id}
+				</if>
+			</if>
+				<if test="set_id!=null and set_id!=''">
+						and mim.store_id in (select distinct store_id from MAT_STORE_DETAIL  where set_id = #{set_id})
+				</if>
+				<if test="begin_in_date != null and begin_in_date != '' and end_in_date != null and end_in_date != ''">
+					AND mim.in_date between to_date(#{begin_in_date},'yyyy-MM-dd') and to_date(#{end_in_date},'yyyy-MM-dd')
+				</if>
+				<if test="sup_id != null and sup_id != ''">
+					and mim.sup_id = #{sup_id}
+				</if>
+				
+				<if test="is_charge !=null and is_charge != ''">
+					and midd.is_charge= #{is_charge}
+				</if>
+				)
+       	      group by sup_code,sup_name
+    	      )
+    	      select  sup_code, to_char(sup_name) as sup_name,bus_amount from sup_fim_type
+    	      where sup_code!= ' '
+				union all  
+				select   '', '总合计' as sup_name,sum(nvl(bus_amount,0)) from sup_fim_type
+				
+    </select>
+</mapper>
+

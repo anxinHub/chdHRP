@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+
+	<sql id="rf_hr_wageitemsaly" type="fun" desc=""><![CDATA[
+	CREATE OR REPLACE FUNCTION RF_HR_WAGEITEMSALY(prm_group_id  IN VARCHAR2, --集团
+                                              prm_hos_id    IN VARCHAR2, --医院
+                                              prm_plan_name IN VARCHAR2, --薪资方案名称
+                                              prm_item_name IN VARCHAR2, --工资项名称
+                                              prm_emp_id  IN VARCHAR2 --职工ID或 "职工编号 职工姓名"
+                                              ) RETURN varchar2
+IS
+    p_column_item varchar2(200);
+    p_plan_code   varchar2(200);
+    item_money    number(19, 2);
+    v_sql         varchar2(4000);
+BEGIN
+    select t1.plan_code, t1.column_item into p_plan_code, p_column_item
+    from hr_wage_item t1
+    left join hr_wage_plan t2
+           on t2.group_id = t1.group_id
+          and t2.hos_id = t1.hos_id
+          and t2.plan_code = t1.plan_code
+    where t1.group_id = prm_group_id
+      and t1.hos_id = prm_hos_id
+      and t2.plan_name = prm_plan_name
+      and t1.item_name = prm_item_name;
+
+    if instr(prm_emp_id,' ',1,1)>0 then
+        v_sql := 'select sum(' || p_column_item || ')
+                  from hr_wage t1
+                  left join hos_emp t2
+                         on t2.group_id = t1.group_id
+                        and t2.hos_id = t1.hos_id
+                        and t2.emp_id = t1.emp_id
+                  where t1.group_id = ' || prm_group_id ||
+                 '  and t1.hos_id = ' || prm_hos_id ||
+                 '  and t1.wage_plan = ' || p_plan_code || '
+                    and t2.emp_code = ' || prm_emp_id;
+    else
+        v_sql := 'select sum(' || p_column_item || ')
+                  from hr_wage
+                  where group_id = ' || prm_group_id ||
+                 '  and hos_id = ' || prm_hos_id ||
+                 '  and wage_plan = ' || p_plan_code || '
+                    and emp_id = ' || prm_emp_id;
+    end if;
+
+    execute immediate v_sql into item_money;
+
+    if item_money is null then
+        return '0';
+    else
+        return to_char(item_money);
+    end if;
+
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        return '0';
+    WHEN OTHERS THEN
+        return '0';
+
+END RF_HR_WAGEITEMSALY;
+	
+	
+		]]></sql>
+	
+</root>
+	

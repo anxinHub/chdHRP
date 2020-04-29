@@ -1,0 +1,515 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.ass.dao.deptreport.AssDeptAccountReportMapper">
+	
+	<resultMap id="assDeptAccountReport" type="java.util.Map">
+	<result property="dept_id" column="dept_id"/>
+	<result property="dept_code" column="dept_code"/>
+	<result property="dept_name" column="dept_name"/>
+	<result property="ass_type_code" column="ass_type_code"/> 
+	<result property="ass_type_name" column="ass_type_name"/>
+	<result property="acc_amount" column="acc_amount"/>
+	<result property="check_amount" column="check_amount"/>
+	<result property="amount" column="amount"/>
+	<result property="price" column="price"/>
+	</resultMap> 
+	
+	<resultMap id="assDeptAccountReportDetail" type="java.util.Map">
+	<result property="ass_card_no" column="ass_card_no"/>
+	<result property="ass_name" column="ass_name"/>
+	<result property="ass_spec" column="ass_spec"/> 
+	<result property="ass_mondl" column="ass_mondl"/>
+	<result property="price" column="price"/>
+	<result property="depre_money" column="depre_money"/>
+	<result property="state_name" column="state_name"/>
+	<result property="in_date" column="in_date"/>
+	<result property="bar_code" column="bar_code"/>
+	</resultMap>
+	 
+	
+	<select id="query" parameterType="java.util.Map" resultMap="assDeptAccountReport" >
+			with t_card as
+		 	(select t.ass_naturs,
+		         t.DEPT_ID,
+		         t2.dept_code,
+		         t2.dept_name,
+		         count(1) acc_amount,
+		         sum(t1.price) card_price
+		    from v_ass_share_dept_r t
+		    left join v_ass_card t1
+		      on t.ass_naturs = t1.ass_naturs
+		     and t.GROUP_ID = t1.GROUP_ID
+		     and t.HOS_ID = t1.HOS_ID
+		     and t.COPY_CODE = t1.COPY_CODE
+		     and t.ASS_CARD_NO = t1.ASS_CARD_NO
+		  
+		    left join hos_dept_dict t2
+		      on t.GROUP_ID = t2.group_id
+		     and t.HOS_ID = t2.hos_id
+		     and t.DEPT_ID = t2.dept_id
+		     and t2.is_stop = 0
+		  
+		  
+		   where 
+		     t.group_id = #{group_id}
+		     and t.hos_id = #{hos_id}
+		     and t.copy_code=#{copy_code}
+		     and t.ASS_YEAR||t.ASS_MONTH = #{year_month}
+		  	 <if test="dept_id != null and dept_id != ''">
+		  	 and t.DEPT_ID = #{dept_id}
+		  	 </if>
+		  	 <if test="ass_naturs != null and ass_naturs != ''">
+		  	 and t.ass_naturs = #{ass_naturs}
+		  	 </if>
+		  
+		   group by t.ass_naturs,
+		            t.DEPT_ID,
+		            t2.dept_code,
+		            t2.dept_name),
+		t_check as
+		 (select t.ass_naturs,
+		         t.dept_id,
+		         count(1) check_amount,
+		         sum(t2.price) check_price
+		    from v_ass_check_dept t
+		    left join V_ASS_CHECK_MAIN_D t1
+		      on t.GROUP_ID = t1.group_id
+		     and t.hos_id = t1.hos_id
+		     and t.COPY_CODE = t1.copy_code
+		     and t.check_plan_no = t1.check_plan_no
+		     and t.check_no = t1.check_no
+		     
+		     left join v_ass_card t2
+		      on t.ass_naturs = t2.ass_naturs
+		     and t.GROUP_ID = t2.GROUP_ID
+		     and t.HOS_ID = t2.HOS_ID
+		     and t.COPY_CODE = t2.COPY_CODE
+		     and t.ASS_CARD_NO = t2.ASS_CARD_NO
+		     
+		   where 
+		     t.group_id = #{group_id}
+		     and t.hos_id = #{hos_id}
+		     and t.copy_code=#{copy_code}
+		     and to_char(t1.check_date, 'YYYYMM') = #{year_month}
+		  	 <if test="dept_id != null and dept_id != ''">
+		  	 and t.DEPT_ID = #{dept_id}
+		  	 </if>
+		  	 <if test="ass_naturs != null and ass_naturs != ''">
+		  	 and t.ass_naturs = #{ass_naturs}
+		  	 </if>
+		     
+		   group by t.ass_naturs, t.dept_id)
+		<if test="ass_naturs != null and ass_naturs != ''">
+			<if test="ass_naturs == '02'">
+				select t1.dept_id,t1.dept_code, t1.dept_name, t1.acc_amount, nvl(t2.check_amount, 0) check_amount, nvl(t1.acc_amount, 0) - nvl(t2.check_amount, 0) amount
+					,nvl(t1.card_price,0) - nvl(t2.check_price,0) price
+				  from t_card t1
+				  left join t_check t2
+				    on t1.DEPT_ID = t2.dept_id and t1.ass_naturs = t2.ass_naturs
+				 where t1.ass_naturs = '02'
+				union all
+				select null dept_id,'' dept_code, '专用设备小计' dept_name,  sum(t1.acc_amount) acc_amount, sum(nvl(t2.check_amount, 0)) check_amount, sum(t1.acc_amount) - sum(nvl(t2.check_amount, 0)) amount
+				,sum(nvl(t1.card_price, 0)) - sum(nvl(t2.check_price, 0)) as price
+				  from t_card t1
+				  left join t_check t2
+				    on t1.DEPT_ID = t2.dept_id and t1.ass_naturs = t2.ass_naturs
+				 where t1.ass_naturs = '02'
+			</if>
+			
+			<if test="ass_naturs == '03'">
+				select t1.dept_id,t1.dept_code, t1.dept_name, t1.acc_amount, nvl(t2.check_amount, 0) check_amount, nvl(t1.acc_amount, 0) - nvl(t2.check_amount, 0) amount
+				,nvl(t1.card_price,0) - nvl(t2.check_price,0) price
+				  from t_card t1
+				  left join t_check t2
+				    on t1.DEPT_ID = t2.dept_id and t1.ass_naturs = t2.ass_naturs
+				 where t1.ass_naturs = '03'
+				union all
+				select null dept_id,'' dept_code, '一般设备小计' dept_name,  sum(t1.acc_amount) acc_amount, sum(nvl(t2.check_amount, 0)) check_amount, sum(t1.acc_amount) - sum(nvl(t2.check_amount, 0)) amount
+				,sum(nvl(t1.card_price, 0)) - sum(nvl(t2.check_price, 0)) as price
+				  from t_card t1
+				  left join t_check t2
+				    on t1.DEPT_ID = t2.dept_id and t1.ass_naturs = t2.ass_naturs
+				 where t1.ass_naturs = '03'
+			</if>
+			
+			<if test="ass_naturs == '04'">
+				select t1.dept_id,t1.dept_code, t1.dept_name, t1.acc_amount, nvl(t2.check_amount, 0) check_amount, nvl(t1.acc_amount, 0) - nvl(t2.check_amount, 0) amount
+				,nvl(t1.card_price,0) - nvl(t2.check_price,0) price
+				  from t_card t1
+				  left join t_check t2
+				    on t1.DEPT_ID = t2.dept_id and t1.ass_naturs = t2.ass_naturs
+				 where t1.ass_naturs = '04'
+				union all
+				select null dept_id,'' dept_code, '其他固定资产小计' dept_name,  sum(t1.acc_amount) acc_amount, sum(nvl(t2.check_amount, 0)) check_amount, sum(t1.acc_amount) - sum(nvl(t2.check_amount, 0)) amount
+				,sum(nvl(t1.card_price, 0)) - sum(nvl(t2.check_price, 0)) as price
+				  from t_card t1
+				  left join t_check t2
+				    on t1.DEPT_ID = t2.dept_id and t1.ass_naturs = t2.ass_naturs
+				 where t1.ass_naturs = '04'
+			</if>
+			
+			<if test="ass_naturs == '05'">
+				select t1.dept_id,t1.dept_code, t1.dept_name,  t1.acc_amount, nvl(t2.check_amount, 0) check_amount, nvl(t1.acc_amount, 0) - nvl(t2.check_amount, 0) amount
+				,nvl(t1.card_price,0) - nvl(t2.check_price,0) price
+				  from t_card t1
+				  left join t_check t2
+				    on t1.DEPT_ID = t2.dept_id and t1.ass_naturs = t2.ass_naturs
+				 where t1.ass_naturs = '05'
+				union all
+				select null dept_id,'' dept_code, '其他无形资产小计' dept_name,  sum(t1.acc_amount) acc_amount, sum(nvl(t2.check_amount, 0)) check_amount, sum(t1.acc_amount) - sum(nvl(t2.check_amount, 0)) amount
+				,sum(nvl(t1.card_price, 0)) - sum(nvl(t2.check_price, 0)) as price
+				  from t_card t1
+				  left join t_check t2
+				    on t1.DEPT_ID = t2.dept_id and t1.ass_naturs = t2.ass_naturs
+				 where t1.ass_naturs = '05'
+			</if>
+		</if>
+		
+		<if test="ass_naturs == null or ass_naturs == ''">
+		select t1.dept_id,t1.dept_code, t1.dept_name, t1.acc_amount, nvl(t2.check_amount, 0) check_amount, nvl(t1.acc_amount, 0) - nvl(t2.check_amount, 0) amount
+			,nvl(t1.card_price,0) - nvl(t2.check_price,0) price
+		  from t_card t1
+		  left join t_check t2
+		    on t1.DEPT_ID = t2.dept_id and t1.ass_naturs = t2.ass_naturs
+		 where t1.ass_naturs = '02'
+		union all
+		select null dept_id,'' dept_code, '专用设备小计' dept_name,  sum(t1.acc_amount) acc_amount, sum(nvl(t2.check_amount, 0)) check_amount, sum(t1.acc_amount) - sum(nvl(t2.check_amount, 0)) amount
+		,sum(nvl(t1.card_price, 0)) - sum(nvl(t2.check_price, 0)) as price
+		  from t_card t1
+		  left join t_check t2
+		    on t1.DEPT_ID = t2.dept_id and t1.ass_naturs = t2.ass_naturs
+		 where t1.ass_naturs = '02'
+		
+		union all
+		
+		select t1.dept_id,t1.dept_code, t1.dept_name, t1.acc_amount, nvl(t2.check_amount, 0) check_amount, nvl(t1.acc_amount, 0) - nvl(t2.check_amount, 0) amount
+		,nvl(t1.card_price,0) - nvl(t2.check_price,0) price
+		  from t_card t1
+		  left join t_check t2
+		    on t1.DEPT_ID = t2.dept_id and t1.ass_naturs = t2.ass_naturs
+		 where t1.ass_naturs = '03'
+		union all
+		select null dept_id,'' dept_code, '一般设备小计' dept_name,  sum(t1.acc_amount) acc_amount, sum(nvl(t2.check_amount, 0)) check_amount, sum(t1.acc_amount) - sum(nvl(t2.check_amount, 0)) amount
+		,sum(nvl(t1.card_price, 0)) - sum(nvl(t2.check_price, 0)) as price
+		  from t_card t1
+		  left join t_check t2
+		    on t1.DEPT_ID = t2.dept_id and t1.ass_naturs = t2.ass_naturs
+		 where t1.ass_naturs = '03'
+		
+		union all
+		
+		select t1.dept_id,t1.dept_code, t1.dept_name, t1.acc_amount, nvl(t2.check_amount, 0) check_amount, nvl(t1.acc_amount, 0) - nvl(t2.check_amount, 0) amount
+		,nvl(t1.card_price,0) - nvl(t2.check_price,0) price
+		  from t_card t1
+		  left join t_check t2
+		    on t1.DEPT_ID = t2.dept_id and t1.ass_naturs = t2.ass_naturs
+		 where t1.ass_naturs = '04'
+		union all
+		select null dept_id,'' dept_code, '其他固定资产小计' dept_name,  sum(t1.acc_amount) acc_amount, sum(nvl(t2.check_amount, 0)) check_amount, sum(t1.acc_amount) - sum(nvl(t2.check_amount, 0)) amount
+		,sum(nvl(t1.card_price, 0)) - sum(nvl(t2.check_price, 0)) as price
+		  from t_card t1
+		  left join t_check t2
+		    on t1.DEPT_ID = t2.dept_id and t1.ass_naturs = t2.ass_naturs
+		 where t1.ass_naturs = '04'
+		
+		union all
+		
+		select t1.dept_id,t1.dept_code, t1.dept_name,  t1.acc_amount, nvl(t2.check_amount, 0) check_amount, nvl(t1.acc_amount, 0) - nvl(t2.check_amount, 0) amount
+		,nvl(t1.card_price,0) - nvl(t2.check_price,0) price
+		  from t_card t1
+		  left join t_check t2
+		    on t1.DEPT_ID = t2.dept_id and t1.ass_naturs = t2.ass_naturs
+		 where t1.ass_naturs = '05'
+		union all
+		select null dept_id,'' dept_code, '其他无形资产小计' dept_name,  sum(t1.acc_amount) acc_amount, sum(nvl(t2.check_amount, 0)) check_amount, sum(t1.acc_amount) - sum(nvl(t2.check_amount, 0)) amount
+		,sum(nvl(t1.card_price, 0)) - sum(nvl(t2.check_price, 0)) as price
+		  from t_card t1
+		  left join t_check t2
+		    on t1.DEPT_ID = t2.dept_id and t1.ass_naturs = t2.ass_naturs
+		 where t1.ass_naturs = '05'
+		</if>
+		   
+		
+		union all
+		select null dept_id,null dept_code, '合计' dept_name, sum(t1.acc_amount) acc_amount, sum(nvl(t2.check_amount, 0)) check_amount, sum(t1.acc_amount) - sum(nvl(t2.check_amount, 0)) amount
+		,sum(nvl(t1.card_price, 0)) - sum(nvl(t2.check_price, 0)) as price
+		  from t_card t1
+		  left join t_check t2
+		    on t1.DEPT_ID = t2.dept_id and t1.ass_naturs = t2.ass_naturs
+	</select>
+	
+
+	<select id="queryPrint" parameterType="java.util.Map" resultMap="assDeptAccountReport">
+		with t_card as
+		 	(select t.ass_naturs,
+		         t.DEPT_ID,
+		         t2.dept_code,
+		         t2.dept_name,
+		         count(1) acc_amount,
+		         sum(t1.price) card_price
+		    from v_ass_share_dept_r t
+		    left join v_ass_card t1
+		      on t.ass_naturs = t1.ass_naturs
+		     and t.GROUP_ID = t1.GROUP_ID
+		     and t.HOS_ID = t1.HOS_ID
+		     and t.COPY_CODE = t1.COPY_CODE
+		     and t.ASS_CARD_NO = t1.ASS_CARD_NO
+		  
+		    left join hos_dept_dict t2
+		      on t.GROUP_ID = t2.group_id
+		     and t.HOS_ID = t2.hos_id
+		     and t.DEPT_ID = t2.dept_id
+		     and t2.is_stop = 0
+		  
+		  
+		   where 
+		     t.group_id = #{group_id}
+		     and t.hos_id = #{hos_id}
+		     and t.copy_code=#{copy_code}
+		     and t.ASS_YEAR||t.ASS_MONTH = #{year_month}
+		  	 <if test="dept_id != null and dept_id != ''">
+		  	 and t.DEPT_ID = #{dept_id}
+		  	 </if>
+		  	 <if test="ass_naturs != null and ass_naturs != ''">
+		  	 and t.ass_naturs = #{ass_naturs}
+		  	 </if>
+		  
+		   group by t.ass_naturs,
+		            t.DEPT_ID,
+		            t2.dept_code,
+		            t2.dept_name),
+		t_check as
+		 (select t.ass_naturs,
+		         t.dept_id,
+		         count(1) check_amount,
+		         sum(t2.price) check_price
+		    from v_ass_check_dept t
+		    left join V_ASS_CHECK_MAIN_D t1
+		      on t.GROUP_ID = t1.group_id
+		     and t.hos_id = t1.hos_id
+		     and t.COPY_CODE = t1.copy_code
+		     and t.check_plan_no = t1.check_plan_no
+		     and t.check_no = t1.check_no
+		     
+		     left join v_ass_card t2
+		      on t.ass_naturs = t2.ass_naturs
+		     and t.GROUP_ID = t2.GROUP_ID
+		     and t.HOS_ID = t2.HOS_ID
+		     and t.COPY_CODE = t2.COPY_CODE
+		     and t.ASS_CARD_NO = t2.ASS_CARD_NO
+		     
+		   where 
+		     t.group_id = #{group_id}
+		     and t.hos_id = #{hos_id}
+		     and t.copy_code=#{copy_code}
+		     and to_char(t1.check_date, 'YYYYMM') = #{year_month}
+		  	 <if test="dept_id != null and dept_id != ''">
+		  	 and t.DEPT_ID = #{dept_id}
+		  	 </if>
+		  	 <if test="ass_naturs != null and ass_naturs != ''">
+		  	 and t.ass_naturs = #{ass_naturs}
+		  	 </if>
+		     
+		   group by t.ass_naturs, t.dept_id)
+		<if test="ass_naturs != null and ass_naturs != ''">
+			<if test="ass_naturs == '02'">
+				select t1.dept_id,t1.dept_code, t1.dept_name, t1.acc_amount, nvl(t2.check_amount, 0) check_amount, nvl(t1.acc_amount, 0) - nvl(t2.check_amount, 0) amount
+					,nvl(t1.card_price,0) - nvl(t2.check_price,0) price
+				  from t_card t1
+				  left join t_check t2
+				    on t1.DEPT_ID = t2.dept_id and t1.ass_naturs = t2.ass_naturs
+				 where t1.ass_naturs = '02'
+				union all
+				select null dept_id,'' dept_code, '专用设备小计' dept_name,  sum(t1.acc_amount) acc_amount, sum(nvl(t2.check_amount, 0)) check_amount, sum(t1.acc_amount) - sum(nvl(t2.check_amount, 0)) amount
+				,sum(nvl(t1.card_price, 0)) - sum(nvl(t2.check_price, 0)) as price
+				  from t_card t1
+				  left join t_check t2
+				    on t1.DEPT_ID = t2.dept_id and t1.ass_naturs = t2.ass_naturs
+				 where t1.ass_naturs = '02'
+			</if>
+			
+			<if test="ass_naturs == '03'">
+				select t1.dept_id,t1.dept_code, t1.dept_name, t1.acc_amount, nvl(t2.check_amount, 0) check_amount, nvl(t1.acc_amount, 0) - nvl(t2.check_amount, 0) amount
+				,nvl(t1.card_price,0) - nvl(t2.check_price,0) price
+				  from t_card t1
+				  left join t_check t2
+				    on t1.DEPT_ID = t2.dept_id and t1.ass_naturs = t2.ass_naturs
+				 where t1.ass_naturs = '03'
+				union all
+				select null dept_id,'' dept_code, '一般设备小计' dept_name,  sum(t1.acc_amount) acc_amount, sum(nvl(t2.check_amount, 0)) check_amount, sum(t1.acc_amount) - sum(nvl(t2.check_amount, 0)) amount
+				,sum(nvl(t1.card_price, 0)) - sum(nvl(t2.check_price, 0)) as price
+				  from t_card t1
+				  left join t_check t2
+				    on t1.DEPT_ID = t2.dept_id and t1.ass_naturs = t2.ass_naturs
+				 where t1.ass_naturs = '03'
+			</if>
+			
+			<if test="ass_naturs == '04'">
+				select t1.dept_id,t1.dept_code, t1.dept_name, t1.acc_amount, nvl(t2.check_amount, 0) check_amount, nvl(t1.acc_amount, 0) - nvl(t2.check_amount, 0) amount
+				,nvl(t1.card_price,0) - nvl(t2.check_price,0) price
+				  from t_card t1
+				  left join t_check t2
+				    on t1.DEPT_ID = t2.dept_id and t1.ass_naturs = t2.ass_naturs
+				 where t1.ass_naturs = '04'
+				union all
+				select null dept_id,'' dept_code, '其他固定资产小计' dept_name,  sum(t1.acc_amount) acc_amount, sum(nvl(t2.check_amount, 0)) check_amount, sum(t1.acc_amount) - sum(nvl(t2.check_amount, 0)) amount
+				,sum(nvl(t1.card_price, 0)) - sum(nvl(t2.check_price, 0)) as price
+				  from t_card t1
+				  left join t_check t2
+				    on t1.DEPT_ID = t2.dept_id and t1.ass_naturs = t2.ass_naturs
+				 where t1.ass_naturs = '04'
+			</if>
+			
+			<if test="ass_naturs == '05'">
+				select t1.dept_id,t1.dept_code, t1.dept_name,  t1.acc_amount, nvl(t2.check_amount, 0) check_amount, nvl(t1.acc_amount, 0) - nvl(t2.check_amount, 0) amount
+				,nvl(t1.card_price,0) - nvl(t2.check_price,0) price
+				  from t_card t1
+				  left join t_check t2
+				    on t1.DEPT_ID = t2.dept_id and t1.ass_naturs = t2.ass_naturs
+				 where t1.ass_naturs = '05'
+				union all
+				select null dept_id,'' dept_code, '其他无形资产小计' dept_name,  sum(t1.acc_amount) acc_amount, sum(nvl(t2.check_amount, 0)) check_amount, sum(t1.acc_amount) - sum(nvl(t2.check_amount, 0)) amount
+				,sum(nvl(t1.card_price, 0)) - sum(nvl(t2.check_price, 0)) as price
+				  from t_card t1
+				  left join t_check t2
+				    on t1.DEPT_ID = t2.dept_id and t1.ass_naturs = t2.ass_naturs
+				 where t1.ass_naturs = '05'
+			</if>
+		</if>
+		
+		<if test="ass_naturs == null or ass_naturs == ''">
+		select t1.dept_id,t1.dept_code, t1.dept_name, t1.acc_amount, nvl(t2.check_amount, 0) check_amount, nvl(t1.acc_amount, 0) - nvl(t2.check_amount, 0) amount
+			,nvl(t1.card_price,0) - nvl(t2.check_price,0) price
+		  from t_card t1
+		  left join t_check t2
+		    on t1.DEPT_ID = t2.dept_id and t1.ass_naturs = t2.ass_naturs
+		 where t1.ass_naturs = '02'
+		union all
+		select null dept_id,'' dept_code, '专用设备小计' dept_name,  sum(t1.acc_amount) acc_amount, sum(nvl(t2.check_amount, 0)) check_amount, sum(t1.acc_amount) - sum(nvl(t2.check_amount, 0)) amount
+		,sum(nvl(t1.card_price, 0)) - sum(nvl(t2.check_price, 0)) as price
+		  from t_card t1
+		  left join t_check t2
+		    on t1.DEPT_ID = t2.dept_id and t1.ass_naturs = t2.ass_naturs
+		 where t1.ass_naturs = '02'
+		
+		union all
+		
+		select t1.dept_id,t1.dept_code, t1.dept_name, t1.acc_amount, nvl(t2.check_amount, 0) check_amount, nvl(t1.acc_amount, 0) - nvl(t2.check_amount, 0) amount
+		,nvl(t1.card_price,0) - nvl(t2.check_price,0) price
+		  from t_card t1
+		  left join t_check t2
+		    on t1.DEPT_ID = t2.dept_id and t1.ass_naturs = t2.ass_naturs
+		 where t1.ass_naturs = '03'
+		union all
+		select null dept_id,'' dept_code, '一般设备小计' dept_name,  sum(t1.acc_amount) acc_amount, sum(nvl(t2.check_amount, 0)) check_amount, sum(t1.acc_amount) - sum(nvl(t2.check_amount, 0)) amount
+		,sum(nvl(t1.card_price, 0)) - sum(nvl(t2.check_price, 0)) as price
+		  from t_card t1
+		  left join t_check t2
+		    on t1.DEPT_ID = t2.dept_id and t1.ass_naturs = t2.ass_naturs
+		 where t1.ass_naturs = '03'
+		
+		union all
+		
+		select t1.dept_id,t1.dept_code, t1.dept_name, t1.acc_amount, nvl(t2.check_amount, 0) check_amount, nvl(t1.acc_amount, 0) - nvl(t2.check_amount, 0) amount
+		,nvl(t1.card_price,0) - nvl(t2.check_price,0) price
+		  from t_card t1
+		  left join t_check t2
+		    on t1.DEPT_ID = t2.dept_id and t1.ass_naturs = t2.ass_naturs
+		 where t1.ass_naturs = '04'
+		union all
+		select null dept_id,'' dept_code, '其他固定资产小计' dept_name,  sum(t1.acc_amount) acc_amount, sum(nvl(t2.check_amount, 0)) check_amount, sum(t1.acc_amount) - sum(nvl(t2.check_amount, 0)) amount
+		,sum(nvl(t1.card_price, 0)) - sum(nvl(t2.check_price, 0)) as price
+		  from t_card t1
+		  left join t_check t2
+		    on t1.DEPT_ID = t2.dept_id and t1.ass_naturs = t2.ass_naturs
+		 where t1.ass_naturs = '04'
+		
+		union all
+		
+		select t1.dept_id,t1.dept_code, t1.dept_name,  t1.acc_amount, nvl(t2.check_amount, 0) check_amount, nvl(t1.acc_amount, 0) - nvl(t2.check_amount, 0) amount
+		,nvl(t1.card_price,0) - nvl(t2.check_price,0) price
+		  from t_card t1
+		  left join t_check t2
+		    on t1.DEPT_ID = t2.dept_id and t1.ass_naturs = t2.ass_naturs
+		 where t1.ass_naturs = '05'
+		union all
+		select null dept_id,'' dept_code, '其他无形资产小计' dept_name,  sum(t1.acc_amount) acc_amount, sum(nvl(t2.check_amount, 0)) check_amount, sum(t1.acc_amount) - sum(nvl(t2.check_amount, 0)) amount
+		,sum(nvl(t1.card_price, 0)) - sum(nvl(t2.check_price, 0)) as price
+		  from t_card t1
+		  left join t_check t2
+		    on t1.DEPT_ID = t2.dept_id and t1.ass_naturs = t2.ass_naturs
+		 where t1.ass_naturs = '05'
+		</if>
+		   
+		
+		union all
+		select null dept_id,null dept_code, '合计' dept_name, sum(t1.acc_amount) acc_amount, sum(nvl(t2.check_amount, 0)) check_amount, sum(t1.acc_amount) - sum(nvl(t2.check_amount, 0)) amount
+		,sum(nvl(t1.card_price, 0)) - sum(nvl(t2.check_price, 0)) as price
+		  from t_card t1
+		  left join t_check t2
+		    on t1.DEPT_ID = t2.dept_id and t1.ass_naturs = t2.ass_naturs
+	</select>
+	
+	
+	<select id="queryDetail" parameterType="java.util.Map" resultMap="assDeptAccountReportDetail">
+		select 	   t.ass_card_no,
+			       t1.ass_name,
+			       t.ass_spec,
+			       t.ass_mondl,
+			       t.price,
+			       t.depre_money,
+			       t2.state_name,
+			       t.in_date,
+			       t.bar_code
+			  from v_ass_card t
+			
+			  left join ass_no_dict t1
+			    on t.group_id = t1.group_id
+			   and t.hos_id = t1.hos_id
+			   and t.copy_code = t1.copy_code
+			   and t.ASS_ID = t1.ass_id
+			   and t1.is_stop = 0
+			
+			  left join ass_card_use_state t2
+			    on t.use_state = t2.state_code
+			
+			  left join v_ass_share_dept_r t3
+			    on t.group_id = t3.group_id
+			   and t.hos_id = t3.hos_id
+			   and t.copy_code = t3.copy_code
+			   and t.ASS_CARD_NO = t3.ass_card_no
+			
+			 where 
+			 t.group_id = #{group_id}
+		     and t.hos_id = #{hos_id}
+		     and t.copy_code=#{copy_code}
+		     and t3.ASS_YEAR || t3.ASS_MONTH = #{year_month}
+		     and to_char(t.IN_DATE,'YYYYMM') &lt; #{year_month}
+		  	 and t3.DEPT_ID = #{dept_id}
+		  	 <if test="ass_naturs != null and ass_naturs != ''">
+		  	 and t.ass_naturs = #{ass_naturs}
+		  	 </if>
+			 
+			   and not exists(
+			       select 1 from v_ass_check_dept t_c 
+			       left join V_ASS_CHECK_MAIN_D t1
+					      on t_c.GROUP_ID = t1.group_id
+					     and t_c.hos_id = t1.hos_id
+					     and t_c.COPY_CODE = t1.copy_code
+					     and t_c.check_plan_no = t1.check_plan_no
+					     and t_c.check_no = t1.check_no
+			       where 
+			       t_c.group_id = #{group_id}
+				   and t_c.hos_id = #{hos_id}
+				   and t_c.copy_code=#{copy_code}
+			       and to_char(t1.check_date, 'YYYYMM') = #{year_month}
+			       and t_c.dept_id = #{dept_id}
+			       <if test="ass_naturs != null and ass_naturs != ''">
+				   and t_c.ass_naturs = #{ass_naturs}
+				   </if>
+			       and t_c.ass_card_no = t.ass_card_no
+			       
+			   )
+					
+	</select>
+</mapper>

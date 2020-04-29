@@ -1,0 +1,977 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+<sql id="PKG_HR_APP" type="proc"><![CDATA[
+
+create or replace package PKG_HR_APP is
+
+  -- Purpose : 人事档案
+
+  /*-------------------------------------------------------------------------*/
+  /* 变量声明区                                                              */
+  /*-------------------------------------------------------------------------*/
+  def_OK      CONSTANT NUMBER := 0; -- 成功
+  def_ERR     CONSTANT NUMBER := -1; -- 系统错误
+  def_WARNING CONSTANT NUMBER := 100; -- 系统警告
+
+  /*-------------------------------------------------------------------------
+  || 过程名称 ：proc_dynamic_query
+  || 功能描述 ：动态查询
+  || 参数描述 ：参数标识          名称             输入/输出    类型
+  ||            -------------------------------------------------------------
+  ||            prm_group_id        集团             IN           NUMBER
+  ||            prm_hos_id          医院             IN           NUMBER
+  ||            prm_copy_code       账套             IN           VARCHAR2
+  ||            prm_tab_code        表名             IN           VARCHAR2
+  ||            prm_store_type_code 档案库分类       IN           VARCHAR2
+  ||            resultlist          结果集           OUT          SYS_REFCURSOR
+  ||
+  || 作    者 ：           完成日期 ：
+  ||-------------------------------------------------------------------------
+  || 修改记录 ：           修改日期：
+  ||-------------------------------------------------------------------------*/
+  PROCEDURE proc_dynamic_query(prm_group_id        number,
+                               prm_hos_id          number,
+                               prm_copy_code       varchar2,
+                               prm_tab_code        varchar2,
+                               prm_store_type_code varchar2,
+                               prm_condition       varchar2,
+                               resultlist          out sys_refcursor,
+                               prm_AppCode         Out Number,
+                               prm_ErrTxt          Out Varchar2);
+
+  /*-------------------------------------------------------------------------
+  || 过程名称 ：proc_store_condition_query
+  || 功能描述 ：档案库人员限定查询（拼接条件语句）
+  || 参数描述 ：参数标识          名称             输入/输出    类型
+  ||            -------------------------------------------------------------
+  ||            prm_group_id        集团             IN           NUMBER
+  ||            prm_hos_id          医院             IN           NUMBER
+  ||            prm_copy_code       账套             IN           VARCHAR2
+  ||            prm_tab_code        表名             IN           VARCHAR2
+  ||            prm_store_type_code 档案库分类       IN           VARCHAR2
+  ||
+  || 作    者 ：           完成日期 ：
+  ||-------------------------------------------------------------------------
+  || 修改记录 ：           修改日期：
+  ||-------------------------------------------------------------------------*/
+  PROCEDURE proc_store_condition_query(prm_group_id        number,
+                                       prm_hos_id          number,
+                                       prm_copy_code       varchar2,
+                                       prm_tab_code        varchar2,
+                                       prm_store_type_code varchar2,
+                                       prm_AppCode         Out Number,
+                                       prm_ErrTxt          Out Varchar2);
+
+  /*-------------------------------------------------------------------------
+  || 过程名称 ：proc_col_is_change
+  || 功能描述 ：查询列是否存在变更信息
+  || 参数描述 ：参数标识          名称             输入/输出    类型
+  ||            -------------------------------------------------------------
+  ||            prm_group_id        集团             IN           NUMBER
+  ||            prm_hos_id          医院             IN           NUMBER
+  ||            prm_copy_code       账套             IN           VARCHAR2
+  ||            prm_tab_code        表名             IN           VARCHAR2
+  ||            prm_col_code        列名             IN           VARCHAR2
+  ||            prm_store_type_code 档案库分类       IN           VARCHAR2
+  ||            prm_is_change       是否变更列       OUT          NUMBER
+  ||            prm_change_col      变更列名         OUT          VARCHAR2
+  ||
+  || 作    者 ：           完成日期 ：
+  ||-------------------------------------------------------------------------
+  || 修改记录 ：           修改日期：
+  ||-------------------------------------------------------------------------*/
+  PROCEDURE proc_col_is_change(prm_group_id        number,
+                               prm_hos_id          number,
+                               prm_copy_code       varchar2,
+                               prm_tab_code        varchar2,
+                               prm_col_code        varchar2,
+                               prm_store_type_code varchar2,
+                               prm_is_change       out number,
+                               prm_change_col      out varchar2,
+                               prm_AppCode         Out Number,
+                               prm_ErrTxt          Out Varchar2);
+
+  /*-------------------------------------------------------------------------
+  || 过程名称 ：proc_join_field_data
+  || 功能描述 ：拼接join代码表SQL
+  || 参数描述 ：参数标识          名称             输入/输出    类型
+  ||            -------------------------------------------------------------
+  ||            prm_group_id        集团             IN           NUMBER
+  ||            prm_hos_id          医院             IN           NUMBER
+  ||            prm_copy_code       账套             IN           VARCHAR2
+  ||            prm_field_tab_code  代码表名         IN           VARCHAR2
+  ||            prm_store_type_code 档案库分类编码   IN           VARCHAR2
+  ||
+  || 作    者 ：           完成日期 ：
+  ||-------------------------------------------------------------------------
+  || 修改记录 ：           修改日期：
+  ||-------------------------------------------------------------------------*/
+  PROCEDURE proc_join_field_data(prm_group_id        number,
+                                 prm_hos_id          number,
+                                 prm_copy_code       varchar2,
+                                 prm_tab_code        varchar2,
+                                 prm_store_type_code varchar2,
+                                 prm_AppCode         Out Number,
+                                 prm_ErrTxt          Out Varchar2);
+
+  /*-------------------------------------------------------------------------
+  || 过程名称 ：proc_fiied_data_query
+  || 功能描述 ：根据表名列名查询代码表数据
+  || 参数描述 ：参数标识          名称             输入/输出    类型
+  ||            -------------------------------------------------------------
+  ||            prm_group_id        集团             IN           NUMBER
+  ||            prm_hos_id          医院             IN           NUMBER
+  ||            prm_copy_code       账套             IN           VARCHAR2
+  ||            prm_user_id         用户ID           IN           NUMBER
+  ||            prm_tab_cdoe        表名             IN           VARCHAR2
+  ||            prm_col_code        列名             IN           VARCHAR2
+  ||            prm_key             模糊查询         IN           VARCHAR2
+  ||            resultlist          返回结果集       OUT           CLOB
+  ||
+  || 作    者 ：           完成日期 ：
+  ||-------------------------------------------------------------------------
+  || 修改记录 ：           修改日期：
+  ||-------------------------------------------------------------------------*/
+  PROCEDURE proc_fiied_data_query(prm_group_id  NUMBER,
+                                  prm_hos_id    NUMBER,
+                                  prm_copy_code VARCHAR2,
+                                  prm_user_id   NUMBER,
+                                  prm_tab_cdoe  VARCHAR2,
+                                  prm_col_code  VARCHAR2,
+                                  prm_key       VARCHAR2,
+                                  resultlist    out sys_refcursor,
+                                  prm_AppCode   Out Number,
+                                  prm_ErrTxt    Out Varchar2);
+
+  /*-------------------------------------------------------------------------
+  || 过程名称 ：proc_get_bill_no
+  || 功能描述 ：生成单据号
+  || 参数描述 ：参数标识          名称                   输入/输出    类型
+  ||            -------------------------------------------------------------
+  ||            prm_group_id        集团                   IN           NUMBER
+  ||            prm_hos_id          医院                   IN           NUMBER
+  ||            prm_copy_code       账套                   IN           VARCHAR2
+  ||            prm_bill_no_code    单号字段名             IN           NUMBER
+  ||            prm_perfixe        标识符                   IN           VARCHAR2
+  ||            prm_bill_no_value   返回的将被使用的单号   OUT           VARCHAR2
+  ||
+  || 作    者 ：           完成日期 ：
+  ||-------------------------------------------------------------------------
+  || 修改记录 ：           修改日期：
+  ||-------------------------------------------------------------------------*/
+  PROCEDURE proc_get_bill_no(prm_group_id      NUMBER,
+                             prm_hos_id        NUMBER,
+                             prm_copy_code     VARCHAR2,
+                             prm_bill_no_code  HR_BILL_NO_CREATE.BILL_CODE%TYPE,
+                             prm_perfixe       VARCHAR2,
+                             prm_bill_no_value OUT VARCHAR2,
+                             prm_AppCode       OUT Number,
+                             prm_ErrTxt        OUT VARCHAR2);
+                               /*-------------------------------------------------------------------------
+  || 过程名称 ：proc_select_bill_no
+  || 功能描述 ：生成单据号
+  || 参数描述 ：参数标识          名称                   输入/输出    类型
+  ||            -------------------------------------------------------------
+  ||            prm_group_id        集团                   IN           NUMBER
+  ||            prm_hos_id          医院                   IN           NUMBER
+  ||            prm_copy_code       账套                   IN           VARCHAR2
+  ||            prm_bill_no_code    单号字段名             IN           NUMBER
+  ||            prm_perfixe        标识符                   IN           VARCHAR2
+  ||            prm_bill_no_value   返回的将被使用的单号   OUT           VARCHAR2
+  ||
+  || 作    者 ：           完成日期 ：
+  ||-------------------------------------------------------------------------
+  || 修改记录 ：           修改日期：
+  ||-------------------------------------------------------------------------*/
+  PROCEDURE proc_select_bill_no(prm_group_id      NUMBER,
+                             prm_hos_id        NUMBER,
+                             prm_copy_code     VARCHAR2,
+                             prm_bill_no_code  HR_BILL_NO_CREATE.BILL_CODE%TYPE,
+                             prm_perfixe       VARCHAR2,
+                             prm_bill_no_value OUT VARCHAR2,
+                             prm_AppCode       OUT Number,
+                             prm_ErrTxt        OUT VARCHAR2);
+end PKG_HR_APP;
+
+
+
+]]></sql>
+
+<sql id="PKG_HR_APP_BODY" type="proc"><![CDATA[
+
+create or replace package body PKG_HR_APP is
+
+  /*-------------------------------------------------------------------------*/
+  /* 变量声明区                                                              */
+  /*-------------------------------------------------------------------------*/
+  g_store_condition clob; --档案库人员限定条件
+  g_emp_tab         varchar2(30) default 'HOS_EMP'; --主表表名
+  g_emp_name_col    varchar2(30) default 'EMP_NAME'; -- 员工名称列名
+  g_emp_id_col      varchar2(30) default 'EMP_ID'; --员工ID
+
+  g_col_text clob; -- 拼接代码表 name列
+  g_join_sql clob; -- 拼接 代码表 SQL
+
+  C_SELECT_TEXT CONSTANT varchar2(50) := '_TEXT';
+
+  /*-------------------------------------------------------------------------
+  || 过程名称 ：proc_dynamic_query
+  || 功能描述 ：动态查询
+  || 参数描述 ：参数标识          名称             输入/输出    类型
+  ||            -------------------------------------------------------------
+  ||            prm_group_id        集团             IN           NUMBER
+  ||            prm_hos_id          医院             IN           NUMBER
+  ||            prm_copy_code       账套             IN           VARCHAR2
+  ||            prm_tab_code        表名             IN           VARCHAR2
+  ||            prm_store_type_code 档案库分类       IN           VARCHAR2
+  ||            resultlist          结果集           OUT          SYS_REFCURSOR
+  ||
+  || 作    者 ：           完成日期 ：
+  ||-------------------------------------------------------------------------
+  || 修改记录 ：           修改日期：
+  ||-------------------------------------------------------------------------*/
+  procedure proc_dynamic_query(prm_group_id        number,
+                               prm_hos_id          number,
+                               prm_copy_code       varchar2,
+                               prm_tab_code        varchar2,
+                               prm_store_type_code varchar2,
+                               prm_condition       varchar2,
+                               resultlist          out sys_refcursor,
+                               prm_AppCode         Out Number,
+                               prm_ErrTxt          Out Varchar2) is
+    cursor cur_col_set is
+      select t.group_id,
+             t.hos_id,
+             t.tab_code,
+             t.col_code,
+             t.col_name,
+             t.field_tab_code,
+             se.store_type_code,
+             se.com_type_code,
+             ct.com_type_name,
+             se.seq_no,
+             se.col_width,
+             se.is_view,
+             se.is_view_tab,
+             se.text_align,
+             se.field_width,
+             se.is_verify,
+             se.is_pk,
+             se.is_auto,
+             se.is_read,
+             se.is_default,
+             se.default_value,
+             se.default_text,
+             se.is_change,
+             se.change_col_code
+        from hr_col_struc t
+
+        left join HR_STORE_COL_SET se
+          on t.group_id = se.group_id
+         and t.hos_id = se.hos_id
+         and t.tab_code = se.tab_code
+         and t.col_code = se.col_code
+         and se.store_type_code = prm_store_type_code
+
+        left join HR_COM_TYPE ct
+          on se.com_type_code = ct.com_type_code
+
+       where t.group_id = prm_group_id
+         and t.hos_id = prm_hos_id
+         and t.tab_code = prm_tab_code;
+
+    v_col      clob;
+    v_sql      clob;
+    v_col_name varchar2(50);
+  begin
+    prm_AppCode := def_OK;
+    prm_ErrTxt  := '';
+
+    proc_store_condition_query(prm_group_id,
+                               prm_hos_id,
+                               prm_copy_code,
+                               prm_tab_code,
+                               prm_store_type_code,
+                               prm_AppCode,
+                               prm_ErrTxt);
+
+    proc_join_field_data(prm_group_id,
+                         prm_hos_id,
+                         prm_copy_code,
+                         prm_tab_code,
+                         prm_store_type_code,
+                         prm_AppCode,
+                         prm_ErrTxt);
+
+    -- 如果查询的不是主表 需显示员工名称
+    if g_emp_tab <> prm_tab_code then
+      v_col := g_emp_tab || '.' || g_emp_name_col;
+    end if;
+
+    -- 拼接列
+    for col_set_record in cur_col_set loop 
+      case
+        when col_set_record.is_change = 1 and
+             col_set_record.change_col_code is not null then
+          v_col_name := col_set_record.tab_code || '.' ||
+                        col_set_record.col_code || '||''@''||' ||
+                        col_set_record.tab_code || '.' ||
+                        col_set_record.change_col_code;
+        else
+          v_col_name := col_set_record.tab_code || '.' ||
+                        col_set_record.col_code;
+      end case;
+
+      case
+        when v_col is not null then
+          v_col := v_col || ',' || v_col_name;
+        else
+          v_col := v_col_name;
+      end case;
+    end loop;
+
+    if g_emp_tab = prm_tab_code then
+      v_sql := 'select ' || v_col || g_col_text || ' from ' ||
+               g_store_condition;
+    else
+      v_sql := 'select ' || v_col || g_col_text || ' from ' || prm_tab_code;
+      v_sql := v_sql || ' left join ' || g_store_condition || ' on ' ||
+               g_emp_tab || '.' || g_emp_id_col || ' = ' || prm_tab_code || '.' ||
+               g_emp_id_col;
+      v_sql := v_sql || ' and ' || g_emp_tab || '.GROUP_ID = ' ||
+               prm_tab_code || '.GROUP_ID';
+      v_sql := v_sql || ' and ' || g_emp_tab || '.HOS_ID = ' ||
+               prm_tab_code || '.HOS_ID';
+    end if;
+
+    v_sql := v_sql || g_join_sql;
+
+    if prm_condition is not null then
+      v_sql := v_sql || ' WHERE ' || prm_condition;
+    end if;
+
+    if prm_tab_code = 'HOS_EMP'  then
+      v_sql := v_sql || ' order by HOS_EMP.emp_code' ;
+    end if;
+
+    --dbms_output.put_line(v_sql);
+    --dbms_output.put_line(g_store_condition);
+    open resultlist for v_sql;
+
+  EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+      prm_AppCode := def_WARNING;
+      prm_ErrTxt  := '';
+      return;
+    WHEN OTHERS THEN
+      prm_AppCode := def_ERR;
+      prm_ErrTxt  := '未知错误!';
+      return;
+
+  end proc_dynamic_query;
+
+  /*-------------------------------------------------------------------------
+  || 过程名称 ：proc_store_condition_query
+  || 功能描述 ：档案库人员限定查询（拼接条件语句）
+  || 参数描述 ：参数标识          名称             输入/输出    类型
+  ||            -------------------------------------------------------------
+  ||            prm_group_id        集团             IN           NUMBER
+  ||            prm_hos_id          医院             IN           NUMBER
+  ||            prm_copy_code       账套             IN           VARCHAR2
+  ||            prm_tab_code        表名             IN           VARCHAR2
+  ||            prm_store_type_code 档案库分类       IN           VARCHAR2
+  ||
+  || 作    者 ：           完成日期 ：
+  ||-------------------------------------------------------------------------
+  || 修改记录 ：           修改日期：
+  ||-------------------------------------------------------------------------*/
+  PROCEDURE proc_store_condition_query(prm_group_id        number,
+                                       prm_hos_id          number,
+                                       prm_copy_code       varchar2,
+                                       prm_tab_code        varchar2,
+                                       prm_store_type_code varchar2,
+                                       prm_AppCode         Out Number,
+                                       prm_ErrTxt          Out Varchar2) is
+
+    cursor cur_condition is
+      select t.group_id,
+             t.hos_id,
+             t.store_type_code,
+             nvl(t.l_bracket, '(') l_bracket,
+             t.tab_code,
+             t.col_code,
+             t.con_sign_code,
+             nvl(cs.con_sign_name, '=') con_sign_name,
+             t.col_value,
+             nvl(t.r_bracket, ')') r_bracket,
+             t.join_sign_code,
+             nvl(js.join_sign_name, 'AND') join_sign_name,
+             scs.is_change,
+             scs.change_col_code
+        from hr_store_condition t
+
+        left join HR_CON_SIGN cs
+          on t.con_sign_code = cs.con_sign_code
+
+        left join HR_JOIN_SIGN js
+          on t.join_sign_code = js.join_sign_code
+
+        left join HR_STORE_COL_SET scs
+          on t.group_id = scs.group_id
+         and t.hos_id = scs.hos_id
+         and t.store_type_code = scs.store_type_code
+         and t.tab_code = scs.tab_code
+         and t.col_code = scs.col_code
+
+       where t.group_id = prm_group_id
+         and t.hos_id = prm_hos_id
+         and t.tab_code = prm_tab_code
+         and t.store_type_code = prm_store_type_code
+       order by t.line_no;
+    v_condition_conunt integer; --查找条件记录数
+    v_is_change        HR_STORE_COL_SET.Is_Change%type; -- 是否存在变更列
+    v_change_col       HR_STORE_COL_SET.Change_Col_Code%type; -- 变更列名
+    v_sc_sql           clob;
+  begin
+    prm_AppCode := def_OK;
+    prm_ErrTxt  := '';
+
+    --查找条件数
+    select count(0)
+      into v_condition_conunt
+      from hr_store_condition t
+     where t.group_id = prm_group_id
+       and t.hos_id = prm_hos_id
+       and t.tab_code = prm_tab_code
+       and t.store_type_code = prm_store_type_code;
+
+    -- 拼接条件语句
+    if v_condition_conunt > 0 then
+      for v_record in cur_condition loop
+        --查找是否存在变更列
+        proc_col_is_change(v_record.group_id,
+                           v_record.hos_id,
+                           /*v_record.copy_code*/'',
+                           v_record.tab_code,
+                           v_record.col_code,
+                           v_record.store_type_code,
+                           v_is_change,
+                           v_change_col,
+                           prm_AppCode,
+                           prm_ErrTxt);
+
+        -- 如果存在变更列需要拆分判断
+        if v_is_change = 1 then
+          v_sc_sql := v_sc_sql || ' ' || v_record.l_bracket ||
+                      v_record.tab_code || '.' || v_record.col_code ||
+                      '||''@''||' || v_record.tab_code || '.' ||
+                      v_change_col || v_record.con_sign_name || '''' ||
+                      v_record.col_value || '''' || v_record.r_bracket;
+        else
+          v_sc_sql := v_sc_sql || ' ' || v_record.l_bracket ||
+                      v_record.tab_code || '.' || v_record.col_code ||
+                      v_record.con_sign_name || '''' || v_record.col_value || '''' ||
+                      v_record.r_bracket;
+        end if;
+        --拼接连接符
+        if cur_condition%rowcount > 0 and
+           cur_condition%rowcount < v_condition_conunt then
+          v_sc_sql := v_sc_sql || '  ' || v_record.join_sign_name || ' ';
+        end if;
+
+      end loop;
+    end if;
+
+    if v_sc_sql is not null then
+      v_sc_sql := '(select * from ' || g_emp_tab || ' where ' || v_sc_sql || ') ' ||
+                  g_emp_tab;
+    else
+      v_sc_sql := g_emp_tab;
+    end if;
+
+    g_store_condition := v_sc_sql;
+
+  EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+      prm_AppCode := def_WARNING;
+      prm_ErrTxt  := '';
+      return;
+    WHEN OTHERS THEN
+      prm_AppCode := def_ERR;
+      prm_ErrTxt  := '未知错误!';
+      return;
+  end proc_store_condition_query;
+
+  /*-------------------------------------------------------------------------
+  || 过程名称 ：proc_col_is_change
+  || 功能描述 ：查询列是否存在变更信息
+  || 参数描述 ：参数标识          名称             输入/输出    类型
+  ||            -------------------------------------------------------------
+  ||            prm_group_id        集团             IN           NUMBER
+  ||            prm_hos_id          医院             IN           NUMBER
+  ||            prm_copy_code       账套             IN           VARCHAR2
+  ||            prm_tab_code        表名             IN           VARCHAR2
+  ||            prm_col_code        列名             IN           VARCHAR2
+  ||            prm_store_type_code 档案库分类       IN           VARCHAR2
+  ||            prm_is_change       是否变更列       OUT          NUMBER
+  ||            prm_change_col      变更列名         OUT          VARCHAR2
+  ||
+  || 作    者 ：           完成日期 ：
+  ||-------------------------------------------------------------------------
+  || 修改记录 ：           修改日期：
+  ||-------------------------------------------------------------------------*/
+  PROCEDURE proc_col_is_change(prm_group_id        number,
+                               prm_hos_id          number,
+                               prm_copy_code       varchar2,
+                               prm_tab_code        varchar2,
+                               prm_col_code        varchar2,
+                               prm_store_type_code varchar2,
+                               prm_is_change       out number,
+                               prm_change_col      out varchar2,
+                               prm_AppCode         Out Number,
+                               prm_ErrTxt          Out Varchar2) is
+  begin
+    prm_AppCode := def_OK;
+    prm_ErrTxt  := '';
+
+    prm_is_change  := 0;
+    prm_change_col := null;
+
+    select t.is_change, t.change_col_code
+      into prm_is_change, prm_change_col
+      from HR_STORE_COL_SET t
+     where t.group_id = prm_group_id
+       and t.hos_id = prm_hos_id
+       and t.store_type_code = prm_store_type_code
+       and t.tab_code = prm_tab_code
+       and t.col_code = prm_col_code;
+
+    if prm_change_col is null then
+      prm_is_change := 0;
+    end if;
+  EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+      prm_AppCode := def_WARNING;
+      prm_ErrTxt  := '查询' || prm_tab_code || '表' || prm_col_code ||
+                     '列的变更列失败';
+      return;
+    WHEN OTHERS THEN
+      prm_AppCode := def_ERR;
+      prm_ErrTxt  := '未知错误!';
+      return;
+  end proc_col_is_change;
+
+  /*-------------------------------------------------------------------------
+  || 过程名称 ：proc_join_field_data
+  || 功能描述 ：拼接join代码表SQL
+  || 参数描述 ：参数标识          名称             输入/输出    类型
+  ||            -------------------------------------------------------------
+  ||            prm_group_id        集团             IN           NUMBER
+  ||            prm_hos_id          医院             IN           NUMBER
+  ||            prm_copy_code       账套             IN           VARCHAR2
+  ||            prm_field_tab_code  代码表名         IN           VARCHAR2
+  ||            prm_store_type_code 档案库分类编码   IN           VARCHAR2
+  ||
+  || 作    者 ：           完成日期 ：
+  ||-------------------------------------------------------------------------
+  || 修改记录 ：           修改日期：
+  ||-------------------------------------------------------------------------*/
+  PROCEDURE proc_join_field_data(prm_group_id        number,
+                                 prm_hos_id          number,
+                                 prm_copy_code       varchar2,
+                                 prm_tab_code        varchar2,
+                                 prm_store_type_code varchar2,
+                                 prm_AppCode         Out Number,
+                                 prm_ErrTxt          Out Varchar2) is
+
+    cursor cur_col_struc is
+      select t.group_id,
+             t.hos_id,
+             t.tab_code,
+             t.col_code,
+             t.col_name,
+             t.field_tab_code,
+             se.is_change,
+             se.change_col_code
+
+        from hr_col_struc t
+
+        left join HR_STORE_COL_SET se
+          on t.group_id = se.group_id
+         and t.hos_id = se.hos_id
+         and t.tab_code = se.tab_code
+         and t.col_code = se.col_code
+         and se.store_type_code = prm_store_type_code
+
+       where t.group_id = prm_group_id
+         and t.hos_id = prm_hos_id
+         and t.tab_code = prm_tab_code;
+
+    v_field_tab_code hr_col_struc.field_tab_code%type;
+    v_is_cite        NUMBER;
+    v_cite_sql       hr_fiied_view.cite_sql%type;
+
+    v_col_text clob; -- 字典 name值
+    v_join_sql clob; -- 拼接 关联表 SQL
+
+  begin
+    prm_AppCode := def_OK;
+    prm_ErrTxt  := '';
+
+    for col_struc_record in cur_col_struc loop
+      if col_struc_record.field_tab_code is not null then
+
+        -- 如果存在代码表 说明是下拉框  需要拼接下拉显示的文本
+        v_col_text := v_col_text || ', FD' || cur_col_struc%ROWCOUNT ||
+                      '.FIELD_COL_NAME ' || col_struc_record.col_code ||
+                      C_SELECT_TEXT;
+
+        v_field_tab_code := col_struc_record.field_tab_code;
+        select t.is_cite
+          into v_is_cite
+          from hr_fiied_tab_struc t
+         where t.group_id = prm_group_id
+           and t.hos_id = prm_hos_id
+           and t.field_tab_code = v_field_tab_code;
+
+        if v_is_cite = 1 then
+          select t.cite_sql
+            into v_cite_sql
+            from hr_fiied_view t
+           where t.group_id = prm_group_id
+             and t.hos_id = prm_hos_id
+             and t.field_tab_code = v_field_tab_code;
+
+          if v_cite_sql is null then
+            prm_AppCode := def_WARNING;
+            prm_ErrTxt  := '代码表' || v_field_tab_code || '未维护';
+            return;
+          end if;
+
+          v_cite_sql := replace(v_cite_sql, '@group_id', prm_group_id);
+          v_cite_sql := replace(v_cite_sql, '@hos_id', prm_hos_id);
+          v_cite_sql := replace(v_cite_sql, '@copy_code', prm_copy_code);
+          --v_cite_sql := replace(v_cite_sql, '@user_id', p_user_id);
+
+          if col_struc_record.is_change = 1 then
+            v_join_sql := v_join_sql || ' left join  (' || v_cite_sql ||
+                          ') FD' || cur_col_struc%ROWCOUNT;
+            v_join_sql := v_join_sql || ' ON FD' || cur_col_struc%ROWCOUNT || '.' ||
+                          'FIELD_COL_CODE  = to_char(' ||
+                          col_struc_record.tab_code || '.' ||
+                          col_struc_record.col_code;
+            v_join_sql := v_join_sql || ' ||''@''|| ' ||
+                          col_struc_record.tab_code || '.' ||
+                          col_struc_record.change_col_code || ') ';
+          else
+            v_join_sql := v_join_sql || ' left join  (' || v_cite_sql ||
+                          ') FD' || cur_col_struc%ROWCOUNT;
+            v_join_sql := v_join_sql || ' ON FD' || cur_col_struc%ROWCOUNT || '.' ||
+                          'FIELD_COL_CODE = to_char(' ||
+                          col_struc_record.tab_code || '.' ||
+                          col_struc_record.col_code || ') ';
+          end if;
+        else
+          v_join_sql := v_join_sql || ' left join HR_FIIED_DATA FD' ||
+                        cur_col_struc%ROWCOUNT;
+          v_join_sql := v_join_sql || ' ON FD' || cur_col_struc%ROWCOUNT || '.' ||
+                        'FIELD_COL_CODE = to_char(' ||
+                        col_struc_record.tab_code || '.' ||
+                        col_struc_record.col_code || ')  ';
+          v_join_sql := v_join_sql || ' AND FD' || cur_col_struc%ROWCOUNT || '.' ||
+                        'FIELD_TAB_CODE = ''' || v_field_tab_code || '''  ';
+          v_join_sql := v_join_sql || ' AND FD' || cur_col_struc%ROWCOUNT || '.' ||
+                        'GROUP_ID = ' || prm_group_id || ' ';
+          v_join_sql := v_join_sql || ' AND FD' || cur_col_struc%ROWCOUNT || '.' ||
+                        'HOS_ID = ' || prm_hos_id || ' ';
+        end if;
+      end if;
+
+    end loop;
+
+    g_col_text := v_col_text;
+    g_join_sql := v_join_sql;
+    --dbms_output.put_line(g_col_text);
+    --dbms_output.put_line(g_join_sql);
+
+  EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+      prm_AppCode := def_WARNING;
+      prm_ErrTxt  := '代码表' || v_field_tab_code || '未维护';
+      g_col_text  := null;
+      g_join_sql  := null;
+      return;
+    WHEN OTHERS THEN
+      prm_AppCode := def_ERR;
+      prm_ErrTxt  := '未知错误!';
+      g_col_text  := null;
+      g_join_sql  := null;
+      return;
+
+  end proc_join_field_data;
+
+  /*-------------------------------------------------------------------------
+  || 过程名称 ：proc_fiied_data_query
+  || 功能描述 ：根据表名列名查询代码表数据
+  || 参数描述 ：参数标识          名称             输入/输出    类型
+  ||            -------------------------------------------------------------
+  ||            prm_group_id        集团             IN           NUMBER
+  ||            prm_hos_id          医院             IN           NUMBER
+  ||            prm_copy_code       账套             IN           VARCHAR2
+  ||            prm_user_id         用户ID           IN           NUMBER
+  ||            prm_tab_cdoe        表名             IN           VARCHAR2
+  ||            prm_col_code        列名             IN           VARCHAR2
+  ||            prm_key             模糊查询         IN           VARCHAR2
+  ||            resultlist          返回结果集       OUT           CLOB
+  ||
+  || 作    者 ：           完成日期 ：
+  ||-------------------------------------------------------------------------
+  || 修改记录 ：           修改日期：
+  ||-------------------------------------------------------------------------*/
+  PROCEDURE proc_fiied_data_query(prm_group_id  NUMBER,
+                                  prm_hos_id    NUMBER,
+                                  prm_copy_code VARCHAR2,
+                                  prm_user_id   NUMBER,
+                                  prm_tab_cdoe  VARCHAR2,
+                                  prm_col_code  VARCHAR2,
+                                  prm_key       VARCHAR2,
+                                  resultlist    out sys_refcursor,
+                                  prm_AppCode   Out Number,
+                                  prm_ErrTxt    Out Varchar2) is
+
+    v_is_cite        NUMBER;
+    v_field_tab_code VARCHAR2(50);
+    v_cite_sql       hr_fiied_view.cite_sql%type;
+    v_search_sql     VARCHAR2(200);
+  begin
+    prm_AppCode := def_OK;
+    prm_ErrTxt  := '';
+
+    select t.is_cite, t.field_tab_code
+      into v_is_cite, v_field_tab_code
+      from hr_fiied_tab_struc t
+     where t.field_tab_code =
+           (select distinct cs.field_tab_code
+              from hr_col_struc cs
+             where cs.tab_code = prm_tab_cdoe
+               and cs.col_code = prm_col_code
+				  and cs.group_id = prm_group_id
+				  and cs.hos_id = prm_hos_id
+			   )
+			   and t.group_id=prm_group_id
+               and t.hos_id=prm_hos_id;
+
+    if v_is_cite = 1 then
+      select t.cite_sql
+        into v_cite_sql
+        from hr_fiied_view t
+       where t.group_id = prm_group_id
+         and t.hos_id = prm_hos_id
+         and t.field_tab_code = v_field_tab_code;
+      v_cite_sql := replace(v_cite_sql, '@group_id', prm_group_id);
+      v_cite_sql := replace(v_cite_sql, '@hos_id', prm_hos_id);
+      v_cite_sql := replace(v_cite_sql, '@copy_code', prm_copy_code);
+      v_cite_sql := replace(v_cite_sql, '@user_id', prm_user_id);
+      --v_cite_sql := replace(v_cite_sql, '@key', p_key);
+      --dbms_output.put_line(v_cite_sql);
+      if prm_key is not null then
+        v_cite_sql := 'select * from (' || v_cite_sql ||
+                      ') t where field_col_code like ''' || prm_key ||
+                      '%'' or t.field_col_name like ''%' || prm_key ||
+                      '%''';
+      end if;
+      open resultlist for v_cite_sql;
+    else
+      if prm_key is not null then
+        v_search_sql := ' and (t.field_col_code like ''' || prm_key ||
+                        '%'' or t.field_col_name like ''%' || prm_key ||
+                        '%''
+         or t.spell_code like upper(''%' || prm_key ||
+                        '%'')
+         or t.wbx_code like upper(''%' || prm_key ||
+                        '%''))';
+        --dbms_output.put_line(v_search_sql);
+      end if;
+      open resultlist for 'select t.field_col_code,t.field_col_name from hr_fiied_data t
+                          where t.group_id = :group_id
+                            and t.hos_id = :hos_id
+                            and t.field_tab_code = :field_tab_code
+                            and t.is_stop = 0 ' || v_search_sql
+        using prm_group_id, prm_hos_id, v_field_tab_code;
+
+    end if;
+  EXCEPTION
+    WHEN OTHERS THEN
+      open resultlist for 'select 1 from dual where 1=2';
+  end proc_fiied_data_query;
+
+  /*-------------------------------------------------------------------------
+  || 过程名称 ：proc_get_bill_no
+  || 功能描述 ：生成单据号
+  || 参数描述 ：参数标识          名称                   输入/输出    类型
+  ||            -------------------------------------------------------------
+  ||            prm_group_id        集团                   IN           NUMBER
+  ||            prm_hos_id          医院                   IN           NUMBER
+  ||            prm_copy_code       账套                   IN           VARCHAR2
+  ||            prm_bill_no_code    单号字段名             IN           NUMBER
+  ||            prm_bill_no_value   返回的将被使用的单号   OUT           VARCHAR2
+  ||
+  || 作    者 ：           完成日期 ：
+  ||-------------------------------------------------------------------------
+  || 修改记录 ：           修改日期：
+  ||-------------------------------------------------------------------------*/
+  PROCEDURE proc_get_bill_no(prm_group_id      NUMBER,
+                             prm_hos_id        NUMBER,
+                             prm_copy_code     VARCHAR2,
+
+                             prm_bill_no_code  HR_BILL_NO_CREATE.BILL_CODE%TYPE,
+                             prm_perfixe       VARCHAR2,
+                             prm_bill_no_value OUT VARCHAR2,
+                             prm_AppCode       OUT Number,
+                             prm_ErrTxt        OUT VARCHAR2) is
+
+  V_CUR_YEAR  HR_BILL_NO_CREATE.YEAR%TYPE;
+  V_CUR_MONTH HR_BILL_NO_CREATE.Month%TYPE;
+  V_COUNT NUMBER(4);
+  begin
+    -- 得到当前年
+    V_CUR_YEAR := TO_CHAR(SYSDATE, 'YYYY');
+    --得到当前月
+    V_CUR_MONTH := TO_CHAR(SYSDATE, 'MM');
+
+    select count(1) into V_COUNT from HR_BILL_NO_CREATE t
+     where t.group_id = prm_group_id
+       and t.hos_id = prm_hos_id
+       and t.bill_code = prm_bill_no_code;
+
+    -- 如果未设置 插入默认
+    if V_COUNT = 0 then
+      INSERT INTO HR_BILL_NO_CREATE (GROUP_ID,HOS_ID,BILL_CODE,BILL_NAME,PREFIXE,YEAR,MONTH,MAX_NO,SEQ_NO)
+      values
+      (prm_group_id,prm_hos_id,prm_bill_no_code,prm_bill_no_code, prm_perfixe,V_CUR_YEAR,V_CUR_MONTH,'0000','4');
+    end if;
+
+    UPDATE HR_BILL_NO_CREATE A
+       SET A.MAX_NO = LPAD(TO_NUMBER(A.MAX_NO) + 1, A.SEQ_NO, '0')
+     WHERE A.GROUP_ID = prm_group_id
+       AND A.HOS_ID = prm_hos_id
+       AND A.BILL_CODE = prm_bill_no_code
+       AND A.YEAR = V_CUR_YEAR
+       AND A.MONTH = V_CUR_MONTH
+    RETURNING A.Prefixe || A.YEAR || A.MONTH || A.MAX_NO INTO prm_bill_no_value; --直接返回结果；
+
+    IF SQL%ROWCOUNT = 0 --这种情况，一般是新的一个月开始了，所以序号初始化1，月份为当前日期
+     THEN
+      UPDATE HR_BILL_NO_CREATE A
+         SET A.MAX_NO = LPAD(1, A.SEQ_NO, '0'),
+             A.YEAR   = V_CUR_YEAR,
+             A.MONTH  = V_CUR_MONTH
+       WHERE A.GROUP_ID = prm_group_id
+         AND A.HOS_ID = prm_hos_id
+         AND A.BILL_CODE = prm_bill_no_code
+      RETURNING A.Prefixe || A.YEAR || A.MONTH || A.MAX_NO INTO prm_bill_no_value; --直接返回结果；
+      IF SQL%ROWCOUNT = 0 THEN
+        prm_AppCode := def_WARNING;
+        prm_ErrTxt  := '单号名[' || prm_bill_no_code || ']在[单号生成控制表]里不存在';
+        RETURN;
+      END IF;
+    END IF;
+
+    prm_AppCode := def_OK;
+    prm_ErrTxt  := '单号名[' || prm_bill_no_code || ']生产最新单号[' || prm_bill_no_value || ']';
+  end proc_get_bill_no;
+
+
+  /*-------------------------------------------------------------------------
+  || 过程名称 ：proc_select_bill_no
+  || 功能描述 ：获取单据号
+  || 参数描述 ：参数标识          名称                   输入/输出    类型
+  ||            -------------------------------------------------------------
+  ||            prm_group_id        集团                   IN           NUMBER
+  ||            prm_hos_id          医院                   IN           NUMBER
+  ||            prm_copy_code       账套                   IN           VARCHAR2
+  ||            prm_bill_no_code    单号字段名             IN           NUMBER
+  ||            prm_bill_no_value   返回的将被使用的单号   OUT           VARCHAR2
+  ||
+  || 作    者 ：           完成日期 ：
+  ||-------------------------------------------------------------------------
+  || 修改记录 ：           修改日期：
+  ||-------------------------------------------------------------------------*/
+   PROCEDURE proc_select_bill_no(prm_group_id      NUMBER,
+                             prm_hos_id        NUMBER,
+                             prm_copy_code     VARCHAR2,
+                             prm_bill_no_code  HR_BILL_NO_CREATE.BILL_CODE%TYPE,
+                              prm_perfixe       VARCHAR2,
+                             prm_bill_no_value OUT VARCHAR2,
+                             prm_AppCode       OUT Number,
+                             prm_ErrTxt        OUT VARCHAR2) is
+  V_CUR_YEAR  HR_BILL_NO_CREATE.YEAR%TYPE;
+  V_CUR_MONTH HR_BILL_NO_CREATE.Month%TYPE;
+  V_COUNT NUMBER(4);
+  begin
+     -- 得到当前年
+    V_CUR_YEAR := TO_CHAR(SYSDATE, 'YYYY');
+    --得到当前月
+    V_CUR_MONTH := TO_CHAR(SYSDATE, 'MM');
+
+    select count(1) into V_COUNT from HR_BILL_NO_CREATE t
+     where t.group_id = prm_group_id
+       and t.hos_id = prm_hos_id
+
+       and t.bill_code = prm_bill_no_code;
+
+    -- 如果未设置 插入默认
+    if V_COUNT = 0 then
+      INSERT INTO HR_BILL_NO_CREATE (GROUP_ID,HOS_ID,BILL_CODE,BILL_NAME,PREFIXE,YEAR,MONTH,MAX_NO,SEQ_NO)
+      values
+      (prm_group_id,prm_hos_id,prm_bill_no_code,prm_bill_no_code, prm_perfixe,V_CUR_YEAR,V_CUR_MONTH,'0000','4');
+
+
+    UPDATE HR_BILL_NO_CREATE A
+       SET A.MAX_NO = LPAD(TO_NUMBER(A.MAX_NO) + 1, A.SEQ_NO, '0')
+     WHERE A.GROUP_ID = prm_group_id
+       AND A.HOS_ID = prm_hos_id
+       AND A.BILL_CODE = prm_bill_no_code
+       AND A.YEAR = V_CUR_YEAR
+       AND A.MONTH = V_CUR_MONTH
+    RETURNING A.Prefixe || A.YEAR || A.MONTH || A.MAX_NO INTO prm_bill_no_value; --直接返回结果；
+ end if;
+
+    IF SQL%ROWCOUNT = 0 --这种情况，一般是新的一个月开始了，所以序号初始化1，月份为当前日期
+     THEN
+      UPDATE HR_BILL_NO_CREATE A
+         SET A.MAX_NO = LPAD(1, A.SEQ_NO, '0'),
+             A.YEAR   = V_CUR_YEAR,
+             A.MONTH  = V_CUR_MONTH
+       WHERE A.GROUP_ID = prm_group_id
+         AND A.HOS_ID = prm_hos_id
+         AND A.BILL_CODE = prm_bill_no_code
+      RETURNING A.Prefixe || A.YEAR || A.MONTH || A.MAX_NO INTO prm_bill_no_value; --直接返回结果；
+      IF SQL%ROWCOUNT = 0 THEN
+        prm_AppCode := def_WARNING;
+        prm_ErrTxt  := '单号名[' || prm_bill_no_code || ']在[单号生成控制表]里不存在';
+        RETURN;
+      END IF;
+    END IF;
+
+     SELECT A.Prefixe || A.YEAR || A.MONTH || A.MAX_NO
+     into prm_bill_no_value
+     FROM HR_BILL_NO_CREATE A
+       WHERE A.GROUP_ID = prm_group_id
+         AND A.HOS_ID = prm_hos_id
+         AND A.BILL_CODE = prm_bill_no_code;
+
+
+
+
+    prm_AppCode := def_OK;
+    prm_ErrTxt  := '单号名[' || prm_bill_no_code || ']生产最新单号[' || prm_bill_no_value || ']';
+  end proc_select_bill_no;
+
+
+end PKG_HR_APP;
+	
+
+
+]]></sql>
+</root>

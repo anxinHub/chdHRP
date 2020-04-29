@@ -1,0 +1,399 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.mat.dao.termend.MatUnconfirmBillMapper">
+	<resultMap id="MatUnconfirmBill" type="java.util.Map">
+		<result property="bill_flag" column="bill_flag"/>
+		<result property="store_name" column="store_name"/>
+		<result property="bus_type_name" column="bus_type_name"/>
+		<result property="bill_code" column="bill_code"/>
+		<result property="maker" column="maker"/>
+		<result property="create_date" column="create_date"/>
+		<result property="state" column="state"/>
+		<result property="is_com" column="is_com"/>
+		<result property="dura_id" column="dura_id"/>
+		<result property="bus_type_code" column="bus_type_code"/>
+		<result property="in_id" column="in_id"/> 
+		<result property="out_id" column="out_id"/>
+		<result property="special_id" column="special_id"/>
+		
+	</resultMap>	
+	<select id="query" parameterType="java.util.Map" resultMap="MatUnconfirmBill" >
+		SELECT 
+			'matin' bill_flag,
+			hsd.store_name,
+			mbt.bus_type_code,
+			mbt.bus_type_name,
+			mim.in_id as out_id ,
+			msr.special_id,
+			 mim.in_id as in_id,
+			mim.in_no bill_code,
+			su.user_name maker,
+			mim.in_date create_date,
+			msl.field_desc state,
+			'否' is_com
+	    FROM MAT_IN_MAIN mim
+		LEFT JOIN mat_bus_type mbt 
+		ON 
+			mim.bus_type_code=mbt.bus_type_code
+		LEFT JOIN hos_store_dict hsd 
+		ON 
+			mim.store_id=hsd.store_id 
+			AND hsd.is_stop=0
+			AND mim.group_id=hsd.group_id 
+			AND mim.hos_id=hsd.hos_id 
+		LEFT JOIN sys_user su 
+		ON 
+			mim.maker=su.user_id 
+			AND su.group_id=mim.group_id 
+			AND su.hos_id=mim.hos_id
+		LEFT JOIN mat_sys_list msl 
+		ON 
+			msl.field_value=mim.state 
+		    AND msl.table_code='MAT_IN_MAIN' 
+		    AND msl.field_code='STATE'
+	 left join mat_special_rela msr on mim.group_id = msr.group_id
+	    and mim.hos_id = msr.hos_id
+	    and mim.copy_code = msr.copy_code
+	    and mim.in_id = msr.in_id
+    
+	    WHERE 
+	    	mim.state &lt; 3
+	      	AND mim.group_id=#{group_id} 
+	      	AND mim.hos_id=#{hos_id} 
+		  	AND mim.copy_code=#{copy_code} 
+		  	AND mim.year=#{year} 
+		  	AND mim.month=#{month}
+		   <if test="store_id != null and store_id != ''">
+			AND mim.store_id=#{store_id} 
+		   </if>
+	   
+	   UNION ALL
+	   
+	   SELECT 
+			'matout' bill_flag,
+			hsd.store_name,
+			mbt.bus_type_code,
+			mbt.bus_type_name,
+			 mom.out_id as  out_id,
+			 msr.special_id ,
+			mom.out_id as in_id,
+			mom.out_no bill_code,
+			su.user_name maker,
+			mom.out_date create_date,
+			msl.field_desc state,
+			'否' is_com
+		FROM MAT_OUT_MAIN mom
+		LEFT JOIN mat_bus_type mbt 
+		ON 
+			mom.bus_type_code=mbt.bus_type_code
+		LEFT JOIN hos_store_dict hsd 
+		ON 
+			mom.store_id=hsd.store_id 
+			AND hsd.is_stop=0
+		    AND mom.group_id=hsd.group_id 
+		    AND mom.hos_id=hsd.hos_id 
+		LEFT JOIN sys_user su 
+		ON 
+			mom.maker=su.user_id 
+			AND su.group_id=mom.group_id 
+			AND su.hos_id=mom.hos_id
+		LEFT JOIN mat_sys_list msl 
+		ON 
+			msl.field_value=mom.state 
+		    AND msl.table_code='MAT_OUT_MAIN' 
+		    AND msl.field_code='STATE'
+		 left join mat_special_rela msr on
+			    mom.group_id=msr.group_id
+			    and mom.hos_id=msr.hos_id
+			    and mom.copy_code=msr.copy_code
+			    and mom.out_id=msr.out_id
+			    and mom.out_no=msr.out_no
+	    WHERE 
+	    	mom.state &lt; 3
+	      	AND mom.group_id=#{group_id} 
+	      	AND mom.hos_id=#{hos_id} 
+		  	AND mom.copy_code=#{copy_code}  
+		  	AND mom.year=#{year} 
+		  	AND mom.month=#{month}
+		   <if test="store_id != null and store_id != ''">
+			AND mom.store_id=#{store_id} 
+		   </if>
+	   
+	   <!-- 
+	   UNION ALL
+	   
+	   SELECT 
+	   		'mattran' bill_flag,
+	   		hsd.store_name,
+	   		cast('调拨出库' as NVARCHAR2(10)) bus_type_name,
+	   		mtm.tran_no bill_code,
+	   		su.user_name maker,
+	   		mtm.tran_date create_date,
+	   		msl.field_desc state,
+	   		'否' is_com
+		FROM MAT_TRAN_MAIN mtm
+		LEFT JOIN hos_store_dict hsd 
+      	ON 
+      		mtm.out_store_id=hsd.store_id 
+      		AND hsd.is_stop=0
+            AND mtm.group_id=hsd.group_id 
+            AND mtm.hos_id=hsd.hos_id 
+      	LEFT JOIN sys_user su 
+      	ON 
+      		mtm.maker=su.user_id 
+      		AND su.group_id=mtm.group_id 
+      		AND su.hos_id=mtm.hos_id
+      	LEFT JOIN mat_sys_list msl 
+      	ON 
+      		msl.field_value=mtm.state 
+        	AND msl.table_code='MAT_TRAN_MAIN' 
+        	AND msl.field_code='STATE'
+      	WHERE 
+      		mtm.state &lt;  3
+	      	AND mtm.group_id=#{group_id} 
+	      	AND mtm.hos_id=#{hos_id} 
+		  	AND mtm.copy_code=#{copy_code}  
+		  	AND mtm.year=#{year} 
+		  	AND mtm.month=#{month}
+	   		<if test="store_id != null and store_id != ''">
+		  	AND mtm.out_store_id=#{store_id} 
+	   		</if>
+	    -->
+	  UNION ALL
+	   
+	  	SELECT 
+	   		'affiin' bill_flag,
+	   		hsd.store_name,
+	   		mbt.bus_type_code,
+	   		mbt.bus_type_name,
+	   		mai.in_id as out_id,
+	   		msr.special_id,
+	   		mai.in_id  as in_id,
+	   		mai.in_no bill_code,
+	   		su.user_name maker,
+	   		mai.in_date create_date,
+	   		msl.field_desc state,
+	   		'是' is_com
+	  	FROM MAT_AFFI_IN mai
+      	LEFT JOIN mat_bus_type mbt 
+      	ON 
+      		mai.bus_type_code=mbt.bus_type_code
+      	LEFT JOIN hos_store_dict hsd 
+      	ON 
+      		mai.store_id=hsd.store_id 
+      		AND hsd.is_stop=0
+		    AND mai.group_id=hsd.group_id 
+		    AND mai.hos_id=hsd.hos_id 
+	  	LEFT JOIN sys_user su 
+	  	ON 
+	  		mai.maker=su.user_id 
+	  		AND su.group_id=mai.group_id 
+	  		AND su.hos_id=mai.hos_id
+		LEFT JOIN mat_sys_list msl 
+		ON 
+			msl.field_value=mai.state 
+			AND msl.table_code='MAT_AFFI_IN' 
+			AND msl.field_code='STATE'
+		left join mat_special_rela msr on mai.group_id = msr.group_id
+		    and mai.hos_id = msr.hos_id
+		    and mai.copy_code = msr.copy_code
+		    and mai.in_id = msr.in_id
+	    WHERE 
+	    	mai.state &lt; 3
+	      	AND mai.group_id=#{group_id} 
+	      	AND mai.hos_id=#{hos_id} 
+		  	AND mai.copy_code=#{copy_code} 
+		  	AND mai.year=#{year} 
+		  	AND mai.month=#{month}
+	   		<if test="store_id != null and store_id != ''">
+		  	AND mai.store_id=#{store_id} 
+	   		</if>
+	   
+	   UNION ALL
+	   
+	   	SELECT 
+	   		'affiout' bill_flag,
+	   		hsd.store_name,
+	   		mbt.bus_type_code,
+	   		mbt.bus_type_name,
+	   		mao.out_id as out_id, 
+	   		msr.special_id，
+	   		mao.out_id as in_id,
+	   		mao.out_no bill_code,
+	   		su.user_name maker,
+	   		mao.out_date create_date,
+	   		msl.field_desc state,
+	   		'是' is_com
+	    FROM MAT_AFFI_OUT mao
+		LEFT JOIN mat_bus_type mbt 
+		ON 
+			mao.bus_type_code=mbt.bus_type_code
+		LEFT JOIN hos_store_dict hsd 
+		ON 
+			mao.store_id=hsd.store_id 
+			AND hsd.is_stop=0
+		    AND mao.group_id=hsd.group_id 
+		    AND mao.hos_id=hsd.hos_id 
+		LEFT JOIN sys_user su 
+		ON 
+			mao.maker=su.user_id 
+			AND su.group_id=mao.group_id 
+			AND su.hos_id=mao.hos_id
+		LEFT JOIN mat_sys_list msl 
+		ON 
+			msl.field_value=mao.state 
+			AND msl.table_code='MAT_AFFI_OUT' 
+			AND msl.field_code='STATE'
+		left join mat_special_rela msr on mao.group_id = msr.group_id
+		    and mao.hos_id = msr.hos_id
+		    and mao.copy_code = msr.copy_code
+		    and mao.out_id = msr.out_id
+	    WHERE 
+	    	mao.state &lt; 3
+	      	AND mao.group_id=#{group_id} 
+	      	AND mao.hos_id=#{hos_id} 
+		  	AND mao.copy_code=#{copy_code}  
+		  	AND mao.year=#{year} AND mao.month=#{month}
+	   		<if test="store_id != null and store_id != ''">
+		  	AND mao.store_id=#{store_id} 
+	   		</if>
+	   
+		<!-- 
+	   UNION ALL
+	   
+	   SELECT 
+	   		'affitran' bill_flag,
+	   		hsd.store_name,
+	   		cast('调拨出库' as nvarchar2(10)) bus_type_name,
+	   		maim.tran_no bill_code,
+	   		su.user_name maker,
+	   		maim.tran_date create_date,
+	   		msl.field_desc state,
+	   		'是' is_com
+      	FROM MAT_AFFI_TRAN_MAIN maim
+        LEFT JOIN hos_store_dict hsd 
+        ON 
+        	maim.out_store_id=hsd.store_id 
+        	AND hsd.is_stop=0
+            AND maim.group_id=hsd.group_id 
+            AND maim.hos_id=hsd.hos_id 
+        LEFT JOIN sys_user su 
+        ON 
+        	maim.maker=su.user_id 
+        	AND su.group_id=maim.group_id 
+        	AND su.hos_id=maim.hos_id
+        LEFT JOIN mat_sys_list msl 
+        ON 
+        	msl.field_value=maim.state 
+        	AND msl.table_code='MAT_AFFI_TRAN_MAIN' 
+        	AND msl.field_code='STATE'
+      	WHERE 
+      		maim.state &lt;  3
+	      	AND maim.group_id=#{group_id} 
+	      	AND maim.hos_id=#{hos_id} 
+		  	AND maim.copy_code=#{copy_code}  
+		  	AND maim.year=#{year} 
+		  	AND maim.month=#{month}
+	   		<if test="store_id != null and store_id != ''">
+		  	AND maim.out_store_id=#{store_id} 
+	   		</if>
+	    -->
+	</select>
+	<update id="updateUnconfirmBillByMatIn" parameterType="java.util.Map" >
+		UPDATE MAT_IN_MAIN 
+		SET 
+			year=#{next_year},
+			month=#{next_month}
+	    WHERE 
+	    	state &lt; 3
+	      	AND group_id=#{group_id} 
+	      	AND hos_id=#{hos_id} 
+		  	AND copy_code=#{copy_code} 
+		  	AND year=#{year} 
+		  	AND month=#{month}
+	   		<if test="store_id != null and store_id != ''">
+		  	AND store_id=#{store_id} 
+	   		</if>
+	</update>
+	<update id="updateUnconfirmBillByMatOut" parameterType="java.util.Map" >
+		UPDATE MAT_OUT_MAIN 
+		SET 
+			year=#{next_year}, 
+			month=#{next_month}
+	    WHERE 
+	    	state &lt; 3
+	      	AND group_id=#{group_id} 
+	      	AND hos_id=#{hos_id} 
+		  	AND copy_code=#{copy_code} 
+		  	AND year=#{year} 
+		  	AND month=#{month}
+	   		<if test="store_id != null and store_id != ''">
+		  	AND store_id=#{store_id} 
+	   		</if>
+	</update>
+	<update id="updateUnconfirmBillByMatTran" parameterType="java.util.Map" >
+		UPDATE MAT_TRAN_MAIN 
+		SET 
+			year=#{next_year},
+			month=#{next_month} 
+	    WHERE 
+	    	state &lt; 3
+	      	AND group_id=#{group_id} 
+	      	AND hos_id=#{hos_id} 
+		  	AND copy_code=#{copy_code} 
+		  	AND year=#{year} 
+		  	AND month=#{month}
+	   		<if test="store_id != null and store_id != ''">
+		  	AND out_store_id=#{store_id} 
+	   		</if>
+	</update>
+	<update id="updateUnconfirmBillByAffiIn" parameterType="java.util.Map" >
+		UPDATE MAT_AFFI_IN 
+		SET 
+			year=#{next_year}, 
+			month=#{next_month} 
+	    WHERE 
+	    	state &lt; 3
+	      	AND group_id=#{group_id} 
+	      	AND hos_id=#{hos_id} 
+		  	AND copy_code=#{copy_code} 
+		  	AND year=#{year} 
+		  	AND month=#{month}
+		    <if test="store_id != null and store_id != ''">
+			AND store_id=#{store_id} 
+		    </if>
+	</update>
+	<update id="updateUnconfirmBillByAffiOut" parameterType="java.util.Map" >
+		UPDATE MAT_AFFI_OUT
+		SET 
+			year=#{next_year}, 
+			month=#{next_month} 
+	    WHERE 
+	    	state &lt; 3
+	      	AND group_id=#{group_id} 
+	      	AND hos_id=#{hos_id} 
+		  	AND copy_code=#{copy_code} 
+		  	AND year=#{year} 
+		  	AND month=#{month}
+	   		<if test="store_id != null and store_id != ''">
+		  	AND store_id=#{store_id} 
+	   		</if>
+	</update>
+	<update id="updateUnconfirmBillByAffiTran" parameterType="java.util.Map" >
+		UPDATE MAT_AFFI_TRAN_MAIN 
+		SET 
+			year=#{next_year}, 
+			month=#{next_month} 
+	    WHERE 
+	    	state &lt; 3
+	      	AND group_id=#{group_id} 
+	      	AND hos_id=#{hos_id} 
+		  	AND copy_code=#{copy_code} 
+		  	AND year=#{year} 
+		  	AND month=#{month}
+	   		<if test="store_id != null and store_id != ''">
+		  		AND out_store_id=#{store_id} 
+	   		</if>
+	</update>
+</mapper>
+

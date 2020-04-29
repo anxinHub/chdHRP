@@ -1,0 +1,1139 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+
+	<sql id="init_copy_data_proc" type="proc"><![CDATA[
+	create or replace procedure init_copy_data_proc(GROUP_ID  IN number,
+	                                                HOS_ID    IN number,
+	                                                COPY_CODE IN varchar2)
+	------------------------------------------
+	  --初始化数据
+	  ------------------------------------------
+	 is
+	  V_GROUP_ID  number(18, 0);
+	  V_HOS_ID    number(18, 0);
+	  V_COPY_CODE varchar2(20);
+	  v_num       NUMBER;
+	begin
+	  V_GROUP_ID  := GROUP_ID;
+	  V_HOS_ID    := HOS_ID;
+	  V_COPY_CODE := COPY_CODE;
+	  begin
+	  
+	    -----------------------------------------------
+	    --添加账套的时候需要初始化的数据
+	    -----------------------------------------------
+	  
+	    --业务系统表SYS_MOD_START
+	  
+	    insert into sys_mod_start
+	      (GROUP_ID, HOS_ID, COPY_CODE, MOD_CODE)
+	      SELECT V_GROUP_ID, V_HOS_ID, V_COPY_CODE, MOD_CODE
+	        FROM sys_mod a
+	       where not exists (select 1
+	                from sys_mod_start b
+	               where GROUP_ID = V_GROUP_ID
+	                 AND HOS_ID = V_HOS_ID
+	                 AND COPY_CODE = V_COPY_CODE
+	                 AND a.MOD_CODE = b.MOD_CODE);
+	    -----------------------------------------------
+	    --财务初始化数据
+	    -----------------------------------------------
+	    --系统参数表ACC_PARA   
+	    INSERT into ACC_PARA
+	      (GROUP_ID,
+	       HOS_ID,
+	       COPY_CODE,
+	       MOD_CODE,
+	       PARA_CODE,
+	       PARA_NAME,
+	       PARA_TYPE,
+	       PARA_JSON,
+	       PARA_VALUE,
+	       NOTE,
+	       IS_STOP)
+	      SELECT V_GROUP_ID,
+	             V_HOS_ID,
+	             V_COPY_CODE,
+	             MOD_CODE,
+	             PARA_CODE,
+	             PARA_NAME,
+	             PARA_TYPE,
+	             PARA_JSON,
+	             PARA_VALUE,
+	             NOTE,
+	             IS_STOP
+	        FROM INIT_ACC_PARA a
+	       WHERE a.attr_code=1 and not exists (select 1
+	                from ACC_PARA b
+	               WHERE GROUP_ID = V_GROUP_ID
+	                 AND HOS_ID = V_HOS_ID
+	                 AND COPY_CODE = V_COPY_CODE
+	                 AND a.MOD_CODE = b.MOD_CODE
+	                 and a.para_code = b.para_code);
+	  
+	    --系统编码规则表HOS_RULES
+	    insert into HOS_RULES
+	      (GROUP_ID,
+	       HOS_ID,
+	       COPY_CODE,
+	       MOD_CODE,
+	       PROJ_CODE,
+	       PROJ_NAME,
+	       MAX_LEVEL,
+	       MAX_LENGTH,
+	       IS_AUTO,
+	       LEVEL1,
+	       LEVEL2,
+	       LEVEL3,
+	       LEVEL4,
+	       LEVEL5,
+	       LEVEL6,
+	       LEVEL7,
+	       LEVEL8,
+	       LEVEL9,
+	       LEVEL10)
+	      SELECT V_GROUP_ID,
+	             V_HOS_ID,
+	             V_COPY_CODE,
+	             MOD_CODE,
+	             PROJ_CODE,
+	             PROJ_NAME,
+	             MAX_LEVEL,
+	             MAX_LENGTH,
+	             IS_AUTO,
+	             LEVEL1,
+	             LEVEL2,
+	             LEVEL3,
+	             LEVEL4,
+	             LEVEL5,
+	             LEVEL6,
+	             LEVEL7,
+	             LEVEL8,
+	             LEVEL9,
+	             LEVEL10
+	        FROM INIT_HOS_RULES a
+	       where not exists (select 1
+	                from hos_rules b
+	               where b.GROUP_ID = V_GROUP_ID
+	                 AND b.HOS_ID = V_HOS_ID
+	                 AND b.COPY_CODE = V_COPY_CODE
+	                 AND a.MOD_CODE = b.MOD_CODE
+	                 and a.proj_code = b.proj_code)
+	                 and a.is_copy=1;
+	  
+	    --科目性质表ACC_SUBJ_NATURE
+	    insert into ACC_SUBJ_NATURE
+	      (GROUP_ID, HOS_ID, COPY_CODE, SUBJ_NATURE_CODE, SUBJ_NATURE_NAME)
+	      SELECT V_GROUP_ID,
+	             V_HOS_ID,
+	             V_COPY_CODE,
+	             SUBJ_NATURE_CODE,
+	             SUBJ_NATURE_NAME
+	        FROM INIT_ACC_SUBJ_NATURE a
+	       where not exists
+	       (select 1
+	                from acc_subj_nature b
+	               where b.GROUP_ID = V_GROUP_ID
+	                 AND b.HOS_ID = V_HOS_ID
+	                 AND b.COPY_CODE = V_COPY_CODE
+	                 AND a.subj_nature_code = b.subj_nature_code);
+	    --科目类别表ACC_SUBJ_TYPE
+	    insert into ACC_SUBJ_TYPE
+	      (GROUP_ID, HOS_ID, COPY_CODE, SUBJ_TYPE_CODE, SUBJ_TYPE_NAME,KIND_CODE)
+	      SELECT V_GROUP_ID,
+	             V_HOS_ID,
+	             V_COPY_CODE,
+	             SUBJ_TYPE_CODE,
+	             SUBJ_TYPE_NAME,a.KIND_CODE
+	        FROM INIT_ACC_SUBJ_TYPE a
+	       where not exists (select 1
+	                from acc_subj_type b
+	               where b.GROUP_ID = V_GROUP_ID
+	                 AND b.HOS_ID = V_HOS_ID
+	                 AND b.COPY_CODE = V_COPY_CODE
+	                 AND a.subj_type_code = b.subj_type_code);
+	  
+	    --凭证状态表ACC_VOUCH_STATE
+	    insert into ACC_VOUCH_STATE
+	      (GROUP_ID, HOS_ID, COPY_CODE, STATE, STATE_NAME, FLOW_FLAG)
+	      SELECT V_GROUP_ID,
+	             V_HOS_ID,
+	             V_COPY_CODE,
+	             STATE,
+	             STATE_NAME,
+	             FLOW_FLAG
+	        FROM INIT_ACC_VOUCH_STATE a
+	       where not exists (select 1
+	                from acc_vouch_state b
+	               where b.GROUP_ID = V_GROUP_ID
+	                 AND b.HOS_ID = V_HOS_ID
+	                 AND b.COPY_CODE = V_COPY_CODE
+	                 AND a.state = b.state);
+	  
+	    --凭证制单流程表ACC_VOUCH_FLOW
+	  
+	    insert into ACC_VOUCH_FLOW
+	      (GROUP_ID,
+	       HOS_ID,
+	       COPY_CODE,
+	       NODE_ID,
+	       PARENT_NODE_ID,
+	       NODE_NAME,
+	       NOTE, 
+	       SORT_CODE)
+	      SELECT V_GROUP_ID,
+	             V_HOS_ID,
+	             V_COPY_CODE,
+	             NODE_ID,
+	             PARENT_NODE_ID,
+	             NODE_NAME,
+	             NOTE, 
+	             rownum
+	        FROM INIT_ACC_VOUCH_FLOW a
+	       where not exists (select 1
+	                from acc_vouch_flow b
+	               where b.GROUP_ID = V_GROUP_ID
+	                 AND b.HOS_ID = V_HOS_ID
+	                 AND b.COPY_CODE = V_COPY_CODE
+	                 AND a.node_id = b.node_id
+	                 );
+	  
+	    --核算类表ACC_CHECK_TYPE
+     SELECT COUNT(1)
+       INTO v_num
+       FROM ACC_CHECK_TYPE
+      WHERE GROUP_ID = V_GROUP_ID
+        AND HOS_ID = V_HOS_ID
+        AND COPY_CODE = V_COPY_CODE;
+     IF v_num = 0 THEN
+       insert into ACC_CHECK_TYPE
+         (CHECK_TYPE_ID,
+          GROUP_ID,
+          HOS_ID,
+          COPY_CODE,
+          CHECK_TABLE,
+          CHECK_TYPE_NAME,
+          SORT_CODE,
+          SPELL_CODE,
+          WBX_CODE,
+          IS_STOP,
+          IS_SYS,
+          COLUMN_ID,
+          COLUMN_NO,
+          COLUMN_CODE,
+          COLUMN_NAME,
+          IS_CHANGE,
+          COLUMN_CHECK)
+         SELECT ACC_CHECK_TYPE_SEQ.NEXTVAL,
+                V_GROUP_ID,
+                V_HOS_ID,
+                V_COPY_CODE,
+                CHECK_TABLE,
+                CHECK_TYPE_NAME,
+                SORT_CODE,
+                SPELL_CODE,
+                WBX_CODE,
+                IS_STOP,
+                IS_SYS,
+                COLUMN_ID,
+                COLUMN_NO,
+                COLUMN_CODE,
+                COLUMN_NAME,
+                IS_CHANGE,
+                COLUMN_CHECK
+           FROM INIT_ACC_CHECK_TYPE a
+             where not exists (select 1
+                 from ACC_CHECK_TYPE b
+                where b.GROUP_ID = V_GROUP_ID
+                  AND b.HOS_ID = V_HOS_ID
+                  AND b.COPY_CODE = V_COPY_CODE
+                  AND a.CHECK_TABLE = b.CHECK_TABLE
+                  );
+	    END IF;
+	  
+	    --凭证分类 ACC_VOUCH_TYPE
+	    insert into ACC_VOUCH_TYPE
+	      (GROUP_ID,
+	       HOS_ID,
+	       COPY_CODE,
+	       VOUCH_TYPE_CODE,
+	       VOUCH_TYPE_NAME,
+	       VOUCH_TYPE_SHORT,
+	       SPELL_CODE,
+	       WBX_CODE,
+	       IS_STOP)
+	      SELECT V_GROUP_ID,
+	             V_HOS_ID,
+	             V_COPY_CODE,
+	             VOUCH_TYPE_CODE,
+	             VOUCH_TYPE_NAME,
+	             VOUCH_TYPE_SHORT,
+	             SPELL_CODE,
+	             WBX_CODE,
+	             IS_STOP
+	        FROM init_ACC_VOUCH_TYPE a
+	       where not exists
+	       (select 1
+	                from ACC_VOUCH_TYPE b
+	               where b.GROUP_ID = V_GROUP_ID
+	                 AND b.HOS_ID = V_HOS_ID
+	                 AND b.COPY_CODE = V_COPY_CODE
+	                 AND a.VOUCH_TYPE_CODE = b.VOUCH_TYPE_CODE);
+	  
+	    --成本分摊参数内置
+	    insert into cost_dept_para_dict
+	      (GROUP_ID,
+	       HOS_ID,
+	       COPY_CODE,
+	       PARA_CODE,
+	       PARA_NAME,
+	       REMARK,
+	       SPELL_CODE,
+	       WBX_CODE,
+	       IS_SYS)
+	      SELECT V_GROUP_ID,
+	             V_HOS_ID,
+	             V_COPY_CODE,
+	             PARA_CODE,
+	             PARA_NAME,
+	             REMARK,
+	             SPELL_CODE,
+	             WBX_CODE,
+	             IS_SYS
+	        FROM init_cost_dept_para_dict a
+	       where not exists (select 1
+	                from COST_DEPT_PARA_DICT b
+	               where b.GROUP_ID = V_GROUP_ID
+	                 AND b.HOS_ID = V_HOS_ID
+	                 AND b.COPY_CODE = V_COPY_CODE
+	                 AND a.PARA_CODE = b.PARA_CODE);
+	  
+	    	    --资产业务类型字典内置
+	    insert into ASS_BUS_TYPE_DICT
+	      (GROUP_ID,
+	       HOS_ID,
+	       COPY_CODE,
+	       BUS_TYPE_CODE,
+	       BUS_TYPE_NAME,
+	       SPELL_CODE,
+	       WBX_CODE,
+	       IS_STOP,
+	       IN_OUT_TYPE,is_menu)
+	      SELECT V_GROUP_ID,
+	             V_HOS_ID,
+	             V_COPY_CODE,
+	             BUS_TYPE_CODE,
+	             BUS_TYPE_NAME,
+	             SPELL_CODE,
+	             WBX_CODE,
+	             IS_STOP,
+	             IN_OUT_TYPE,is_menu
+	        FROM INIT_ASS_BUS_TYPE_DICT a
+	       where not exists (select 1
+	                from ASS_BUS_TYPE_DICT b
+	               where b.GROUP_ID = V_GROUP_ID
+	                 AND b.HOS_ID = V_HOS_ID
+	                 AND b.COPY_CODE = V_COPY_CODE
+	                 AND a.BUS_TYPE_CODE = b.BUS_TYPE_CODE);
+	  
+	    	    --资产卡片显示内置
+	    insert into ass_card_set_view
+	      (GROUP_ID,
+	       HOS_ID,
+	       COPY_CODE,
+	       ASS_NATURS,
+	       TABLE_NAME,
+	       COL_CODE,
+	       COL_NAME,
+	       TYPE_CODE,
+	       SEQ_NO,
+	       IS_VIEW,
+	       RE_URL,
+	       IS_CHANGE, COLUMN_WIDTH, TEXT_ALIGN, FIELD_AREA, FIELD_WIDTH, IS_TAB_VIEW, IS_VERIFY, IS_PK, IS_INIT_VIEW, IS_INIT_TAB_VIEW, IS_INSERT_VIEW, IS_DEFAULT, DEFAULT_VALUE, DEFAULT_TEXT, IS_READ, IS_INSERT_READ, IS_INIT_READ)
+	      SELECT V_GROUP_ID,
+	             V_HOS_ID,
+	             V_COPY_CODE,
+	             ASS_NATURS,
+	             TABLE_NAME,
+	             COL_CODE,
+	             COL_NAME,
+	             TYPE_CODE,
+	             SEQ_NO,
+	             IS_VIEW,
+	             RE_URL,
+	             IS_CHANGE, COLUMN_WIDTH, TEXT_ALIGN, FIELD_AREA, FIELD_WIDTH, IS_TAB_VIEW, IS_VERIFY, IS_PK, IS_INIT_VIEW, IS_INIT_TAB_VIEW, IS_INSERT_VIEW, IS_DEFAULT, DEFAULT_VALUE, DEFAULT_TEXT, IS_READ, IS_INSERT_READ, IS_INIT_READ
+	        FROM init_ass_card_set_view a
+	       where not exists (select 1
+	                from ASS_CARD_SET_VIEW b
+	               where b.GROUP_ID = V_GROUP_ID
+	                 AND b.HOS_ID = V_HOS_ID
+	                 AND b.COPY_CODE = V_COPY_CODE
+	                 AND a.ASS_NATURS = b.ASS_NATURS
+                   and a.table_name=b.table_name
+                   and a.col_code=b.col_code);
+                   
+       --资产卡片页签内置
+	    insert into ASS_CARD_SET_Tab
+	      (GROUP_ID,
+	       HOS_ID,
+	       COPY_CODE,
+	       ASS_NATURS, TAB_ID, TAB_NAME, TAB_URL, SEQ_NO, IS_VIEW, INIT_TAB_URL)
+	      SELECT V_GROUP_ID,
+	             V_HOS_ID,
+	             V_COPY_CODE,
+	            ASS_NATURS, TAB_ID, TAB_NAME, TAB_URL, SEQ_NO, IS_VIEW, INIT_TAB_URL
+	        FROM INIT_ASS_CARD_SET_Tab a
+	       where not exists (select 1
+	                from ASS_CARD_SET_Tab b
+	               where b.GROUP_ID = V_GROUP_ID
+	                 AND b.HOS_ID = V_HOS_ID
+	                 AND b.COPY_CODE = V_COPY_CODE
+	                 AND a.ASS_NATURS = b.ASS_NATURS
+                   and a.tab_id=b.tab_id);  
+         --资产卡片查询内置
+	    insert into ASS_CARD_SET_QUE
+	      (GROUP_ID,
+	       HOS_ID,
+	       COPY_CODE,
+	       ASS_NATURS, TABLE_NAME, COL_CODE, COL_NAME, TYPE_CODE, SEQ_NO, IS_VIEW, RE_URL, IS_CHANGE, FIELD_WIDTH, IS_SECTION, IS_INIT, IS_VERIFY, IS_DEFAULT, DEFAULT_VALUE, DEFAULT_TEXT)
+	      SELECT V_GROUP_ID,
+	             V_HOS_ID,
+	             V_COPY_CODE,
+	            ASS_NATURS, TABLE_NAME, COL_CODE, COL_NAME, TYPE_CODE, SEQ_NO, IS_VIEW, RE_URL, IS_CHANGE, FIELD_WIDTH, IS_SECTION, IS_INIT, IS_VERIFY, IS_DEFAULT, DEFAULT_VALUE, DEFAULT_TEXT
+	        FROM INIT_ASS_CARD_SET_QUE a
+	       where not exists (select 1
+	                from ASS_CARD_SET_QUE b
+	               where b.GROUP_ID = V_GROUP_ID
+	                 AND b.HOS_ID = V_HOS_ID
+	                 AND b.COPY_CODE = V_COPY_CODE
+	                 AND a.ASS_NATURS = b.ASS_NATURS
+                   and a.table_name=b.table_name
+                   and a.col_code=b.col_code);             
+	    --资产单据号规则内置
+	    insert into ASS_BILL_NO
+	      (GROUP_ID,
+	       HOS_ID,
+	       COPY_CODE,
+	       BILL_TABLE,
+	       BILL_NAME,
+	       PREF,
+	       WBX_CODE,
+	       SPELL_CODE,
+	       MAX_NO,
+	       SEQ_NO,
+	       IS_YEAR        ,
+		  IS_MONTH       ,
+		  IS_DAY         ,
+		  IS_STORE       ,
+		  IS_YEAR_POINT  ,
+		  IS_MONTH_POINT ,
+		  IS_DAY_POINT   ,
+		  IS_STORE_POINT ,
+		  PREF_POINT     ,
+		  IS_READ )
+	      SELECT V_GROUP_ID,
+	             V_HOS_ID,
+	             V_COPY_CODE,
+	             BILL_TABLE,
+	             BILL_NAME,
+	             PREF,
+	             WBX_CODE,
+	             SPELL_CODE,
+	             MAX_NO,
+	             SEQ_NO,
+	             IS_YEAR        ,
+				  IS_MONTH       ,
+				  IS_DAY         ,
+				  IS_STORE       ,
+				  IS_YEAR_POINT  ,
+				  IS_MONTH_POINT ,
+				  IS_DAY_POINT   ,
+				  IS_STORE_POINT ,
+				  PREF_POINT     ,
+				  IS_READ 
+	        FROM INIT_ASS_BILL_NO a
+	       where not exists (select 1
+	                from ASS_BILL_NO b
+	               where b.GROUP_ID = V_GROUP_ID
+	                 AND b.HOS_ID = V_HOS_ID
+	                 AND b.COPY_CODE = V_COPY_CODE
+	                 AND a.BILL_TABLE = b.BILL_TABLE);
+	                 
+	    -----------------------------------------------
+	    --以下复制报表数据
+	    -----------------------------------------------  
+	  	-----------------------------------------------
+	    --复制报表元素数据
+	    -----------------------------------------------  
+	    insert into rep_define_ele
+	      (GROUP_ID,HOS_ID,COPY_CODE,MOD_CODE, ELE_CODE, ELE_NAME, ELE_GROUP, ELE_TYPE, SORT_CODE, IS_STOP, IS_SYS, NOTE)
+	      SELECT V_GROUP_ID, V_HOS_ID, V_COPY_CODE, p.MOD_CODE, p.ELE_CODE, p.ELE_NAME, p.ELE_GROUP, p.ELE_TYPE, p.SORT_CODE, p.IS_STOP, p.IS_SYS, p.NOTE
+	        FROM init_rep_define_ele p
+	       where not exists (select 1
+	                from rep_define_ele b
+	               where b.GROUP_ID = V_GROUP_ID
+	                 AND b.HOS_ID = V_HOS_ID
+	                 AND b.COPY_CODE = V_COPY_CODE
+	                 AND p.ELE_CODE = b.ELE_CODE);
+	                 
+	    -----------------------------------------------
+	    --复制报表字典数据
+	    -----------------------------------------------  
+	    insert into rep_define_dict
+	      (GROUP_ID,HOS_ID,COPY_CODE,MOD_CODE, DICT_CODE, DICT_NAME, DICT_SQL, DICT_CHECK_SQL, IS_SYS, SORT_CODE, NOTE, IS_STOP)
+	      SELECT V_GROUP_ID, V_HOS_ID, V_COPY_CODE, p.MOD_CODE, p.DICT_CODE, p.DICT_NAME, p.DICT_SQL, p.DICT_CHECK_SQL, p.IS_SYS, p.SORT_CODE, p.NOTE, p.IS_STOP
+	        FROM init_rep_define_dict p
+	       where not exists (select 1
+	                from rep_define_dict b
+	               where b.GROUP_ID = V_GROUP_ID
+	                 AND b.HOS_ID = V_HOS_ID
+	                 AND b.COPY_CODE = V_COPY_CODE
+	                 AND p.DICT_CODE = b.DICT_CODE);        
+	                 
+	    -----------------------------------------------
+	    --复制报表元素参数数据
+	    -----------------------------------------------  
+	    insert into rep_define_para
+	      (GROUP_ID,HOS_ID,COPY_CODE,ELE_CODE, PARA_CODE, PARA_NAME, PARA_TYPE, PARA_JSON, DICT_CODE, SORT_CODE,is_stop)
+	      SELECT V_GROUP_ID, V_HOS_ID, V_COPY_CODE, p.ELE_CODE, p.PARA_CODE, p.PARA_NAME, p.PARA_TYPE, p.PARA_JSON, p.DICT_CODE, p.SORT_CODE,p.is_stop
+	        FROM init_rep_define_para p
+	       where not exists (select 1
+	                from rep_define_para b
+	               where b.GROUP_ID = V_GROUP_ID
+	                 AND b.HOS_ID = V_HOS_ID
+	                 AND b.COPY_CODE = V_COPY_CODE
+	                 AND p.ELE_CODE = b.ELE_CODE
+	                 AND p.PARA_CODE = b.PARA_CODE);
+	                 
+	    -----------------------------------------------
+	    --复制报表定义数据
+	    -----------------------------------------------  
+	    insert into rep_define
+	      (GROUP_ID,HOS_ID,COPY_CODE,REPORT_CODE, MOD_CODE, REPORT_NAME, REPORT_GROUP, REPORT_TYPE, USER_ID, CONTENT,REPORT_NOTE,IS_PERM,IS_SYS,is_stop,SORT_CODE,CREATE_DATE)
+	      SELECT V_GROUP_ID, V_HOS_ID, V_COPY_CODE, p.REPORT_CODE, p.MOD_CODE, p.REPORT_NAME, p.REPORT_GROUP, p.REPORT_TYPE, p.USER_ID, p.CONTENT,p.REPORT_NOTE,p.IS_PERM,p.IS_SYS,p.is_stop,p.SORT_CODE,sysdate
+	        FROM init_rep_define p
+	       where not exists (select 1
+	                from rep_define b
+	               where b.GROUP_ID = V_GROUP_ID
+	                 AND b.HOS_ID = V_HOS_ID
+	                 AND b.COPY_CODE = V_COPY_CODE
+	                 AND p.REPORT_CODE = b.REPORT_CODE
+	                 AND p.MOD_CODE = b.MOD_CODE);  
+	                 
+	           
+	     --复制结算方式属性
+	    -----------------------------------------------  
+	    insert into acc_pay_attr
+	      (GROUP_ID,HOS_ID,COPY_CODE,PAY_TYPE, TYPE_NAME)
+	      SELECT V_GROUP_ID, V_HOS_ID, V_COPY_CODE, p.DICT_CODE, p.DICT_NAME
+	        FROM INIT_ACC_DICT p
+	       where not exists (select 1
+	                from ACC_PAY_ATTR b
+	               where b.GROUP_ID = V_GROUP_ID
+	                 AND b.HOS_ID = V_HOS_ID
+	                 AND b.COPY_CODE = V_COPY_CODE
+	                 AND P.TABLE_CODE='ACC_PAY_ATTR'
+	                 AND p.DICT_CODE = b.PAY_TYPE) 
+                and  P.TABLE_CODE='ACC_PAY_ATTR';
+                
+                 --复制工资项目类型
+	    -----------------------------------------------  
+	    insert into ACC_WAGE_ITEM_TYPE
+	      (GROUP_ID,HOS_ID,COPY_CODE,TYPE_CODE, TYPE_NAME)
+	      SELECT V_GROUP_ID, V_HOS_ID, V_COPY_CODE, p.DICT_CODE, p.DICT_NAME
+	        FROM INIT_ACC_DICT p
+	       where not exists (select 1
+	                from ACC_WAGE_ITEM_TYPE b
+	               where b.GROUP_ID = V_GROUP_ID
+	                 AND b.HOS_ID = V_HOS_ID
+	                 AND b.COPY_CODE = V_COPY_CODE
+	                 AND P.TABLE_CODE='ACC_WAGE_ITEM_TYPE'
+	                 AND p.DICT_CODE = b.TYPE_CODE) 
+                and  P.TABLE_CODE='ACC_WAGE_ITEM_TYPE';  
+                
+                
+        --复制工资项目性质
+      -----------------------------------------------  
+      insert into ACC_WAGE_ITEM_NATURE
+        (GROUP_ID,HOS_ID,COPY_CODE,NATURE_CODE, NATURE_NAME)
+        SELECT V_GROUP_ID, V_HOS_ID, V_COPY_CODE, p.DICT_CODE, p.DICT_NAME
+          FROM INIT_ACC_DICT p
+         where not exists (select 1
+                  from ACC_WAGE_ITEM_NATURE b
+                 where b.GROUP_ID = V_GROUP_ID
+                   AND b.HOS_ID = V_HOS_ID
+                   AND b.COPY_CODE = V_COPY_CODE
+                   AND P.TABLE_CODE='ACC_WAGE_ITEM_NATURE'
+                   AND p.DICT_CODE = b.NATURE_CODE) 
+                and  P.TABLE_CODE='ACC_WAGE_ITEM_NATURE';  
+                
+           
+              --复制 现金流量类别acc_cash_type  
+           ---------------------------------------------     
+      
+insert into ACC_CASH_TYPE
+  (GROUP_ID,
+   HOS_ID,
+   COPY_CODE,
+   CASH_TYPE_ID,
+   CASH_TYPE_CODE,
+   CASH_TYPE_NAME,
+   SPELL_CODE,
+   WBX_CODE,
+   IS_STOP)
+  select V_GROUP_ID,
+         V_HOS_ID,
+         V_COPY_CODE,
+         ACC_CASH_TYPE_SEQ.NEXTVAL,
+          DICT_CODE,
+         DICT_NAME,
+         SPELL_CODE,
+         WBX_CODE,
+         0 IS_STOP
+    from (SELECT V_GROUP_ID,
+                 V_HOS_ID,
+                 V_COPY_CODE,
+                 p.DICT_CODE,
+                 p.DICT_NAME,
+                 SPELL_CODE,
+                 WBX_CODE,
+                 0 IS_STOP
+            FROM INIT_ACC_DICT p
+           where not exists (select 1
+                    from ACC_CASH_TYPE b
+                   where b.GROUP_ID = V_GROUP_ID
+                     AND b.HOS_ID = V_HOS_ID
+                     AND b.COPY_CODE = V_COPY_CODE
+                     AND P.TABLE_CODE = 'ACC_CASH_TYPE'
+                     AND p.DICT_CODE = b.cash_type_code and b.is_stop=0)
+             and P.TABLE_CODE = 'ACC_CASH_TYPE'
+             order by DICT_CODE
+          
+          ) t ;
+
+--复制现金流量项目acc_cash_item
+---------------------------
+insert into ACC_CASH_ITEM
+  (GROUP_ID,
+   HOS_ID,
+   COPY_CODE,
+   CASH_ITEM_ID,
+   CASH_TYPE_ID,
+   CASH_ITEM_CODE,
+   CASH_ITEM_NAME,
+   CASH_DIRE,
+   SPELL_CODE,
+   WBX_CODE,
+   IS_STOP)
+  select V_GROUP_ID,
+         V_HOS_ID,
+         V_COPY_CODE,
+         ACC_CASH_ITEM_SEQ.NEXTVAL,
+         cash_type_id,
+         DICT_CODE,
+         DICT_NAME,
+         dict_ext1,
+         SPELL_CODE,
+         WBX_CODE,
+         IS_STOP
+    from (SELECT V_GROUP_ID,
+                 V_HOS_ID,
+                 V_COPY_CODE,
+                 t1.cash_type_id,
+                 p.DICT_CODE,
+                 p.DICT_NAME,
+                 dict_ext1,
+                 p.SPELL_CODE,
+                 p.WBX_CODE,
+                 0 IS_STOP
+            FROM INIT_ACC_DICT p
+           inner join ACC_CASH_TYPE t1
+              on p.type_code = t1.cash_type_code and t1.is_stop=0
+           where not exists (select 1
+                    from ACC_CASH_ITEM b
+                   where b.GROUP_ID = V_GROUP_ID
+                     AND b.HOS_ID = V_HOS_ID
+                     AND b.COPY_CODE = V_COPY_CODE
+                     AND P.TABLE_CODE = 'ACC_CASH_ITEM'
+                     AND p.DICT_CODE = b.cash_item_code and b.is_stop=0)
+             and P.TABLE_CODE = 'ACC_CASH_ITEM'
+             and t1.group_id = V_GROUP_ID
+             and t1.hos_id = V_HOS_ID
+             and t1.copy_code = V_COPY_CODE
+             order by DICT_CODE
+             ) t ;
+
+       	   -----------------------------------------------
+      --复制门户栏目表
+      -----------------------------------------------  
+      insert into SYS_PORTAL_TITLE
+        (GROUP_ID,HOS_ID,COPY_CODE,MOD_CODE, TITLE_CODE, TITLE_NAME,TITLE_TYPE, VIEW_CODE, MORE_URL, CLICK_URL, VIEW_COLUMN, VIEW_WHERE,COLUMN_NAME)
+        SELECT V_GROUP_ID, V_HOS_ID, V_COPY_CODE, p.MOD_CODE, p.TITLE_CODE, p.TITLE_NAME,p.TITLE_TYPE, p.VIEW_CODE, p.MORE_URL, p.CLICK_URL, p.VIEW_COLUMN, p.VIEW_WHERE, p.COLUMN_NAME
+          FROM init_SYS_PORTAL_TITLE p
+         where not exists (select 1
+                  from SYS_PORTAL_TITLE b
+                 where b.GROUP_ID = V_GROUP_ID
+                   AND b.HOS_ID = V_HOS_ID
+                   AND b.COPY_CODE = V_COPY_CODE
+                   AND p.TITLE_CODE = b.TITLE_CODE); 
+                   
+                   
+     	-----------------------------------------------
+      --复制门户栏目配置表
+      -----------------------------------------------  
+      insert  into SYS_PORTAL_TITLE_SET(GROUP_ID,HOS_ID,COPY_CODE,MOD_CODE, TITLE_CODE, SHOW_ROWS, IS_MORE, IS_COLSPAN, SORT_CODE, PARA_JSON)
+      select V_GROUP_ID,V_HOS_ID,V_COPY_CODE,p.MOD_CODE, p.TITLE_CODE, p.SHOW_ROWS, p.IS_MORE, p.IS_COLSPAN, p.SORT_CODE, p.PARA_JSON      
+      from INIT_SYS_PORTAL_TITLE_SET p 
+      where not exists (select 1
+                        from SYS_PORTAL_TITLE_SET b
+                       where b.GROUP_ID =V_GROUP_ID
+                         AND b.HOS_ID = V_HOS_ID
+                         AND b.COPY_CODE =V_COPY_CODE
+                         AND p.TITLE_CODE = b.TITLE_CODE); 
+
+declare num number(4);
+begin
+  select count(*) into num from ACC_WAGE_TAX_SET WHERE GROUP_ID=V_GROUP_ID AND HOS_ID=V_HOS_ID AND COPY_CODE=V_COPY_CODE;
+  if num=0
+  then
+     --复制起征点ACC_WAGE_TAX_SET
+
+	  insert into ACC_WAGE_TAX_SET(GROUP_ID,HOS_ID,COPY_CODE,TAX_VALUE,ASS_VALUE)  
+	  select V_GROUP_ID,V_HOS_ID,V_COPY_CODE,p.DICT_EXT1,p.DICT_EXT2  
+	  from INIT_ACC_DICT p where p.table_code='ACC_WAGE_TAX_SET';
+  end if;
+end;
+
+declare num1 number(4);
+begin
+  select count(*) into num1 from ACC_WAGE_TAX WHERE GROUP_ID=V_GROUP_ID AND HOS_ID=V_HOS_ID AND COPY_CODE=V_COPY_CODE;
+  if num1=0
+  then
+     --复制起征点ACC_WAGE_TAX
+	insert into ACC_WAGE_TAX(RATE_ID,GROUP_ID,HOS_ID,COPY_CODE,STARTS,ENDS,RATE,DEDUCT,NOTE)
+	select ACC_WAGE_TAX_SEQ.NEXTVAL,V_GROUP_ID,V_HOS_ID,V_COPY_CODE,p.DICT_EXT2,p.DICT_EXT3,p.DICT_EXT4,p.DICT_EXT5,p.DICT_CODE
+	from INIT_ACC_DICT p where p.table_code='ACC_WAGE_TAX';
+
+  end if;
+end;
+	                        
+	  end;
+	  
+  --1、插入绩效指标性质内置数据  
+  insert 
+    into PRM_TARGET_NATURE(
+             GROUP_ID,
+             HOS_ID,
+             COPY_CODE,
+             NATURE_CODE,
+             NATURE_NAME,
+             SPELL_CODE,
+             WBX_CODE,
+             IS_STOP
+           )
+    select V_GROUP_ID as GROUP_ID,
+           V_HOS_ID as hos_id,
+           V_COPY_CODE as copy_code,
+           t1.dict_code,
+           t1.dict_name,
+           t1.spell_code,
+           t1.wbx_code,
+           t1.is_stop
+      from INIT_PRM_DICT t1
+     where t1.table_code = upper('PRM_TARGET_NATURE')
+       and  not exists (select 1
+                          from PRM_TARGET_NATURE b
+                         where b.GROUP_ID  = V_GROUP_ID
+                           AND b.HOS_ID    = V_HOS_ID
+                           AND b.COPY_CODE = V_COPY_CODE
+                           AND t1.dict_code = b.NATURE_CODE
+                       )
+    ;  
+    
+  --2、插入科室性质内置数据表
+  insert 
+    into APHI_DEPT_NATURE(
+             GROUP_ID,
+             HOS_ID,
+             COPY_CODE,
+             NATURE_CODE,
+             NATURE_NAME,
+             SPELL_CODE,
+             WBX_CODE,
+             IS_STOP
+           )
+    select V_GROUP_ID  as GROUP_ID,
+           V_HOS_ID    as hos_id,
+           V_COPY_CODE as copy_code,
+           t1.dict_code,
+           t1.dict_name,
+           t1.spell_code,
+           t1.wbx_code,
+           t1.is_stop
+      from INIT_PRM_DICT t1
+     where t1.table_code = upper('APHI_DEPT_NATURE')
+       and  not exists (select 1
+                          from APHI_DEPT_NATURE b
+                         where b.GROUP_ID  = V_GROUP_ID
+                           AND b.HOS_ID    = V_HOS_ID
+                           AND b.COPY_CODE = V_COPY_CODE
+                           AND t1.dict_code = b.NATURE_CODE
+                       )
+      ;  
+      
+  --3、插入取值方法内置数据表
+  insert 
+    into PRM_TARGET_METHOD_PARA(
+             GROUP_ID,
+             HOS_ID,
+             COPY_CODE,
+             METHOD_CODE,
+             METHOD_NAME,
+             SPELL_CODE,
+             WBX_CODE,
+             IS_STOP
+           )
+    select V_GROUP_ID  as GROUP_ID,
+           V_HOS_ID    as hos_id,
+           V_COPY_CODE as copy_code,
+           t1.dict_code,
+           t1.dict_name,
+           t1.spell_code,
+           t1.wbx_code,
+           t1.is_stop
+      from INIT_PRM_DICT t1
+     where t1.table_code = upper('PRM_TARGET_METHOD_PARA')
+       and  not exists (select 1
+                          from PRM_TARGET_METHOD_PARA b
+                         where b.GROUP_ID  = V_GROUP_ID
+                           AND b.HOS_ID    = V_HOS_ID
+                           AND b.COPY_CODE = V_COPY_CODE
+                           AND t1.dict_code = b.METHOD_CODE
+                       )
+      ;   
+      
+       -- 1.插入 预算单据号规则内置数据
+	    insert into budg_no_rule
+	      (GROUP_ID,
+	       HOS_ID,
+	       COPY_CODE,
+	       TABLE_CODE,
+	       TABLE_NAME,
+	       PREFIXE,
+	       IS_YEAR,
+	       IS_BUDG_YEAR,
+	       IS_MONTH ,
+	       SEQ_NO)
+	      SELECT V_GROUP_ID,
+	             V_HOS_ID,
+	             V_COPY_CODE,
+	             a.TABLE_CODE,
+			     a.TABLE_NAME,
+			     a.PREFIXE,
+			     a.IS_YEAR,
+			     a.IS_BUDG_YEAR,
+			     a.IS_MONTH ,
+			     a.SEQ_NO
+	        FROM init_budg_no_rule a
+	       where not exists (select 1
+	                from budg_no_rule b
+	               where b.GROUP_ID = V_GROUP_ID
+	                 AND b.HOS_ID = V_HOS_ID
+	                 AND b.COPY_CODE = V_COPY_CODE
+	                 AND a.TABLE_CODE = b.TABLE_CODE);
+	                 
+
+                   
+                   
+        --票据类型
+        insert into acc_paper_type (GROUP_ID, HOS_ID, COPY_CODE, TYPE_CODE, TYPE_NAME, PAPER_CLEN, PAPER_ZLEN, PAPER_WAY_TYPE, PAPER_USE_TYPE, IS_SD, IS_AUTO, SPELL_CODE, WBX_CODE, SORT_CODE, IS_STOP, IS_WB)
+		select V_GROUP_ID,V_HOS_ID,V_COPY_CODE,p.DICT_CODE, p.DICT_NAME, 20,1,1,1,0,0,p.spell_code,p.wbx_code,p.sort_code,0,p.DICT_EXT1
+		from INIT_ACC_DICT p 
+		where p.table_code='ACC_PAPER_TYPE' 
+		and p.DICT_CODE not in(select TYPE_CODE from acc_paper_type where group_id=V_GROUP_ID and hos_id=V_HOS_ID and copy_code=V_COPY_CODE);           
+                       
+        
+
+		--载入数据集表数据
+		insert into rep_dataset(
+			group_id, hos_id, copy_code, ds_code, ds_name, ds_type, 
+			mod_code, state, ds_class, ds_group, sort_code, is_sys, sqlcontent 
+		)
+		select V_GROUP_ID, V_HOS_ID, V_COPY_CODE, a.ds_code, a.ds_name, 
+			a.ds_type, a.mod_code, a.state, a.ds_class, a.ds_group, a.sort_code, 1, a.sqlcontent 
+		from init_rep_dataset a 
+		where not exists(
+			select 1 
+			from rep_dataset b
+			where b.group_id = V_GROUP_ID
+				and b.hos_id = V_HOS_ID
+				and b.copy_code = V_COPY_CODE
+				and b.ds_code = a.ds_code
+		);
+		
+		--载入数据集列表数据
+		insert into rep_ds_colum(
+			group_id, hos_id, copy_code, ds_code, col_code, 
+			col_name, col_type, col_length, bak, sort_code 
+		)
+		select V_GROUP_ID, V_HOS_ID, V_COPY_CODE, a.ds_code, a.col_code, 
+			a.col_name, 1, 160, null, a.sort_code 
+		from init_rep_ds_colum a 
+		where not exists(
+			select 1 
+			from rep_ds_colum b
+			where b.group_id = V_GROUP_ID
+				and b.hos_id = V_HOS_ID
+				and b.copy_code = V_COPY_CODE
+				and b.ds_code = a.ds_code 
+				and b.col_code = a.col_code 
+		);
+		
+		--载入数据集参数表数据
+		insert into rep_ds_para(
+			group_id, hos_id, copy_code, ds_code, para_code, para_name, 
+			para_type, dict_code, para_json, sort_code, is_stop 
+		)
+		select V_GROUP_ID, V_HOS_ID, V_COPY_CODE, a.ds_code, a.para_code, a.para_name, 
+			a.para_type, a.dict_code, a.para_json, a.sort_code, 0 
+		from init_rep_ds_para a 
+		where not exists(
+			select 1 
+			from rep_ds_para b
+			where b.group_id = V_GROUP_ID
+				and b.hos_id = V_HOS_ID
+				and b.copy_code = V_COPY_CODE
+				and b.ds_code = a.ds_code 
+				and b.para_code = a.para_code 
+		);
+		
+		
+		 --复制数据--业务类型表
+    insert  into ACC_BUSI_TYPE(GROUP_ID, HOS_ID,COPY_CODE,MOD_CODE,BUSI_TYPE_CODE,BUSI_TYPE_NAME,SUPER_CODE,
+    BUSI_TYPE_LEVEL,IS_LAST,LOG_NAME,IS_VOUCH,SORT_CODE)
+    select V_GROUP_ID,V_HOS_ID,V_COPY_CODE,p.MOD_CODE,p.BUSI_TYPE_CODE,p.BUSI_TYPE_NAME,p.SUPER_CODE,
+    p.BUSI_TYPE_LEVEL,p.IS_LAST,p.LOG_NAME,p.IS_VOUCH,p.SORT_CODE 
+    from SYS_BUSI_TYPE p 
+    where not exists(
+      select 1 
+      from ACC_BUSI_TYPE b
+      where b.group_id = V_GROUP_ID
+        and b.hos_id = V_HOS_ID
+        and b.copy_code = V_COPY_CODE
+        and b.MOD_CODE = p.MOD_CODE 
+        and b.BUSI_TYPE_CODE = p.BUSI_TYPE_CODE 
+    );
+    
+
+    --复制数据--业务元素表
+    insert into ACC_BUSI_META(GROUP_ID, HOS_ID,COPY_CODE,META_CODE,META_NAME,TYPE_TABLE,IS_AUTO,
+    WHERE_SQL,IS_INOUT_TYPE,IS_RESOURCE,IS_STORE,KIND_CODE)
+    select V_GROUP_ID,V_HOS_ID,V_COPY_CODE,p.META_CODE,p.META_NAME,p.TYPE_TABLE,p.IS_AUTO,
+    p.WHERE_SQL,p.IS_INOUT_TYPE,p.IS_RESOURCE,p.IS_STORE,KIND_CODE
+    from SYS_BUSI_META p 
+    where not exists(
+      select 1 
+      from ACC_BUSI_META b
+      where b.group_id = V_GROUP_ID
+        and b.hos_id = V_HOS_ID
+        and b.copy_code = V_COPY_CODE
+        and b.META_CODE = p.META_CODE        
+    );
+
+    --复制数据--元素关系表
+    insert into ACC_BUSI_RELA(GROUP_ID, HOS_ID,COPY_CODE,MOD_CODE,BUSI_TYPE_CODE,META_CODE)
+    select V_GROUP_ID,V_HOS_ID,V_COPY_CODE,p.MOD_CODE,p.BUSI_TYPE_CODE,p.META_CODE
+    from SYS_BUSI_RELA p 
+    where not exists(
+      select 1 
+      from ACC_BUSI_RELA b
+      where b.group_id = V_GROUP_ID
+        and b.hos_id = V_HOS_ID
+        and b.copy_code = V_COPY_CODE
+        and b.MOD_CODE = p.MOD_CODE
+        and b.BUSI_TYPE_CODE = p.BUSI_TYPE_CODE     
+        and b.META_CODE = p.META_CODE    
+    );
+    
+    
+    -- 1.插入 合同管理 合同状态内置数据
+	insert into PACT_STATE (group_id,
+		hos_id,
+		Copy_Code ,	
+		State_Code ,
+		State_Name,
+		Is_Init ,
+		Is_Stop)
+	select V_GROUP_ID , 
+		V_HOS_ID , 
+		V_COPY_CODE , 
+		a.state_code ,
+		a.state_name,
+		'1' ,
+		'0' 
+	from init_pact_state a
+    where not exists (select 1
+                  from PACT_STATE b
+                 where b.GROUP_ID = V_GROUP_ID
+                   AND b.HOS_ID = V_HOS_ID
+                   AND b.COPY_CODE = V_COPY_CODE
+                   AND a.state_code = b.state_code);
+	                 
+	 -- 1.插入 合同管理 单据号规则内置数据
+	insert into PACT_NO_RULE (GROUP_ID,
+		HOS_ID,
+		COPY_CODE,
+		TABLE_CODE, 
+		TABLE_NAME, 
+		PREFIXE, 
+		IS_TYPE, 
+		IS_YEAR, 
+		IS_MONTH, 
+		SEQ_NO,
+		CODE_COLUME)
+	select V_GROUP_ID , 
+		V_HOS_ID , 
+		V_COPY_CODE , 
+		a.TABLE_CODE, 
+		a.TABLE_NAME, 
+		a.PREFIXE , 
+		a.IS_TYPE, 
+		a.IS_YEAR, 
+		a.IS_MONTH, 
+		a.SEQ_NO,
+		a.CODE_COLUME 
+	from INIT_PACT_NO_RULE a
+    where not exists (select 1
+                  from PACT_NO_RULE b
+                 where b.GROUP_ID = V_GROUP_ID
+                   AND b.HOS_ID = V_HOS_ID
+                   AND b.COPY_CODE = V_COPY_CODE
+                   AND a.TABLE_CODE = b.TABLE_CODE);
+                   
+     --复制 差异标注类别acc_diff_type    
+  insert into ACC_DIFF_TYPE
+    (GROUP_ID,
+     HOS_ID,
+     COPY_CODE,
+     DIFF_TYPE_CODE,
+     DIFF_TYPE_NAME,
+     DIFF_DIRE,
+     DIFF_OBJ,
+     SPELL_CODE,
+     WBX_CODE,
+     IS_STOP)
+    SELECT V_GROUP_ID,
+           V_HOS_ID,
+           V_COPY_CODE,
+           DICT_CODE,
+           DICT_NAME,
+           DICT_EXT1,
+           DICT_EXT2,
+           SPELL_CODE,
+           WBX_CODE,
+           0 IS_STOP
+      FROM INIT_ACC_DICT p
+     WHERE P.TABLE_CODE = upper('ACC_DIFF_TYPE')
+       and not exists (select 1
+              from ACC_DIFF_TYPE c
+             where c.group_id = V_group_id
+               and c.hos_id = V_hos_id
+               and c.copy_code = V_copy_code
+               and c.DIFF_TYPE_CODE = P.dict_code);
+
+  --复制差异标注项目acc_diff_item
+  insert into ACC_DIFF_ITEM
+    (GROUP_ID,
+     HOS_ID,
+     COPY_CODE,
+     DIFF_ITEM_CODE,
+     DIFF_ITEM_NAME,
+     DIFF_TYPE_CODE,
+     DIFF_DIRE,
+     DIFF_OBJ,
+     IS_DEFAULT,
+     SPELL_CODE,
+     WBX_CODE,
+     IS_STOP)
+    SELECT V_GROUP_ID,
+           V_HOS_ID,
+           V_COPY_CODE,
+           DICT_CODE,
+           DICT_NAME,
+           TYPE_CODE,
+           DICT_EXT1,
+           DICT_EXT2,
+           DICT_EXT3,
+           SPELL_CODE,
+           WBX_CODE,
+           0 IS_STOP
+      FROM INIT_ACC_DICT p
+     WHERE P.TABLE_CODE = upper('ACC_DIFF_ITEM')
+       and not exists (select 1
+              from ACC_DIFF_ITEM c
+             where c.group_id = v_group_id
+               and c.hos_id = v_hos_id
+               and c.copy_code = v_copy_code
+               and c.diff_item_code = P.dict_code
+               and c.DIFF_TYPE_CODE = P.TYPE_CODE);
+
+  --复制标注项目与科目对应关系
+  insert into ACC_DIFF_SUBJ_SET
+    (GROUP_ID,
+     HOS_ID,
+     COPY_CODE,
+     DIFF_ITEM_CODE,
+     SUBJ_CODE,
+     DIFF_TYPE_CODE)
+    SELECT V_GROUP_ID,
+           V_HOS_ID,
+           V_COPY_CODE,
+           DIFF_ITEM_CODE,
+           SUBJ_CODE,
+           DIFF_TYPE_CODE
+      FROM ACC_DIFF_SUBJ_SET_INIT p
+     WHERE not exists (select 1
+              from ACC_DIFF_SUBJ_SET c
+             where c.group_id = v_group_id
+               and c.hos_id = v_hos_id
+               and c.copy_code = v_copy_code
+               and c.diff_item_code = P.DIFF_ITEM_CODE
+               and c.DIFF_TYPE_CODE = P.DIFF_TYPE_CODE
+               and c.SUBJ_CODE = P.SUBJ_CODE);              
+	
+	
+	--复制基本分析指标
+	insert into ACC_ALY_BAS (GROUP_ID, HOS_ID, COPY_CODE, BAS_CODE, BAS_NAME, BAS_UNIT, BAS_TYPE_CODE, WX_TYPE_CODE, FMA_EN, FMA_CN, STD_VAL, IS_STOP, SPELL_CODE, NOTE)
+	select V_GROUP_ID,V_HOS_ID,V_COPY_CODE,p.BAS_CODE, p.BAS_NAME, p.BAS_UNIT, p.BAS_TYPE_CODE, p.WX_TYPE_CODE, p.FMA_EN, p.FMA_CN, p.STD_VAL, p.IS_STOP, p.SPELL_CODE, p.NOTE 
+	from INIT_ACC_ALY_BAS p
+	where not exists(
+		select 1 from ACC_ALY_BAS b 
+		where b.group_id=v_group_id and b.hos_id=v_hos_id and b.copy_code=v_copy_code and b.BAS_CODE=p.BAS_CODE	
+	);
+	
+	-- 初始化预警类型系统信息
+    insert into MAT_WARN_TYPE(
+      group_id, hos_id, copy_code, warn_type_code, warn_type_name, warn_way, days, 
+      space, space_due, is_stop, is_warn, icon_name, icon_url, note, oper_name, oper_date, is_sys
+    )
+    select V_GROUP_ID, V_HOS_ID, V_COPY_CODE, a.warn_type_code, a.warn_type_name, a.warn_way, 
+      a.days, a.space, a.space_due, a.is_stop, a.is_warn, a.icon_name, a.icon_url, a.note, 'sys', sysdate, 1
+    from mat_warn_type_init a 
+    where not exists(
+      select 1 from MAT_WARN_TYPE b
+      where a.warn_type_code = b.warn_type_code
+        and b.group_id = V_GROUP_ID
+        and b.hos_id = V_HOS_ID
+        and b.copy_code = V_COPY_CODE
+    ); 
+	                 	        
+   EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+         null;
+      WHEN OTHERS THEN
+         null;   
+	end init_copy_data_proc;
+	]]></sql>
+	
+</root>
+

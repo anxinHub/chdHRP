@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.ass.dao.repair.assRepRule.AssRepRuleMapper">
+	<resultMap type="java.util.Map" id="tree">
+		<result property="id" column="id" />
+		<result property="name" column="name" />
+		<result property="pId" column="pId" />
+		<result property="dept_name" column="dept_name" />
+	</resultMap>
+
+	<select id="queryRepTeamUser" resultMap="tree" parameterType="java.util.Map">
+		with repData as
+		(select a.rep_team_code as id,
+		a.rep_team_name as name,
+		'0' as pId, 'team' as flag
+		from ass_repair_team_dict a
+		where a.group_id= #{group_id}
+		and a.hos_id =#{hos_id}
+		union all
+		select to_char(b.user_id) as id,
+		b.user_name as name,
+		c.rep_team_code as pId, 'user' as flag
+		from sys_user b
+		left join ass_repair_user c
+		on b.group_id = c.group_id
+		and b.hos_id = c.hos_id
+		and b.copy_code = c.copy_code
+		and b.user_id = c.rep_user
+		and b.is_stop = 0
+		where b.group_id = #{group_id}
+		and b.hos_id = #{hos_id}
+		and b.copy_code = #{copy_code}
+		)
+		select id, name, pId , flag
+		from repData
+		start with pId = 0
+		connect by prior id = pId
+	</select>
+	
+	<insert id="saveRepRule" parameterType="java.util.Map">
+	insert into ${map.table_name}
+  	(group_id, hos_id, copy_code, user_id, ${map.column})
+  	<foreach collection="list" index="index" item="item" separator="union all " >
+		select 
+		  #{map.group_id}, 
+		  #{map.hos_id}, 
+		  #{map.copy_code}, 
+		  #{map.user_id}，
+		  #{item}
+		  <if test="map.flag != '' and  map.flag != null">
+		  	,
+	  	  #{map.naturs_code}
+		  </if>
+		from dual
+  	</foreach>
+	</insert>
+	<delete id="deleteRepRule" parameterType="java.util.Map">
+	delete ${table_name}
+	where group_id = #{group_id}
+	and hos_id = #{hos_id}
+	and copy_code = #{copy_code}
+	and user_id = #{user_id}
+	 <if test="flag != '' and  flag != null">
+ 	 and  naturs_code= #{naturs_code}
+	  </if> 
+	</delete>
+	<select id="queryTreeDataByUserId"  resultType="java.util.Map">
+		select  
+			${column} 
+		from ${table_name} 
+			where group_id =#{group_id}
+			and hos_id = #{hos_id}
+			and copy_code =#{copy_code}
+			and user_id = ${user_id}
+	</select>
+	<select id="queryAssFaultTypeTree" resultMap="tree"  parameterType="java.util.Map">
+		select
+		fau_code as id ,
+		fau_name as name ,
+		super_code pId ,
+		spell_code,
+		wbx_code
+		from ass_fault_type
+		where group_id =#{group_id}
+		and hos_id = #{hos_id}
+		and copy_code =#{copy_code}
+		and is_stop = 0
+		start with super_code =#{super_code}
+		connect by prior fau_code = super_code
+		order by fau_code
+	</select>
+	
+	<!--资产分类tree  -->
+	<select id="queryAssTypeTree" resultMap="tree">
+ 		select a.ass_type_id, a.ass_type_code as id , a.ass_type_name as name, nvl(a.super_code,0) as pId
+		  from ass_type_dict a
+		  where a.group_id= #{group_id}
+		  and a.hos_id = #{hos_id}
+		  and a.copy_code = #{copy_code}
+		  and a.is_stop = 0
+		 start with nvl(a.super_code, 0) = 0
+		connect by prior a.ass_type_code = a.super_code
+	    order by a.ass_type_code
+	</select>
+	<!-- 资产卡片tree -->
+	<select id="queryAsscardTree" resultMap="tree" parameterType="java.util.Map">
+		with ass_card_data as  (
+	    select group_id,hos_id,copy_code,ass_card_no,ass_id,ass_no,use_state,'03' naturs_code,dept_id,dept_no from ass_card_general
+	        where   group_id = #{group_id}
+	            AND hos_id = #{hos_id}
+	            AND copy_code = #{copy_code}
+	            <if test="dept_id != null and dept_id != ''">
+	           		 and dept_id = #{dept_id}
+	            </if>
+	      union all
+	      select group_id,hos_id,copy_code,ass_card_no,ass_id,ass_no,use_state,'02' naturs_code,dept_id,dept_no from ass_card_special
+	        where   group_id = #{group_id}
+	            AND hos_id = #{hos_id}
+	            AND copy_code = #{copy_code}
+	            <if test="dept_id != null and dept_id != ''">
+	           		 and dept_id = #{dept_id}
+	            </if>
+	      union all
+	      select group_id,hos_id,copy_code,ass_card_no,ass_id,ass_no,use_state,'01' naturs_code,dept_id,dept_no from ass_card_house
+	        where   group_id = #{group_id}
+	            AND hos_id = #{hos_id}
+	            AND copy_code = #{copy_code}
+	            <if test="dept_id != null and dept_id != ''">
+	           		 and dept_id = #{dept_id}
+	            </if>
+	      union all
+	      select group_id,hos_id,copy_code,ass_card_no,ass_id,ass_no,use_state,'05' naturs_code,dept_id,dept_no from ass_card_inassets
+	        where   group_id = #{group_id}
+	            AND hos_id = #{hos_id}
+	            AND copy_code = #{copy_code}
+	           <if test="dept_id != null and dept_id != ''">
+	           		 and dept_id = #{dept_id}
+	            </if>
+	      union all
+	      select group_id,hos_id,copy_code,ass_card_no,ass_id,ass_no,use_state,'06' naturs_code ,dept_id,dept_no from ass_card_land
+	        where   group_id = #{group_id}
+	            AND hos_id = #{hos_id}
+	            AND copy_code = #{copy_code}
+	            <if test="dept_id != null and dept_id != ''">
+	           		 and dept_id = #{dept_id}
+	            </if>
+	      union all
+	      select group_id,hos_id,copy_code,ass_card_no,ass_id,ass_no,use_state,'04' naturs_code,dept_id,dept_no from ass_card_other
+	        where   group_id = #{group_id}
+	            AND hos_id = #{hos_id}
+	            AND copy_code = #{copy_code}
+	           <if test="dept_id != null and dept_id != ''">
+	           		 and dept_id = #{dept_id}
+	            </if>
+	            
+	    ),treeData as (
+	    select a.ass_card_no as  id,a.ass_card_no||' '||b.ass_name as name ,c.dept_code || ''|| c.dept_name as dept_name, a.naturs_code as pId
+	    from ass_card_data a
+	    left join ass_no_dict b
+	    on a.group_id = b.group_id
+	    and a.hos_id = b.hos_id
+	    and a.copy_code = b.copy_code
+	    and a.ass_id = b.ass_id
+	     left join HOS_DEPT_DICT c
+	    on c.group_id = a.group_id
+	    and c.hos_id = a.hos_id
+	    and c.dept_id = a.dept_id
+	    and c.dept_no = a.dept_no
+	    and c.is_stop = 0
+	    ) 
+	    select id,name, dept_name, pId
+	    from treeData
+	    start with pId = #{super_code}
+		connect by prior id = pId
+	</select>
+</mapper>

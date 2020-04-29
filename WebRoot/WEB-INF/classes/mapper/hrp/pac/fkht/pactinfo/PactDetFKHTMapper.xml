@@ -1,0 +1,367 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper	namespace="com.chd.hrp.pac.dao.fkht.pactinfo.PactDetFKHTMapper">
+	<resultMap id="pactMainFKHT"	type="java.util.Map">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="pact_code" column="pact_code" />
+		<result property="detail_id" column="detail_id" />
+		<result property="subject_type" column="subject_type" />
+		<result property="subject_type_name" column="subject_type_name" />
+		<result property="subject_id" column="subject_id" />
+		<result property="subject_no" column="subject_no" />
+		<result property="subject_code" column="subject_code" />
+		<result property="subject_name" column="subject_name" />
+		<result property="item_spec" column="item_spec" />
+		<result property="item_model" column="item_model" />
+		<result property="amount" column="amount" />
+		<result property="price" column="price" />
+		<result property="else_cost" column="else_cost" />
+		<result property="change_money" column="change_money" />
+		<result property="money" column="money" />
+		<result property="arrive_date" column="arrive_date" />
+		<result property="repair_months" column="repair_months" />
+		<result property="note" column="note" />
+		<result property="dept_id" column="dept_id" />
+		<result property="dept_no" column="dept_no" />
+		<result property="dept_name" column="dept_name" />
+		<result property="unit_code" column="unit_code" />
+		<result property="unit_name" column="unit_name" />
+		<result property="fac_id" column="fac_id" />
+		<result property="fac_name" column="fac_name" />
+		
+		<result property="item_name" column="item_name" />
+		<result property="item_brand" column="item_brand" />
+		<result property="source" column="source" />
+		<result property="bid_id" column="bid_id" />
+		<result property="bid_det_id" column="bid_det_id" />
+		<result property="apply_id" column="apply_id" />
+		<result property="apply_det_id" column="apply_det_id" />
+		
+		<result property="change_code" column="change_code" />
+		
+	</resultMap>
+
+	<select id="query" parameterType="java.util.Map" resultMap="pactMainFKHT">
+		SELECT
+			pdf.group_id,pdf.hos_id,pdf.copy_code ,pdf.pact_code,pdf.detail_id,pdf.subject_type,pdd.value_name as subject_type_name,pdf.subject_id,temp.ass_code subject_code ,
+			temp.ass_name as subject_name,pdf.subject_no,pdf.item_spec,pdf.item_model,pdf.amount,pdf.price,pdf.money,pdf.arrive_date,
+			pdf.repair_months,pdf.note,pdf.dept_id,
+			case nvl(pdf.dept_id,-1) when -1 then null else pdf.dept_id||'@'||pdf.dept_no end dept_no,
+			hdd.dept_name,pdf.unit_code, hu.unit_name,pdf.fac_id,
+			hf.fac_name ,item_name,item_brand,source,ss.bid_id,ss.bid_det_id,tt.apply_id,tt.apply_det_id
+			<if test=" table_code == 'PACT_DET_FKHT_C'">,pdf.change_code</if>
+		FROM
+		${table_code } pdf
+		LEFT JOIN PACT_DICT_DATA pdd ON pdd.F_CODE = 'SUBJECT_TYPE' AND pdf.SUBJECT_TYPE = pdd.VALUE_CODE
+		LEFT JOIN ASS_NO_DICT temp on pdf.group_id = temp.group_id and pdf.hos_id = temp.hos_id and pdf.copy_code = temp.copy_code and pdf.subject_id = temp.ass_id and pdf.subject_type = '01'
+		LEFT JOIN HOS_DEPT_DICT hdd on pdf.GROUP_ID = hdd.group_id and pdf.hos_id= hdd.hos_id and pdf.dept_id = hdd.dept_id
+		left join HOS_UNIT hu on pdf.GROUP_ID = hu.GROUP_ID and pdf.HOS_ID = hu.HOS_ID and pdf.UNIT_CODE = hu.UNIT_CODE
+		LEFT JOIN HOS_FAC_DICT hf on pdf.GROUP_ID = hf.GROUP_ID and pdf.HOS_ID = hf.HOS_ID and pdf.FAC_ID = hf.FAC_ID
+		left join PACT_BID_FKHT ss
+			on
+				pdf.group_id = ss.group_id
+				and pdf.hos_id = ss.hos_id
+				and pdf.copy_code = ss.copy_code
+				and pdf.pact_code = ss.pact_code
+				and pdf.detail_id = ss.pact_det_id
+		left join PACT_ASS_APPLY_FKHT tt
+			on
+				pdf.group_id = tt.group_id
+				and pdf.hos_id = tt.hos_id
+				and pdf.copy_code = tt.copy_code
+				and pdf.pact_code = tt.pact_code
+				and pdf.detail_id = tt.pact_det_id
+		<where>
+			pdf.group_id=#{group_id,jdbcType=NUMERIC}
+			and pdf.hos_id=#{hos_id,jdbcType=NUMERIC}
+			and pdf.copy_code=#{copy_code,jdbcType=VARCHAR}
+			and pdf.PACT_CODE=#{pact_code,jdbcType=VARCHAR}
+			and pdf.subject_type = '01'
+			<if test="change_code != null and change_code != ''">
+				and pdf.change_code = #{change_code,jdbcType=VARCHAR }
+			</if>
+		</where>
+		UNION
+		SELECT
+			pdf.group_id,pdf.hos_id,pdf.copy_code ,pdf.pact_code,pdf.detail_id,pdf.subject_type,pdd.value_name as	subject_type_name,pdf.subject_id,
+			temp.inv_code subject_code , to_char(cast(temp.inv_name as varchar2(20))) as subject_name,
+			pdf.subject_no,pdf.item_spec,pdf.item_model,pdf.amount,pdf.price,pdf.money,pdf.arrive_date,
+			pdf.repair_months,pdf.note,pdf.dept_id,
+			case nvl(pdf.dept_id,-1) when -1 then null else pdf.dept_id||'@'||pdf.dept_no end dept_no,
+			hdd.dept_name,pdf.unit_code, hu.unit_name,
+			pdf.fac_id,hf.fac_name,item_name,item_brand,source,ss.bid_id,ss.bid_det_id,tt.apply_id,tt.apply_det_id
+			<if test=" table_code == 'PACT_DET_FKHT_C'">,pdf.change_code</if>
+		FROM
+		${table_code } pdf
+		LEFT JOIN PACT_DICT_DATA pdd ON pdd.F_CODE = 'SUBJECT_TYPE' AND pdf.SUBJECT_TYPE = pdd.VALUE_CODE
+		LEFT JOIN MAT_INV_DICT temp on pdf.group_id = temp.group_id and pdf.hos_id = temp.hos_id and pdf.copy_code = temp.copy_code and pdf.subject_id = temp.INV_ID and pdf.subject_type = '03'
+		LEFT JOIN HOS_DEPT_DICT hdd on pdf.GROUP_ID = hdd.group_id and pdf.hos_id= hdd.hos_id and pdf.dept_id = hdd.dept_id
+		left join HOS_UNIT hu on pdf.GROUP_ID = hu.GROUP_ID and pdf.HOS_ID = hu.HOS_ID and pdf.UNIT_CODE = hu.UNIT_CODE
+		LEFT JOIN HOS_FAC_DICT hf on pdf.GROUP_ID = hf.GROUP_ID and pdf.HOS_ID = hf.HOS_ID and pdf.FAC_ID = hf.FAC_ID
+		left join PACT_BID_FKHT ss
+			on
+				pdf.group_id = ss.group_id
+				and pdf.hos_id = ss.hos_id
+				and pdf.copy_code = ss.copy_code
+				and pdf.pact_code = ss.pact_code
+				and pdf.detail_id = ss.pact_det_id
+		left join PACT_ASS_APPLY_FKHT tt
+			on
+				pdf.group_id = tt.group_id
+				and pdf.hos_id = tt.hos_id
+				and pdf.copy_code = tt.copy_code
+				and pdf.pact_code = tt.pact_code
+				and pdf.detail_id = tt.pact_det_id
+		<where>
+			pdf.group_id=#{group_id,jdbcType=NUMERIC}
+			and pdf.hos_id=#{hos_id,jdbcType=NUMERIC}
+			and pdf.copy_code=#{copy_code,jdbcType=VARCHAR}
+			and pdf.PACT_CODE=#{pact_code,jdbcType=VARCHAR}
+			and pdf.subject_type = '03'
+			<if test="change_code != null and change_code != ''">
+				and pdf.change_code = #{change_code,jdbcType=VARCHAR }
+			</if>
+		</where>
+		UNION
+		SELECT
+			pdf.group_id,pdf.hos_id,pdf.copy_code ,pdf.pact_code,pdf.detail_id,pdf.subject_type,pdd.value_name as subject_type_name,pdf.subject_id,
+			temp.inv_code subject_code ,temp.inv_name as subject_name,
+			pdf.subject_no,pdf.item_spec,pdf.item_model,pdf.amount,pdf.price,
+			pdf.money,pdf.arrive_date,pdf.repair_months,pdf.note,pdf.dept_id,
+			case nvl(pdf.dept_id,-1) when -1 then null else pdf.dept_id||'@'||pdf.dept_no end dept_no,
+			hdd.dept_name,pdf.unit_code, hu.unit_name,pdf.fac_id,hf.fac_name,item_name,item_brand,source,
+			ss.bid_id,ss.bid_det_id,tt.apply_id,tt.apply_det_id
+			<if test=" table_code == 'PACT_DET_FKHT_C'">,pdf.change_code</if>
+		FROM
+		${table_code } pdf
+		LEFT JOIN PACT_DICT_DATA pdd ON pdd.F_CODE = 'SUBJECT_TYPE' AND pdf.SUBJECT_TYPE = pdd.VALUE_CODE
+		LEFT JOIN MED_INV_DICT temp on pdf.group_id = temp.group_id and pdf.hos_id = temp.hos_id and pdf.copy_code = temp.copy_code and pdf.subject_id = temp.INV_ID and pdf.subject_type = '04'
+		LEFT JOIN HOS_DEPT_DICT hdd on pdf.GROUP_ID = hdd.group_id and pdf.hos_id= hdd.hos_id and pdf.dept_id = hdd.dept_id
+		left join HOS_UNIT hu on pdf.GROUP_ID = hu.GROUP_ID and pdf.HOS_ID = hu.HOS_ID and pdf.UNIT_CODE = hu.UNIT_CODE
+		LEFT JOIN HOS_FAC_DICT hf on pdf.GROUP_ID = hf.GROUP_ID and pdf.HOS_ID = hf.HOS_ID and pdf.FAC_ID = hf.FAC_ID
+		left join PACT_BID_FKHT ss
+			on
+				pdf.group_id = ss.group_id
+				and pdf.hos_id = ss.hos_id
+				and pdf.copy_code = ss.copy_code
+				and pdf.pact_code = ss.pact_code
+				and pdf.detail_id = ss.pact_det_id
+		left join PACT_ASS_APPLY_FKHT tt
+			on
+				pdf.group_id = tt.group_id
+				and pdf.hos_id = tt.hos_id
+				and pdf.copy_code = tt.copy_code
+				and pdf.pact_code = tt.pact_code
+				and pdf.detail_id = tt.pact_det_id
+		<where>
+			pdf.group_id=#{group_id,jdbcType=NUMERIC}
+			and pdf.hos_id=#{hos_id,jdbcType=NUMERIC}
+			and pdf.copy_code=#{copy_code,jdbcType=VARCHAR}
+			and pdf.PACT_CODE=#{pact_code,jdbcType=VARCHAR}
+			and pdf.subject_type = '04'
+			<if test="change_code != null and change_code != ''">
+				and pdf.change_code = #{change_code,jdbcType=VARCHAR }
+			</if>
+		</where>
+		UNION
+		SELECT
+			pdf.group_id,pdf.hos_id,pdf.copy_code ,pdf.pact_code,pdf.detail_id,pdf.subject_type,pdd.value_name as subject_type_name,pdf.subject_id,
+			temp.sub_code as subject_code,temp.sub_name as subject_name,
+			pdf.subject_no,pdf.item_spec,pdf.item_model,pdf.amount,pdf.price,pdf.money,
+			pdf.arrive_date,pdf.repair_months,pdf.note,pdf.dept_id,
+			case nvl(pdf.dept_id,-1) when -1 then null else pdf.dept_id||'@'||pdf.dept_no end dept_no,
+			hdd.dept_name,pdf.unit_code, hu.unit_name,pdf.fac_id,hf.fac_name,item_name,item_brand,source,
+			ss.bid_id,ss.bid_det_id,tt.apply_id,tt.apply_det_id
+			<if test=" table_code == 'PACT_DET_FKHT_C'">,pdf.change_code</if>
+		FROM
+		${table_code } pdf
+		LEFT JOIN PACT_DICT_DATA pdd ON pdd.F_CODE = 'SUBJECT_TYPE' AND pdf.SUBJECT_TYPE = pdd.VALUE_CODE
+		LEFT JOIN PACT_ELSE_SUB_DICT temp on pdf.group_id = temp.group_id and pdf.hos_id = temp.hos_id and pdf.copy_code = temp.copy_code and pdf.subject_id = temp.SUB_ID and pdf.subject_type = '05' and temp.is_new = 0
+		LEFT JOIN HOS_DEPT_DICT hdd on pdf.GROUP_ID = hdd.group_id and pdf.hos_id= hdd.hos_id and pdf.dept_id = hdd.dept_id
+		left join HOS_UNIT hu on pdf.GROUP_ID = hu.GROUP_ID and pdf.HOS_ID = hu.HOS_ID and pdf.UNIT_CODE = hu.UNIT_CODE
+		LEFT JOIN HOS_FAC_DICT hf on pdf.GROUP_ID = hf.GROUP_ID and pdf.HOS_ID = hf.HOS_ID and pdf.FAC_ID = hf.FAC_ID
+		left join PACT_BID_FKHT ss
+			on
+				pdf.group_id = ss.group_id
+				and pdf.hos_id = ss.hos_id
+				and pdf.copy_code = ss.copy_code
+				and pdf.pact_code = ss.pact_code
+				and pdf.detail_id = ss.pact_det_id
+		left join PACT_ASS_APPLY_FKHT tt
+			on
+				pdf.group_id = tt.group_id
+				and pdf.hos_id = tt.hos_id
+				and pdf.copy_code = tt.copy_code
+				and pdf.pact_code = tt.pact_code
+				and pdf.detail_id = tt.pact_det_id
+		<where>
+			pdf.group_id=#{group_id,jdbcType=NUMERIC}
+			and pdf.hos_id=#{hos_id,jdbcType=NUMERIC}
+			and pdf.copy_code=#{copy_code,jdbcType=VARCHAR}
+			and pdf.PACT_CODE=#{pact_code,jdbcType=VARCHAR}
+			and pdf.subject_type = '05'
+			<if test="change_code != null and change_code != ''">
+				and pdf.change_code = #{change_code,jdbcType=VARCHAR }
+			</if>
+		</where>
+	</select>
+
+	<select id="queryMaxDetailId" parameterType="java.util.Map"
+		resultType="java.lang.Integer">
+		SELECT max(DETAIL_ID) from PACT_DET_FKHT
+		<where>
+			group_id=#{group_id,jdbcType=NUMERIC}
+			and hos_id=#{hos_id,jdbcType=NUMERIC}
+			and copy_code=#{copy_code,jdbcType=VARCHAR}
+			and pact_code = #{pact_code,jdbcType=VARCHAR}
+		</where>
+	</select>
+
+	<select id="queryByPactCodeList" parameterType="java.util.Map" resultMap="pactMainFKHT">
+		SELECT PACT_CODE,DETAIL_ID,SUBJECT_ID,SUBJECT_NO,SUBJECT_TYPE,
+			AMOUNT,PRICE,MONEY,ARRIVE_DATE,REPAIR_MONTHS,NOTE,DEPT_ID,DEPT_NO ,
+			item_name , item_brand , source
+		from PACT_DET_FKHT
+		WHERE group_id=#{group_id,jdbcType=NUMERIC}
+		and hos_id=#{hos_id,jdbcType=NUMERIC}
+		and copy_code=#{copy_code,jdbcType=VARCHAR}
+		AND PACT_CODE IN
+		<foreach close=")" collection="list" item="item" index="index"
+			open="(" separator=",">
+			#{item}
+		</foreach>
+	</select>
+
+	<insert id="add" parameterType="java.util.Map">
+		INSERT INTO PACT_DET_FKHT (
+			GROUP_ID,HOS_ID,COPY_CODE,PACT_CODE,DETAIL_ID,SUBJECT_TYPE,SUBJECT_ID,SUBJECT_NO,ITEM_SPEC,
+			ITEM_MODEL,AMOUNT,PRICE,MONEY,ARRIVE_DATE,REPAIR_MONTHS,NOTE,DEPT_ID,DEPT_NO,fac_id,fac_no,
+			UNIT_CODE,ITEM_NAME , ITEM_BRAND , SOURCE
+		)
+		VALUES(
+		#{group_id,jdbcType=NUMERIC},
+		#{hos_id,jdbcType=NUMERIC},
+		#{copy_code,jdbcType=VARCHAR},
+		#{pact_code,jdbcType=VARCHAR},
+		#{detail_id,jdbcType=NUMERIC},
+		#{subject_type,jdbcType=VARCHAR},
+		#{subject_id,jdbcType=NUMERIC},
+		#{subject_no,jdbcType=NUMERIC},
+		#{item_spec,jdbcType=VARCHAR},
+		#{item_model,jdbcType=VARCHAR},
+		#{amount,jdbcType=NUMERIC},
+		#{price,jdbcType=NUMERIC},
+		#{else_cost,jdbcType=NUMERIC},
+		#{change_money,jdbcType=NUMERIC},
+		#{money,jdbcType=NUMERIC},
+		#{arrive_date,jdbcType=TIMESTAMP},
+		#{repair_months,jdbcType=NUMERIC},
+		#{note,jdbcType=VARCHAR},
+		#{dept_id,jdbcType=NUMERIC},
+		#{dept_no,jdbcType=NUMERIC},
+		#{fac_id,jdbcType=NUMERIC},
+		#{fac_no,jdbcType=NUMERIC},
+		#{unit_code,jdbcType=NUMERIC},
+		#{item_name,jdbcType=VARCHAR},
+		#{item_brand,jdbcType=VARCHAR},
+		#{source,jdbcType=NUMERIC}
+		
+
+		)
+	</insert>
+
+	<insert id="addBatch" parameterType="java.util.List">
+		INSERT INTO PACT_DET_FKHT (
+			GROUP_ID,HOS_ID,COPY_CODE,PACT_CODE,DETAIL_ID,SUBJECT_TYPE,SUBJECT_ID,SUBJECT_NO,ITEM_SPEC,ITEM_MODEL,AMOUNT,
+			PRICE,MONEY,arrive_date,REPAIR_MONTHS,NOTE,DEPT_ID,DEPT_NO,fac_id,fac_no,unit_code,item_name , item_brand , source
+			)
+		<foreach close=")" collection="list" item="item" index="index"
+			open="(" separator="union">
+			select
+			#{item.group_id,jdbcType=NUMERIC},
+			#{item.hos_id,jdbcType=NUMERIC},
+			#{item.copy_code,jdbcType=VARCHAR},
+			#{item.pact_code,jdbcType=VARCHAR},
+			#{item.detail_id,jdbcType=NUMERIC},
+			#{item.subject_type,jdbcType=VARCHAR},
+			#{item.subject_id,jdbcType=NUMERIC},
+			#{item.subject_no,jdbcType=NUMERIC},
+			#{item.item_spec,jdbcType=VARCHAR},
+			#{item.item_model,jdbcType=VARCHAR},
+			#{item.amount,jdbcType=NUMERIC},
+			#{item.price,jdbcType=NUMERIC},
+			#{item.money,jdbcType=NUMERIC},
+			#{item.arrive_date,jdbcType=DATE},
+			#{item.repair_months,jdbcType=NUMERIC},
+			#{item.note,jdbcType=VARCHAR},
+			to_number(#{item.dept_id,jdbcType=NUMERIC}),
+			to_number(#{item.dept_no,jdbcType=NUMERIC}),
+			to_number(#{item.fac_id,jdbcType=NUMERIC}),
+			to_number(#{item.fac_no,jdbcType=NUMERIC}),
+			#{item.unit_code,jdbcType=VARCHAR},
+			#{item.item_name,jdbcType=VARCHAR},
+			#{item.item_brand,jdbcType=VARCHAR},
+			#{item.source,jdbcType=NUMERIC}
+			from dual
+		</foreach>
+	</insert>
+	
+	<delete id="deleteBatch">
+		DELETE FROM PACT_DET_FKHT
+		<where>
+			<foreach collection="list" index="index" item="item" open="("
+				separator="or" close=")">
+				GROUP_ID = #{item.group_id,jdbcType=NUMERIC}
+				and HOS_ID = #{item.hos_id,jdbcType=NUMERIC}
+				AND COPY_CODE = #{item.copy_code,jdbcType=VARCHAR}
+				AND pact_code = #{item.pact_code,jdbcType=VARCHAR}
+				and detail_id= #{item.detail_id,jdbcType=NUMERIC}
+			</foreach>
+		</where>
+	</delete>
+	
+	<delete id="deleteAllBatch">
+		DELETE FROM PACT_DET_FKHT
+		<where>
+			<foreach collection="list" index="index" item="item" open="("
+				separator="or" close=")">
+				GROUP_ID = #{item.group_id,jdbcType=NUMERIC}
+				and HOS_ID = #{item.hos_id,jdbcType=NUMERIC}
+				AND COPY_CODE = #{item.copy_code,jdbcType=VARCHAR}
+				AND pact_code = #{item.pact_code,jdbcType=VARCHAR}
+				and detail_id= #{item.detail_id,jdbcType=NUMERIC}
+			</foreach>
+		</where>
+	</delete>
+	<delete id="deleteByPactCodeList">
+		DELETE FROM PACT_DET_FKHT
+		<where>
+			<foreach collection="list" index="index" item="item" open="("
+				separator="or" close=")">
+				GROUP_ID = #{item.group_id,jdbcType=NUMERIC}
+				and HOS_ID = #{item.hos_id,jdbcType=NUMERIC}
+				AND COPY_CODE = #{item.copy_code,jdbcType=VARCHAR}
+				AND pact_code = #{item.pact_code,jdbcType=VARCHAR}
+			</foreach>
+		</where>
+	</delete>
+	<delete id="deleteByPactCode" parameterType="java.util.Map">
+		DELETE FROM
+		PACT_DET_FKHT WHERE
+		GROUP_ID = #{group_id,jdbcType=NUMERIC}
+		and HOS_ID = #{hos_id,jdbcType=NUMERIC}
+		AND COPY_CODE = #{copy_code,jdbcType=VARCHAR}
+		AND pact_code = #{pact_code,jdbcType=VARCHAR}
+	</delete>
+	
+	<select id="queryExistsByPactCode" parameterType="java.util.Map" resultType="java.lang.Integer">
+		select count(1) FROM
+		PACT_DET_FKHT WHERE
+		GROUP_ID = #{group_id,jdbcType=NUMERIC}
+		and HOS_ID = #{hos_id,jdbcType=NUMERIC}
+		AND COPY_CODE = #{copy_code,jdbcType=VARCHAR}
+		AND pact_code = #{pact_code,jdbcType=VARCHAR}
+	</select>
+</mapper>

@@ -1,0 +1,248 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.pac.dao.skht.pactinfo.PactPlanSKHTMapper">
+	<resultMap id="pactMainSKHT"
+		type="com.chd.hrp.pac.entity.skht.pactinfo.PactPlanSKHTEntity">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="pact_code" column="pact_code" />
+		<result property="plan_detail_id" column="plan_detail_id" />
+		<result property="rec_id" column="rec_id" />
+		<result property="summary" column="summary" />
+		<result property="rec_date" column="rec_date" />
+		<result property="rec_cond" column="rec_cond" />
+		<result property="source_id" column="source_id" />
+		<result property="plan_money" column="plan_money" />
+		<result property="rec_cond_name" column="rec_cond_name" />
+		<result property="source_name" column="source_name" />
+	</resultMap>
+	
+	<resultMap id="pactMainSKHTMap" type="java.util.Map">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="pact_code" column="pact_code" />
+		<result property="plan_detail_id" column="plan_detail_id" />
+		<result property="rec_id" column="rec_id" />
+		<result property="summary" column="summary" />
+		<result property="rec_date" column="rec_date" />
+		<result property="rec_cond" column="rec_cond" />
+		<result property="source_id" column="source_id" />
+		<result property="plan_money" column="plan_money" />
+		<result property="rec_cond_name" column="rec_cond_name" />
+		<result property="source_name" column="source_name" />
+	</resultMap>
+	
+	<resultMap type="java.util.Map" id="payPlanDetail">
+		<result property="pact_code" column="pact_code" />
+		<result property="plan_detail_id" column="plan_detail_id" />
+		<result property="rec_id" column="rec_id" />
+		<result property="summary" column="summary" />
+		<result property="rec_date" column="rec_date" />
+		<result property="rec_cond" column="rec_cond" />
+		<result property="source_id" column="source_id" />
+		<result property="source_name" column="source_name" />
+		<result property="rec_cond_name" column="rec_cond_name" />
+		<result property="plan_money" column="plan_money" />
+		<result property="ing_money" column="ing_money" />
+		<result property="paied_money" column="paied_money" />
+		<result property="unPaied_money" column="unPaied_money" />
+		<result property="rec_money" column="rec_money" />
+	</resultMap>
+
+	<select id="query" parameterType="java.util.Map"
+		resultMap="pactMainSKHT">
+		SELECT
+		p.pact_code,p.plan_detail_id,p.rec_id,p.summary,p.rec_date,p.rec_cond,p.plan_money,p.rec_cond
+		as rec_cond_name
+		FROM PACT_PLAN_SKHT p
+		<where>
+			p.group_id=#{group_id,jdbcType=NUMERIC}
+			and p.hos_id=#{hos_id,jdbcType=NUMERIC}
+			and p.copy_code=#{copy_code,jdbcType=VARCHAR}
+			and p.PACT_CODE=#{pact_code,jdbcType=VARCHAR}
+			<if test="plan_detail_id != null and plan_detail_id != ''">
+				and p.plan_detail_id=#{plan_detail_id,jdbcType=NUMERIC}
+			</if>
+		</where>
+		order by p.rec_id
+	</select>
+	
+	<select id="queryPactPlanList" parameterType="java.util.Map"
+		resultMap="pactMainSKHTMap">
+		SELECT
+		p.group_id,p.hos_id,p.copy_code,p.pact_code,p.plan_detail_id,p.rec_id,p.summary,p.rec_date,p.rec_cond,p.plan_money,p.rec_cond
+		as rec_cond_name
+		FROM PACT_PLAN_SKHT p
+		<where>
+			p.group_id=#{group_id,jdbcType=NUMERIC}
+			and p.hos_id=#{hos_id,jdbcType=NUMERIC}
+			and p.copy_code=#{copy_code,jdbcType=VARCHAR}
+			and p.pact_code=#{pact_code,jdbcType=VARCHAR}
+			<if test="plan_detail_id != null and plan_detail_id != ''">
+				and p.plan_detail_id=#{plan_detail_id,jdbcType=NUMERIC}
+			</if>
+		</where>
+		order by p.rec_id
+	</select>
+	
+	<select id="queryForPay" parameterType="java.util.Map" resultMap="payPlanDetail">
+		select p.pact_code, p.plan_detail_id, p.rec_id, p.summary, TO_CHAR(p.rec_date, 'yyyy-MM-dd') as rec_date, p.rec_cond,  p.rec_cond as rec_cond_name
+				, NVL(p.plan_money, 0) as plan_money
+				, sum(NVL(ppdf.REC_MONEY, 0)) as ing_money
+				, sum(NVL(ppdf2.REC_MONEY, 0)) as paied_money
+				, NVL(p.plan_money - sum(NVL(ppdf2.REC_MONEY, 0)), 0) as unPaied_money
+				, NVL(p.plan_money - sum(NVL(ppdf2.REC_MONEY, 0)), 0) - sum(NVL(ppdf.REC_MONEY, 0)) as rec_money
+			from PACT_PLAN_SKHT p
+			
+			left join 
+			(SELECT ppdf.GROUP_ID,ppdf.HOS_ID,ppdf.COPY_CODE,ppdf.PACT_CODE,pppf.REC_MONEY,pppf.PLAN_DETAIL_ID FROM PACT_REC_DET_SKHT ppdf
+				inner join PACT_REC_PLAN_SKHT pppf on ppdf.GROUP_ID = pppf.GROUP_ID and ppdf.HOS_ID = pppf.HOS_ID and ppdf.COPY_CODE = pppf.COPY_CODE and ppdf.REC_CODE = pppf.REC_CODE and ppdf.PACT_CODE = pppf.PACT_CODE
+				WHERE ppdf.group_id=#{group_id,jdbcType=NUMERIC} and ppdf.hos_id=#{hos_id,jdbcType=NUMERIC} and ppdf.copy_code=#{copy_code,jdbcType=VARCHAR} and ppdf.PACT_CODE=#{pact_code,jdbcType=VARCHAR} and ppdf.REC_CODE in (select REC_CODE from PACT_REC_MAIN_SKHT where group_id = #{group_id,jdbcType=NUMERIC} and hos_id = #{hos_id,jdbcType=NUMERIC} and copy_code = #{copy_code,jdbcType=VARCHAR} and PACT_CODE=#{pact_code,jdbcType=VARCHAR} and STATE in ('01', '02')) 
+			) ppdf ON ppdf.GROUP_ID = p.GROUP_ID AND ppdf.HOS_ID = p.HOS_ID AND ppdf.COPY_CODE=p.COPY_CODE AND p.pact_code = ppdf.PACT_CODE AND p.PLAN_DETAIL_ID = ppdf.PLAN_DETAIL_ID
+			left join 
+			( SELECT ppdf2.GROUP_ID,ppdf2.HOS_ID,ppdf2.COPY_CODE,ppdf2.PACT_CODE,pppf2.REC_MONEY,pppf2.PLAN_DETAIL_ID FROM PACT_REC_DET_SKHT ppdf2  
+				INNER JOIN PACT_REC_PLAN_SKHT pppf2 ON ppdf2.GROUP_ID = pppf2.GROUP_ID and ppdf2.HOS_ID = pppf2.HOS_ID and ppdf2.COPY_CODE = pppf2.COPY_CODE and ppdf2.REC_CODE = pppf2.REC_CODE and ppdf2.PACT_CODE = pppf2.PACT_CODE
+				WHERE ppdf2.group_id=#{group_id,jdbcType=NUMERIC} and ppdf2.hos_id=#{hos_id,jdbcType=NUMERIC} and ppdf2.copy_code=#{copy_code,jdbcType=VARCHAR} and ppdf2.PACT_CODE=#{pact_code,jdbcType=VARCHAR} AND ppdf2.REC_CODE in (select REC_CODE from PACT_REC_MAIN_SKHT where group_id = #{group_id,jdbcType=NUMERIC} and hos_id = #{hos_id,jdbcType=NUMERIC} and copy_code = #{copy_code,jdbcType=VARCHAR} and PACT_CODE=#{pact_code,jdbcType=VARCHAR} and STATE = '03')  
+			) ppdf2 on p.group_id = ppdf2.group_id and p.hos_id = ppdf2.hos_id and p.copy_code = ppdf2.copy_code and p.PACT_CODE = ppdf2.PACT_CODE AND p.PLAN_DETAIL_ID = ppdf2.PLAN_DETAIL_ID
+		<where>
+			p.group_id=#{group_id,jdbcType=NUMERIC}
+			and p.hos_id=#{hos_id,jdbcType=NUMERIC}
+			and p.copy_code=#{copy_code,jdbcType=VARCHAR}
+			and p.PACT_CODE=#{pact_code,jdbcType=VARCHAR}
+			and (p.pay_flag != 1 or p.pay_flag is null or p.pay_flag=0)
+			<if test="plan_detail_id != null and plan_detail_id != ''">
+				and p.plan_detail_id=#{plan_detail_id,jdbcType=NUMERIC}
+			</if>
+			<!-- <if test="REC_CODE != null and REC_CODE != ''">
+				and ppdf.REC_CODE =#{REC_CODE,jdbcType=NUMERIC}
+			</if> -->
+		</where>
+		GROUP BY p.pact_code, p.plan_detail_id, p.rec_id, p.summary, p.rec_date ,p.rec_cond, p.rec_cond , p.plan_money
+	</select>
+	<select id="queryForEdit" parameterType="java.util.Map" resultMap="payPlanDetail">
+		select p.pact_code, p.plan_detail_id, p.rec_id, p.summary, TO_CHAR(p.rec_date, 'yyyy-MM-dd') as rec_date, p.rec_cond, p.rec_cond as rec_cond_name
+				, NVL(p.plan_money, 0) as plan_money
+				, sum(NVL(ppdf.REC_MONEY, 0)) as ing_money
+				, sum(NVL(ppdf2.REC_MONEY, 0)) as paied_money
+				, NVL(p.plan_money - sum(NVL(ppdf2.REC_MONEY, 0)), 0) as unPaied_money
+				, NVL(p.plan_money - sum(NVL(ppdf2.REC_MONEY, 0)), 0) - sum(NVL(ppdf.REC_MONEY, 0)) as rec_money
+			from PACT_PLAN_SKHT p			
+			left join 
+			(SELECT ppdf.GROUP_ID,ppdf.HOS_ID,ppdf.COPY_CODE,ppdf.PACT_CODE,ppdf.REC_MONEY,pppf.PLAN_DETAIL_ID FROM PACT_REC_DET_SKHT ppdf
+				inner join PACT_REC_PLAN_SKHT pppf on ppdf.GROUP_ID = pppf.GROUP_ID and ppdf.HOS_ID = pppf.HOS_ID and ppdf.COPY_CODE = pppf.COPY_CODE and ppdf.REC_CODE = pppf.REC_CODE and ppdf.PACT_CODE = pppf.PACT_CODE  and ppdf.REC_MONEY = pppf.REC_MONEY
+				WHERE ppdf.group_id=#{group_id,jdbcType=NUMERIC} and ppdf.hos_id=#{hos_id,jdbcType=NUMERIC} and ppdf.copy_code=#{copy_code,jdbcType=VARCHAR} and ppdf.PACT_CODE=#{pact_code,jdbcType=VARCHAR} and ppdf.REC_CODE in (select REC_CODE from PACT_REC_MAIN_SKHT where group_id = #{group_id,jdbcType=NUMERIC} and hos_id = #{hos_id,jdbcType=NUMERIC} and copy_code = #{copy_code,jdbcType=VARCHAR} and PACT_CODE=#{pact_code,jdbcType=VARCHAR} and STATE in ('01', '02')) 
+			) ppdf ON ppdf.GROUP_ID = p.GROUP_ID AND ppdf.HOS_ID = p.HOS_ID AND ppdf.COPY_CODE=p.COPY_CODE AND p.pact_code = ppdf.PACT_CODE AND p.PLAN_DETAIL_ID = ppdf.PLAN_DETAIL_ID
+			left join 
+			( SELECT ppdf2.GROUP_ID,ppdf2.HOS_ID,ppdf2.COPY_CODE,ppdf2.PACT_CODE,ppdf2.REC_MONEY,pppf2.PLAN_DETAIL_ID FROM PACT_REC_DET_SKHT ppdf2  
+				INNER JOIN PACT_REC_PLAN_SKHT pppf2 ON ppdf2.GROUP_ID = pppf2.GROUP_ID and ppdf2.HOS_ID = pppf2.HOS_ID and ppdf2.COPY_CODE = pppf2.COPY_CODE and ppdf2.REC_CODE = pppf2.REC_CODE and ppdf2.PACT_CODE = pppf2.PACT_CODE  and ppdf2.REC_MONEY = pppf2.REC_MONEY
+				WHERE ppdf2.group_id=#{group_id,jdbcType=NUMERIC} and ppdf2.hos_id=#{hos_id,jdbcType=NUMERIC} and ppdf2.copy_code=#{copy_code,jdbcType=VARCHAR} and ppdf2.PACT_CODE=#{pact_code,jdbcType=VARCHAR} AND ppdf2.REC_CODE in (select REC_CODE from PACT_REC_MAIN_SKHT where group_id = #{group_id,jdbcType=NUMERIC} and hos_id = #{hos_id,jdbcType=NUMERIC} and copy_code = #{copy_code,jdbcType=VARCHAR} and PACT_CODE=#{pact_code,jdbcType=VARCHAR} and STATE = '03')  
+			) ppdf2 on p.group_id = ppdf2.group_id and p.hos_id = ppdf2.hos_id and p.copy_code = ppdf2.copy_code and p.PACT_CODE = ppdf2.PACT_CODE AND p.PLAN_DETAIL_ID = ppdf2.PLAN_DETAIL_ID
+		<where>
+			p.group_id=#{group_id,jdbcType=NUMERIC}
+			and p.hos_id=#{hos_id,jdbcType=NUMERIC}
+			and p.copy_code=#{copy_code,jdbcType=VARCHAR}
+			and p.PACT_CODE=#{pact_code,jdbcType=VARCHAR}
+			<if test="plan_detail_id != null and plan_detail_id != ''">
+				and p.plan_detail_id=#{plan_detail_id,jdbcType=NUMERIC}
+			</if>
+			<!-- <if test="REC_CODE != null and REC_CODE != ''">
+				and ppdf.REC_CODE =#{REC_CODE,jdbcType=NUMERIC}
+			</if> -->
+		</where>
+		GROUP BY p.pact_code, p.plan_detail_id, p.rec_id, p.summary, p.rec_date ,p.rec_cond,  p.plan_money
+	</select>
+
+	<insert id="add" parameterType="java.util.Map">
+		INSERT INTO PACT_PLAN_SKHT (
+		group_id,hos_id,copy_code,pact_code,plan_detail_id,rec_id,summary,rec_date,rec_cond,plan_money)
+		VALUES(
+		#{group_id,jdbcType=NUMERIC},
+		#{hos_id,jdbcType=NUMERIC},
+		#{copy_code,jdbcType=VARCHAR},
+		#{pact_code,jdbcType=VARCHAR},
+		#{plan_detail_id,jdbcType=NUMERIC},
+		#{rec_id,jdbcType=NUMERIC},
+		#{summary,jdbcType=NUMERIC},
+		#{rec_date,jdbcType=TIMESTAMP},
+		#{rec_cond_name,jdbcType=VARCHAR},
+		#{plan_money,jdbcType=NUMERIC})
+	</insert>
+	<insert id="addBatch" parameterType="java.util.List">
+		INSERT INTO PACT_PLAN_SKHT (
+		group_id,hos_id,copy_code,pact_code,plan_detail_id,rec_id,summary,rec_date,rec_cond,plan_money)
+		<foreach close=")" collection="list" item="item" index="index"
+			open="(" separator="union">
+			select
+			#{item.group_id,jdbcType=NUMERIC},
+			#{item.hos_id,jdbcType=NUMERIC},
+			#{item.copy_code,jdbcType=VARCHAR},
+			#{item.pact_code,jdbcType=VARCHAR},
+			#{item.plan_detail_id,jdbcType=NUMERIC},
+			#{item.rec_id,jdbcType=NUMERIC},
+			#{item.summary,jdbcType=NUMERIC},
+			#{item.rec_date,jdbcType=TIMESTAMP},
+			#{item.rec_cond_name,jdbcType=VARCHAR},
+			#{item.plan_money,jdbcType=NUMERIC}
+			from dual
+		</foreach>
+	</insert>
+	
+<select id="queryMaxDetailId" parameterType="java.util.Map" resultType="java.lang.Integer">
+		select max(plan_detail_id) from PACT_PLAN_SKHT 
+		where 
+		group_id=#{group_id,jdbcType=NUMERIC}
+		and hos_id=#{hos_id,jdbcType=NUMERIC}
+		and copy_code=#{copy_code,jdbcType=VARCHAR}
+		and PACT_CODE=#{pact_code,jdbcType=VARCHAR}
+	</select>
+	
+	<delete id="deleteAllBatch">
+		DELETE FROM PACT_PLAN_SKHT
+		<where>
+			<foreach collection="list" index="index" item="item" open="("
+				separator="or" close=")">
+				GROUP_ID = #{item.group_id,jdbcType=NUMERIC}
+				and HOS_ID = #{item.hos_id,jdbcType=NUMERIC}
+				AND COPY_CODE = #{item.copy_code,jdbcType=VARCHAR}
+				AND pact_code = #{item.pact_code,jdbcType=VARCHAR}
+				and plan_detail_id = #{item.plan_detail_id,jdbcType=NUMERIC}
+			</foreach>
+		</where>
+	</delete>
+	<delete id="deleteByPactCode" parameterType="java.util.Map">
+		DELETE FROM
+		PACT_PLAN_SKHT WHERE
+		GROUP_ID = #{group_id,jdbcType=NUMERIC}
+		and HOS_ID = #{hos_id,jdbcType=NUMERIC}
+		AND COPY_CODE = #{copy_code,jdbcType=VARCHAR}
+		AND pact_code = #{pact_code,jdbcType=VARCHAR}
+	</delete>
+	<delete id="deleteByPactCodeList">
+		DELETE FROM PACT_PLAN_SKHT
+		<where>
+			<foreach collection="list" index="index" item="item" open="("
+				separator="or" close=")">
+				GROUP_ID = #{item.group_id,jdbcType=NUMERIC}
+				and HOS_ID = #{item.hos_id,jdbcType=NUMERIC}
+				AND COPY_CODE = #{item.copy_code,jdbcType=VARCHAR}
+				AND pact_code = #{item.pact_code,jdbcType=VARCHAR}
+			</foreach>
+		</where>
+	</delete>
+	
+	<update id="updateBatch" parameterType="java.util.List">
+		<foreach collection="list" item="item" index="index" open="begin" close=";end;" separator=";" >
+			UPDATE PACT_PLAN_SKHT SET
+				payed_money=#{item.payed_money,jdbcType=NUMERIC},
+				pay_flag=#{item.pay_flag,jdbcType=NUMERIC}
+			WHERE
+			group_id = #{item.group_id,jdbcType=NUMERIC}
+			and hos_id = #{item.hos_id,jdbcType=NUMERIC}
+			and copy_code = #{item.copy_code,jdbcType=VARCHAR}
+			and pact_code = #{item.pact_code,jdbcType=VARCHAR}
+			and plan_detail_id = #{item.plan_detail_id,jdbcType=NUMERIC}
+		</foreach>
+	</update>
+</mapper>

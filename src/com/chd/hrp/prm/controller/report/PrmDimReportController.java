@@ -1,0 +1,151 @@
+﻿/** 
+ * @Description:
+ * @Copyright: Copyright (c) 2015-9-16 下午9:54:34
+ * @Company: 智慧云康（北京）数据科技有限公司
+ * @网站：www.s-chd.com
+ */
+package com.chd.hrp.prm.controller.report;
+
+import java.util.Map;
+
+import javax.annotation.Resource;
+
+import org.apache.log4j.Logger;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+
+import com.alibaba.fastjson.JSONObject;
+import com.chd.base.BaseController;
+import com.chd.base.SessionManager;
+import com.chd.hrp.prm.service.report.PrmDimReportService;
+
+/**
+ * 
+ * @Description: 8801 科室字典表
+ * @Table: APHI_DEPT
+ * @Author: bell
+ * @email: bell@s-chd.com
+ * @Version: 1.0
+ */
+
+@Controller
+public class PrmDimReportController extends BaseController {
+
+	private static Logger logger = Logger.getLogger(PrmDimReportController.class);
+
+	// 引入Service服务
+	@Resource(name = "prmDimReportService")
+	private final PrmDimReportService prmDimReportService = null;
+
+	@RequestMapping(value = "/hrp/prm/report/prmDimReportMainPage", method = RequestMethod.GET)
+	public String prmDimReportMainPage(Model mode) throws Exception {
+
+		return "hrp/prm/report/prmDimReportMain";
+
+	}
+
+	/**
+	 * @Description 查询数据 返回柱状图表
+	 * @param mapVo
+	 * @param mode
+	 * @return Map<String, Object>
+	 * @throws Exception
+	 */
+	@RequestMapping(value = "/hrp/prm/report/queryPrmDimReportOption", method = RequestMethod.POST)
+	@ResponseBody
+	public Map<String, Object> queryPrmDimReportOption(@RequestParam Map<String, Object> mapVo, Model mode) throws Exception {
+
+		if (mapVo.get("group_id") == null) {
+			mapVo.put("group_id", SessionManager.getGroupId());
+		}
+
+		if (mapVo.get("hos_id") == null) {
+			mapVo.put("hos_id", SessionManager.getHosId());
+
+		}
+
+		if (mapVo.get("copy_code") == null) {
+			mapVo.put("copy_code", SessionManager.getCopyCode());
+		}
+
+		if (mapVo.get("acc_year") == null) {
+			mapVo.put("acc_year", SessionManager.getAcctYear());
+		}
+
+		String option = prmDimReportService.queryPrmDimReportOption(mapVo);
+		
+		//System.out.print("option="+option);
+
+		return JSONObject.parseObject(option);
+
+	}
+
+	/**
+	 * @Description 查询数据 返回Grid
+	 * @param mapVo
+	 * @param mode
+	 * @return Map<String, Object>
+	 * @throws Exception
+	 */
+	@RequestMapping(value = "/hrp/prm/report/queryPrmDimReportBottomGrid", method = RequestMethod.POST)
+	@ResponseBody
+	public Map<String, Object> queryPrmDimReportBottomGrid(@RequestParam Map<String, Object> mapVo, Model mode) throws Exception {
+
+		if (mapVo.get("group_id") == null) {
+			mapVo.put("group_id", SessionManager.getGroupId());
+		}
+
+		if (mapVo.get("hos_id") == null) {
+			mapVo.put("hos_id", SessionManager.getHosId());
+
+		}
+
+		if (mapVo.get("copy_code") == null) {
+			mapVo.put("copy_code", SessionManager.getCopyCode());
+		}
+
+		if (mapVo.get("acc_year") == null) {
+			mapVo.put("acc_year", SessionManager.getAcctYear());
+		}
+		
+		String grid = prmDimReportService.queryPrmDimReportBottomGrid(mapVo);
+
+		return JSONObject.parseObject(grid);
+
+	}
+
+	/**
+	 * @Description 查询数据 返回Grid
+	 * @param mapVo
+	 * @param mode
+	 * @return Map<String, Object>
+	 * @throws Exception
+	 */
+	@RequestMapping(value = "/hrp/prm/report/queryPrmDimReportRightGrid", method = RequestMethod.POST)
+	@ResponseBody
+	public Map<String, Object> queryPrmDimReportRightGrid(@RequestParam Map<String, Object> mapVo, Model mode) throws Exception {
+
+		if (mapVo.get("group_id") == null) {
+			mapVo.put("group_id", SessionManager.getGroupId());
+		}
+
+		if (mapVo.get("hos_id") == null) {
+			mapVo.put("hos_id", SessionManager.getHosId());
+
+		}
+
+		if (mapVo.get("copy_code") == null) {
+			mapVo.put("copy_code", SessionManager.getCopyCode());
+		}
+
+		String grid = prmDimReportService.queryPrmDimReportRightGrid(mapVo);
+
+		return JSONObject.parseObject(grid);
+
+	}
+
+}

@@ -1,0 +1,281 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.hr.dao.salarymanagement.salaryChange.HrSalaryChangeTypeMapper">
+
+	<!-- 工资项下拉加载 -->
+	<select id="queryItemOption" resultType="java.util.Map">
+		SELECT 
+			PLAN_CODE "id", PLAN_NAME "label" 
+		FROM 
+			HR_WAGE_PLAN
+		WHERE
+			GROUP_ID = #{group_id,jdbcType=INTEGER}
+			AND HOS_ID = #{hos_id,jdbcType=INTEGER}
+			AND STATE = 1
+	</select>
+	
+	<!-- 工资项编码下拉加载 -->
+	<select id="queryPlancodeOption" resultType="java.util.Map">
+		SELECT 
+			ITEM_CODE "id", ITEM_NAME "label" 
+		FROM 
+			HR_WAGE_ITEM
+		WHERE
+			GROUP_ID = #{group_id,jdbcType=INTEGER}
+			AND HOS_ID = #{hos_id,jdbcType=INTEGER}
+			AND PLAN_CODE = #{plan_code,jdbcType=VARCHAR}
+			AND IS_STOP = 0
+	</select>
+
+	<!-- 查询新增时是否存在重复的编码-->
+	<select id="queryAddChangeTypeCount" resultType="int">
+		SELECT 
+			COUNT(1)
+		FROM 
+			HR_WAGE_CHANGE_TYPE
+		WHERE
+			GROUP_ID = #{group_id,jdbcType=INTEGER}
+			AND HOS_ID = #{hos_id,jdbcType=INTEGER}
+			AND TYPE_CODE = #{type_code,jdbcType=VARCHAR}
+	</select>
+	
+	<!-- 查询新增时是否存在重复的编码名称-->
+	<select id="queryAddChangeTypeNameCount" resultType="int">
+		SELECT 
+			COUNT(1)
+		FROM 
+			HR_WAGE_CHANGE_TYPE
+		WHERE
+			GROUP_ID = #{group_id,jdbcType=INTEGER}
+			AND HOS_ID = #{hos_id,jdbcType=INTEGER}
+			AND TYPE_NAME = #{type_name,jdbcType=VARCHAR}
+			AND TYPE_CODE != #{type_code,jdbcType=VARCHAR}
+	</select>
+	
+	<!-- 薪资变动类型添加 -->
+	<insert id="addSalaryChangeType">
+		INSERT INTO
+			HR_WAGE_CHANGE_TYPE (GROUP_ID,HOS_ID,TYPE_CODE,TYPE_NAME,IS_STOP,SPELL_CODE,WBX_CODE,NOTE)
+			VALUES
+			(
+			#{group_id,jdbcType=INTEGER},
+			#{hos_id,jdbcType=INTEGER},
+			#{type_code,jdbcType=VARCHAR},
+			#{type_name,jdbcType=VARCHAR},
+			#{is_stop,jdbcType=INTEGER},
+			#{spell_code,jdbcType=VARCHAR},
+			#{wbx_code,jdbcType=VARCHAR},
+			#{note,jdbcType=VARCHAR}
+			)
+	</insert>
+	
+	<!-- 新增之添加变动项目 -->
+	<insert id="addChangeProject">
+		INSERT INTO
+			HR_WAGE_C_TYPE_ITEM (GROUP_ID,HOS_ID,TYPE_CODE,TAB_CODE,COL_CODE)
+			<foreach open=" ( " close=" ) " item="item" collection="list" separator=" UNION ALL ">
+			SELECT
+				#{vo.group_id,jdbcType=INTEGER},
+				#{vo.hos_id,jdbcType=INTEGER},
+				#{vo.type_code,jdbcType=VARCHAR},
+				#{item.tab_code,jdbcType=VARCHAR},
+				#{item.col_code,jdbcType=VARCHAR}
+			FROM
+				DUAL
+			</foreach>
+	</insert>
+	
+	<!-- 新增之添加工资动项目 -->
+	<insert id="addSalaryProject">
+		INSERT INTO
+			HR_WAGE_C_TYPE_WAGE (GROUP_ID,HOS_ID,TYPE_CODE,PLAN_CODE,ITEM_CODE)
+			<foreach open=" ( " close=" ) " item="item" collection="list" separator=" UNION ALL ">
+			SELECT
+				#{vo.group_id,jdbcType=INTEGER},
+				#{vo.hos_id,jdbcType=INTEGER},
+				#{vo.type_code,jdbcType=VARCHAR},
+				#{item.plan_code,jdbcType=VARCHAR},
+				#{item.item_code,jdbcType=VARCHAR}
+			FROM
+				DUAL
+			</foreach>
+	</insert>
+	
+	<!-- 薪资变动类型查询 -->
+	<select id="querySalaryChangeType" resultType="java.util.Map">
+		SELECT
+			TYPE_CODE,TYPE_NAME,IS_STOP,NOTE
+		FROM
+			HR_WAGE_CHANGE_TYPE
+		WHERE
+			GROUP_ID = #{group_id,jdbcType=INTEGER}
+			AND HOS_ID = #{hos_id,jdbcType=INTEGER}
+			<if test="key != null and key != '' ">
+			AND ( TYPE_CODE LIKE '%${key}%' OR
+				  TYPE_NAME LIKE '%${key}%' OR
+				  SPELL_CODE LIKE UPPER('%${key}%') OR
+				  WBX_CODE LIKE UPPER('%${key}%')
+				)
+			</if>
+			<if test="is_stop != null and is_stop != '' ">
+			AND IS_STOP = #{is_stop,jdbcType=INTEGER}
+			</if>
+			ORDER BY
+				TYPE_CODE
+	</select>
+	
+	<!-- 删除之查询ID -->
+	<select id="queryDeleteSalaryChangeTypeId" resultType="java.lang.String">
+		SELECT
+			CHANGE_TYPE
+		FROM
+			HR_WAGE_CHANGE
+		WHERE
+			GROUP_ID = #{vo.group_id,jdbcType=INTEGER}
+			AND hos_id = #{vo.hos_id,jdbcType=INTEGER}
+			AND CHANGE_TYPE IN
+				<foreach collection="list" item="item" open=" ( " close=" ) " separator=",">
+					#{item,jdbcType=VARCHAR}
+				</foreach>
+		GROUP BY 
+			CHANGE_TYPE
+	</select>
+	
+	<!-- 删除薪资变动前删除变动项目 -->
+	<delete id="deleteSalaryChangeTypeChangeProject">
+		DELETE FROM
+			HR_WAGE_C_TYPE_ITEM
+		WHERE
+			GROUP_ID = #{vo.group_id,jdbcType=INTEGER}
+			AND HOS_ID = #{vo.hos_id,jdbcType=INTEGER}
+			AND TYPE_CODE IN
+				<foreach collection="list" open=" ( " close=" ) " item="item" separator=" , ">
+					#{item,jdbcType=VARCHAR}
+				</foreach>
+	</delete>
+	
+	<!-- 删除薪资变动前删除工资项目 -->
+	<delete id="deleteSalaryChangeTypeProject">
+		DELETE FROM
+			HR_WAGE_C_TYPE_WAGE
+		WHERE
+			GROUP_ID = #{vo.group_id,jdbcType=INTEGER}
+			AND HOS_ID = #{vo.hos_id,jdbcType=INTEGER}
+			AND TYPE_CODE IN
+				<foreach collection="list" open=" ( " close=" ) " item="item" separator=" , ">
+					#{item,jdbcType=VARCHAR}
+				</foreach>
+	</delete>
+	
+	<!-- 删除薪资变动类型 -->
+	<delete id="deleteSalaryChangeType">
+		DELETE FROM
+			HR_WAGE_CHANGE_TYPE
+		WHERE
+			GROUP_ID = #{vo.group_id,jdbcType=INTEGER}
+			AND HOS_ID = #{vo.hos_id,jdbcType=INTEGER}
+			AND TYPE_CODE IN
+				<foreach collection="list" open=" ( " close=" ) " item="item" separator=" , ">
+					#{item,jdbcType=VARCHAR}
+				</foreach>
+	</delete>
+	
+	<!-- 薪资变动修改回显数据 -->
+	<select id="queryUpdateSalaryChangeType" resultType="java.util.Map">
+		SELECT
+			GROUP_ID,
+			HOS_ID,
+			TYPE_CODE,
+			TYPE_NAME,
+			IS_STOP,
+			NOTE
+		FROM
+			HR_WAGE_CHANGE_TYPE
+		WHERE
+			GROUP_ID = #{group_id,jdbcType=INTEGER}
+			AND HOS_ID = #{hos_id,jdbcType=INTEGER}
+			AND TYPE_CODE = #{type_code,jdbcType=VARCHAR}
+	</select>
+	
+	<!-- 薪资变动类型，变动项目回显 -->
+	<select id="querySalaryChangeTypeChangeProject" resultType="java.util.Map">
+		SELECT 
+			P2.TAB_CODE "tab_code",
+			P2.TAB_NAME "tab_codes",
+			P3.COL_CODE "col_code",
+			P3.COL_NAME "col_codes"
+		FROM
+			HR_WAGE_C_TYPE_ITEM P1 
+			LEFT JOIN HR_TAB_STRUC P2
+				ON P1.GROUP_ID = P2.GROUP_ID
+				AND P1.HOS_ID = P2.HOS_ID
+				AND P1.TAB_CODE = P2.TAB_CODE
+			LEFT JOIN HR_COL_STRUC P3
+				ON P1.GROUP_ID = P3.GROUP_ID
+				AND P1.HOS_ID = P3.HOS_ID
+				AND P1.TAB_CODE  = P3.TAB_CODE
+				AND P1.COL_CODE = P3.COL_CODE
+		WHERE P1.GROUP_ID = #{group_id,jdbcType=INTEGER}
+			AND P1.HOS_ID = #{hos_id,jdbcType=INTEGER}
+			AND P1.TYPE_CODE = #{type_code,jdbcType=VARCHAR}
+	</select>
+	
+		<!-- 薪资变动类型，工资项目回显 -->
+	<select id="querySalaryChangeTypeSalaryProject" resultType="java.util.Map">
+		SELECT
+			P2.PLAN_CODE "plan_code",
+			P2.PLAN_NAME "plan_codes",
+			P3.ITEM_CODE "item_code",
+			P3.ITEM_NAME "item_codes" 
+		FROM 
+			HR_WAGE_C_TYPE_WAGE P1 
+			LEFT JOIN HR_WAGE_PLAN P2
+				ON P1.GROUP_ID = P2.GROUP_ID
+				AND P1.HOS_ID = P2.HOS_ID
+				AND P1.PLAN_CODE = P2.PLAN_CODE
+			LEFT JOIN HR_WAGE_ITEM P3
+				ON P1.GROUP_ID = P3.GROUP_ID
+				AND P1.HOS_ID = P3.HOS_ID
+				AND P1.PLAN_CODE = P3.PLAN_CODE
+				AND P1.ITEM_CODE = P3.ITEM_CODE
+		WHERE P1.GROUP_ID = #{group_id,jdbcType=INTEGER}
+			AND P1.HOS_ID = #{hos_id,jdbcType=INTEGER}
+			AND P1.TYPE_CODE = #{type_code,jdbcType=VARCHAR}
+	</select>
+
+	<!-- 薪资变动类型修改 -->
+	<update id="updateSalaryChangeType">
+		UPDATE
+			HR_WAGE_CHANGE_TYPE
+		SET
+			TYPE_NAME = #{type_name,jdbcType=VARCHAR},
+			IS_STOP = #{is_stop,jdbcType=INTEGER},
+			SPELL_CODE = #{spell_code,jdbcType=VARCHAR},
+			WBX_CODE = #{wbx_code,jdbcType=VARCHAR},
+			NOTE = #{note,jdbcType=VARCHAR}
+		WHERE
+			GROUP_ID = #{group_id,jdbcType=INTEGER}
+			AND HOS_ID = #{hos_id,jdbcType=INTEGER}
+			AND TYPE_CODE = #{type_code,jdbcType=VARCHAR}
+	</update>
+	
+	<!-- 删除变动项目数据 -->
+	<delete id="deleteChangeProject">
+		DELETE FROM
+			HR_WAGE_C_TYPE_ITEM
+		where 
+			GROUP_ID = #{group_id,jdbcType=INTEGER}
+			AND HOS_ID = #{hos_id,jdbcType=INTEGER}
+			AND TYPE_CODE = #{type_code,jdbcType=VARCHAR}
+	</delete>
+	
+	<!-- 删除工资项目数据 -->
+	<delete id="deleteSalaryProject">
+		DELETE FROM
+			HR_WAGE_C_TYPE_WAGE
+		where 
+			GROUP_ID = #{group_id,jdbcType=INTEGER}
+			AND HOS_ID = #{hos_id,jdbcType=INTEGER}
+			AND TYPE_CODE = #{type_code,jdbcType=VARCHAR}
+	</delete>
+</mapper>

@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+	<sql id="v_acc_ass_depre" type="view" desc="卡片信息视图"><![CDATA[
+	CREATE OR REPLACE VIEW V_ACC_ASS_DEPRE AS
+	SELECT
+          RS.GROUP_ID,  --集团
+          RS.HOS_ID,    --单位
+          RS.COPY_CODE, --账套
+          RS.ASS_CARD_NO AS BUSINESS_ID, --卡片号作为单据号
+          RS.ASS_CARD_NO AS BUSINESS_NO, --卡片号作为单据号
+          RS.DEPRE_YEAR, --折旧年
+          RS.DEPRE_MONTH, --折旧月
+          RS.DEPRE_YEAR||RS.DEPRE_MONTH YEAR_MONTH,--折旧年月
+          RS.DEAL_DATE BUSI_DATE, --折旧日期
+          RS.ASS_CARD_NO, --卡片号
+          RS.SOURCE_ID,   --资金来源
+          RS.USE_DEPT_ID DEPT_ID, --科室ID
+          RS.USE_DEPT_NO DEPT_NO, --科室变更号
+          ATTR.OUT_CODE,--支出性质
+          VC.ASS_ID,  --资产ID
+          VC.ASS_NO,   --资产变更NO
+          ATD.ASS_TYPE_ID AS SUB_TYPE_ID, --分类ID
+          ATD.ASS_TYPE_CODE, --分类编码
+          ATD.ASS_TYPE_NAME, --分类名称
+          ATD.ASS_NATURS,    --资产性质编码
+          HS.SOURCE_CODE,    --资金来源编码
+          HS.SOURCE_NAME,    --资金来源名称
+          HS.SOURCE_ATTR FUND_SOURCE_ATTR,--资金来源性质
+          HSN.NATURE_NAME AS SOURCE_NATURE_NAME, --资金来源性质名称
+          VC.PRICE, --原值
+          RS.NOW_DEPRE_AMOUNT,--折旧金额
+          RS.ADD_DEPRE_AMOUNT,--累计折旧金额
+          RS.ADD_DEPRE_MONTH, --累计折旧月份
+          RS.CUR_MONEY, --现值
+           VC.PROJ_ID,--项目ID
+           VC.PROJ_NO,--项目NO
+           VC.PROC_STORE_ID,--采购仓库ID
+           VC.PROC_STORE_NO, --采购仓库NO
+           AD.ASS_NAME,
+           VC.ASS_SPEC,
+           VC.ASS_MONDL,
+           HDD.DEPT_NAME
+       FROM(
+          SELECT
+            GROUP_ID,
+            HOS_ID,
+            COPY_CODE,
+            ASS_CARD_NO,
+            SOURCE_ID,
+            USE_DEPT_ID,
+            USE_DEPT_NO,
+            USE_PERCENT,
+            DEPRE_YEAR,
+            DEPRE_MONTH,
+            DEAL_DATE,
+            NOW_DEPRE_AMOUNT,
+            ADD_DEPRE_AMOUNT,
+            ADD_DEPRE_MONTH,
+            CUR_MONEY,
+            EQUI_DEPRE_CODE
+         FROM ASS_DEPRE_ACC_HOUSE where nvl(note,'99999')!='冲减'
+         UNION ALL
+         SELECT
+            GROUP_ID,
+            HOS_ID,
+            COPY_CODE,
+            ASS_CARD_NO,
+            SOURCE_ID,
+            USE_DEPT_ID,
+            USE_DEPT_NO,
+            USE_PERCENT,
+            DEPRE_YEAR,
+            DEPRE_MONTH,
+            DEAL_DATE,
+            NOW_DEPRE_AMOUNT,
+            ADD_DEPRE_AMOUNT,
+            ADD_DEPRE_MONTH,
+            CUR_MONEY,
+            EQUI_DEPRE_CODE
+         FROM ASS_DEPRE_ACC_SPECIAL where nvl(note,'99999')!='冲减'
+         UNION ALL
+         SELECT
+            GROUP_ID,
+            HOS_ID,
+            COPY_CODE,
+            ASS_CARD_NO,
+            SOURCE_ID,
+            USE_DEPT_ID,
+            USE_DEPT_NO,
+            USE_PERCENT,
+            DEPRE_YEAR,
+            DEPRE_MONTH,
+            DEAL_DATE,
+            NOW_DEPRE_AMOUNT,
+            ADD_DEPRE_AMOUNT,
+            ADD_DEPRE_MONTH,
+            CUR_MONEY,
+            EQUI_DEPRE_CODE
+         FROM ASS_DEPRE_ACC_GENERAL where nvl(note,'99999')!='冲减'
+         UNION ALL
+         SELECT
+            GROUP_ID,
+            HOS_ID,
+            COPY_CODE,
+            ASS_CARD_NO,
+            SOURCE_ID,
+            USE_DEPT_ID,
+            USE_DEPT_NO,
+            USE_PERCENT,
+            DEPRE_YEAR,
+            DEPRE_MONTH,
+            DEAL_DATE,
+            NOW_DEPRE_AMOUNT,
+            ADD_DEPRE_AMOUNT,
+            ADD_DEPRE_MONTH,
+            CUR_MONEY,
+            EQUI_DEPRE_CODE
+         FROM ASS_DEPRE_ACC_OTHER where nvl(note,'99999')!='冲减'
+      ) RS
+      LEFT JOIN V_ACC_ASS_CARD VC  --卡片
+      ON
+        RS.GROUP_ID=VC.GROUP_ID
+        AND RS.HOS_ID=VC.HOS_ID
+        AND RS.COPY_CODE=VC.COPY_CODE
+        AND RS.ASS_CARD_NO=VC.ASS_CARD_NO
+      LEFT JOIN ASS_NO_DICT AD --资产字典
+      ON
+         VC.GROUP_ID=AD.GROUP_ID
+         AND VC.HOS_ID=AD.HOS_ID
+         AND VC.COPY_CODE=AD.COPY_CODE
+         AND VC.ASS_ID=AD.ASS_ID
+         AND VC.ASS_NO=AD.ASS_NO
+      LEFT JOIN ASS_TYPE_DICT ATD --资产分类
+      ON
+         RS.GROUP_ID=ATD.GROUP_ID
+         AND RS.HOS_ID=ATD.HOS_ID
+         AND RS.COPY_CODE=ATD.COPY_CODE
+         AND AD.ASS_TYPE_ID=ATD.ASS_TYPE_ID
+      LEFT JOIN HOS_SOURCE HS  --资金来源
+      ON
+         RS.GROUP_ID=HS.GROUP_ID
+         AND RS.HOS_ID=HS.HOS_ID
+         AND RS.SOURCE_ID=HS.SOURCE_ID
+      LEFT JOIN HOS_SOURCE_NATURE HSN --资金来源性质
+      ON
+         HS.SOURCE_ATTR=HSN.NATURE_CODE
+      LEFT JOIN HOS_DEPT_DICT HDD   --领料科室
+      ON
+        RS.GROUP_ID=HDD.GROUP_ID
+        AND RS.HOS_ID=HDD.HOS_ID
+        AND RS.USE_DEPT_ID=HDD.DEPT_ID
+        AND RS.USE_DEPT_NO=HDD.DEPT_NO
+     LEFT JOIN ACC_DEPT_ATTR ATTR --科室属性
+     ON
+      HDD.DEPT_ID=ATTR.DEPT_ID
+      AND HDD.GROUP_ID=ATTR.GROUP_ID
+      AND HDD.HOS_ID=ATTR.HOS_ID
+
+      
+	]]></sql>
+</root>        

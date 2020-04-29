@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.acc.dao.AccVouchFlowMapper">
+
+	<resultMap id="accVouchFlow" type="java.util.Map">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="node_id" column="node_id"/>
+		<result property="parent_node_id" column="parent_node_id"/>
+		<result property="node_name" column="node_name"/>
+		<result property="note" column="note"/>
+		<result property="sort_code" column="sort_code"/>
+	</resultMap>
+
+	<!-- 列表查询 -->
+	<select id="queryList" parameterType="java.util.Map" resultMap="accVouchFlow">
+		SELECT group_id, hos_id, copy_code, node_id, parent_node_id, node_name, note
+		FROM acc_vouch_flow
+		WHERE group_id = #{group_id,jdbcType=INTEGER} 
+			AND hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+		ORDER BY sort_code
+	</select>
+	
+	<!-- 查询初始化数据 -->
+	<select id="queryInitData" parameterType="java.util.Map" resultMap="accVouchFlow">
+		SELECT node_id, parent_node_id, node_name, note
+		FROM init_acc_vouch_flow
+		ORDER BY node_id
+	</select>
+	
+	<!-- 添加 -->
+	<insert id="addAccVouchFlow" parameterType="java.util.List">
+		INSERT INTO acc_vouch_flow(
+			group_id, hos_id, copy_code, node_id, parent_node_id, node_name, note, sort_code 
+		)
+		SELECT group_id, hos_id, copy_code, node_id, parent_node_id, node_name, note, sort_code 
+		FROM(
+			<foreach collection="list" item="item" index="index" separator=" union all ">
+				SELECT 
+					#{item.group_id,jdbcType=INTEGER} group_id, 
+					#{item.hos_id,jdbcType=INTEGER} hos_id, 
+					#{item.copy_code,jdbcType=VARCHAR} copy_code, 
+					#{item.node_id,jdbcType=INTEGER} node_id, 
+					#{item.parent_node_id,jdbcType=INTEGER} parent_node_id, 
+					#{item.node_name,jdbcType=VARCHAR} node_name, 
+					#{item.note,jdbcType=VARCHAR} note, 
+					#{item.sort_code,jdbcType=VARCHAR} sort_code
+				FROM dual
+			</foreach>
+		) tmp
+	</insert>
+	
+	<!-- 删除数据 -->
+	<delete id="deleteAccVouchFlow" parameterType="java.util.Map">
+		DELETE FROM acc_vouch_flow 
+		WHERE group_id = #{group_id,jdbcType=INTEGER} 
+			AND hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND copy_code = #{copy_code,jdbcType=VARCHAR} 
+	</delete>
+
+	<!-- 校验是否含未记账凭证 -->
+	<select id="existsAcc" parameterType="java.util.Map" resultType="java.lang.Integer">
+		SELECT count(0) 
+		FROM acc_vouch 
+		WHERE group_id = #{group_id,jdbcType=INTEGER} 
+			AND hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND copy_code = #{copy_code,jdbcType=VARCHAR} 
+			AND state &lt; 99
+			AND state &gt; 0
+	</select>
+</mapper>
+

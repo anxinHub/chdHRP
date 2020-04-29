@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.sup.dao.SupDeliveryCountMapper">
+	
+	<!-- 订单信息表信息 -->
+	<resultMap id="supDeliveryInfo" type="java.util.Map">
+		<!-- 主表信息 -->
+		<result property="delivery_id" column="delivery_id"/>
+	<result property="delivery_no" column="delivery_no"/>
+	<result property="group_id" column="group_id"/>
+	<result property="hos_id" column="hos_id"/>
+	<result property="copy_code" column="copy_code"/>
+	<result property="acc_year" column="acc_year"/>
+	<result property="acc_month" column="acc_month"/>
+	<result property="sup_id" column="sup_id"/>
+	<result property="sup_no" column="sup_no"/>
+	<result property="create_date" column="create_date"/>
+	<result property="check_date" column="check_date"/>
+	<result property="bill_type" column="bill_type"/>
+	<result property="hos_id_in" column="hos_id_in"/>
+	<result property="is_dir" column="is_dir"/>
+	<result property="dir_dept_id" column="dir_dept_id"/>
+	<result property="dir_dept_no" column="dir_dept_no"/>
+	<result property="delivery_address" column="delivery_address"/>
+	<result property="delivery_url" column="delivery_url"/>
+	<result property="in_state" column="in_state"/>
+	<result property="state" column="state"/>
+	<result property="hos_name" column="hos_name"/>
+		
+	
+	<!-- 明细表信息 -->
+	<result property="detail_id" column="detail_id"/>
+	<result property="batch_no" column="batch_no"/>
+	<result property="inva_date" column="inva_date"/>
+	<result property="disinfect_date" column="disinfect_date"/>
+	<result property="sn" column="sn"/>
+	<result property="note" column="note"/>
+		
+		<result property="inv_id" column="inv_id"/>
+		<result property="inv_no" column="inv_no"/>
+		<result property="inv_code" column="inv_code"/>
+		<result property="inv_name" column="inv_name"/>
+		<result property="inv_model" column="inv_model"/>
+		<result property="unit_code" column="unit_code"/>
+		<result property="unit_name" column="unit_name"/>
+		<result property="pack_code" column="pack_code"/>
+		<result property="amount" column="amount"/>
+		<result property="price" column="price"/>
+		<result property="amount_money" column="amount_money"/>
+		<result property="num" column="num"/>	
+		<result property="num_exchange" column="num_exchange"/>
+		<result property="arrive_date" column="arrive_date"/>
+		<result property="memo" column="memo"/>
+		<result property="in_amount" column="in_amount"/>
+		<result property="in_money" column="in_money"/>
+		<result property="not_amount" column="not_amount"/>
+		
+		
+	</resultMap>
+	
+	<!-- 订单执行查询  主查询 -->
+	<select id="querySupDeliveryCount" resultMap="supDeliveryInfo" parameterType="java.util.Map">
+	    select sdm.group_id,
+         sdm.hos_id,
+         sdm.copy_code,
+         sdm.acc_year,
+         sdm.acc_month,
+         sdm.delivery_id,
+         sdm.delivery_no,
+         mid.inv_code,
+         mid.inv_name,
+         mid.inv_model,
+         hu.unit_name,
+         nvl(sdir.in_amount, 0) amount,
+         nvl(sdir.in_amount, 0) * nvl(sdir.price, 0) amount_money,
+         sdir.in_amount ,
+         nvl(sdir.in_amount, 0) * nvl(sdir.price, 0) in_money,
+         nvl(sdir.in_amount, 0) - nvl(sdir.delivery_amount, 0) not_amount,
+         hid.hos_name
+    from SUP_DELIVERY_MAIN sdm
+    left join SUP_DELIVERY_IN_RELA sdir
+      on sdm.group_id = sdir.group_id
+     and sdm.hos_id = sdir.hos_id
+     and sdm.delivery_no = sdir.delivery_no
+    left join mat_inv_dict mid
+      on mid.inv_id = sdir.inv_id
+     and mid.group_id = sdir.group_id
+     and mid.hos_id = sdir.hos_id
+     and mid.is_stop = 0
+    left join hos_unit hu
+      on hu.group_id = mid.group_id
+     and hu.hos_id = mid.hos_id
+     and hu.is_stop = 0
+     and hu.unit_code = mid.unit_code
+    left join hos_info_dict hid
+        on hid.group_id=sdm.group_id
+        and hid.hos_id=sdm.hos_id
+        and hid.is_stop=0
+		where  sdm.group_id = #{group_id,jdbcType=INTEGER}
+        	and sdm.hos_id = #{hos_id,jdbcType=INTEGER}
+        	and sdm.copy_code = #{copy_code,jdbcType=VARCHAR}
+     
+        	<if test="begin_date != null and begin_date != '' and end_date != null and end_date != '' ">
+        		AND sdm.create_date between to_date(#{begin_date},'yyyy/MM/dd') and to_date(#{end_date},'yyyy/MM/dd')
+      		</if>  
+      		<if test="check_begin_date != null and check_begin_date != '' and check_end_date != null and check_end_date != '' ">
+        		AND sdm.check_date between to_date(#{check_begin_date},'yyyy/MM/dd') and to_date(#{check_end_date},'yyyy/MM/dd')
+      		</if>  
+	        <if test="delivery_no != null and delivery_no != '' ">
+	         AND sdm.delivery_no  like upper('${delivery_no}%') 
+	        </if>
+      
+      		<if test="sup_no != null and sup_no != '' ">
+        		AND sdm.sup_no = #{sup_no,jdbcType=INTEGER}
+      		</if>
+      		<if test="sup_id != null and sup_id != '' ">
+        		AND sdm.sup_id = #{sup_id,jdbcType=INTEGER}
+      		</if>
+        	<if test="bill_type != null and bill_type != '' ">
+        		AND sdm.bill_type = #{bill_type,jdbcType=VARCHAR}
+      		</if>
+      		<if test="hos_id_in != null and hos_id_in != '' ">
+        		AND sdm.hos_id_in like '%${hos_id_in}%'
+      		</if>
+      		<if test="in_state != null and in_state != '' ">
+        		AND sdm.in_state = #{in_state,jdbcType=INTEGER}
+      		</if>
+      		<if test="inv_code != null and inv_code != '' ">
+        		AND (mid.inv_code like '${inv_code}%'
+          		or
+          		mid.inv_name like '${inv_code}%')
+      		</if> 
+		   order by sdm.delivery_no
+	</select>
+</mapper>
+

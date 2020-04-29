@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.hr.dao.attendancemanagement.attend.HrOfficialHolidayMapper">
+	<resultMap type="java.util.Map" id="Commuteholiday">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="attend_date" column="attend_date" />
+		<result property="attend_date_state" column="attend_date_state" />
+		
+	</resultMap>
+	<resultMap type="com.chd.hrp.hr.entity.attendancemanagement.attend.HrOfficialHoliday" id="competency">
+	<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="attend_date" column="attend_date" />
+		<result property="attend_date_state" column="attend_date_state" />
+	</resultMap>
+	<!-- 添加 -->
+	<insert id="addBatch" parameterType="java.util.List">
+		INSERT INTO HR_ATTEND_NONWORKDAYS (
+			group_id,
+			hos_id,
+			attend_date,
+			attend_date_state
+		)(
+			<foreach collection="list" item="item" index="index" separator=" union all " >
+				select 		
+					#{item.group_id,jdbcType=INTEGER},
+					#{item.hos_id,jdbcType=INTEGER},
+					#{item.attend_date,jdbcType=VARCHAR},
+					#{item.attend_date_state,jdbcType=VARCHAR}
+			    from dual
+			</foreach>
+		)
+	</insert>
+	
+	<!--查询所有 -->
+	<select id="query" parameterType="java.util.Map" resultMap="Commuteholiday">
+
+		SELECT
+		group_id,
+		hos_id,
+		to_char(attend_date,'yyyy-mm-dd') attend_date
+		,
+		attend_date_state
+		FROM HR_ATTEND_NONWORKDAYS
+		<where>
+			<if test="group_id != null and group_id != ''">
+				AND group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND hos_id = #{hos_id}
+			</if>
+			<if test="year_month != null and year_month != ''">
+				AND attend_date = to_date(#{year_month},'yyyy-MM-dd')
+			</if>
+			
+		</where>
+	</select>
+	
+    
+
+  
+  <delete id="deleteOfficialHoliday" parameterType="java.util.List">
+        DELETE FROM HR_ATTEND_NONWORKDAYS WHERE
+		<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+		 group_id = #{item.group_id} and 
+		 hos_id = #{item.hos_id} and 
+		 attend_date = #{item.attend_date}
+		</foreach>
+    </delete>
+	
+	<!-- 通过集团、医院、时间区域查非工作日 -->
+	<select id="queryOfficialHolidayByDateDrea" parameterType="java.util.Map" resultMap="Commuteholiday">
+		select to_char(attend_date,'yyyy-mm-dd') attend_date from HR_ATTEND_NONWORKDAYS
+		where group_id = #{group_id, jdbcType=INTEGER}
+		  and hos_id = #{hos_id, jdbcType=INTEGER}
+		  and attend_date_state = '0'
+		  and attend_date &gt;= to_date(#{beginDate, jdbcType=DATE}, 'yyyy-mm-dd')
+		  and attend_date &lt;= to_date(#{endDate, jdbcType=DATE}, 'yyyy-mm-dd')
+		order by attend_date
+	</select>
+
+</mapper>

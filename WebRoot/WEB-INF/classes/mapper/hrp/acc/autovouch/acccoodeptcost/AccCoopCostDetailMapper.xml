@@ -1,0 +1,158 @@
+﻿<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.acc.dao.autovouch.acccoodeptcost.AccCoopCostDetailMapper">
+	<resultMap id="result" type="java.util.Map">
+        <result property="group_id" column="group_id"/>
+        <result property="hos_id" column="hos_id"/>
+        <result property="copy_code" column="copy_code"/>
+        <result property="ser_num" column="ser_num"/>
+        <result property="proj_code" column="proj_code"/>
+        <result property="coop_obj" column="coop_obj"/>
+        <result property="coop_obj_name" column="coop_obj_name"/>
+        <result property="ft_bl" column="ft_bl"/>
+        <result property="ft_my" column="ft_my"/>
+        <result property="note" column="note"/>
+		<result property="dept_id" column="dept_id"/>
+		<result property="dept_no" column="dept_no"/>
+		<result property="dept_name" column="dept_name"/>
+		<result property="cus_id" column="cus_id"/>
+		<result property="cus_no" column="cus_no"/>
+		<result property="sup_id" column="sup_id"/>
+		<result property="sup_no" column="sup_no"/>
+		<result property="obj_name" column="obj_name"/>
+	</resultMap>
+	
+	<select id="queryAccCoopCostDetail" parameterType="java.util.Map" resultMap="result">
+		SELECT 
+		a.SER_NUM,a.DEPT_ID,a.DEPT_NO,b.dept_code ||' '||b.DEPT_NAME as DEPT_NAME,a.FT_BL,a.FT_MY,a.NOTE,a.COOP_OBJ 
+		FROM ACC_COOP_COST_DETAIL a
+		LEFT JOIN HOS_DEPT_DICT b ON a.GROUP_ID = b.GROUP_ID AND a.HOS_ID = b.HOS_ID AND a.DEPT_ID = b.DEPT_ID AND b.IS_STOP = 0
+		LEFT JOIN ACC_COOP_COST c ON a.GROUP_ID = c.GROUP_ID AND a.HOS_ID = c.HOS_ID AND a.COPY_CODE = c.COPY_CODE AND a.SER_NUM = c.SER_NUM
+		<where>
+			a.GROUP_ID = #{group_id}
+			AND a.HOS_ID = #{hos_id}
+			AND a.COPY_CODE = #{copy_code}
+			AND a.coop_obj = 0
+			AND a.SER_NUM = #{ser_num}
+			<if test="proj_code != null and proj_code != ''">
+				AND c.PROJ_CODE = #{proj_code}
+			</if>
+		</where>
+	</select>
+	
+	<select id="queryAccCoopObj" parameterType="java.util.Map" resultMap="result">
+		SELECT
+			a.SER_NUM,
+			a.FT_BL,
+			a.FT_MY,
+			a.NOTE,
+			CASE a.COOP_OBJ WHEN 1 THEN b.cus_code||' '||b.CUS_NAME ELSE d.sup_code||' '||d.SUP_NAME END AS obj_name,
+			CASE a.COOP_OBJ WHEN 1 THEN '客户' ELSE '供应商' END AS coop_obj_name,
+			a.CUS_ID,
+			a.CUS_NO,
+			a.SUP_ID,
+			a.SUP_NO,
+			a.COOP_OBJ 
+		FROM ACC_COOP_COST_DETAIL a
+		LEFT JOIN HOS_CUS_DICT b on a.GROUP_ID = b.GROUP_ID AND a.HOS_ID = b.HOS_ID AND a.CUS_ID = b.CUS_ID AND b.IS_STOP = 0
+		LEFT JOIN HOS_SUP_DICT d on a.GROUP_ID = d.GROUP_ID AND a.HOS_ID = d.HOS_ID AND a.SUP_ID = d.SUP_ID AND d.IS_STOP = 0
+		LEFT JOIN ACC_COOP_COST c ON a.GROUP_ID = c.GROUP_ID AND a.HOS_ID = c.HOS_ID AND a.COPY_CODE = c.COPY_CODE AND a.SER_NUM = c.SER_NUM
+		<where>
+			a.GROUP_ID = #{group_id}
+			AND a.HOS_ID = #{hos_id}
+			AND a.COPY_CODE = #{copy_code}
+			AND a.coop_obj != 0
+			AND a.SER_NUM = #{ser_num}
+			<if test="proj_code != null and proj_code != ''">
+				AND c.PROJ_CODE = #{proj_code}
+			</if>
+		</where>
+	</select>
+	
+	<select id="queryAccCoopCostDetailPrint" parameterType="java.util.Map" resultMap="result">
+		SELECT 
+			a.FT_BL,
+			a.FT_MY,
+			a.NOTE as dnote,
+			CASE a.COOP_OBJ WHEN 0 THEN b.DEPT_NAME WHEN 1 THEN e.CUS_NAME ELSE d.SUP_NAME END AS COOP_COM,
+			CASE a.COOP_OBJ WHEN 0 THEN '院内科室' WHEN 1 THEN '客户' WHEN 2 THEN '供应商' END AS coop_obj
+		FROM ACC_COOP_COST_DETAIL a
+		LEFT JOIN HOS_DEPT_DICT b ON a.GROUP_ID = b.GROUP_ID AND a.HOS_ID = b.HOS_ID AND a.DEPT_ID = b.DEPT_ID AND b.IS_STOP = 0
+		LEFT JOIN HOS_CUS_DICT e on a.GROUP_ID = e.GROUP_ID AND a.HOS_ID = e.HOS_ID AND a.CUS_ID = e.CUS_ID AND e.IS_STOP = 0
+		LEFT JOIN HOS_SUP_DICT d on a.GROUP_ID = d.GROUP_ID AND a.HOS_ID = d.HOS_ID AND a.SUP_ID = d.SUP_ID AND d.IS_STOP = 0
+		LEFT JOIN ACC_COOP_COST c ON a.GROUP_ID = c.GROUP_ID AND a.HOS_ID = c.HOS_ID AND a.COPY_CODE = c.COPY_CODE AND a.SER_NUM = c.SER_NUM
+		<where>
+			a.GROUP_ID = #{group_id}
+			AND a.HOS_ID = #{hos_id}
+			AND a.COPY_CODE = #{copy_code} 
+			AND a.SER_NUM = #{ser_num}
+		</where>
+	</select>
+	
+	<insert id="addAccCoopCostDetail" parameterType="java.util.List">
+		INSERT INTO ACC_COOP_COST_DETAIL (
+			GROUP_ID, 
+			HOS_ID,
+			COPY_CODE,
+			SER_NUM,
+			COOP_OBJ,
+			DEPT_ID,
+			DEPT_NO,
+			CUS_ID,
+			CUS_NO,
+			SUP_ID,
+			SUP_NO,
+			FT_BL,
+			FT_MY,
+			NOTE
+		)
+		
+		select t.* from(
+		<foreach collection="list" item="item" index="index" separator=" union all ">
+			select
+			#{item.group_id ,jdbcType=NUMERIC},
+			#{item.hos_id ,jdbcType=NUMERIC},
+			#{item.copy_code ,jdbcType=VARCHAR},
+			#{item.ser_num ,jdbcType=VARCHAR},
+			#{item.coop_obj,jdbcType=NUMERIC},
+			#{item.dept_id,jdbcType=NUMERIC},
+			#{item.dept_no,jdbcType=NUMERIC},
+			#{item.cus_id,jdbcType=NUMERIC},
+			#{item.cus_no,jdbcType=NUMERIC},
+			#{item.sup_id,jdbcType=NUMERIC},
+			#{item.sup_no,jdbcType=NUMERIC},
+			#{item.ft_bl,jdbcType=NUMERIC},
+			#{item.ft_my,jdbcType=NUMERIC},
+			#{item.note ,jdbcType=VARCHAR}
+			from dual
+		</foreach>
+		)t
+	</insert>
+	
+	<delete id="deleteAccCoopCostDetail" parameterType="java.util.List">
+		<foreach collection="list" item="item" index="index" open="begin" close=";end;" separator=";" >
+			delete ACC_COOP_COST_DETAIL where
+		 	group_id = #{item.group_id}
+			and hos_id = #{item.hos_id}
+			and copy_code = #{item.copy_code}
+			and ser_num = #{item.ser_num}
+			<if test="item.dept_id != null and item.dept_id != ''">
+				and dept_id = #{item.dept_id}
+			</if>
+			<if test="item.cus_id != null and item.cus_id != ''">
+				and cus_id = #{item.cus_id}
+			</if>
+			<if test="item.sup_id != null and item.sup_id != ''">
+				and sup_id = #{item.sup_id}
+			</if>
+		</foreach>
+	</delete>
+	<delete id="deleteAccCoopCostDetailBatch" parameterType="java.util.Map">
+			delete ACC_COOP_COST_DETAIL where
+		 	group_id = #{group_id}
+			and hos_id = #{hos_id}
+			and copy_code = #{copy_code}
+			and ser_num = #{ser_num}
+	</delete>
+	
+</mapper>

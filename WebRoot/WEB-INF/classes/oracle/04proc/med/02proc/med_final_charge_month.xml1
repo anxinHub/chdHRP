@@ -1,0 +1,284 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+
+	<sql id="med_final_charge_month" type="proc"><![CDATA[
+	CREATE OR REPLACE PROCEDURE med_final_charge_month
+  
+    /*物流结账*/
+    (
+      p_group_id numeric,  --集团ID
+      p_hos_id numeric,  --医院ID
+      p_copy_code varchar2,  --帐套编码
+      p_year varchar2,  --结账年份
+      p_month varchar2,  --结转月份
+      p_next_year varchar2,  --下一期间年份
+      p_next_month varchar2,  --下一期间月份
+      p_user_code nvarchar2,  --当前操作用户
+      msg OUT nvarchar2  --返回值格式："msg":"···","state":"true/false","year_month":"···"
+    )
+    IS
+      med_flag numeric;  --判断状态依据
+      sys_date date;  --当前系统时间(用于更新结账时间)
+      ddl_sql varchar2(4000);  --拼串
+      num NUMBER;
+    BEGIN
+    
+      sys_date := sysdate;
+    
+    
+       /*常备材料批结余表临时表*/
+       SELECT COUNT(1) INTO num FROM USER_TABLES WHERE TABLE_NAME = UPPER('t_med_batch_balance') ;
+        IF num > 0 THEN
+           EXECUTE IMMEDIATE 'drop Table t_med_batch_balance';
+        END IF;
+        SELECT COUNT(1) INTO num FROM USER_TABLES WHERE TABLE_NAME = UPPER('t_med_batch_balance') ;
+        IF num = 0 THEN
+             ddl_sql:='Create Global Temporary Table t_med_batch_balance(
+                 inv_id               NUMERIC(18,0)                   not null,
+                 STORE_ID             NUMERIC(18,0)                   not null,
+                 BATCH_SN             NUMERIC(18,0)                   not null,
+                 BATCH_NO             NVARCHAR2(30)                   not null,
+                 BAR_CODE             NVARCHAR2(50),
+                 PRICE                NUMERIC(18,6)                   not null,
+                 SALE_PRICE           NUMERIC(18,6),
+                 BEGIN_AMOUNT         NUMERIC(18,6),
+                 BEGIN_MONEY          NUMERIC(18,6),
+                 BEGIN_SALE_MONEY     NUMERIC(18,6),
+                 IN_AMOUNT            NUMERIC(18,6),
+                 IN_MONEY             NUMERIC(18,6),
+                 IN_SALE_MONEY        NUMERIC(18,6),
+                 OUT_AMOUNT           NUMERIC(18,6),
+                 OUT_MONEY            NUMERIC(18,6),
+                 OUT_SALE_MONEY       NUMERIC(18,6),
+                 END_AMOUNT           NUMERIC(18,6),
+                 END_MONEY            NUMERIC(18,6),
+                 END_SALE_MONEY       NUMERIC(18,6),
+                 Y_IN_AMOUNT          NUMERIC(18,6),
+                 Y_IN_MONEY           NUMERIC(18,6),
+                 Y_IN_SALE_MONEY      NUMERIC(18,6),
+                 Y_OUT_AMOUNT         NUMERIC(18,6),
+                 Y_OUT_MONEY          NUMERIC(18,6),
+                 Y_OUT_SALE_MONEY     NUMERIC(18,6),
+                 REMOVE_ZERO_ERROR    NUMERIC(18,6),
+                 SALE_ZERO_ERROR      NUMERIC(18,6),
+                 LOCATION_ID          NUMERIC(18,0)
+              )On COMMIT Delete ROWS';
+              /*
+              On COMMIT PRESERVE ROWS 会话性临时表
+              On Commit Delete Rows 事务性临时表
+              */
+              execute immediate ddl_sql;
+        END IF;
+    
+      execute immediate 'insert into t_med_batch_balance(
+                                    store_id,inv_id,batch_sn,batch_no,bar_code,price,sale_price,
+                                    begin_amount,begin_money,begin_sale_money,in_amount,in_money,in_sale_money,
+                                    out_amount,out_money,out_sale_money,end_amount,end_money,end_sale_money,
+                                    y_in_amount,y_in_money,y_in_sale_money,y_out_amount,y_out_money,y_out_sale_money,REMOVE_ZERO_ERROR,location_id)
+      select  
+               cur.store_id,cur.inv_id,cur.batch_sn,cur.batch_no,cur.bar_code,cur.price,cur.sale_price,
+               nvl(cur.begin_amount,0)+nvl(cur.in_amount,0)-nvl(cur.out_amount,0) begin_amount,
+               nvl(cur.begin_money,0)+nvl(cur.in_money,0)-nvl(cur.out_money,0)-nvl(remove_zero_error,0) begin_money,
+               nvl(cur.begin_sale_money,0)+nvl(cur.in_sale_money,0)-nvl(cur.out_sale_money,0)-nvl(remove_zero_error,0) begin_sale_money,
+               0,0,0,0,0,0,0,0,0,
+               case '''||p_month||''' when ''12'' then 0 else cur.y_in_amount end y_in_amount,
+               case '''||p_month||''' when ''12'' then 0.00 else cur.y_in_money end y_in_money,
+               case '''||p_month||''' when ''12'' then 0.00 else cur.y_in_sale_money end y_in_sale_money,
+               case '''||p_month||''' when ''12'' then 0 else cur.y_out_amount end y_out_amount,
+               case '''||p_month||''' when ''12'' then 0.00 else cur.y_out_money end y_out_money,
+               case '''||p_month||''' when ''12'' then 0.00 else cur.y_out_sale_money end y_out_sale_money,
+               0,
+               location_id
+        from med_batch_balance cur
+        where cur.group_id=:p_group_id
+        and cur.hos_id=:p_hos_id
+        and cur.copy_code=:p_copy_code
+        and cur.year||cur.month=:p_year||:p_month
+    
+        union all
+         select 
+               next.store_id,next.inv_id,next.batch_sn,next.batch_no,next.bar_code,next.price,next.sale_price,
+               0,0,0,
+               in_amount,in_money,in_sale_money,out_amount,out_money,out_sale_money,
+               0,0,0,
+               y_in_amount,y_in_money,y_in_sale_money,y_out_amount,y_out_money,y_out_sale_money,
+               REMOVE_ZERO_ERROR,location_id
+            from med_batch_balance next
+            where next.group_id=:p_group_id
+                  and next.hos_id=:p_hos_id
+                  and next.copy_code=:p_copy_code
+                  and next.year||next.month=:p_next_year||:p_next_month
+    
+        '
+        using p_group_id,p_hos_id,p_copy_code,p_year,p_month,
+        p_group_id,p_hos_id,p_copy_code,p_next_year,p_next_month;
+        
+        delete from med_batch_balance 
+        where group_id=p_group_id 
+              and hos_id=p_hos_id 
+              and copy_code=p_copy_code 
+              and year=p_next_year 
+              and month=p_next_month;
+              
+        execute immediate 'insert into med_batch_balance(group_id, hos_id,copy_code,year,month,
+                                    store_id,inv_id,batch_sn,batch_no,bar_code,price,sale_price,
+                                    begin_amount,begin_money,begin_sale_money,in_amount,in_money,in_sale_money,
+                                    out_amount,out_money,out_sale_money,end_amount,end_money,end_sale_money,
+                                    y_in_amount,y_in_money,y_in_sale_money,y_out_amount,y_out_money,y_out_sale_money,REMOVE_ZERO_ERROR,location_id)
+        select :p_group_id,:p_hos_id,:p_copy_code,:p_next_year,:p_next_month,
+         store_id,inv_id,batch_sn,batch_no,bar_code,price,sale_price,
+         sum(begin_amount),sum(begin_money),sum(begin_sale_money),sum(in_amount),sum(in_money),sum(in_sale_money),
+         sum(out_amount),sum(out_money),sum(out_sale_money),sum(end_amount),sum(end_money),sum(end_sale_money),
+         sum(y_in_amount),sum(y_in_money),sum(y_in_sale_money),sum(y_out_amount),sum(y_out_money),sum(y_out_sale_money),sum(REMOVE_ZERO_ERROR),location_id
+        from t_med_batch_balance 
+        group by  store_id,inv_id,batch_sn,batch_no,bar_code,price,sale_price,location_id'
+        using p_group_id,p_hos_id,p_copy_code,p_next_year,p_next_month;
+        
+        update med_batch_balance 
+        set 
+           end_amount=nvl(begin_amount,0.00)+nvl(in_amount,0.00)-nvl(out_amount,0.00),
+           end_money=nvl(begin_money,0.00)+nvl(in_money,0.00)-nvl(out_money,0.00),
+           end_sale_money=nvl(begin_sale_money,0.00)+nvl(in_sale_money,0.00)-nvl(out_sale_money,0.00)
+        where group_id=p_group_id 
+              and hos_id=p_hos_id 
+              and copy_code=p_copy_code 
+              and year=p_year 
+              and month=p_month;
+        
+        
+        
+         /*常备材料结余表临时表*/
+        SELECT COUNT(1) INTO num FROM USER_TABLES WHERE TABLE_NAME = UPPER('t_med_inv_balance') ;
+        IF num > 0 THEN
+           EXECUTE IMMEDIATE 'drop Table t_med_inv_balance';
+        END IF;
+        num:=0;
+        SELECT COUNT(1) INTO num FROM USER_TABLES WHERE TABLE_NAME = UPPER('t_med_inv_balance') ;
+        IF num = 0 THEN
+             ddl_sql:='Create Global Temporary Table t_med_inv_balance(
+                   STORE_ID             NUMERIC(18,0)                   NOT NULL,
+                   inv_id               NUMERIC(18,0)                   NOT NULL,
+                   BEGIN_AMOUNT         NUMERIC(18,6),
+                   BEGIN_MONEY          NUMERIC(18,6),
+                   BEGIN_SALE_MONEY     NUMERIC(18,6),
+                   IN_AMOUNT            NUMERIC(18,6),
+                   IN_MONEY             NUMERIC(18,6),
+                   IN_SALE_MONEY        NUMERIC(18,6),
+                   OUT_AMOUNT           NUMERIC(18,6),
+                   OUT_MONEY            NUMERIC(18,6),
+                   OUT_SALE_MONEY       NUMERIC(18,6),
+                   END_AMOUNT           NUMERIC(18,6),
+                   END_MONEY            NUMERIC(18,6),
+                   END_SALE_MONEY       NUMERIC(18,6),
+                   Y_IN_AMOUNT          NUMERIC(18,6),
+                   Y_IN_MONEY           NUMERIC(18,6),
+                   Y_IN_SALE_MONEY      NUMERIC(18,6),
+                   Y_OUT_AMOUNT         NUMERIC(18,6),
+                   Y_OUT_MONEY          NUMERIC(18,6),
+                   Y_OUT_SALE_MONEY     NUMERIC(18,6),
+                   REMOVE_ZERO_ERROR    NUMERIC(18,6),
+                   LOCATION_ID          NUMERIC(18,0)
+              )ON COMMIT DELETE ROWS';
+              /*
+              On COMMIT PRESERVE ROWS 会话性临时表
+              On Commit Delete Rows 事务性临时表
+              */
+              execute immediate ddl_sql;
+        END IF;
+        
+      execute immediate 'insert into t_med_inv_balance(
+                                    store_id,inv_id,
+                                    begin_amount,begin_money,begin_sale_money,in_amount,in_money,in_sale_money,
+                                    out_amount,out_money,out_sale_money,end_amount,end_money,end_sale_money,
+                                    y_in_amount,y_in_money,y_in_sale_money,y_out_amount,y_out_money,y_out_sale_money,REMOVE_ZERO_ERROR,location_id)
+      select  
+               cur.store_id,cur.inv_id,
+               nvl(cur.begin_amount,0)+nvl(cur.in_amount,0)-nvl(cur.out_amount,0) begin_amount,
+               nvl(cur.begin_money,0)+nvl(cur.in_money,0)-nvl(cur.out_money,0)-nvl(remove_zero_error,0) begin_money,
+               nvl(cur.begin_sale_money,0)+nvl(cur.in_sale_money,0)-nvl(cur.out_sale_money,0)-nvl(remove_zero_error,0) begin_sale_money,
+               0,0,0,0,0,0,0,0,0,
+               case '''||p_month||''' when ''12'' then 0 else cur.y_in_amount end y_in_amount,
+               case '''||p_month||''' when ''12'' then 0 else cur.y_in_money end y_in_money,
+               case '''||p_month||''' when ''12'' then 0 else cur.y_in_sale_money end y_in_sale_money,
+               case '''||p_month||''' when ''12'' then 0 else cur.y_out_amount end y_out_amount ,
+               case '''||p_month||''' when ''12'' then 0.00 else cur.y_out_money end y_out_money,
+               case '''||p_month||''' when ''12'' then 0.00 else cur.y_out_sale_money end y_out_sale_money,
+               0,
+               location_id
+        from med_inv_balance cur
+        where cur.group_id=:p_group_id
+        and cur.hos_id=:p_hos_id
+        and cur.copy_code=:p_copy_code
+        and cur.year||cur.month=:p_year||:p_month
+    
+        union all
+         select 
+               next.store_id,next.inv_id,
+               0,0,0,
+               in_amount,in_money,in_sale_money,out_amount,out_money,out_sale_money,0,0,0,
+               y_in_amount,y_in_money,y_in_sale_money,y_out_amount,y_out_money,y_out_sale_money,
+               REMOVE_ZERO_ERROR,location_id
+            from med_inv_balance next
+            where next.group_id=:p_group_id
+                  and next.hos_id=:p_hos_id
+                  and next.copy_code=:p_copy_code
+                  and next.year||next.month=:p_next_year||:p_next_month
+    
+        '
+         --dbms_output.put_line('退库操作);
+        
+        
+        using p_group_id,p_hos_id,p_copy_code,p_year,p_month,
+        p_group_id,p_hos_id,p_copy_code,p_next_year,p_next_month;
+        
+        delete from med_inv_balance
+        where group_id=p_group_id 
+              and hos_id=p_hos_id 
+              and copy_code=p_copy_code 
+              and year=p_next_year 
+              and month=p_next_month;
+              
+        execute immediate 'insert into med_inv_balance(group_id, hos_id,copy_code,year,month,
+                                    store_id,inv_id,
+                                    begin_amount,begin_money,begin_sale_money,in_amount,in_money,in_sale_money,
+                                    out_amount,out_money,out_sale_money,end_amount,end_money,end_sale_money,
+                                    y_in_amount,y_in_money,y_in_sale_money,y_out_amount,y_out_money,y_out_sale_money,REMOVE_ZERO_ERROR,location_id)
+        select :p_group_id,:p_hos_id,:p_copy_code,:p_next_year,:p_next_month,
+         store_id,inv_id,
+         sum(begin_amount),sum(begin_money),sum(begin_sale_money),sum(in_amount),sum(in_money),sum(in_sale_money),
+         sum(out_amount),sum(out_money),sum(out_sale_money),sum(end_amount),sum(end_money),sum(end_sale_money),
+         sum(y_in_amount),sum(y_in_money),sum(y_in_sale_money),sum(y_out_amount),sum(y_out_money),sum(y_out_sale_money),sum(REMOVE_ZERO_ERROR),location_id
+        from t_med_inv_balance 
+        group by  store_id,inv_id,location_id'
+        using p_group_id,p_hos_id,p_copy_code,p_next_year,p_next_month;
+        
+        
+        update med_inv_balance 
+        set 
+           end_amount=nvl(begin_amount,0.00)+nvl(in_amount,0.00)-nvl(out_amount,0.00),
+           end_money=nvl(begin_money,0.00)+nvl(in_money,0.00)-nvl(out_money,0.00),
+           end_sale_money=nvl(begin_sale_money,0.00)+nvl(in_sale_money,0.00)-nvl(out_sale_money,0.00)
+        where group_id=p_group_id 
+              and hos_id=p_hos_id 
+              and copy_code=p_copy_code 
+              and year=p_year 
+              and month=p_month;
+ 
+        
+        /*修改结账信息*/
+        update acc_year_month set med_flag=1,med_date=sys_date,med_user=p_user_code  
+        where group_id=p_group_id 
+              and hos_id=p_hos_id 
+              and copy_code=p_copy_code 
+              and acc_year=p_year 
+              and acc_month=p_month
+              ;
+        
+    
+      /*返回信息*/
+      msg := '{"msg":"操作成功","state":"true","last_year":"'||p_year||'","last_month":"'||p_month||'","year":"'||p_next_year||'","month":"'||p_next_month||'"}';
+    END med_final_charge_month;
+	]]></sql>
+	
+</root>
+

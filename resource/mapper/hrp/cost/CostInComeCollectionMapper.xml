@@ -1,0 +1,902 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.cost.dao.CostInComeCollectionMapper">
+ 
+	<resultMap id="costIncome" type="com.chd.hrp.cost.entity.CostIncome">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="acc_year" column="acc_year" />
+		<result property="acc_month" column="acc_month" />
+		<result property="appl_dept_id" column="appl_dept_id" />
+		<result property="appl_dept_no" column="appl_dept_no" />
+		<result property="exec_dept_id" column="exec_dept_id" />
+		<result property="exec_dept_no" column="exec_dept_no" />
+		<result property="charge_kind_code" column="charge_kind_code" />
+		<result property="charge_kind_id" column="charge_kind_id" />
+		<result property="money" column="money" />
+		<result property="create_user" column="create_user" />
+		<result property="create_date" column="create_date" />
+	</resultMap>
+	<resultMap id="map" type="java.util.Map">
+	<result property="group_id" column="group_id"/>
+	<result property="hos_id" column="hos_id"/>
+	<result property="copy_code" column="copy_code"/>
+	<result property="charge_kind_id" column="charge_kind_id"/>
+	<result property="acc_year" column="acc_year"/>
+	<result property="acc_month" column="acc_month"/>
+	<result property="appl_dept_id" column="appl_dept_id"/>
+	<result property="appl_dept_no" column="appl_dept_no"/>
+	<result property="exec_dept_id" column="exec_dept_id"/>
+	<result property="exec_dept_no" column="exec_dept_no"/>
+	<result property="money" column="money"/>
+	<result property="create_user" column="create_user"/>
+	<result property="create_date" column="create_date"/>
+	</resultMap>
+
+
+	<select id="queryIncomeCollection" parameterType="java.util.Map" resultMap="costIncome">
+		with temp as
+		(
+		SELECT
+            ci.group_id,
+            ci.hos_id,
+            ci.copy_code,
+            ci.acc_year,
+            ci.acc_month,
+            ci.acc_year||ci.acc_month as year_month,
+            ci.charge_kind_id,
+            ccka.charge_kind_code,
+            ccka.charge_kind_name,
+            ci.appl_dept_id,
+            ci.appl_dept_no,
+            appl_hdd.dept_code appl_dept_code,
+            appl_hdd.dept_name appl_dept_name,
+            ci.exec_dept_id,
+            ci.exec_dept_no,
+            exec_hdd.dept_code exec_dept_code,
+            exec_hdd.dept_name exec_dept_name,
+            ci.money,
+            ci.create_user,
+            hed.emp_code create_code,
+            hed.emp_name create_name,
+            ci.create_date
+        FROM cost_income ci
+        left join cost_charge_kind_arrt ccka
+        on ccka.charge_kind_id = ci.charge_kind_id and ccka.group_id = ci.group_id and ccka.hos_id = ci.hos_id
+        and ccka.copy_code = ci.copy_code
+        left join hos_dept_dict appl_hdd on appl_hdd.group_id = ci.group_id
+        and appl_hdd.hos_id = ci.hos_id and appl_hdd.dept_id = ci.appl_dept_id 
+        and appl_hdd.dept_no = ci.appl_dept_no
+        left join hos_dept_dict exec_hdd on exec_hdd.group_id = ci.group_id
+        and exec_hdd.hos_id = ci.hos_id and exec_hdd.dept_id = ci.exec_dept_id
+        and exec_hdd.dept_no = ci.exec_dept_no
+        left join hos_emp_dict hed on hed.group_id = ccka.group_id
+        and hed.hos_id = ccka.hos_id and hed.emp_id = ci.create_user and hed.is_stop = 0
+            <where>                     
+			    <if test="group_id != null and group_id != ''">
+                    AND ci.group_id = #{group_id}
+               </if>
+			    <if test="hos_id != null and hos_id != ''">
+                    AND ci.hos_id = #{hos_id}
+               </if>
+			    <if test="copy_code != null and copy_code != ''">
+                    AND ci.copy_code = #{copy_code}
+               </if>
+               <if test=" year_month != null and year_month != '' and e_year_month != null and e_year_month != ''">
+                  AND ci.acc_year ||''|| ci.acc_month between #{year_month} and  #{e_year_month}
+            	</if>
+<!-- 			    <if test="acc_year != null and acc_year != ''"> -->
+<!--                     AND ci.acc_year = #{acc_year} -->
+<!--                </if> -->
+<!--               	<if test="acc_month != null and acc_month != ''"> -->
+<!--                     AND ci.acc_month = #{acc_month} -->
+<!--                </if> -->
+			    <if test="appl_dept_id != null and appl_dept_id != ''">
+                    AND ci.appl_dept_id = #{appl_dept_id}
+               </if>
+			    
+			    <if test="exec_dept_id != null and exec_dept_id != ''">
+                    AND ci.exec_dept_id = #{exec_dept_id}
+               </if>
+			    
+			    <if test="charge_kind_id != null and charge_kind_id != ''">
+                    AND ci.charge_kind_id = #{charge_kind_id}
+               </if>
+			    <if test="money != null and money != ''">
+                    AND ci.money = #{money}
+               </if>
+			    <if test="create_user != null and create_user != ''">
+                    AND ci.create_user = #{create_user}
+               </if>
+			    <if test="create_date != null and create_date != ''">
+                    AND ci.create_date = #{create_date}
+               </if>
+        </where>   
+				order by ci.acc_year,ci.acc_month,ci.appl_dept_id,ci.exec_dept_id,ci.charge_kind_id
+	)select group_id,hos_id,copy_code,acc_year,acc_month,acc_year||acc_month as year_month,charge_kind_id,charge_kind_code,charge_kind_name,appl_dept_id,
+		 appl_dept_no,appl_dept_code,appl_dept_name,exec_dept_id,exec_dept_no,exec_dept_code,exec_dept_name,money,create_user,create_code,create_name,create_date from temp
+   union all
+   select  null,null, null,'总','计' ,null, null, null, null, null,null,null, null, null, null,null, null, sum(money), null, null, null,null from temp
+    
+	</select>
+	
+	<select id="queryCostInComeCollectionPrint" parameterType="java.util.Map" resultType="java.util.Map">
+		with temp as
+		(
+		SELECT
+            ci.group_id,
+            ci.hos_id,
+            ci.copy_code,
+            ci.acc_year,
+            ci.acc_month,
+            ci.acc_year||ci.acc_month as year_month,
+            ci.charge_kind_id,
+            ccka.charge_kind_code,
+            ccka.charge_kind_name,
+            ci.appl_dept_id,
+            ci.appl_dept_no,
+            appl_hdd.dept_code appl_dept_code,
+            appl_hdd.dept_name appl_dept_name,
+            ci.exec_dept_id,
+            ci.exec_dept_no,
+            exec_hdd.dept_code exec_dept_code,
+            exec_hdd.dept_name exec_dept_name,
+            ci.money,
+            ci.create_user,
+            hed.emp_code create_code,
+            hed.emp_name create_name,
+            ci.create_date
+        FROM cost_income ci
+        left join cost_charge_kind_arrt ccka
+        on ccka.charge_kind_id = ci.charge_kind_id and ccka.group_id = ci.group_id and ccka.hos_id = ci.hos_id
+        and ccka.copy_code = ci.copy_code
+        left join hos_dept_dict appl_hdd on appl_hdd.group_id = ci.group_id
+        and appl_hdd.hos_id = ci.hos_id and appl_hdd.dept_id = ci.appl_dept_id 
+        and appl_hdd.dept_no = ci.appl_dept_no
+        left join hos_dept_dict exec_hdd on exec_hdd.group_id = ci.group_id
+        and exec_hdd.hos_id = ci.hos_id and exec_hdd.dept_id = ci.exec_dept_id
+        and exec_hdd.dept_no = ci.exec_dept_no
+        left join hos_emp_dict hed on hed.group_id = ccka.group_id
+        and hed.hos_id = ccka.hos_id and hed.emp_id = ci.create_user and hed.is_stop = 0
+            <where>                     
+			    <if test="group_id != null and group_id != ''">
+                    AND ci.group_id = #{group_id}
+               </if>
+			    <if test="hos_id != null and hos_id != ''">
+                    AND ci.hos_id = #{hos_id}
+               </if>
+			    <if test="copy_code != null and copy_code != ''">
+                    AND ci.copy_code = #{copy_code}
+               </if>
+               <if test=" year_month != null and year_month != '' and e_year_month != null and e_year_month != ''">
+                  AND ci.acc_year ||''|| ci.acc_month between #{year_month} and  #{e_year_month}
+            	</if>
+<!-- 			    <if test="acc_year != null and acc_year != ''"> -->
+<!--                     AND ci.acc_year = #{acc_year} -->
+<!--                </if> -->
+<!--               	<if test="acc_month != null and acc_month != ''"> -->
+<!--                     AND ci.acc_month = #{acc_month} -->
+<!--                </if> -->
+			    <if test="appl_dept_id != null and appl_dept_id != ''">
+                    AND ci.appl_dept_id = #{appl_dept_id}
+               </if>
+			    <if test="appl_dept_no != null and appl_dept_no != ''">
+                    AND ci.appl_dept_no = #{appl_dept_no}
+               </if>
+			    <if test="exec_dept_id != null and exec_dept_id != ''">
+                    AND ci.exec_dept_id = #{exec_dept_id}
+               </if>
+			    <if test="exec_dept_no != null and exec_dept_no != ''">
+                    AND ci.exec_dept_no = #{exec_dept_no}
+               </if>
+			    <if test="charge_kind_id != null and charge_kind_id != ''">
+                    AND ci.charge_kind_id = #{charge_kind_id}
+               </if>
+			    <if test="money != null and money != ''">
+                    AND ci.money = #{money}
+               </if>
+			    <if test="create_user != null and create_user != ''">
+                    AND ci.create_user = #{create_user}
+               </if>
+			    <if test="create_date != null and create_date != ''">
+                    AND ci.create_date = #{create_date}
+               </if>
+               and appl_hdd.is_stop = 0   and exec_hdd.is_stop = 0 
+        </where>   
+				order by ci.acc_year,ci.acc_month,ci.appl_dept_id,ci.exec_dept_id,ci.charge_kind_id
+	)select group_id,hos_id,copy_code,acc_year,acc_month,acc_year||acc_month as year_month,charge_kind_id,charge_kind_code,charge_kind_name,appl_dept_id,
+		 appl_dept_no,appl_dept_code,appl_dept_name,exec_dept_id,exec_dept_no,exec_dept_code,exec_dept_name,money,create_user,create_code,create_name,create_date from temp
+   union all
+   select  null,null, null,'总','计' ,null, null, null, null, null,null,null, null, null, null,null, null, sum(money), null, null, null,null from temp
+    
+	</select>
+
+     <select id="queryIncomeDetail" parameterType="java.util.Map" resultMap="map">
+		             
+                         select 
+						         acc_year,
+			                     acc_month,
+			                     appl_dept_no,
+			                     appl_dept_id,
+			                     exec_dept_no,
+			                     exec_dept_id,
+			                     charge_kind_id,
+								 sum(money) money
+						  from (
+								 select 
+										 cid.acc_year,
+										 cid.acc_month,
+										 appl_hd.dept_no as appl_dept_no,
+										 appl_hd.dept_id as appl_dept_id,
+										 exec_hd.dept_no as exec_dept_no,
+										 exec_hd.dept_id as exec_dept_id,
+										 ccka.charge_kind_id,
+										 cid.money
+								 from cost_income_detail cid
+								 inner join (select distinct group_id, hos_id, hrp_dept_code, his_dept_code
+															from sys_his_dept_ref
+															where group_id = #{group_id}
+															and hos_id = #{hos_id}
+															and dept_type in (1, 3)
+															and natur_code = '01') appl_ref
+								 on cid.appl_dept_code = appl_ref.his_dept_code
+								 inner join hos_dept_dict appl_hd
+								 on appl_hd.group_id = appl_ref.group_id
+								 and appl_hd.hos_id = appl_ref.hos_id
+								 and appl_hd.dept_code = appl_ref.hrp_dept_code
+								 and appl_hd.is_stop = 0
+								 and appl_hd.is_last = 1
+								 inner join (select distinct group_id, hos_id, hrp_dept_code, his_dept_code
+								 from sys_his_dept_ref
+								 where group_id = #{group_id}
+								 and hos_id = #{hos_id}
+								 and dept_type in (2, 3)
+								 and natur_code = '01' ) exec_ref
+								 on cid.exec_dept_code = exec_ref.his_dept_code
+								 inner join hos_dept_dict exec_hd
+								 on exec_hd.group_id = exec_ref.group_id
+								 and exec_hd.hos_id = exec_ref.hos_id
+								 and exec_hd.dept_code = exec_ref.hrp_dept_code
+								 and exec_hd.is_stop = 0
+								 and exec_hd.is_last = 1
+								 inner join cost_charge_kind_arrt ccka
+								 on ccka.charge_kind_code = cid.charge_kind_code
+								 and ccka.group_id = #{group_id}
+								 and ccka.hos_id  = #{hos_id}
+								 and ccka.copy_code = #{copy_code}
+								 where cid.acc_year = #{acc_year}
+								 and cid.acc_month = #{acc_month}
+								 and cid.busi_data_source_code = '01'
+								 union all
+								 select  cid.acc_year,
+										 cid.acc_month,
+										 appl_hd.dept_no as appl_dept_no,
+										 appl_hd.dept_id as appl_dept_id,
+										 exec_hd.dept_no as exec_dept_no,
+										 exec_hd.dept_id as exec_dept_id,
+										 ccka.charge_kind_id,
+										 cid.money
+								 from cost_income_detail cid
+								 inner join (select distinct group_id, hos_id, hrp_dept_code, his_dept_code
+															from sys_his_dept_ref
+															where group_id = #{group_id}
+															and hos_id  = #{hos_id}
+															and dept_type in (1, 3)
+															and natur_code != '01') appl_ref
+								 on cid.appl_dept_code = appl_ref.his_dept_code
+								 inner join hos_dept_dict appl_hd
+								 on appl_hd.group_id = appl_ref.group_id
+								 and appl_hd.hos_id = appl_ref.hos_id
+								 and appl_hd.dept_code = appl_ref.hrp_dept_code
+								 and appl_hd.is_stop = 0
+								 and appl_hd.is_last = 1
+								 inner join (select distinct group_id, hos_id, hrp_dept_code, his_dept_code
+								 from sys_his_dept_ref
+								 where group_id = #{group_id}
+								 and hos_id = #{hos_id}
+								 and dept_type in (2, 3)
+								 and natur_code != '01' ) exec_ref
+								 on cid.exec_dept_code = exec_ref.his_dept_code
+								 inner join hos_dept_dict exec_hd
+								 on exec_hd.group_id = exec_ref.group_id
+								 and exec_hd.hos_id = exec_ref.hos_id
+								 and exec_hd.dept_code = exec_ref.hrp_dept_code
+								 and exec_hd.is_stop = 0
+								 and exec_hd.is_last = 1
+								 inner join cost_charge_kind_arrt ccka
+								 on ccka.charge_kind_code = cid.charge_kind_code
+								 and ccka.group_id = #{group_id}
+								 and ccka.hos_id  = #{hos_id}
+								 and ccka.copy_code = #{copy_code}
+								 where cid.acc_year = #{acc_year}
+								 and cid.acc_month = #{acc_month}
+								 and cid.busi_data_source_code = '02'
+							)t group by acc_year,
+										 acc_month,
+										 appl_dept_no,
+										 appl_dept_id,
+										 exec_dept_no,
+										 exec_dept_id,
+										 charge_kind_id
+	</select>
+     <select id="queryIncomeMain" parameterType="java.util.Map" resultMap="map">
+					       select 
+			                           acc_year,
+			                           acc_month,
+			                           appl_dept_no,
+			                           appl_dept_id,
+			                           exec_dept_no,
+			                           exec_dept_id,
+			                           charge_kind_id,
+			                 sum(money) money
+			              from (
+			                 select 
+			                     cim.acc_year,
+			                     cim.acc_month,
+			                     appl_hd.dept_no as appl_dept_no,
+			                     appl_hd.dept_id as appl_dept_id,
+			                     exec_hd.dept_no as exec_dept_no,
+			                     exec_hd.dept_id as exec_dept_id,
+			                     ccka.charge_kind_id,
+			                     cim.money
+			                 from cost_income_main cim
+			                 inner join (select distinct group_id, hos_id, hrp_dept_code, his_dept_code
+			                              from sys_his_dept_ref
+			                              where group_id = #{group_id}
+			                              and hos_id = #{hos_id}
+			                              and dept_type in (1, 3)
+			                              and natur_code = '01') appl_ref
+			                 on cim.appl_dept_code = appl_ref.his_dept_code
+			                 inner join hos_dept_dict appl_hd
+			                 on appl_hd.group_id = appl_ref.group_id
+			                 and appl_hd.hos_id = appl_ref.hos_id
+			                 and appl_hd.dept_code = appl_ref.hrp_dept_code
+			                 and appl_hd.is_stop = 0
+			                 and appl_hd.is_last = 1
+			                 inner join (select distinct group_id, hos_id, hrp_dept_code, his_dept_code
+			                 from sys_his_dept_ref
+			                 where group_id = #{group_id}
+			                 and hos_id = #{hos_id}
+			                 and dept_type in (2, 3)
+			                 and natur_code = '01' ) exec_ref
+			                 on cim.exec_dept_code = exec_ref.his_dept_code
+			                 inner join hos_dept_dict exec_hd
+			                 on exec_hd.group_id = exec_ref.group_id
+			                 and exec_hd.hos_id = exec_ref.hos_id
+			                 and exec_hd.dept_code = exec_ref.hrp_dept_code
+			                 and exec_hd.is_stop = 0
+			                 and exec_hd.is_last = 1
+			                 inner join cost_charge_kind_arrt ccka
+			                 on ccka.charge_kind_code = cim.charge_kind_code
+			                 and ccka.group_id = #{group_id}
+			                 and ccka.hos_id  = #{hos_id}
+			                 and ccka.copy_code = #{copy_code}
+			                 where cim.acc_year = #{acc_year}
+			                 and cim.acc_month = #{acc_month}
+			                 and cim.busi_data_source_code = '01'
+			                 union all
+			                 select  cim.acc_year,
+			                         cim.acc_month,
+			                         appl_hd.dept_no as appl_dept_no,
+			                         appl_hd.dept_id as appl_dept_id,
+			                         exec_hd.dept_no as exec_dept_no,
+			                         exec_hd.dept_id as exec_dept_id,
+			                         ccka.charge_kind_id,
+			                         cim.money
+			                 from cost_income_main cim
+			                 inner join (select distinct group_id, hos_id, hrp_dept_code, his_dept_code
+			                              from sys_his_dept_ref
+			                              where group_id = #{group_id}
+			                              and hos_id  = #{hos_id}
+			                              and dept_type in (1, 3)
+			                              and natur_code != '01') appl_ref
+			                 on cim.appl_dept_code = appl_ref.his_dept_code
+			                 inner join hos_dept_dict appl_hd
+			                 on appl_hd.group_id = appl_ref.group_id
+			                 and appl_hd.hos_id = appl_ref.hos_id
+			                 and appl_hd.dept_code = appl_ref.hrp_dept_code
+			                 and appl_hd.is_stop = 0
+			                 and appl_hd.is_last = 1
+			                 inner join (select distinct group_id, hos_id, hrp_dept_code, his_dept_code
+			                 from sys_his_dept_ref
+			                 where group_id = #{group_id}
+			                 and hos_id = #{hos_id}
+			                 and dept_type in (2, 3)
+			                 and natur_code != '01' ) exec_ref
+			                 on cim.exec_dept_code = exec_ref.his_dept_code
+			                 inner join hos_dept_dict exec_hd
+			                 on exec_hd.group_id = exec_ref.group_id
+			                 and exec_hd.hos_id = exec_ref.hos_id
+			                 and exec_hd.dept_code = exec_ref.hrp_dept_code
+			                 and exec_hd.is_stop = 0
+			                 and exec_hd.is_last = 1
+			                 inner join cost_charge_kind_arrt ccka
+			                 on ccka.charge_kind_code = cim.charge_kind_code
+			                 and ccka.group_id = #{group_id}
+			                 and ccka.hos_id  = #{hos_id}
+			                 and ccka.copy_code = #{copy_code}
+			                 where cim.acc_year = #{acc_year}
+			                 and cim.acc_month = #{acc_month}
+			                 and cim.busi_data_source_code = '02'
+			              )t group by acc_year,
+				                      acc_month,
+				                      appl_dept_no,
+				                      appl_dept_id,
+				                      exec_dept_no,
+				                      exec_dept_id,
+				                      charge_kind_id
+		
+	</select>
+	<select id="queryIncomeCollectionPrmHead" parameterType="java.util.Map" resultType="java.util.Map">
+	                 
+			 select ci.group_id, ci.hos_id, ci.copy_code, ci.charge_kind_id,ccka.charge_kind_code,ccka.charge_kind_name
+			    from cost_income ci
+					left join cost_charge_kind_arrt ccka
+					on ci.group_id = ccka.group_id
+					and ci.hos_id = ccka.hos_id
+					and ci.copy_code = ccka.copy_code
+					and ci.charge_kind_id = ccka.charge_kind_id
+					where ci.group_id = #{group_id}
+					and  ci.hos_id = #{hos_id}
+					and  ci.copy_code = #{copy_code}
+			 group by ci.group_id, ci.hos_id, ci.copy_code, ci.charge_kind_id,ccka.charge_kind_code,ccka.charge_kind_name
+			 order by ci.group_id, ci.hos_id, ci.copy_code, ccka.charge_kind_code
+				                 
+	</select>
+	<select id="queryIncomeCollectionPrm" parameterType="java.util.Map" resultType="java.util.Map">
+		with temp as
+		(
+		select
+            ci.group_id,
+            ci.hos_id,
+            ci.copy_code,
+            ci.acc_year,
+            ci.acc_month,
+            ci.acc_year||ci.acc_month as year_month,
+            ci.charge_kind_id,
+            ccka.charge_kind_code,
+            ccka.charge_kind_name,
+            ci.appl_dept_id,
+            ci.appl_dept_no,
+            appl_hdd.dept_code appl_dept_code,
+            appl_hdd.dept_name appl_dept_name,
+            ci.exec_dept_id,
+            ci.exec_dept_no,
+            exec_hdd.dept_code exec_dept_code,
+            exec_hdd.dept_name exec_dept_name,
+            ci.money,
+            ci.create_user,
+            hed.emp_code create_code,
+            hed.emp_name create_name,
+            ci.create_date
+        from cost_income ci
+        left join cost_charge_kind_arrt ccka
+        on ccka.charge_kind_id = ci.charge_kind_id
+        and ccka.group_id = ci.group_id
+        and ccka.hos_id = ci.hos_id
+        and ccka.copy_code = ci.copy_code
+        left join hos_dept_dict appl_hdd
+        on appl_hdd.group_id = ci.group_id
+        and appl_hdd.hos_id = ci.hos_id
+        and appl_hdd.dept_id = ci.appl_dept_id 
+        and appl_hdd.dept_no = ci.appl_dept_no
+        left join hos_dept_dict exec_hdd
+        on exec_hdd.group_id = ci.group_id
+        and exec_hdd.hos_id = ci.hos_id
+        and exec_hdd.dept_id = ci.exec_dept_id
+        and exec_hdd.dept_no = ci.exec_dept_no
+        left join hos_emp_dict hed
+        on hed.group_id = ccka.group_id
+        and hed.hos_id = ccka.hos_id
+        and hed.emp_id = ci.create_user and hed.is_stop = 0
+            <where>   ci.group_id = #{group_id}
+                    and ci.hos_id = #{hos_id}
+                    and ci.copy_code = #{copy_code}
+               <if test="year_month != null and year_month != '' and e_year_month != null and e_year_month != ''">
+                    and ci.acc_year || ci.acc_month between #{year_month} and #{e_year_month}
+            	</if>
+			    <if test="appl_dept != null and appl_dept != ''">
+                    and appl_hdd.dept_code like #{appl_dept}||'%'
+               </if>
+			    
+			    <if test="exec_dept != null and exec_dept != ''">
+                    and exec_hdd.dept_code like #{exec_dept}||'%'
+               </if>
+        </where>   
+				order by ci.acc_year,ci.acc_month,ci.appl_dept_id,ci.exec_dept_id,ci.charge_kind_id
+	)
+	select group_id,hos_id,copy_code,acc_year,acc_month,year_month,appl_dept_id,
+		 appl_dept_no,appl_dept_code,appl_dept_name,exec_dept_id,exec_dept_no,exec_dept_code,exec_dept_name
+		  <foreach collection="prm" item="item" index="index" separator="  " >
+			  , sum(decode(charge_kind_code, '${item.CHARGE_KIND_CODE}', money, 0)) as c_${item.CHARGE_KIND_CODE}
+		</foreach>
+		from temp group by group_id,hos_id,copy_code,acc_year,acc_month,year_month,appl_dept_id,
+		 appl_dept_no,appl_dept_code,appl_dept_name,exec_dept_id,exec_dept_no,exec_dept_code,exec_dept_name
+   union all
+   select  null,null, null,'总','计' ,null, null, null, null, null,null, null,null, null
+    <foreach collection="prm" item="item" index="index" separator="  " >
+			  , sum(decode(charge_kind_code, '${item.CHARGE_KIND_CODE}', money, 0)) as c_${item.CHARGE_KIND_CODE}
+		</foreach>
+   from temp 
+   order by group_id,hos_id,copy_code,acc_year,acc_month,appl_dept_code,exec_dept_code
+	</select>
+	
+	<select id="queryCostCollectionMainCheck" parameterType="java.util.Map" resultType="java.util.Map">
+				 with temp as(
+      select 
+			 acc_year,
+			 acc_month,
+			 appl_dept_no,
+			 appl_dept_id,
+			 appl_dept_code,
+			 appl_dept_name,
+			 exec_dept_no,
+			 exec_dept_id,
+			 exec_dept_code,
+       exec_dept_name,
+       charge_kind_id,
+       charge_kind_code,
+       charge_kind_name,
+       sum(money) money
+    from (
+      select cim.acc_year,
+             cim.acc_month,
+             appl_hd.dept_no     as appl_dept_no,
+             appl_hd.dept_id     as appl_dept_id,
+             cim.appl_dept_code,
+             cim.appl_dept_name,
+             exec_hd.dept_no     as exec_dept_no,
+             exec_hd.dept_id     as exec_dept_id,
+             cim.exec_dept_code,
+             cim.exec_dept_name,
+             ccka.charge_kind_id,
+             cim.charge_kind_code,
+             cim.charge_kind_name,
+             cim.money
+        from cost_income_main cim
+        left join (select distinct group_id, hos_id, hrp_dept_code, his_dept_code
+                     from sys_his_dept_ref
+                    where group_id = #{group_id}
+                      and hos_id = #{hos_id}
+                      and dept_type in (1, 3)
+                      and natur_code = '01') appl_ref
+          on cim.appl_dept_code = appl_ref.his_dept_code
+       left join hos_dept_dict appl_hd
+          on appl_hd.group_id = appl_ref.group_id
+         and appl_hd.hos_id = appl_ref.hos_id
+         and appl_hd.dept_code = appl_ref.hrp_dept_code
+         and appl_hd.is_stop = 0
+         and appl_hd.is_last = 1
+       left join (select distinct group_id, hos_id, hrp_dept_code, his_dept_code
+                     from sys_his_dept_ref
+                    where group_id = #{group_id}
+                      and hos_id = #{hos_id}
+                      and dept_type in (2, 3)
+                      and natur_code = '01') exec_ref
+          on cim.exec_dept_code = exec_ref.his_dept_code
+       left join hos_dept_dict exec_hd
+          on exec_hd.group_id = exec_ref.group_id
+         and exec_hd.hos_id = exec_ref.hos_id
+         and exec_hd.dept_code = exec_ref.hrp_dept_code
+         and exec_hd.is_stop = 0
+         and exec_hd.is_last = 1
+       left join cost_charge_kind_arrt ccka
+          on ccka.charge_kind_code = cim.charge_kind_code
+         and ccka.group_id = #{group_id}
+         and ccka.hos_id = #{hos_id}
+         and ccka.copy_code = #{copy_code}
+       where cim.acc_year = #{acc_year}
+         and cim.acc_month = #{acc_month}
+         and cim.busi_data_source_code = '01'
+      union all
+      select cim.acc_year,
+             cim.acc_month,
+             appl_hd.dept_no     as appl_dept_no,
+             appl_hd.dept_id     as appl_dept_id,
+             cim.appl_dept_code,
+             cim.appl_dept_name,
+             exec_hd.dept_no     as exec_dept_no,
+             exec_hd.dept_id     as exec_dept_id,
+             cim.exec_dept_code,
+             cim.exec_dept_name,
+             ccka.charge_kind_id,
+             cim.charge_kind_code,
+             cim.charge_kind_name,
+             cim.money
+        from cost_income_main cim
+        left join (select distinct group_id, hos_id, hrp_dept_code, his_dept_code
+                     from sys_his_dept_ref
+                    where group_id = #{group_id}
+                      and hos_id = #{hos_id}
+                      and dept_type in (1, 3)
+                      and natur_code != '01') appl_ref
+          on cim.appl_dept_code = appl_ref.his_dept_code
+        left join hos_dept_dict appl_hd
+          on appl_hd.group_id = appl_ref.group_id
+         and appl_hd.hos_id = appl_ref.hos_id
+         and appl_hd.dept_code = appl_ref.hrp_dept_code
+         and appl_hd.is_stop = 0
+         and appl_hd.is_last = 1
+        left join (select distinct group_id, hos_id, hrp_dept_code, his_dept_code
+                     from sys_his_dept_ref
+                    where group_id = #{group_id}
+                      and hos_id = #{hos_id}
+                      and dept_type in (2, 3)
+                      and natur_code != '01') exec_ref
+          on cim.exec_dept_code = exec_ref.his_dept_code
+       left join hos_dept_dict exec_hd
+          on exec_hd.group_id = exec_ref.group_id
+         and exec_hd.hos_id = exec_ref.hos_id
+         and exec_hd.dept_code = exec_ref.hrp_dept_code
+         and exec_hd.is_stop = 0
+         and exec_hd.is_last = 1
+       left join cost_charge_kind_arrt ccka
+          on ccka.charge_kind_code = cim.charge_kind_code
+         and ccka.group_id = #{group_id}
+         and ccka.hos_id =  #{hos_id}
+         and ccka.copy_code = #{copy_code}
+       where cim.acc_year = #{acc_year}
+         and cim.acc_month = #{acc_month}
+         and cim.busi_data_source_code = '02'
+            )t group by  acc_year,
+               acc_month,
+               appl_dept_no,
+               appl_dept_id,
+               appl_dept_code,
+               appl_dept_name,
+               exec_dept_no,
+               exec_dept_id,
+               exec_dept_code,
+               exec_dept_name,
+               charge_kind_id,
+               charge_kind_code,
+               charge_kind_name
+                   ) 
+            select acc_year || acc_month as year_month, appl_dept_no, appl_dept_id, appl_dept_code
+          , appl_dept_name, exec_dept_no, exec_dept_id, exec_dept_code, exec_dept_name
+          , charge_kind_id, charge_kind_code, charge_kind_name,money
+          , decode(appl_dept_no, null, '开单科室没有维护对应关系,') || null || decode(exec_dept_no, null, '执行科室没有维护对应关系,') || null || decode(charge_kind_id, null, '收费类别不存在,') as note
+        from temp
+        where appl_dept_no is null
+          or exec_dept_no is null
+          or charge_kind_id is null
+        union all
+        select '合计', null, null, null, null
+          , null, null, null, null, null
+          , null, null,sum(money), null
+        from temp
+        where appl_dept_no is null
+          or exec_dept_no is null
+          or charge_kind_id is null
+        union all
+        select '通过合计', null, null, null, null
+          , null, null, null, null, null
+          , null, null,sum(money), null
+        from temp
+        where appl_dept_no is not null
+          and exec_dept_no is not null
+          and charge_kind_id is not null
+        union all
+        select '总合计', null, null, null, null
+          , null, null, null, null, null
+          , null, null,sum(money), null
+        from temp
+        union all
+        select '通过条数', null, null, null, null
+          , null, null, null, null, null
+          , null, null, count(money), null
+        from temp
+        where appl_dept_no is not null
+          and exec_dept_no is not null
+          and charge_kind_id is not null
+        union all
+        select '总条数', null, null, null, null
+          , null, null, null, null, null
+          , null, null,count(money), null
+        from temp
+	</select>
+	
+	<select id="queryCostCollectionDetailCheck" parameterType="java.util.Map" resultType="java.util.Map">
+				 			
+			 								
+              with temp as(
+                select 
+			 acc_year,
+			 acc_month,
+			 appl_dept_no,
+			 appl_dept_id,
+			 appl_dept_code,
+			 appl_dept_name,
+			 exec_dept_no,
+			 exec_dept_id,
+			 exec_dept_code,
+			 exec_dept_name,
+			 charge_kind_id,
+			 charge_kind_code,
+			 charge_kind_name,
+			 charge_item_code,
+			 charge_item_name,
+			 price,
+			 sum(num) num,
+			 sum(money) money
+		from (
+			select cid.acc_year,
+						 cid.acc_month,
+						 appl_hd.dept_no     as appl_dept_no,
+						 appl_hd.dept_id     as appl_dept_id,
+						 cid.appl_dept_code,
+						 cid.appl_dept_name,
+						 exec_hd.dept_no     as exec_dept_no,
+						 exec_hd.dept_id     as exec_dept_id,
+						 cid.exec_dept_code,
+						 cid.exec_dept_name,
+						 ccka.charge_kind_id,
+						 cid.charge_kind_code,
+						 cid.charge_kind_name,
+						 cid.charge_item_code,
+						 cid.charge_item_name,
+						 cid.price,
+						 cid.num,
+						 cid.money
+				from cost_income_detail cid 
+				left join (select distinct group_id, hos_id, hrp_dept_code, his_dept_code
+										 from sys_his_dept_ref
+										where group_id = #{group_id}
+											and hos_id = #{hos_id}
+											and dept_type in (1, 3)
+											and natur_code = '01') appl_ref
+					on cid.appl_dept_code = appl_ref.his_dept_code
+			 left join hos_dept_dict appl_hd
+					on appl_hd.group_id = appl_ref.group_id
+				 and appl_hd.hos_id = appl_ref.hos_id
+				 and appl_hd.dept_code = appl_ref.hrp_dept_code
+				 and appl_hd.is_stop = 0
+				 and appl_hd.is_last = 1
+			 left join (select distinct group_id, hos_id, hrp_dept_code, his_dept_code
+										 from sys_his_dept_ref
+										where group_id = #{group_id}
+											and hos_id = #{hos_id}
+											and dept_type in (2, 3)
+											and natur_code = '01') exec_ref
+					on cid.exec_dept_code = exec_ref.his_dept_code
+			 left join hos_dept_dict exec_hd
+					on exec_hd.group_id = exec_ref.group_id
+				 and exec_hd.hos_id = exec_ref.hos_id
+				 and exec_hd.dept_code = exec_ref.hrp_dept_code
+				 and exec_hd.is_stop = 0
+				 and exec_hd.is_last = 1
+			 left join cost_charge_kind_arrt ccka
+					on ccka.charge_kind_code = cid.charge_kind_code
+				 and ccka.group_id = #{group_id}
+				 and ccka.hos_id = #{hos_id}
+				 and ccka.copy_code = #{copy_code}
+			 where cid.acc_year = #{acc_year}
+				 and cid.acc_month = #{acc_month}
+				 and cid.busi_data_source_code = '01'
+			union all
+			select cid.acc_year,
+						 cid.acc_month,
+						 appl_hd.dept_no     as appl_dept_no,
+						 appl_hd.dept_id     as appl_dept_id,
+						 cid.appl_dept_code,
+						 cid.appl_dept_name,
+						 exec_hd.dept_no     as exec_dept_no,
+						 exec_hd.dept_id     as exec_dept_id,
+						 cid.exec_dept_code,
+						 cid.exec_dept_name,
+						 ccka.charge_kind_id,
+						 cid.charge_kind_code,
+						 cid.charge_kind_name,
+						 cid.charge_item_code,
+						 cid.charge_item_name,
+						 cid.price,
+						 cid.num,
+						 cid.money
+				from cost_income_detail cid
+				left join (select distinct group_id, hos_id, hrp_dept_code, his_dept_code
+										 from sys_his_dept_ref
+										where group_id = #{group_id}
+											and hos_id = #{hos_id}
+											and dept_type in (1, 3)
+											and natur_code != '01') appl_ref
+					on cid.appl_dept_code = appl_ref.his_dept_code
+				left join hos_dept_dict appl_hd
+					on appl_hd.group_id = appl_ref.group_id
+				 and appl_hd.hos_id = appl_ref.hos_id
+				 and appl_hd.dept_code = appl_ref.hrp_dept_code
+				 and appl_hd.is_stop = 0
+				 and appl_hd.is_last = 1
+				left join (select distinct group_id, hos_id, hrp_dept_code, his_dept_code
+										 from sys_his_dept_ref
+										where group_id = #{group_id}
+											and hos_id = #{hos_id}
+											and dept_type in (2, 3)
+											and natur_code != '01') exec_ref
+					on cid.exec_dept_code = exec_ref.his_dept_code
+			 left join hos_dept_dict exec_hd
+					on exec_hd.group_id = exec_ref.group_id
+				 and exec_hd.hos_id = exec_ref.hos_id
+				 and exec_hd.dept_code = exec_ref.hrp_dept_code
+				 and exec_hd.is_stop = 0
+				 and exec_hd.is_last = 1
+			 left join cost_charge_kind_arrt ccka
+					on ccka.charge_kind_code = cid.charge_kind_code
+				 and ccka.group_id = #{group_id}
+				 and ccka.hos_id =  #{hos_id}
+				 and ccka.copy_code = #{copy_code}
+			 where cid.acc_year = #{acc_year}
+				 and cid.acc_month = #{acc_month}
+				 and cid.busi_data_source_code = '02'
+	          )t group by  acc_year,
+							 acc_month,
+							 appl_dept_no,
+							 appl_dept_id,
+							 appl_dept_code,
+							 appl_dept_name,
+							 exec_dept_no,
+							 exec_dept_id,
+							 exec_dept_code,
+							 exec_dept_name,
+							 charge_kind_id,
+							 charge_kind_code,
+							 charge_kind_name,
+							 charge_item_code,
+						   charge_item_name,
+							 price
+                   ) 
+						select acc_year || acc_month as year_month, appl_dept_no, appl_dept_id, appl_dept_code
+					, appl_dept_name, exec_dept_no, exec_dept_id, exec_dept_code, exec_dept_name
+					, charge_kind_id, charge_kind_code, charge_kind_name, charge_item_code, charge_item_name
+					, price, num, money
+					, decode(appl_dept_no, null, '开单科室没有维护对应关系,') || null || decode(exec_dept_no, null, '执行科室没有维护对应关系,') || null || decode(charge_kind_id, null, '收费类别不存在,') as note
+				from temp
+				where appl_dept_no is null
+					or exec_dept_no is null
+					or charge_kind_id is null
+				union all
+				select '合计', null, null, null, null
+					, null, null, null, null, null
+					, null, null, null, null, null
+					, sum(num), sum(money)
+					, null
+				from temp
+				where appl_dept_no is null
+					or exec_dept_no is null
+					or charge_kind_id is null
+				union all
+				select '通过合计', null, null, null, null
+					, null, null, null, null, null
+					, null, null, null, null, null
+					, sum(num), sum(money)
+					, null
+				from temp
+				where appl_dept_no is not null
+					and exec_dept_no is not null
+					and charge_kind_id is not null
+				union all
+				select '总合计', null, null, null, null
+					, null, null, null, null, null
+					, null, null, null, null, null
+					, sum(num), sum(money)
+					, null
+				from temp
+				union all
+				select '通过条数', null, null, null, null
+					, null, null, null, null, null
+					, null, null, null, null, null
+					, null, count(money), null
+				from temp
+				where appl_dept_no is not null
+					and exec_dept_no is not null
+					and charge_kind_id is not null
+				union all
+				select '总条数', null, null, null, null
+					, null, null, null, null, null
+					, null, null, null, null, null
+					, null, count(money), null
+				from temp
+	</select>
+	
+</mapper>
+

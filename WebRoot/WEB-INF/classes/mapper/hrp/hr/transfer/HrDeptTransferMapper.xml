@@ -1,0 +1,464 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.hr.dao.transfer.HrDeptTransferMapper">
+
+
+	<resultMap id="deptTransfer" type="com.chd.hrp.hr.entity.transfer.HrDeptTransfer">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="adjust_code" column="adjust_code" />
+		<result property="emp_id" column="emp_id" />
+		<result property="emp_name" column="emp_name" />
+		<result property="adjust_date" column="adjust_date" />
+		<result property="adjust_reason" column="adjust_reason" />
+		<result property="bef_dept_id" column="bef_dept_id" />
+		<result property="bef_dept_name" column="bef_dept_name" />
+		<result property="bef_dept_no" column="bef_dept_no" />
+		<result property="aft_dept_id" column="aft_dept_id" />
+		<result property="aft_dept_name" column="aft_dept_name" />
+		<result property="aft_dept_no" column="aft_dept_no" />
+		<result property="adjust_state" column="adjust_state" />
+		<result property="adjust_state_name" column="adjust_state_name" />
+		<result property="maker" column="maker" />
+		<result property="maker_name" column="maker_name" />
+		<result property="make_date" column="make_date" />
+		<result property="checker" column="checker" />
+		<result property="checker_name" column="checker_name" />
+		<result property="check_date" column="check_date" />
+		<result property="photo" column="photo" />
+		
+		
+	</resultMap>
+
+<insert id="add" useGeneratedKeys="true" >
+		INSERT INTO HR_DEPT_ADJUST (
+			group_id,
+			hos_id,
+			adjust_code,
+			emp_id,
+			adjust_date	,	
+			adjust_reason,
+			bef_dept_id,		
+			bef_dept_no,
+			aft_dept_id,
+			aft_dept_no,
+			adjust_state,
+			maker,
+			make_date	
+		) VALUES (
+			#{group_id,jdbcType=INTEGER},
+			#{hos_id,jdbcType=INTEGER},
+			#{adjust_code,jdbcType=VARCHAR}	,
+			#{emp_id,jdbcType=INTEGER},
+			TO_DATE(#{adjust_date},'YYYY-MM-DD'),
+			#{adjust_reason,jdbcType=VARCHAR},
+			#{bef_dept_id,jdbcType=INTEGER},
+			#{bef_dept_no,jdbcType=INTEGER},
+			#{aft_dept_id,jdbcType=INTEGER},
+			#{aft_dept_no,jdbcType=INTEGER},
+			#{adjust_state,jdbcType=INTEGER},
+			#{maker,jdbcType=INTEGER},
+			TO_DATE(#{make_date},'YYYY-MM-DD')
+			
+		)
+	</insert>
+	<select id="queryByCode" resultMap="deptTransfer" parameterType="java.util.Map">
+	 select hda.group_id, hda.hos_id, hda.adjust_code, hda.emp_id, he.emp_name
+  ,he.photo,hek.kind_name, hda.adjust_date, hda.adjust_reason, hda.bef_dept_id, hd.dept_name as bef_dept_name, hda.aft_dept_id
+  ,hd1.dept_no aft_dept_no, hd1.dept_name as aft_dept_name, hda.adjust_state
+  , case 
+    when hda.adjust_state = 0 then '新建'
+    when hda.adjust_state = 1 then '审核'
+    else null
+  end as adjust_state_name, hda.maker, he1.user_name as maker_name, hda.make_date, hda.checker
+  , he2.user_name as checker_name, hda.check_date
+from HR_DEPT_ADJUST hda
+left join hos_emp he on hda.group_id = he.group_id
+and hda.hos_id = he.hos_id
+and hda.emp_id = he.emp_id 
+left join sys_user he1 on hda.group_id = he1.group_id
+and hda.hos_id = he1.hos_id
+and hda.maker = he1.user_id
+left join sys_user he2 on hda.group_id = he2.group_id
+and hda.hos_id = he2.hos_id
+and hda.checker = he2.user_id 
+left join hos_dept hd on hda.group_id = hd.group_id
+and hda.hos_id = hd.hos_id
+and hda.bef_dept_id = hd.dept_id 
+  left join hos_dept_dict hd1 on hda.group_id = hd1.group_id
+and hda.hos_id = hd1.hos_id
+and hda.aft_dept_id = hd1.dept_id 
+and hd1.is_stop=0
+left join HOS_EMP_KIND hek on he.kind_code=hek.kind_code
+		and he.group_id = hek.group_id
+		and he.hos_id = hek.hos_id
+		WHERE hda.group_id = #{group_id,jdbcType=INTEGER}
+			AND hda.hos_id = #{hos_id,jdbcType=INTEGER}
+	AND hda.adjust_code = #{adjust_code,jdbcType=VARCHAR}
+	
+	
+	
+	</select>
+
+<!-- 删除-->
+	<delete id="deleteDeptTransfer" parameterType="java.util.Map" >
+		delete from HR_DEPT_ADJUST
+		where group_id = #{group_id,jdbcType=INTEGER}
+			and hos_id = #{hos_id,jdbcType=INTEGER}
+			and adjust_code in (${adjust_code})
+		<!-- 	and attend_year = #{attend_year,jdbcType=VARCHAR} -->
+	</delete>
+<update id="updateEmpTable" >
+	<foreach collection="list" item="item" open="begin" close=";end;" separator=";">
+			UPDATE HOS_EMP
+			<trim prefix="SET" suffixOverrides=",">
+				dept_no = #{item.dept_no,jdbcType=INTEGER}
+				
+					,dept_id = #{item.dept_id,jdbcType=INTEGER}
+				
+			</trim>
+			<where>
+					group_id = #{map.group_id,jdbcType=INTEGER}
+				AND hos_id = #{map.hos_id,jdbcType=INTEGER}
+				AND emp_code = #{item.emp_code,jdbcType=INTEGER}
+			</where>
+		</foreach>
+
+</update>
+		<update id="updateAttend" >
+	<foreach collection="list" item="item" open="begin" close=";end;" separator=";">
+			UPDATE hr_attend_result
+			<trim prefix="SET" suffixOverrides=",">
+				dept_id_b = #{item.dept_id,jdbcType=INTEGER}
+				,dept_id_c = #{item.dept_id,jdbcType=INTEGER}
+			</trim>
+			<where>
+					group_id = #{map.group_id,jdbcType=INTEGER}
+				AND hos_id = #{map.hos_id,jdbcType=INTEGER}
+				AND emp_id = #{item.emp_id,jdbcType=INTEGER}
+					AND year_month = #{item.year_month,jdbcType=VARCHAR}
+					AND dept_id_b = #{item.bdept_id,jdbcType=INTEGER}
+				AND dept_id_c = #{item.bdept_id,jdbcType=INTEGER}
+			</where>
+		</foreach>
+
+</update>
+<update id="updateAttendD">
+
+	<foreach collection="list" item="item" open="begin" close=";end;" separator=";">
+			UPDATE hr_attend_result_d
+			<trim prefix="SET" suffixOverrides=",">
+				dept_id_c = #{item.dept_id,jdbcType=INTEGER}
+			</trim>
+			<where>
+					group_id = #{map.group_id,jdbcType=INTEGER}
+				AND hos_id = #{map.hos_id,jdbcType=INTEGER}
+				AND emp_id = #{item.emp_id,jdbcType=INTEGER}
+					AND year_month = #{item.year_month,jdbcType=VARCHAR}
+						
+				AND dept_id_c = #{item.bdept_id,jdbcType=INTEGER}
+			</where>
+		</foreach>
+</update>
+<update id="updateAttendManage" >
+	<foreach collection="list" item="item" open="begin" close=";end;" separator=";">
+			UPDATE hr_attend_result_manage
+			<trim prefix="SET" suffixOverrides=",">
+				dept_id_b = #{item.dept_id,jdbcType=INTEGER}
+				,dept_id_c = #{item.dept_id,jdbcType=INTEGER}
+			</trim>
+			<where>
+					group_id = #{map.group_id,jdbcType=INTEGER}
+				AND hos_id = #{map.hos_id,jdbcType=INTEGER}
+				AND emp_id = #{item.emp_id,jdbcType=INTEGER}
+					AND year_month = #{item.year_month,jdbcType=VARCHAR}
+						AND dept_id_b = #{item.bdept_id,jdbcType=INTEGER}
+				AND dept_id_c = #{item.bdept_id,jdbcType=INTEGER}
+			</where>
+		</foreach>
+
+</update>
+<update id="updateEmpDictTable" >
+	<foreach collection="list" item="item" open="begin" close=";end;" separator=";">
+			UPDATE HOS_EMP_DICT
+			<trim prefix="SET" suffixOverrides=",">
+				dept_no = #{item.dept_no,jdbcType=INTEGER}
+				
+					,dept_id = #{item.dept_id,jdbcType=INTEGER}
+				
+			</trim>
+			<where>
+					group_id = #{map.group_id,jdbcType=INTEGER}
+				AND hos_id = #{map.hos_id,jdbcType=INTEGER}
+				AND emp_code = #{item.emp_code,jdbcType=INTEGER}
+				and is_stop=0
+			</where>
+		</foreach>
+
+</update>
+	
+		<!--修改状态 (批量)-->
+	<update id="auditDeptTransfer">
+		<foreach collection="list" item="item" open="begin" close=";end;" separator=";">
+			UPDATE HR_DEPT_ADJUST
+			<trim prefix="SET" suffixOverrides=",">
+				adjust_state = #{map.adjust_state,jdbcType=INTEGER}
+				
+					,checker = #{map.checker,jdbcType=INTEGER}
+			
+					,check_date = #{map.check_date,jdbcType=DATE}
+				
+			</trim>
+			<where>
+					group_id = #{map.group_id,jdbcType=INTEGER}
+				AND hos_id = #{map.hos_id,jdbcType=INTEGER}
+				AND adjust_code = #{item.adjust_code,jdbcType=INTEGER}
+			</where>
+		</foreach>
+	</update>
+		<update id="update" parameterType="java.util.Map">
+			UPDATE HR_DEPT_ADJUST SET
+					
+			
+					aft_dept_id = #{aft_dept_id,jdbcType=INTEGER}
+			
+					,aft_dept_no = #{aft_dept_no,jdbcType=INTEGER}
+				
+				
+					<if test="adjust_reason != null and adjust_reason != ''">
+			,adjust_reason = #{adjust_reason,jdbcType=INTEGER}
+			</if>
+			<where>
+						group_id = #{group_id,jdbcType=INTEGER}
+					AND hos_id = #{hos_id,jdbcType=INTEGER}
+				
+					and adjust_code =#{adjust_code}
+				
+			</where>
+	</update>
+<select id="query" parameterType="java.util.Map" resultMap="deptTransfer">
+
+	 select hda.group_id, hda.hos_id, hda.adjust_code, he.emp_id,he.emp_code emp_code, he.emp_name
+  , hda.adjust_date, hda.adjust_reason, hda.bef_dept_id,hd.dept_no as bef_dept_no, hd.dept_name as bef_dept_name, hda.aft_dept_id
+  , hd1.dept_name as aft_dept_name,hd1.dept_no as aft_dept_no, hda.adjust_state
+  , case 
+    when hda.adjust_state = 0 then '新建'
+    when hda.adjust_state = 1 then '审核'
+    else null
+  end as adjust_state_name, hda.maker, he1.user_name as maker_name, hda.make_date, hda.checker
+  , he2.user_name as checker_name, hda.check_date
+from HR_DEPT_ADJUST hda
+left join hos_emp he on hda.group_id = he.group_id
+and hda.hos_id = he.hos_id
+and hda.emp_id = he.emp_id 
+left join sys_user he1 on hda.group_id = he1.group_id
+and hda.hos_id = he1.hos_id
+and hda.maker = he1.user_id
+left join sys_user he2 on hda.group_id = he2.group_id
+and hda.hos_id = he2.hos_id
+and hda.checker = he2.user_id 
+left join hos_dept_dict hd on hda.group_id = hd.group_id
+and hda.hos_id = hd.hos_id
+and hda.bef_dept_id = hd.dept_id 
+and hd.is_stop=0
+  left join hos_dept_dict hd1 on hda.group_id = hd1.group_id
+and hda.hos_id = hd1.hos_id
+and hda.aft_dept_id = hd1.dept_id
+and hd1.is_stop=0
+		WHERE hda.group_id = #{group_id,jdbcType=INTEGER}
+			AND hda.hos_id = #{hos_id,jdbcType=INTEGER}
+			<if test="adjust_date != null and adjust_date != ''">
+				AND hda.adjust_date between to_date(#{adjust_date},'YYYY-MM-DD')
+				and to_date(#{adjust_enddate},'YYYY-MM-DD')
+			</if>
+			<if test="adjust_code != null and adjust_code != ''">
+				AND hda.adjust_code like '%${adjust_code}%'
+			</if>
+			
+			<if test="aft_dept_id != null and aft_dept_id != ''">
+				and hda.aft_dept_id = #{aft_dept_id, jdbcType=INTEGER}
+			</if>
+			<if test="emp_id != null and emp_id != ''">
+				AND hda.emp_id = #{emp_id,jdbcType=INTEGER}
+			</if>
+			<if test="maker != null and maker != ''">
+				AND hda.maker = #{maker,jdbcType=INTEGER}
+			</if>
+			<if test="checker != null and checker != ''">
+				AND hda.checker = #{checker,jdbcType=INTEGER}
+			</if>
+			<if test="adjust_state != null and adjust_state != ''">
+				AND hda.adjust_state = #{adjust_state,jdbcType=INTEGER}
+			</if>
+				<if test="kind_code != null and kind_code != ''">
+				AND he.kind_code = #{kind_code,jdbcType=INTEGER}
+			</if>
+		order by adjust_code asc
+	</select>
+	<resultMap type="java.util.Map" id="hrEmpDutyMap">
+		<result property="emp_code" column="emp_code" />
+		<result property="emp_id" column="emp_id" />
+		<result property="emp_name" column="emp_name" />
+		<result property="dept_id" column="dept_id" />
+		<result property="dept_no" column="dept_no" />
+		<result property="dept_name" column="dept_name" />
+		<result property="title_code" column="title_code" />
+		<result property="title_name" column="title_name" />
+		<result property="kind_code" column="kind_code" />
+		<result property="kind_name" column="kind_name" />
+		<result property="level_code" column="level_code" />
+		<result property="level_name" column="level_name" />
+		<result property="duty_code" column="duty_code" />
+		<result property="duty_name" column="duty_name" />
+		<result property="mobile" column="mobile" />
+		<result property="photo" column="photo" />
+		<result property="birthplace" column="birthplace" />
+		<result property="birthday" column="birthday" />
+		<result property="workage" column="workage" />
+		<result property="worktime" column="worktime" />
+		<result property="sex_code" column="sex_code" />
+		<result property="sex_name" column="sex_name" />
+	</resultMap>
+
+<select id="queryHosEmpDept" resultMap="hrEmpDutyMap"
+		parameterType="java.util.Map">
+		select hde.dept_id as dept_id,hde.dept_no as dept_no, hde.dept_name as dept_name, he.emp_id
+		as emp_id, he.emp_name as emp_name,hek.kind_code as kin_code
+		,hek.kind_name as kind_name ,t.field_col_code as level_code
+		, t.field_col_name as level_name, t1.field_col_code as sex_code
+		, t1.field_col_name as sex_name, ht.title_code as title_code,
+		ht.title_name as title_name, hd.duty_code as duty_code, hd.duty_name
+		as duty_name , he.photo,he.birthplace,to_char(he.birthday,
+		'yyyy-mm-dd') as birthday ,he.workage,to_char(he.worktime,
+		'yyyy-mm-dd') as worktime
+		from hos_emp he
+		left join hos_dept_dict hde on he.dept_id = hde.dept_id
+		and he.dept_no = hde.dept_no
+		and he.group_id = hde.group_id
+		and he.hos_id = hde.hos_id
+		left join HR_HOS_DUTY hhd on he.emp_id = hhd.emp_id
+		and he.group_id = hhd.group_id
+		and he.hos_id = hhd.hos_id
+		left join hos_duty hd on hhd.duty_code = hd.duty_code
+		and hd.group_id = hhd.group_id
+		and hd.hos_id = hhd.hos_id
+		left join HR_EMP_TECHNOLOGY_TITLE het on he.emp_id = het.emp_id
+		and he.group_id = het.group_id
+		and he.hos_id = het.hos_id
+		left join HR_TITLE ht on het.title_code = ht.title_code
+		and ht.group_id = het.group_id
+		and ht.hos_id = het.hos_id
+		left join HR_EMP_PROMOTION hep on he.emp_id = hep.emp_id
+		and he.group_id = hep.group_id
+		and he.hos_id = hep.hos_id
+		left join hr_fiied_data t on hep.level_code = t.field_col_code
+		and t.field_tab_code = 'DIC_LEVEL'
+		and t.group_id = hep.group_id
+		and t.hos_id = hep.hos_id
+		left join HOS_EMP_KIND hek on he.kind_code=hek.kind_code
+		and he.group_id = hek.group_id
+		and he.hos_id = hek.hos_id
+		left join hr_fiied_data t1 on he.sex_code= t1.field_col_code
+		and t1.field_tab_code = 'DIC_SEX'
+		and t1.group_id = he.group_id
+		and t1.hos_id = he.hos_id
+		<where>
+		<if test="group_id != null and group_id != ''">
+				he.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and he.hos_id = #{hos_id}
+			</if>
+			<if test="dept_id !=null and dept_id !=''">
+				he.dept_id=#{dept_id}
+			</if>
+			<if test="dept_no !=null and dept_no !=''">
+				and he.dept_no=#{dept_no}
+			</if>
+			<if test="emp_id !=null and emp_id !=''">
+				and he.emp_id = #{emp_id}
+			</if>
+			<if test="emp_name !=null and emp_name !=''">
+				and he.emp_name = #{emp_id}
+			</if>
+			<if test="emp_code !=null and emp_code !=''">
+				and he.emp_code = #{emp_code}
+			</if>
+			<if test="duty_code !=null and duty_code !=''">
+				and hhd.duty_code =#{duty_code}
+			</if>
+			<if test="title_code !=null and title_code !=''">
+				and het.title_code =#{title_code}
+			</if>
+			<if test="level_code !=null and level_code !=''">
+				and t.field_col_code =#{level_code}
+			</if>
+			<if test="key != null and key != ''">
+				and (emp_id like '%'||#{key}||'%' or
+				emp_code like '%'||#{key}||'%' or
+				emp_name like '%'||#{key}||'%' or
+				spell_code like '%'||upper(#{key})||'%' or
+				wbx_code like '%'||upper(#{key})||'%'
+				)
+			</if>
+		</where>
+
+	</select>
+	<select id="queryDeptTransByPrint"  resultType="java.util.Map" parameterType="java.util.Map">
+
+	 select hda.group_id, hda.hos_id, hda.adjust_code, hda.emp_id, he.emp_name
+  , to_char(hda.adjust_date,'yyyy-mm-dd') adjust_date, hda.adjust_reason, hda.bef_dept_id, hd.dept_name as bef_dept_name, hda.aft_dept_id
+  , hd1.dept_name as aft_dept_name, hda.adjust_state
+  , case 
+    when hda.adjust_state = 0 then '新建'
+    when hda.adjust_state = 1 then '审核'
+    else null
+  end as adjust_state_name, hda.maker, he1.user_name as maker_name, to_char(hda.make_date,'yyyy-mm-dd') make_date, hda.checker
+  , he2.user_name as checker_name,  to_char(hda.check_date,'yyyy-mm-dd') check_date
+from HR_DEPT_ADJUST hda
+left join hos_emp he on hda.group_id = he.group_id
+and hda.hos_id = he.hos_id
+and hda.emp_id = he.emp_id 
+left join sys_user he1 on hda.group_id = he1.group_id
+and hda.hos_id = he1.hos_id
+and hda.maker = he1.user_id
+left join sys_user he2 on hda.group_id = he2.group_id
+and hda.hos_id = he2.hos_id
+and hda.checker = he2.user_id 
+left join hos_dept hd on hda.group_id = hd.group_id
+and hda.hos_id = hd.hos_id
+and hda.bef_dept_id = hd.dept_id 
+  left join hos_dept hd1 on hda.group_id = hd1.group_id
+and hda.hos_id = hd1.hos_id
+and hda.aft_dept_id = hd1.dept_id 
+		WHERE hda.group_id = #{group_id,jdbcType=INTEGER}
+			AND hda.hos_id = #{hos_id,jdbcType=INTEGER}
+			<if test="adjust_date != null and adjust_date != ''">
+				AND hda.adjust_date between to_date(#{adjust_date},'YYYY-MM-DD')
+				and to_date(#{adjust_enddate},'YYYY-MM-DD')
+			</if>
+			<if test="adjust_code != null and adjust_code != ''">
+				AND hda.adjust_code like '%${adjust_code}%'
+			</if>
+			
+			<if test="aft_dept_id != null and aft_dept_id != ''">
+				and hda.aft_dept_id = #{aft_dept_id, jdbcType=INTEGER}
+			</if>
+			<if test="emp_id != null and emp_id != ''">
+				AND hda.emp_id = #{emp_id,jdbcType=INTEGER}
+			</if>
+			<if test="maker != null and maker != ''">
+				AND hda.maker = #{maker,jdbcType=INTEGER}
+			</if>
+			<if test="checker != null and checker != ''">
+				AND hda.checker = #{checker,jdbcType=INTEGER}
+			</if>
+			<if test="adjust_state != null and adjust_state != ''">
+				AND hda.adjust_state = #{adjust_state,jdbcType=INTEGER}
+			</if>
+				<if test="kind_code != null and kind_code != ''">
+				AND he.kind_code = #{kind_code,jdbcType=INTEGER}
+			</if>
+		order by adjust_code asc
+		</select>
+</mapper>

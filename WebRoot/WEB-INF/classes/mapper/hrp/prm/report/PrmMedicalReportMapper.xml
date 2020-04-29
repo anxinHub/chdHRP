@@ -1,0 +1,252 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.prm.dao.report.PrmMedicalReportMapper">
+
+	<select id="queryPrmMedicalReport" parameterType="java.util.Map" resultType="java.util.Map">
+		WITH a_table AS (
+	        SELECT pdks.group_id, pdks.hos_id, pdks.copy_code, pdks.acc_year, pdks.acc_month
+	            , pdks.goal_code, pdks.kpi_code, pdk.kpi_name, pdk.nature_code, pkn.nature_name
+	            , pdks.dept_no, pdks.dept_id,ad.dept_name,pdks.kpi_score, pds.ratio, pds.full_score, pds.goal_value
+	            , CASE WHEN pkl.unit_code = '72' THEN ROUND(pdkv.kpi_value, 2) * 100 ELSE NVL(ROUND(pdkv.kpi_value, 2),0)END AS kpi_value, 
+	            b.sec_code,b.led_path
+			FROM PRM_DEPT_KPI_SCORE pdks
+	          
+	        LEFT JOIN PRM_DEPT_SCHEME pds 
+	        ON 
+	          pdks.group_id = pds.group_id
+	            AND pdks.hos_id = pds.hos_id
+	            AND pdks.copy_code = pds.copy_code
+	            AND pdks.acc_year = pds.acc_year
+	            AND pdks.acc_month = pds.acc_month
+	            AND pdks.goal_code = pds.goal_code
+	            AND pdks.kpi_code = pds.kpi_code
+	            AND pdks.dept_id = pds.dept_id
+	            AND pdks.dept_no = pds.dept_no
+	             
+			LEFT JOIN PRM_DEPT_KPI pdk 
+			ON 
+	            pdks.group_id = pdk.group_id
+	            AND pdks.hos_id = pdk.hos_id
+	            AND pdks.copy_code = pdk.copy_code
+	            AND pdks.acc_year = pdk.acc_year
+	            AND pdks.goal_code = pdk.goal_code
+	            AND pdks.kpi_code = pdk.kpi_code
+	             
+			LEFT JOIN (
+	            SELECT pdkl.hos_id, pdkl.group_id, pdkl.copy_code, pdkl.acc_year, pdkl.acc_month
+	              , pdkl.goal_code, pdkl.kpi_code, pdkl.dept_id, pdkl.dept_no, pdkl.sec_code
+	              , pd.led_path
+	            FROM PRM_DEPT_KPI_LED pdkl
+	            LEFT JOIN PRM_LED pd 
+	            ON 
+	              pdkl.hos_id = pd.hos_id
+	              AND pdkl.group_id = pd.group_id
+	              AND pdkl.copy_code = pd.copy_code
+	              AND pdkl.sec_code = pd.sec_code 
+			) b 
+			ON 
+	            pdks.group_id = b.group_id
+	            AND pdks.hos_id = b.hos_id
+	            AND pdks.copy_code = b.copy_code
+	            AND pdks.acc_year = b.acc_year
+	            AND pdks.acc_month = b.acc_month
+	            AND pdks.goal_code = b.goal_code
+	            AND pdks.kpi_code = b.kpi_code
+	            AND pdks.dept_id = b.dept_id
+	            AND pdks.dept_no = b.dept_no
+	            AND pdks.sec_code = b.sec_code 
+	       
+			LEFT JOIN PRM_KPI_NATURE pkn 
+			ON 
+	            pdk.nature_code = pkn.nature_code 
+	            
+			LEFT JOIN PRM_KPI_LIB pkl 
+			ON 
+	            pdks.group_id = pkl.group_id
+	            and pdks.hos_id = pkl.hos_id
+	            and pdks.copy_code = pkl.copy_code
+	            and pdks.kpi_code = pkl.kpi_code 
+	        
+			LEFT JOIN PRM_DEPT_KPI_VALUE pdkv 
+			ON 
+				pdks.hos_id = pdkv.hos_id
+	          	AND pdks.group_id = pdkv.group_id
+	          	AND pdks.copy_code = pdkv.copy_code
+	          	AND pdks.acc_year = pdkv.acc_year
+	          	AND pdks.acc_month = pdkv.acc_month
+	          	AND pdks.goal_code = pdkv.goal_code
+	          	AND pdks.kpi_code = pdkv.kpi_code
+	          	AND pdks.dept_id = pdkv.dept_id
+	          	AND pdks.dept_no = pdkv.dept_no 
+	          
+			LEFT JOIN PRM_DEPT_DICT ad 
+			ON 
+	            pdks.group_id = ad.group_id
+	            AND pdks.hos_id = ad.hos_id
+	            AND pdks.copy_code = ad.copy_code
+	            AND ad.dept_id = pdks.dept_id 
+	            AND pdks.dept_no = ad.dept_no
+	            
+			WHERE 
+	            pdks.group_id = #{group_id}
+	            AND pdks.hos_id = #{hos_id}
+	            AND pdks.copy_code = #{copy_code}
+	            AND pdks.acc_year = #{acc_year}
+	            AND pdks.acc_month = #{acc_month}
+	            AND pdks.goal_code = #{goal_code}
+	            AND ad.dept_kind_code = '03'
+	            AND pdks.kpi_code 
+	                in (
+	                   'YJ001','YJ002','YJ003','YJ004',
+	                   'YJ005','YJ006','YJ007','YJ008',
+	                   'YJ009','YJ010','YJ011','YJ012',
+	                   'YJ013','YJ014','YJ015'
+	                )
+	            ORDER BY pdks.kpi_code asc
+	    ),
+	    
+	    b_table AS(
+	        SELECT 
+	            pdks.group_id, pdks.hos_id, pdks.copy_code, pdks.acc_year, pdks.acc_month
+	          , pdks.goal_code, pdks.dept_no, pdks.dept_id
+	          , sum(pds.ratio * pdks.kpi_score) as kpi_score
+	        FROM PRM_DEPT_KPI_SCORE pdks
+	        
+	        LEFT JOIN PRM_DEPT_SCHEME pds 
+			ON 
+		        pdks.group_id = pds.group_id
+		        AND pdks.hos_id = pds.hos_id
+		        AND pdks.copy_code = pds.copy_code
+		        AND pdks.acc_year = pds.acc_year
+		        AND pdks.acc_month = pds.acc_month
+		        AND pdks.goal_code = pds.goal_code
+		        AND pdks.kpi_code = pds.kpi_code
+		        AND pdks.dept_id = pds.dept_id
+		        AND pdks.dept_no = pds.dept_no
+		        AND pdks.super_kpi_code = 'TOP' 
+		        
+	        WHERE
+	        	pdks.group_id = #{group_id}
+	            AND pdks.hos_id = #{hos_id}
+	            AND pdks.copy_code = #{copy_code}
+	            AND pdks.acc_year = #{acc_year}
+	            AND pdks.acc_month = #{acc_month}
+	            AND pdks.goal_code = #{goal_code}
+	            
+	        GROUP BY
+	            pdks.group_id, pdks.hos_id, pdks.copy_code, pdks.acc_year, pdks.acc_month
+	          , pdks.goal_code, pdks.dept_no, pdks.dept_id
+	    )
+	    
+	  select 
+	    t.group_id,t.hos_id,t.copy_code,t.acc_year,t.acc_month,
+	        t.goal_code,t.dept_id,t.dept_no,t.dept_name,
+	       
+	        sum(case when t.kpi_code = 'YJ001' then t.goal_value end) as goal_001,
+	        sum(case when t.kpi_code = 'YJ001' then t.kpi_value end) as kpi_001,
+	        sum(case when t.kpi_code = 'YJ001' then t.kpi_score end) as score_001,
+	        max(case when t.kpi_code = 'YJ001' then t.led_path end) as led_001,
+	
+	
+	        sum(case when t.kpi_code = 'YJ002' then t.goal_value end) as goal_002,
+	        sum(case when t.kpi_code = 'YJ002' then t.kpi_value end) as kpi_002,
+	        sum(case when t.kpi_code = 'YJ002' then t.kpi_score end) as score_002,
+	        max(case when t.kpi_code = 'YJ002' then t.led_path end) as led_002,
+	
+	
+	        sum(case when t.kpi_code = 'YJ003' then t.goal_value end) as goal_003,
+	        sum(case when t.kpi_code = 'YJ003' then t.kpi_value end) as kpi_003,
+	        sum(case when t.kpi_code = 'YJ003' then t.kpi_score end) as score_003,
+	        max(case when t.kpi_code = 'YJ003' then t.led_path end) as led_003,
+	
+	
+	        sum(case when t.kpi_code = 'YJ004' then t.goal_value end) as goal_004,
+	        sum(case when t.kpi_code = 'YJ004' then t.kpi_value end) as kpi_004,
+	        sum(case when t.kpi_code = 'YJ004' then t.kpi_score end) as score_004,
+	        max(case when t.kpi_code = 'YJ004' then t.led_path end) as led_004,
+	
+	
+	        sum(case when t.kpi_code = 'YJ005' then t.goal_value end) as goal_005,
+	        sum(case when t.kpi_code = 'YJ005' then t.kpi_value end) as kpi_005,
+	        sum(case when t.kpi_code = 'YJ005' then t.kpi_score end) as score_005,
+	        max(case when t.kpi_code = 'YJ005' then t.led_path end) as led_005,
+	
+	
+	        sum(case when t.kpi_code = 'YJ006' then t.goal_value end) as goal_006,
+	        sum(case when t.kpi_code = 'YJ006' then t.kpi_value end) as kpi_006,
+	        sum(case when t.kpi_code = 'YJ006' then t.kpi_score end) as score_006,
+	        max(case when t.kpi_code = 'YJ006' then t.led_path end) as led_006,
+	
+	
+	        sum(case when t.kpi_code = 'YJ007' then t.goal_value end) as goal_007,
+	        sum(case when t.kpi_code = 'YJ007' then t.kpi_value end) as kpi_007,
+	        sum(case when t.kpi_code = 'YJ007' then t.kpi_score end) as score_007,
+	        max(case when t.kpi_code = 'YJ007' then t.led_path end) as led_007,
+	
+	
+	        sum(case when t.kpi_code = 'YJ008' then t.goal_value end) as goal_008,
+	        sum(case when t.kpi_code = 'YJ008' then t.kpi_value end) as kpi_008,
+	        sum(case when t.kpi_code = 'YJ008' then t.kpi_score end) as score_008,
+	        max(case when t.kpi_code = 'YJ008' then t.led_path end) as led_008,
+	
+	
+	        sum(case when t.kpi_code = 'YJ009' then t.goal_value end) as goal_009,
+	        sum(case when t.kpi_code = 'YJ009' then t.kpi_value end) as kpi_009,
+	        sum(case when t.kpi_code = 'YJ009' then t.kpi_score end) as score_009,
+	        max(case when t.kpi_code = 'YJ009' then t.led_path end) as led_009,
+	
+	
+	        sum(case when t.kpi_code = 'YJ010' then t.goal_value end) as goal_010,
+	        sum(case when t.kpi_code = 'YJ010' then t.kpi_value end) as kpi_010,
+	        sum(case when t.kpi_code = 'YJ010' then t.kpi_score end) as score_010,
+	        max(case when t.kpi_code = 'YJ010' then t.led_path end) as led_010,
+	
+	
+	        sum(case when t.kpi_code = 'YJ011' then t.goal_value end) as goal_011,
+	        sum(case when t.kpi_code = 'YJ011' then t.kpi_value end) as kpi_011,
+	        sum(case when t.kpi_code = 'YJ011' then t.kpi_score end) as score_011,
+	        max(case when t.kpi_code = 'YJ011' then t.led_path end) as led_011,
+	
+	
+	        sum(case when t.kpi_code = 'YJ012' then t.goal_value end) as goal_012,
+	        sum(case when t.kpi_code = 'YJ012' then t.kpi_value end) as kpi_012,
+	        sum(case when t.kpi_code = 'YJ012' then t.kpi_score end) as score_012,
+	        max(case when t.kpi_code = 'YJ012' then t.led_path end) as led_012,
+	
+	
+	        sum(case when t.kpi_code = 'YJ013' then t.goal_value end) as goal_013,
+	        sum(case when t.kpi_code = 'YJ013' then t.kpi_value end) as kpi_013,
+	        sum(case when t.kpi_code = 'YJ013' then t.kpi_score end) as score_013,
+	        max(case when t.kpi_code = 'YJ013' then t.led_path end) as led_013,
+	
+	
+	        sum(case when t.kpi_code = 'YJ014' then t.goal_value end) as goal_014,
+	        sum(case when t.kpi_code = 'YJ014' then t.kpi_value end) as kpi_014,
+	        sum(case when t.kpi_code = 'YJ014' then t.kpi_score end) as score_014,
+	        max(case when t.kpi_code = 'YJ014' then t.led_path end) as led_014,
+	
+	
+	        sum(case when t.kpi_code = 'YJ015' then t.goal_value end) as goal_015,
+	        sum(case when t.kpi_code = 'YJ015' then t.kpi_value end) as kpi_015,
+	        sum(case when t.kpi_code = 'YJ015' then t.kpi_score end) as score_015,
+	        max(case when t.kpi_code = 'YJ015' then t.led_path end) as led_015,
+	        t2.kpi_score as sum_score
+	    
+	  FROM a_table t
+	  LEFT JOIN b_table t2
+	  ON
+	      t.group_id=t2.group_id
+	      AND t.hos_id = t2.hos_id
+	      AND t.copy_code = t2.copy_code
+	      AND t.acc_year = t2.acc_year
+	      AND t.acc_month = t2.acc_month
+	      AND t.goal_code = t2.goal_code
+	      AND t.dept_id = t2.dept_id
+	      AND t.dept_no = t.dept_no
+	  GROUP BY 
+	      t.group_id,t.hos_id,t.copy_code,t.acc_year,t.acc_month,
+	      t.goal_code,t.dept_id,t.dept_no,t.dept_name,t2.kpi_score
+	</select>
+	
+</mapper>
+

@@ -1,0 +1,298 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.cost.dao.CostDeptCostDataMapper">
+
+	<resultMap id="costDeptCostData" type="com.chd.hrp.cost.entity.CostDeptCostData">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="acc_year" column="acc_year" />
+		<result property="acc_month" column="acc_month" />
+		<result property="dept_id" column="dept_id" />
+		<result property="dept_no" column="dept_no" />
+		<result property="dept_code" column="dept_code" />
+		<result property="dept_name" column="dept_name" />
+		<result property="cost_item_id" column="cost_item_id" />
+		<result property="cost_item_no" column="cost_item_no" />
+		<result property="cost_item_code" column="cost_item_code" />
+		<result property="cost_item_name" column="cost_item_name" />
+		<result property="source_id" column="source_id" />
+		<result property="source_code" column="source_code" />
+		<result property="source_name" column="source_name" />
+		<result property="dir_amount" column="dir_amount" />
+		<result property="man_amount" column="man_amount" />
+		<result property="ass_amount" column="ass_amount" />
+		<result property="med_amount" column="med_amount" />
+	</resultMap>
+
+	<resultMap id="costStructureAnalysis" type="com.chd.hrp.cost.entity.CostStructureAnalysis">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="acc_year" column="acc_year" />
+		<result property="acc_month" column="acc_month" />
+		<result property="dept_id" column="dept_id" />
+		<result property="dept_no" column="dept_no" />
+		<result property="dept_code" column="dept_code" />
+		<result property="dept_name" column="dept_name" />
+		<result property="cost_emp_amount" column="cost_emp_amount" />
+		<result property="cost_mate_amount" column="cost_mate_amount" />
+		<result property="cost_drug_amount" column="cost_drug_amount" />
+		<result property="cost_fasset_amount" column="cost_fasset_amount" />
+		<result property="cost_iasset_amount" column="cost_iasset_amount" />
+		<result property="cost_risk_amount" column="cost_risk_amount" />
+		<result property="cost_other_amount" column="cost_other_amount" />
+	</resultMap>
+
+	<select id="queryCostStructureAnalysis" parameterType="java.util.Map" resultMap="costStructureAnalysis">
+		select
+		a.group_id,
+		a.hos_id,
+		a.copy_code,
+		a.acc_year,
+		a.acc_month,
+		a.dept_id,
+		a.dept_no,
+		hdd.dept_code,
+		hdd.dept_name ,
+		sum(decode(b.cost_type_id,1,a.dir_amount,0)) cost_emp_amount,
+		sum(decode(b.cost_type_id,2,a.dir_amount,0)) cost_mate_amount,
+		sum(decode(b.cost_type_id,3,a.dir_amount,0)) cost_drug_amount,
+		sum(decode(b.cost_type_id,4,a.dir_amount,0)) cost_fasset_amount,
+		sum(decode(b.cost_type_id,5,a.dir_amount,0)) cost_iasset_amount,
+		sum(decode(b.cost_type_id,6,a.dir_amount,0)) cost_risk_amount,
+		sum(decode(b.cost_type_id,7,a.dir_amount,0)) cost_other_amount
+		from
+		cost_dept_cost_data a
+		left join cost_item_dict b on
+		a.group_id=b.group_id and a.hos_id=b.hos_id
+		and a.copy_code=b.copy_code
+		and a.cost_item_id=b.cost_item_id
+
+		inner join HOS_DEPT_DICT hdd on
+		a.group_id = hdd.group_id and
+		a.hos_id = hdd.hos_id and
+		a.dept_id = hdd.dept_id
+
+		inner join (select
+		hd.dept_id,hd.group_id,hd.hos_id,hd.kind_code,hd.dept_level,ada.natur_code,hd.is_stop
+		from hos_dept hd
+		left join acc_dept_attr ada on
+		hd.group_id = ada.group_id and
+		hd.hos_id = ada.hos_id and
+		hd.dept_id = ada.dept_id) hdc on
+		hdd.group_id = hdc.group_id and
+		hdd.hos_id = hdc.hos_id and
+		hdd.dept_id = hdc.dept_id
+		<where>
+			hdd.is_stop = 0 and
+			hdc.is_stop = 0
+			<if test="group_id != null and group_id != ''">
+				AND a.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND a.hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				AND a.copy_code = #{copy_code}
+			</if>
+			<if
+				test="year_month1 != null and year_month1 != '' and year_month2 != null and year_month2 != ''">
+				and a.year_month between ${year_month1} and ${year_month2}
+			</if>
+			<if test="kind_code != null and kind_code != ''">
+				AND hdc.kind_code = #{kind_code}
+			</if>
+			<if test="natur_code != null and natur_code != ''">
+				AND hdc.natur_code = #{natur_code}
+			</if>
+			<if test="dept_level != null and dept_level != ''">
+				AND hdc.dept_level = #{dept_level}
+			</if>
+		</where>
+		group by
+		a.group_id,a.hos_id,a.copy_code,a.year_month,a.dept_id,a.dept_no,a.year_month,hdd.dept_code,hdd.dept_name
+	</select>
+
+	<insert id="addBatchCostDeptCostData" parameterType="java.util.List">
+
+		INSERT INTO COST_DEPT_COST_DATA
+		(
+		group_id,
+		hos_id,
+		copy_code,
+		acc_year,
+		acc_month,
+		dept_id,
+		dept_no,
+		cost_item_id,
+		cost_item_no,
+		source_id,
+		dir_amount,
+		man_amount,
+		ass_amount,
+		med_amount
+		)
+		<foreach collection="list" item="item" index="index"
+			separator=" union all ">
+			select
+			#{item.group_id},
+			#{item.hos_id},
+			#{item.copy_code},
+			#{item.acc_year},
+			#{item.acc_month},
+			#{item.dept_id},
+			#{item.dept_no},
+			#{item.cost_item_id},
+			#{item.cost_item_no},
+			#{item.source_id},
+			#{item.dir_amount},
+			#{item.man_amount},
+			#{item.ass_amount},
+			#{item.med_amount}
+			from dual
+		</foreach>
+
+	</insert>
+
+	
+	<delete id="deleteCostDeptCostData" parameterType="java.util.Map">
+
+		DELETE FROM cost_dept_cost_data WHERE
+		group_id = #{group_id} and
+		hos_id = #{hos_id} and
+		copy_code = #{copy_code} and
+		acc_year = #{acc_year} and
+		acc_month = #{acc_month}
+
+	</delete>
+	
+	<select id="queryCostDeptCostDataByCode" resultType="com.chd.hrp.cost.entity.CostDeptCostData" parameterType="string">
+
+		SELECT
+		group_id,
+		hos_id,
+		copy_code,
+		acc_year,
+		acc_month,
+		dept_id,
+		dept_no,
+		cost_item_id,
+		cost_item_no,
+		source_id,
+		dir_amount,
+		man_amount,
+		ass_amount,
+		med_amount
+		FROM cost_dept_cost_data
+		WHERE
+		group_id = #{group_id} and
+		hos_id = #{hos_id} and
+		copy_code = #{copy_code} and
+		acc_year = #{acc_year} and
+		acc_month = #{acc_month} and
+		dept_id = #{dept_id} and
+		dept_no = #{dept_no} and
+		cost_item_id = #{cost_item_id} and
+		cost_item_no = #{cost_item_no} and
+		source_id = #{source_id}
+
+	</select>
+	<select id="queryCostDeptCostData" parameterType="java.util.Map" resultMap="costDeptCostData">
+
+		SELECT
+		cdcd.group_id,
+		cdcd.hos_id,
+		cdcd.copy_code,
+		cdcd.acc_year,
+		cdcd.acc_month,
+		cdcd.dept_id,
+		cdcd.dept_no,
+		hdd.dept_code,
+		hdd.dept_name,
+		cdcd.cost_item_id,
+		cdcd.cost_item_no,
+		ctdn.cost_item_code,
+		ctdn.cost_item_name,
+		cdcd.source_id,
+		hs.source_code,
+		hs.source_name,
+		cdcd.dir_amount,
+		cdcd.man_amount,
+		cdcd.ass_amount,
+		cdcd.med_amount
+		FROM COST_DEPT_COST_DATA cdcd
+		left join HOS_DEPT_DICT hdd on
+		cdcd.group_id = hdd.group_id and
+		cdcd.hos_id = hdd.hos_id and
+		cdcd.dept_id = hdd.dept_id
+		<if test="is_flag == 1 ">
+			and cdcd.dept_no = hdd.dept_no
+		</if>
+		left join COST_ITEM_DICT_NO ctdn on
+		cdcd.group_id = ctdn.group_id and
+		cdcd.hos_id = ctdn.hos_id and
+		cdcd.copy_code = ctdn.copy_code and
+		cdcd.cost_item_id = ctdn.cost_item_id
+		<if test="is_flag == 1 ">
+			and cdcd.cost_item_no = ctdn.cost_item_no
+		</if>
+		left join HOS_SOURCE hs on
+		cdcd.group_id = hs.group_id and
+		cdcd.hos_id = hs.hos_id and
+		cdcd.source_id = hs.source_id
+		<where>
+			<if test="is_flag == 0 or is_flag == ''">
+				and hdd.is_stop=0 and ctdn.is_stop=0
+			</if>
+			<if test="group_id != null and group_id != ''">
+				AND cdcd.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND cdcd.hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				AND cdcd.copy_code = #{copy_code}
+			</if>
+			<if test=" year_month != null and year_month != '' and e_year_month != null and e_year_month != ''">
+                  AND cdcd.acc_year ||''|| cdcd.acc_month between #{year_month} and  #{e_year_month}
+            </if>
+<!-- 			<if test="acc_year != null and acc_year != ''"> -->
+<!-- 				AND cdcd.acc_year = #{acc_year} -->
+<!-- 			</if> -->
+<!-- 			<if test="acc_month != null and acc_month != ''"> -->
+<!-- 				AND cdcd.acc_month = #{acc_month} -->
+<!-- 			</if> -->
+			<if test="dept_id != null and dept_id != ''">
+				AND cdcd.dept_id = #{dept_id}
+			</if>
+			<if test="dept_no != null and dept_no != ''">
+				AND cdcd.dept_no = #{dept_no}
+			</if>
+			<if test="cost_item_id != null and cost_item_id != ''">
+				AND cdcd.cost_item_id = #{cost_item_id}
+			</if>
+			<if test="cost_item_no != null and cost_item_no != ''">
+				AND cdcd.cost_item_no = #{cost_item_no}
+			</if>
+			<if test="source_id != null and source_id != ''">
+				AND cdcd.source_id = #{source_id}
+			</if>
+			<if test="dir_amount != null and dir_amount != ''">
+				AND cdcd.dir_amount = #{dir_amount}
+			</if>
+			<if test="man_amount != null and man_amount != ''">
+				AND cdcd.man_amount = #{man_amount}
+			</if>
+			<if test="ass_amount != null and ass_amount != ''">
+				AND cdcd.ass_amount = #{ass_amount}
+			</if>
+			<if test="med_amount != null and med_amount != ''">
+				AND cdcd.med_amount = #{med_amount}
+			</if>
+		</where>
+		order by cdcd.acc_year,cdcd.acc_month asc
+	</select>
+
+</mapper>
+

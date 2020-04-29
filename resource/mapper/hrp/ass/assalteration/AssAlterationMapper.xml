@@ -1,0 +1,632 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.ass.dao.assalteration.AssAlterationMapper">
+	
+	<resultMap id="assAlterationMai" type="java.util.Map">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="ass_type_code" column="ass_type_code"/>
+		<result property="ass_type_name" column="ass_type_name"/>
+		<!-- <result property="buy_type" column="buy_type"/>
+		<result property="bus_type_name" column="bus_type_name"/>
+		<result property="sum_money" column="sum_money"/>
+		<result property="self_money" column="self_money"/>
+		<result property="finance_money" column="finance_money"/>
+		<result property="research_money" column="research_money"/>
+		<result property="teach_money" column="teach_money"/> -->
+		<result property="begin_sum_money" column="begin_sum_money"/>
+		<result property="begin_self_money" column="begin_self_money"/>
+        <result property="begin_finance_money" column="begin_finance_money"/>
+        <result property="begin_research_money" column="begin_research_money"/>
+        <result property="begin_teach_money" column="begin_teach_money"/>
+          
+        <result property="this_add_sum_money" column="this_add_sum_money"/>
+        <result property="this_add_self_money" column="this_add_self_money"/>
+        <result property="this_add_finance_money" column="this_add_finance_money"/>
+        <result property="this_add_research_money" column="this_add_research_money"/>
+        <result property="this_add_teach_money" column="this_add_teach_money"/>
+              
+        <result property="this_decrease_sum_money" column="this_decrease_sum_money"/>
+        <result property="this_decrease_self_money" column="this_decrease_self_money"/>
+        <result property="this_decrease_finance_money" column="this_decrease_finance_money"/>
+        <result property="this_decrease_research_money" column="this_decrease_research_money"/>
+        <result property="this_decrease_teach_money" column="this_decrease_teach_money"/>
+          
+        <result property="end_sum_money" column="end_sum_money"/>
+        <result property="end_self_money" column="end_self_money"/>
+        <result property="end_finance_money" column="end_finance_money"/>
+        <result property="end_research_money" column="end_research_money"/>
+        <result property="end_teach_money" column="end_teach_money"/>
+	</resultMap>
+	
+	<select id="queryAssAlteration" parameterType="java.util.Map" resultMap="assAlterationMai" >
+		<!-- select ass_type_code,
+         ass_type_name,
+         buy_type,
+         is_init， nvl(self_money, 0) + nvl(finance_money, 0) + nvl(research_money, 0) + nvl(teach_money, 0) as sum_money,
+         nvl(self_money, 0) as self_money,
+         nvl(finance_money, 0) as finance_money,
+         nvl(research_money, 0) as research_money,
+         nvl(teach_money, 0) as teach_money
+    from (select a.ass_type_code,
+                 a.ass_type_name,
+                 b.source_id,
+                 sum(b.price) as price,
+                 b.buy_type,
+                 b.is_init
+            from ass_type_dict a
+            left join (select atd.ass_type_code,
+                             atd.ass_type_name,
+                             atcs.source_id,
+                             sum(atcs.price) as price,
+                             atcs.buy_type,
+                             atcs.is_init
+                        from ass_type_dict atd
+                        left join ASS_TYPE_COLLECT_SOURCE atcs
+                          on atd.group_id = atcs.group_id
+                         and atd.hos_id = atcs.hos_id
+                         and atd.copy_code = atcs.copy_code
+                         and atd.ass_type_id = atcs.ass_type_id
+                       where atcs.group_id = #{group_id}
+                         and atcs.hos_id = #{hos_id}
+                         and atcs.copy_code =  #{copy_code}
+                         and atcs.acc_year = #{acc_year}
+                         and atcs.acc_month =  #{acc_month}
+                       group by atd.ass_type_code,
+                                atcs.source_id,
+                                atd.ass_type_name,
+                                atcs.buy_type,
+                                atcs.is_init
+                       order by atd.ass_type_code) b
+              on b.ass_type_code like a.ass_type_code || '%'
+            left join ass_bus_type_dict abtd
+              on abtd.bus_type_code = b.buy_type
+           where buy_type is not null
+           group by a.ass_type_code,
+                    a.ass_type_name,
+                    b.source_id,
+                    b.buy_type,
+                    b.is_init) pivot(sum(price) for source_id in('1' as
+                                                                 self_money,
+                                                                 '2' as
+                                                                 finance_money,
+                                                                 '3' as
+                                                                 research_money,
+                                                                 '4' as
+                                                                 teach_money))
+   order by ass_type_code
+		 -->
+		WITH init_t AS (
+		SELECT 
+          ass_type_id,<!-- ass_type_name, -->
+          nvl(self_money,0) as self_money,
+          nvl(finance_money,0) as finance_money,
+          nvl(research_money,0) as research_money,
+          nvl(teach_money,0) as teach_money 
+        FROM (select ty.ass_type_id ass_type_id，ty.ass_type_name ass_type_name, sum(t1.r_begin) price,t1.SOURCE_CODE source_id from ASS_TYPE_DICT ty 
+left join ass_collect_type_source t1
+on ty.ass_type_id=t1.ass_type_id and
+ty.group_id=t1.group_id
+and ty.copy_code=t1.copy_code
+and ty.hos_id=t1.hos_id
+<if test="acc_year != null and acc_year != ''">
+   			AND t1.acc_year = #{acc_year}
+   			</if>
+   			<if test="acc_month != null and acc_month != ''">
+   			AND t1.acc_month = #{acc_month}
+   			</if>
+
+<!--   <if test="type_level != null and type_level != ''">
+			  WHERE ty.type_level =#{type_level}
+			  </if> -->
+group by ty.ass_type_id，ty.ass_type_name, t1.r_begin,t1.SOURCE_CODE
+)
+
+  PIVOT (sum(price) FOR source_id IN('001' as self_money,'002' as finance_money,'003' as research_money,'004' as teach_money))
+		
+  		
+		),
+		in_t AS (
+		SELECT 
+          ass_type_id,<!-- ass_type_name, -->
+          nvl(self_money,0) as self_money,
+          nvl(finance_money,0) as finance_money,
+          nvl(research_money,0) as research_money,
+          nvl(teach_money,0) as teach_money 
+        FROM (select ty.ass_type_id ass_type_id，ty.ass_type_name ass_type_name, sum(t1.R_ADD) price,t1.SOURCE_CODE source_id from ASS_TYPE_DICT ty 
+left join ass_collect_type_source t1
+on ty.ass_type_id=t1.ass_type_id and
+ty.group_id=t1.group_id
+and ty.copy_code=t1.copy_code
+and ty.hos_id=t1.hos_id
+<if test="acc_year != null and acc_year != ''">
+   			AND t1.acc_year = #{acc_year}
+   			</if>
+   			<if test="acc_month != null and acc_month != ''">
+   			AND t1.acc_month = #{acc_month}
+   			</if>
+
+ <!--  <if test="type_level != null and type_level != ''">
+			  WHERE ty.type_level =#{type_level}
+			  </if> -->
+group by ty.ass_type_id，ty.ass_type_name, t1.r_begin,t1.SOURCE_CODE
+)
+
+  PIVOT (sum(price) FOR source_id IN('001' as self_money,'002' as finance_money,'003' as research_money,'004' as teach_money))
+		
+  		
+		),
+		out_t AS (
+		SELECT 
+          ass_type_id,<!-- ass_type_name, -->
+          nvl(self_money,0) as self_money,
+          nvl(finance_money,0) as finance_money,
+          nvl(research_money,0) as research_money,
+          nvl(teach_money,0) as teach_money 
+        FROM (select ty.ass_type_id ass_type_id，ty.ass_type_name ass_type_name, sum(t1.R_DEC) price,t1.SOURCE_CODE source_id from ASS_TYPE_DICT ty 
+left join ass_collect_type_source t1
+on ty.ass_type_id=t1.ass_type_id and
+ty.group_id=t1.group_id
+and ty.copy_code=t1.copy_code
+and ty.hos_id=t1.hos_id
+<if test="acc_year != null and acc_year != ''">
+   			AND t1.acc_year = #{acc_year}
+   			</if>
+   			<if test="acc_month != null and acc_month != ''">
+   			AND t1.acc_month = #{acc_month}
+   			</if>
+
+ <!--  <if test="type_level != null and type_level != ''">
+			  WHERE ty.type_level =#{type_level}
+			  </if> -->
+group by ty.ass_type_id，ty.ass_type_name, t1.r_begin,t1.SOURCE_CODE
+)
+
+  PIVOT (sum(price) FOR source_id IN('001' as self_money,'002' as finance_money,'003' as research_money,'004' as teach_money))
+		),
+		type_t AS (
+	      SELECT 
+		    a.ass_type_id,
+		    a.ass_type_code,
+		    a.ass_type_name,
+		    a.type_level,
+		    nvl(a.super_code,0) super_code,
+		    nvl(b.self_money,0)+nvl(b.finance_money,0)+nvl(b.research_money,0)+nvl(b.teach_money,0) AS begin_sum_money,<!-- 期初合计 -->
+		    nvl(b.self_money,0) AS begin_self_money,<!-- 期初自筹 -->
+		    nvl(b.finance_money,0) AS begin_finance_money,<!-- 期初财政 -->
+		    nvl(b.research_money,0) AS begin_research_money,<!-- 期初科研 -->
+		    nvl(b.teach_money,0) AS begin_teach_money,<!-- 期初教学 -->
+		    nvl(c.self_money,0)+nvl(c.finance_money,0)+nvl(c.research_money,0)+nvl(c.teach_money,0) AS this_add_sum_money,<!-- 增加合计 -->
+		    nvl(c.self_money,0) AS this_add_self_money,<!-- 增加自筹 -->
+		    nvl(c.finance_money,0) AS this_add_finance_money,<!-- 增加财政 -->
+		    nvl(c.research_money,0) AS this_add_research_money,<!-- 增加科研 -->
+		    nvl(c.teach_money,0) AS this_add_teach_money,<!-- 增加教学 -->
+		    nvl(d.self_money,0)+nvl(d.finance_money,0)+nvl(d.research_money,0)+nvl(d.teach_money,0) AS this_decrease_sum_money,<!-- 减少合计 -->
+		    nvl(d.self_money,0) AS this_decrease_self_money,<!-- 减少自筹 -->
+		    nvl(d.finance_money,0) AS this_decrease_finance_money,<!-- 减少财政 -->
+		    nvl(d.research_money,0) AS this_decrease_research_money,<!-- 减少科研 -->
+		    nvl(d.teach_money,0) AS this_decrease_teach_money,<!-- 减少教学 -->
+		    (nvl(b.self_money,0)+nvl(c.self_money,0)-nvl(d.self_money,0))+(nvl(b.finance_money,0)+nvl(c.finance_money,0)-nvl(d.finance_money,0))+
+		    (nvl(b.research_money,0)+nvl(c.research_money,0)-nvl(d.research_money,0))+
+		    (nvl(b.teach_money,0)+nvl(c.teach_money,0)-nvl(d.teach_money,0)) AS end_sum_money,<!-- 期末合计 -->
+		    nvl(b.self_money,0)+nvl(c.self_money,0)-nvl(d.self_money,0) AS end_self_money,<!-- 期末自筹 -->
+		    nvl(b.finance_money,0)+nvl(c.finance_money,0)-nvl(d.finance_money,0) AS end_finance_money,<!-- 期末财政 -->
+		    nvl(b.research_money,0)+nvl(c.research_money,0)-nvl(d.research_money,0) AS end_research_money,<!-- 期末科研 -->
+		    nvl(b.teach_money,0)+nvl(c.teach_money,0)-nvl(d.teach_money,0) AS end_teach_money<!-- 期末教学 -->
+	      FROM ASS_TYPE_DICT a
+	      LEFT JOIN init_t b
+	        ON a.ass_type_id = b.ass_type_id
+	      LEFT JOIN in_t c
+	        ON a.ass_type_id = c.ass_type_id
+	      LEFT JOIN out_t d
+	        ON a.ass_type_id = d.ass_type_id
+	      WHERE a.is_stop = 0
+	        AND a.group_id = #{group_id} AND a.hos_id = #{hos_id} AND a.copy_code = #{copy_code}
+	    ),
+		temp1 AS(
+		  SELECT 
+		    t2.ass_type_code,
+		    t2.ass_type_name,
+		    sum(t2.begin_sum_money) begin_sum_money,
+		    sum(t2.begin_self_money) begin_self_money,
+            sum(t2.begin_finance_money) begin_finance_money,
+            sum(t2.begin_research_money) begin_research_money,
+            sum(t2.begin_teach_money) begin_teach_money,
+          
+            sum(t2.this_add_sum_money) this_add_sum_money,
+            sum(t2.this_add_self_money) this_add_self_money,
+            sum(t2.this_add_finance_money) this_add_finance_money,
+            sum(t2.this_add_research_money) this_add_research_money,
+            sum(t2.this_add_teach_money) this_add_teach_money,
+          
+            sum(t2.this_decrease_sum_money) this_decrease_sum_money,
+            sum(t2.this_decrease_self_money) this_decrease_self_money,
+            sum(t2.this_decrease_finance_money) this_decrease_finance_money,
+            sum(t2.this_decrease_research_money) this_decrease_research_money,
+            sum(t2.this_decrease_teach_money) this_decrease_teach_money,
+          
+            sum(t2.end_sum_money) end_sum_money,
+            sum(t2.end_self_money) end_self_money,
+            sum(t2.end_finance_money) end_finance_money,
+            sum(t2.end_research_money) end_research_money,
+            sum(t2.end_teach_money) end_teach_money
+		  FROM (
+			SELECT 
+		      connect_by_root(t1.ass_type_code) ass_type_code,
+	          connect_by_root(t1.ass_type_name) ass_type_name,
+	          t1.begin_sum_money,
+	          t1.begin_self_money,
+              t1.begin_finance_money,
+              t1.begin_research_money,
+              t1.begin_teach_money,
+          
+              t1.this_add_sum_money,
+              t1.this_add_self_money,
+              t1.this_add_finance_money,
+              t1.this_add_research_money,
+              t1.this_add_teach_money,
+              
+              t1.this_decrease_sum_money,
+              t1.this_decrease_self_money,
+              t1.this_decrease_finance_money,
+              t1.this_decrease_research_money,
+              t1.this_decrease_teach_money,
+          
+              t1.end_sum_money,
+              t1.end_self_money,
+              t1.end_finance_money,
+              t1.end_research_money,
+              t1.end_teach_money
+			FROM type_t t1
+			START WITH t1.super_code IN (
+			  SELECT super_code FROM type_t 
+			  <if test="type_level != null and type_level != ''">
+			  WHERE type_level =#{type_level}
+			  </if>
+			)
+			CONNECT BY PRIOR t1.ass_type_code = t1.super_code
+		  ) t2
+		  GROUP BY t2.ass_type_code,t2.ass_type_name
+		  ORDER BY t2.ass_type_code
+		),
+		temp2 AS (
+		  SELECT 
+			t.ass_type_code,
+			cast(lpad(chr(41377), level * 2 - 1,chr(41377)) || t.ass_type_name as varchar2(50)) ass_type_name
+		  FROM type_t t
+		  START WITH t.super_code = 0
+		  CONNECT BY PRIOR t.ass_type_code = t.super_code
+		)
+        SELECT * FROM (
+			SELECT
+			  t2.ass_type_code,
+			  t2.ass_type_name,
+			  t1.begin_sum_money,
+			  t1.begin_self_money,
+              t1.begin_finance_money,
+              t1.begin_research_money,
+              t1.begin_teach_money,
+          
+              t1.this_add_sum_money,
+              t1.this_add_self_money,
+              t1.this_add_finance_money,
+              t1.this_add_research_money,
+              t1.this_add_teach_money,
+              
+              t1.this_decrease_sum_money,
+              t1.this_decrease_self_money,
+              t1.this_decrease_finance_money,
+              t1.this_decrease_research_money,
+              t1.this_decrease_teach_money,
+          
+              t1.end_sum_money,
+              t1.end_self_money,
+              t1.end_finance_money,
+              t1.end_research_money,
+              t1.end_teach_money
+			FROM  temp1 t1, temp2 t2
+			WHERE t1.ass_type_code = t2.ass_type_code
+			    
+			UNION ALL
+			    
+			SELECT 
+			  null AS ass_type_code,
+			  '合计' AS ass_type_name,
+			  sum(t3.begin_sum_money) begin_sum_money,
+			  sum(t3.begin_self_money) begin_self_money,
+          	  sum(t3.begin_finance_money) begin_finance_money,
+          	  sum(t3.begin_research_money) begin_research_money,
+          	  sum(t3.begin_teach_money) begin_teach_money,
+          
+	          sum(t3.this_add_sum_money) this_add_sum_money,
+	          sum(t3.this_add_self_money) this_add_self_money,
+	          sum(t3.this_add_finance_money) this_add_finance_money,
+	          sum(t3.this_add_research_money) this_add_research_money,
+	          sum(t3.this_add_teach_money) this_add_teach_money,
+	          
+	          sum(t3.this_decrease_sum_money) this_decrease_sum_money,
+	          sum(t3.this_decrease_self_money) this_decrease_self_money,
+	          sum(t3.this_decrease_finance_money) this_decrease_finance_money,
+	          sum(t3.this_decrease_research_money) this_decrease_research_money,
+	          sum(t3.this_decrease_teach_money) this_decrease_teach_money,
+	          
+	          sum(t3.end_sum_money) end_sum_money,
+	          sum(t3.end_self_money) end_self_money,
+	          sum(t3.end_finance_money) end_finance_money,
+	          sum(t3.end_research_money) end_research_money,
+	          sum(t3.end_teach_money) end_teach_money
+			FROM type_t t3
+		  ) t
+		  ORDER BY t.ass_type_code
+
+	</select>
+	
+	<!-- 打印 -->
+	<select id="queryAssAlterationMainPrint" parameterType="java.util.Map" resultMap="assAlterationMai" >
+			WITH init_t AS (
+		SELECT 
+          ass_type_id,<!-- ass_type_name, -->
+          nvl(self_money,0) as self_money,
+          nvl(finance_money,0) as finance_money,
+          nvl(research_money,0) as research_money,
+          nvl(teach_money,0) as teach_money 
+        FROM (select ty.ass_type_id ass_type_id，ty.ass_type_name ass_type_name, sum(t1.r_begin) price,t1.SOURCE_CODE source_id from ASS_TYPE_DICT ty 
+left join ass_collect_type_source t1
+on ty.ass_type_id=t1.ass_type_id and
+ty.group_id=t1.group_id
+and ty.copy_code=t1.copy_code
+and ty.hos_id=t1.hos_id
+<if test="acc_year != null and acc_year != ''">
+   			AND t1.acc_year = #{acc_year}
+   			</if>
+   			<if test="acc_month != null and acc_month != ''">
+   			AND t1.acc_month = #{acc_month}
+   			</if>
+
+<!--   <if test="type_level != null and type_level != ''">
+			  WHERE ty.type_level =#{type_level}
+			  </if> -->
+group by ty.ass_type_id，ty.ass_type_name, t1.r_begin,t1.SOURCE_CODE
+)
+
+  PIVOT (sum(price) FOR source_id IN('001' as self_money,'002' as finance_money,'003' as research_money,'004' as teach_money))
+    
+      
+    ),
+    in_t AS (
+    SELECT 
+          ass_type_id,<!-- ass_type_name, -->
+          nvl(self_money,0) as self_money,
+          nvl(finance_money,0) as finance_money,
+          nvl(research_money,0) as research_money,
+          nvl(teach_money,0) as teach_money 
+        FROM (select ty.ass_type_id ass_type_id，ty.ass_type_name ass_type_name, sum(t1.R_ADD) price,t1.SOURCE_CODE source_id from ASS_TYPE_DICT ty 
+left join ass_collect_type_source t1
+on ty.ass_type_id=t1.ass_type_id and
+ty.group_id=t1.group_id
+and ty.copy_code=t1.copy_code
+and ty.hos_id=t1.hos_id
+<if test="acc_year != null and acc_year != ''">
+         AND t1.acc_year = #{acc_year}
+         </if>
+         <if test="acc_month != null and acc_month != ''">
+         AND t1.acc_month = #{acc_month}
+         </if>
+
+ <!--  <if test="type_level != null and type_level != ''">
+        WHERE ty.type_level =#{type_level}
+        </if> -->
+group by ty.ass_type_id，ty.ass_type_name, t1.r_begin,t1.SOURCE_CODE
+)
+
+  PIVOT (sum(price) FOR source_id IN('001' as self_money,'002' as finance_money,'003' as research_money,'004' as teach_money))
+    
+      
+    ),
+    out_t AS (
+    SELECT 
+          ass_type_id,<!-- ass_type_name, -->
+          nvl(self_money,0) as self_money,
+          nvl(finance_money,0) as finance_money,
+          nvl(research_money,0) as research_money,
+          nvl(teach_money,0) as teach_money 
+        FROM (select ty.ass_type_id ass_type_id，ty.ass_type_name ass_type_name, sum(t1.R_DEC) price,t1.SOURCE_CODE source_id from ASS_TYPE_DICT ty 
+left join ass_collect_type_source t1
+on ty.ass_type_id=t1.ass_type_id and
+ty.group_id=t1.group_id
+and ty.copy_code=t1.copy_code
+and ty.hos_id=t1.hos_id
+<if test="acc_year != null and acc_year != ''">
+         AND t1.acc_year = #{acc_year}
+         </if>
+         <if test="acc_month != null and acc_month != ''">
+         AND t1.acc_month = #{acc_month}
+         </if>
+
+ <!--  <if test="type_level != null and type_level != ''">
+        WHERE ty.type_level =#{type_level}
+        </if> -->
+group by ty.ass_type_id，ty.ass_type_name, t1.r_begin,t1.SOURCE_CODE
+)
+
+  PIVOT (sum(price) FOR source_id IN('001' as self_money,'002' as finance_money,'003' as research_money,'004' as teach_money))
+    ),
+    type_t AS (
+        SELECT 
+        a.ass_type_id,
+        a.ass_type_code,
+        a.ass_type_name,
+        a.type_level,
+        nvl(a.super_code,0) super_code,
+        nvl(b.self_money,0)+nvl(b.finance_money,0)+nvl(b.research_money,0)+nvl(b.teach_money,0) AS begin_sum_money,<!-- 期初合计 -->
+        nvl(b.self_money,0) AS begin_self_money,<!-- 期初自筹 -->
+        nvl(b.finance_money,0) AS begin_finance_money,<!-- 期初财政 -->
+        nvl(b.research_money,0) AS begin_research_money,<!-- 期初科研 -->
+        nvl(b.teach_money,0) AS begin_teach_money,<!-- 期初教学 -->
+        nvl(c.self_money,0)+nvl(c.finance_money,0)+nvl(c.research_money,0)+nvl(c.teach_money,0) AS this_add_sum_money,<!-- 增加合计 -->
+        nvl(c.self_money,0) AS this_add_self_money,<!-- 增加自筹 -->
+        nvl(c.finance_money,0) AS this_add_finance_money,<!-- 增加财政 -->
+        nvl(c.research_money,0) AS this_add_research_money,<!-- 增加科研 -->
+        nvl(c.teach_money,0) AS this_add_teach_money,<!-- 增加教学 -->
+        nvl(d.self_money,0)+nvl(d.finance_money,0)+nvl(d.research_money,0)+nvl(d.teach_money,0) AS this_decrease_sum_money,<!-- 减少合计 -->
+        nvl(d.self_money,0) AS this_decrease_self_money,<!-- 减少自筹 -->
+        nvl(d.finance_money,0) AS this_decrease_finance_money,<!-- 减少财政 -->
+        nvl(d.research_money,0) AS this_decrease_research_money,<!-- 减少科研 -->
+        nvl(d.teach_money,0) AS this_decrease_teach_money,<!-- 减少教学 -->
+        (nvl(b.self_money,0)+nvl(c.self_money,0)-nvl(d.self_money,0))+(nvl(b.finance_money,0)+nvl(c.finance_money,0)-nvl(d.finance_money,0))+
+        (nvl(b.research_money,0)+nvl(c.research_money,0)-nvl(d.research_money,0))+
+        (nvl(b.teach_money,0)+nvl(c.teach_money,0)-nvl(d.teach_money,0)) AS end_sum_money,<!-- 期末合计 -->
+        nvl(b.self_money,0)+nvl(c.self_money,0)-nvl(d.self_money,0) AS end_self_money,<!-- 期末自筹 -->
+        nvl(b.finance_money,0)+nvl(c.finance_money,0)-nvl(d.finance_money,0) AS end_finance_money,<!-- 期末财政 -->
+        nvl(b.research_money,0)+nvl(c.research_money,0)-nvl(d.research_money,0) AS end_research_money,<!-- 期末科研 -->
+        nvl(b.teach_money,0)+nvl(c.teach_money,0)-nvl(d.teach_money,0) AS end_teach_money<!-- 期末教学 -->
+        FROM ASS_TYPE_DICT a
+        LEFT JOIN init_t b
+          ON a.ass_type_id = b.ass_type_id
+        LEFT JOIN in_t c
+          ON a.ass_type_id = c.ass_type_id
+        LEFT JOIN out_t d
+          ON a.ass_type_id = d.ass_type_id
+        WHERE a.is_stop = 0
+          AND a.group_id = #{group_id} AND a.hos_id = #{hos_id} AND a.copy_code = #{copy_code}
+      ),
+    temp1 AS(
+      SELECT 
+        t2.ass_type_code,
+        t2.ass_type_name,
+        sum(t2.begin_sum_money) begin_sum_money,
+        sum(t2.begin_self_money) begin_self_money,
+            sum(t2.begin_finance_money) begin_finance_money,
+            sum(t2.begin_research_money) begin_research_money,
+            sum(t2.begin_teach_money) begin_teach_money,
+          
+            sum(t2.this_add_sum_money) this_add_sum_money,
+            sum(t2.this_add_self_money) this_add_self_money,
+            sum(t2.this_add_finance_money) this_add_finance_money,
+            sum(t2.this_add_research_money) this_add_research_money,
+            sum(t2.this_add_teach_money) this_add_teach_money,
+          
+            sum(t2.this_decrease_sum_money) this_decrease_sum_money,
+            sum(t2.this_decrease_self_money) this_decrease_self_money,
+            sum(t2.this_decrease_finance_money) this_decrease_finance_money,
+            sum(t2.this_decrease_research_money) this_decrease_research_money,
+            sum(t2.this_decrease_teach_money) this_decrease_teach_money,
+          
+            sum(t2.end_sum_money) end_sum_money,
+            sum(t2.end_self_money) end_self_money,
+            sum(t2.end_finance_money) end_finance_money,
+            sum(t2.end_research_money) end_research_money,
+            sum(t2.end_teach_money) end_teach_money
+      FROM (
+      SELECT 
+          connect_by_root(t1.ass_type_code) ass_type_code,
+            connect_by_root(t1.ass_type_name) ass_type_name,
+            t1.begin_sum_money,
+            t1.begin_self_money,
+              t1.begin_finance_money,
+              t1.begin_research_money,
+              t1.begin_teach_money,
+          
+              t1.this_add_sum_money,
+              t1.this_add_self_money,
+              t1.this_add_finance_money,
+              t1.this_add_research_money,
+              t1.this_add_teach_money,
+              
+              t1.this_decrease_sum_money,
+              t1.this_decrease_self_money,
+              t1.this_decrease_finance_money,
+              t1.this_decrease_research_money,
+              t1.this_decrease_teach_money,
+          
+              t1.end_sum_money,
+              t1.end_self_money,
+              t1.end_finance_money,
+              t1.end_research_money,
+              t1.end_teach_money
+      FROM type_t t1
+      START WITH t1.super_code IN (
+        SELECT super_code FROM type_t 
+        <if test="type_level != null and type_level != ''">
+        WHERE type_level =#{type_level}
+        </if>
+      )
+      CONNECT BY PRIOR t1.ass_type_code = t1.super_code
+      ) t2
+      GROUP BY t2.ass_type_code,t2.ass_type_name
+      ORDER BY t2.ass_type_code
+    ),
+    temp2 AS (
+      SELECT 
+      t.ass_type_code,
+      cast(lpad(chr(41377), level * 2 - 1,chr(41377)) || t.ass_type_name as varchar2(50)) ass_type_name
+      FROM type_t t
+      START WITH t.super_code = 0
+      CONNECT BY PRIOR t.ass_type_code = t.super_code
+    )
+        SELECT * FROM (
+      SELECT
+        t2.ass_type_code,
+        t2.ass_type_name,
+        t1.begin_sum_money,
+        t1.begin_self_money,
+              t1.begin_finance_money,
+              t1.begin_research_money,
+              t1.begin_teach_money,
+          
+              t1.this_add_sum_money,
+              t1.this_add_self_money,
+              t1.this_add_finance_money,
+              t1.this_add_research_money,
+              t1.this_add_teach_money,
+              
+              t1.this_decrease_sum_money,
+              t1.this_decrease_self_money,
+              t1.this_decrease_finance_money,
+              t1.this_decrease_research_money,
+              t1.this_decrease_teach_money,
+          
+              t1.end_sum_money,
+              t1.end_self_money,
+              t1.end_finance_money,
+              t1.end_research_money,
+              t1.end_teach_money
+      FROM  temp1 t1, temp2 t2
+      WHERE t1.ass_type_code = t2.ass_type_code
+          
+      UNION ALL
+          
+      SELECT 
+        null AS ass_type_code,
+        '合计' AS ass_type_name,
+        sum(t3.begin_sum_money) begin_sum_money,
+        sum(t3.begin_self_money) begin_self_money,
+              sum(t3.begin_finance_money) begin_finance_money,
+              sum(t3.begin_research_money) begin_research_money,
+              sum(t3.begin_teach_money) begin_teach_money,
+          
+            sum(t3.this_add_sum_money) this_add_sum_money,
+            sum(t3.this_add_self_money) this_add_self_money,
+            sum(t3.this_add_finance_money) this_add_finance_money,
+            sum(t3.this_add_research_money) this_add_research_money,
+            sum(t3.this_add_teach_money) this_add_teach_money,
+            
+            sum(t3.this_decrease_sum_money) this_decrease_sum_money,
+            sum(t3.this_decrease_self_money) this_decrease_self_money,
+            sum(t3.this_decrease_finance_money) this_decrease_finance_money,
+            sum(t3.this_decrease_research_money) this_decrease_research_money,
+            sum(t3.this_decrease_teach_money) this_decrease_teach_money,
+            
+            sum(t3.end_sum_money) end_sum_money,
+            sum(t3.end_self_money) end_self_money,
+            sum(t3.end_finance_money) end_finance_money,
+            sum(t3.end_research_money) end_research_money,
+            sum(t3.end_teach_money) end_teach_money
+      FROM type_t t3
+      ) t
+      ORDER BY t.ass_type_code
+	
+	</select>
+</mapper>
+

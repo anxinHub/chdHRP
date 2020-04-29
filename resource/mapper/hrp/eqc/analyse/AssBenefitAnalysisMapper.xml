@@ -1,0 +1,615 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.eqc.dao.analyse.AssBenefitAnalysisMapper">
+	
+	<resultMap id="assBenefitAnalysis" type="java.util.Map">
+	<result property="group_id" column="group_id"/>
+	<result property="hos_id" column="hos_id"/>
+	<result property="copy_code" column="copy_code"/>
+	<result property="analysis_code" column="analysis_code"/>
+	<result property="analysis_name" column="analysis_name"/>	
+	<result property="year" column="year"/>
+	<result property="month" column="month"/>
+	<result property="purchase_money" column="purchase_money"/>
+	<result property="check_amount" column="check_amount"/>
+	<result property="income" column="income"/>
+	<result property="sumIncome" column="sumIncome"/>
+	<result property="cost" column="cost"/>
+	<result property="sumCost" column="sumCost"/>
+	<result property="profit" column="profit"/>
+	<result property="sumProfit" column="sumProfit"/>
+	<result property="rate" column="rate"/>
+	<result property="sumRate" column="sumRate"/>
+	<result property="dept_id" column="dept_id"/>
+	<result property="dept_name" column="dept_name"/>
+	<result property="use_month" column="use_month"/>
+	<result property="price" column="price"/>
+	<result property="inves_benefit" column="inves_benefit"/>
+	<result property="inves_money" column="inves_money"/>
+	<result property="period" column="period"/>
+	
+	<result property="ass_spec" column="ass_spec"/>
+	<result property="amount" column="amount"/>
+	<result property="money" column="money"/>
+	<result property="use_date" column="use_date"/>
+	<result property="dept_id" column="dept_id"/>
+	<result property="dept_name" column="dept_name"/>
+	<result property="acc_depre_amount" column="acc_depre_amount"/>
+	<result property="use_num" column="use_num"/>
+	<result property="use_num_sum" column="use_num_sum"/>
+	<result property="pre_use_num" column="pre_use_num"/>
+	<result property="budg_num" column="budg_num"/>
+	<result property="year_use_num" column="year_use_num"/>
+	<result property="income_sum" column="income_sum"/>
+	<result property="pre_income_sum" column="pre_income_sum"/>
+	<result property="budg_income" column="budg_income"/>
+	<result property="year_income" column="year_income"/>
+	</resultMap>
+	
+	<!-- 资产收益分析报表 查询 -->
+	<select id="queryAssProfitAnalysis" parameterType="java.util.Map" resultMap="assBenefitAnalysis" >
+	
+		with useData as ( <!-- 使用记录数据 -->
+			select a.group_id , a.hos_id , a.copy_code , a.analysis_code ,b.analysis_name , a.year , a.month ,
+				a.dept_code dept_id, total_fee ,alone_pay_num , b.money purchase_money
+			from ass_eq_use_recordm a
+			left join v_ass_analysis_object_info b
+				on a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code
+				and a.analysis_code = b.analysis_code
+			where a.group_id = #{group_id}
+				and a.hos_id = #{hos_id}
+				and a.copy_code = #{copy_code}
+				<if test="analysis_code != null and analysis_code != '' ">
+				and a.analysis_code = #{analysis_code}
+				</if>
+		union all
+			select a.group_id , a.hos_id , a.copy_code , a.analysis_code , b.analysis_name , a.year , a.month ,
+				a.dept_code dept_id, total_fee ,alone_pay_num ,b.money purchase_money
+			from ass_eq_use_recordd a
+			left join v_ass_analysis_object_info b
+				on a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code
+				and a.analysis_code = b.analysis_code
+			where a.group_id = #{group_id}
+				and a.hos_id = #{hos_id}
+				and a.copy_code = #{copy_code}
+				<if test="analysis_code != null and analysis_code != '' ">
+				and a.analysis_code = #{analysis_code}
+				</if>
+		),
+		checkAmount as (
+			select group_id , hos_id , copy_code , analysis_code ,analysis_name , year , month , dept_id , count(1) check_amount
+			from useData
+			<where>
+				<if test="dept_id != null and dept_id != ''">
+					and dept_id = #{dept_id}
+				</if>
+				<if test="start_month != null and start_month != ''">
+					and year||'-'|| month &gt;= #{start_month}
+				</if>
+				<if test="end_month != null and end_month != ''">
+					and year||'-'||month &lt;= #{end_month}
+				</if>
+			</where> 
+			group by group_id , hos_id , copy_code , analysis_code ,analysis_name , year , month , dept_id
+		),
+		incomeData as ( <!-- 单期收入 -->
+			select  group_id , hos_id , copy_code , analysis_code , analysis_name , year , month , dept_id , 
+				sum(total_fee) income , sum(purchase_money) purchase_money
+			from useData
+			<where>
+				<if test="dept_id != null and dept_id != ''">
+					and dept_id = #{dept_id}
+				</if>
+				<if test="start_month != null and start_month != ''">
+					and year||'-'|| month &gt;= #{start_month}
+				</if>
+				<if test="end_month != null and end_month != ''">
+					and year||'-'||month &lt;= #{end_month}
+				</if>
+			</where> 
+			group by group_id , hos_id , copy_code , analysis_code , analysis_name , year , month ,dept_id
+		),
+		incomeSumData as ( <!-- 累计收入 -->
+			select  group_id , hos_id , copy_code , analysis_code , analysis_name , year ,
+				dept_id , sum(total_fee) sumIncome
+			from useData
+			<where>
+				<if test="dept_id != null and dept_id != ''">
+					and dept_id = #{dept_id}
+				</if>
+				<if test="start_month != null and start_month != ''">
+					and year||'-'|| month &gt;= #{start_month}
+				</if>
+				<if test="end_month != null and end_month != ''">
+					and year||'-'||month &lt;= #{end_month}
+				</if>
+			</where> 
+			group by group_id , hos_id , copy_code , analysis_code , analysis_name , year , dept_id
+		),
+		costBase as ( <!-- 支出基础数据 -->
+			select a.group_id , a.hos_id , a.copy_code , a.analysis_code , b.analysis_name , to_char(a.use_date,'yyyy') year , 
+				to_char(a.use_date,'mm') month ,a.dept_code dept_id, a.amount 
+			from ass_eq_use_consum_itemm a
+			left join v_ass_analysis_object_info b
+				on a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code
+				and a.analysis_code = b.analysis_code
+			where a.group_id = #{group_id}
+				and a.hos_id = #{hos_id}
+				and a.copy_code = #{copy_code}
+				<if test="analysis_code != null and analysis_code != '' ">
+				and a.analysis_code = #{analysis_code}
+				</if>
+		union all 
+			select a.group_id , a.hos_id , a.copy_code , a.analysis_code  , b.analysis_name , to_char(a.use_date,'yyyy') year , 
+				to_char(a.use_date,'mm') month , a.dept_code dept_id, a.amount
+			from ass_eq_use_consum_itemd a
+			left join v_ass_analysis_object_info b
+				on a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code
+				and a.analysis_code = b.analysis_code
+			where a.group_id = #{group_id}
+				and a.hos_id = #{hos_id}
+				and a.copy_code = #{copy_code}
+				<if test="analysis_code != null and analysis_code != '' ">
+				and a.analysis_code = #{analysis_code}
+				</if>
+		union all
+			select a.group_id , a.hos_id , a.copy_code , a.analysis_code ,b.analysis_name , a.year , a.month ,
+				b.dept_id, a.amount 
+			from ASS_OEQ_Used_Resource a
+			left join v_ass_analysis_object_info b
+				on a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code
+				and a.analysis_code = b.analysis_code
+			where a.group_id = #{group_id}
+				and a.hos_id = #{hos_id}
+				and a.copy_code = #{copy_code}
+				<if test="analysis_code != null and analysis_code != '' ">
+				and a.analysis_code = #{analysis_code}
+				</if>
+				<if test="dept_id != null and dept_id != ''">
+					and b.dept_id = #{dept_id}
+				</if>
+		),
+		costData as ( <!-- 单期支出  -->
+			select  group_id , hos_id , copy_code , analysis_code ,  analysis_name , year , month , dept_id , sum(amount) cost
+			from costBase
+			<where>
+				<if test="dept_id != null and dept_id != ''">
+					and dept_id = #{dept_id}
+				</if>
+				<if test="start_month != null and start_month != ''">
+					and year||'-'|| month &gt;= #{start_month}
+				</if>
+				<if test="end_month != null and end_month != ''">
+					and year||'-'||month &lt;= #{end_month}
+				</if>
+			</where> 
+			group by group_id , hos_id , copy_code , analysis_code , analysis_name , year , month ,dept_id
+		),
+		costSumData as ( <!-- 累计支出 -->
+			select  group_id , hos_id , copy_code , analysis_code , analysis_name , year , dept_id , sum(amount) sumCost
+			from costBase
+			<where>
+				<if test="dept_id != null and dept_id != ''">
+					and dept_id = #{dept_id}
+				</if>
+				<if test="start_month != null and start_month != ''">
+					and year||'-'|| month &gt;= #{start_month}
+				</if>
+				<if test="end_month != null and end_month != ''">
+					and year||'-'||month &lt;= #{end_month}
+				</if>
+			</where> 
+			group by group_id , hos_id , copy_code , analysis_code , analysis_name , year ,dept_id
+		)
+		SELECT 	a.group_id,	a.hos_id,a.copy_code, a.analysis_code ,a.analysis_name , a.year ,a.month ,
+			 a.dept_id , nvl(c.purchase_money,0) purchase_money, nvl(a.check_amount,0)check_amount ,
+			 nvl(c.income,0) income , nvl(d.sumIncome,0)sumIncome , nvl(e.cost,0) cost , nvl(f.sumCost,0) sumCost, 
+			 nvl(c.income,0)-nvl(e.cost,0) profit ,	nvl(d.sumIncome,0) - nvl(f.sumCost,0) sumProfit, 
+			 case nvl(c.income,0) when 0 then 0 else (nvl(c.income,0)-nvl(e.cost,0))/c.income*100 end rate ,
+			 case nvl(d.sumIncome,0) when 0 then 0 else (nvl(d.sumIncome,0) - nvl(f.sumCost,0))/d.sumIncome*100 end sumRate
+		FROM checkAmount a
+		left join incomeData c
+			on a.group_id = c.group_id
+			and a.hos_id = c.hos_id
+			and a.copy_code = c.copy_code
+			and a.analysis_code = c.analysis_code
+			and a.year = c.year
+			and a.month = c.month
+			and a.dept_id = c.dept_id
+		left join incomeSumData d
+			on a.group_id = d.group_id
+			and a.hos_id = d.hos_id
+			and a.copy_code = d.copy_code
+			and a.analysis_code = d.analysis_code
+			and a.year = d.year
+			and a.dept_id = d.dept_id
+		left join costData e
+			on a.group_id = e.group_id
+			and a.hos_id = e.hos_id
+			and a.copy_code = e.copy_code
+			and a.analysis_code = e.analysis_code
+			and a.year = e.year
+			and a.month = e.month
+			and a.dept_id = e.dept_id
+		left join costSumData f
+			on a.group_id = f.group_id
+			and a.hos_id = f.hos_id
+			and a.copy_code = f.copy_code
+			and a.analysis_code = f.analysis_code
+			and a.year = f.year
+			and a.dept_id = f.dept_id
+		
+		order by a.analysis_code asc
+	</select>
+	
+	<!-- 资投资收益报表 查询 -->
+	<select id="queryInvestmentBenefitAnalys" parameterType="java.util.Map" resultMap="assBenefitAnalysis" >
+		with useData as ( <!-- 使用记录数据 -->
+			select a.group_id , a.hos_id , a.copy_code , a.analysis_code ,b.analysis_name , a.year , a.month ,
+				a.dept_code dept_id, total_fee ,alone_pay_num , b.money price,b.depre_money,b.manage_depre_money ,
+				(to_char(sysdate, 'YYYY') - to_char(a.use_date,'YYYY')) * 12 
+				- to_number((to_char(sysdate, 'MM')) - to_char(a.use_date,'MM')) + 1 use_month
+			from ass_eq_use_recordm a
+			left join v_ass_analysis_object_info b
+				on a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code
+				and a.analysis_code = b.analysis_code
+			where a.group_id = #{group_id}
+				and a.hos_id = #{hos_id}
+				and a.copy_code = #{copy_code}
+				<if test="analysis_code != null and analysis_code != '' ">
+				and a.analysis_code = #{analysis_code}
+				</if>
+				<if test="dept_id != null and dept_id != ''">
+					and a.dept_code = #{dept_id}
+				</if>
+		union all
+			select a.group_id , a.hos_id , a.copy_code , a.analysis_code , b.analysis_name , a.year , a.month ,
+				a.dept_code dept_id, total_fee ,alone_pay_num ,b.money price, b.depre_money,b.manage_depre_money ,
+				(to_char(sysdate, 'YYYY') - to_char(a.use_date,'YYYY')) * 12 
+				- to_number((to_char(sysdate, 'MM')) - to_char(a.use_date,'MM')) +1 use_month
+			from ass_eq_use_recordd a
+			left join v_ass_analysis_object_info b
+				on a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code
+				and a.analysis_code = b.analysis_code
+			where a.group_id = #{group_id}
+				and a.hos_id = #{hos_id}
+				and a.copy_code = #{copy_code}
+				<if test="analysis_code != null and analysis_code != '' ">
+				and a.analysis_code = #{analysis_code}
+				</if>
+				<if test="dept_id != null and dept_id != ''">
+					and a.dept_code = #{dept_id}
+				</if>
+		),
+		checkAmount as (
+			select group_id , hos_id , copy_code , analysis_code ,analysis_name ,  dept_id , use_month ,
+				depre_money,manage_depre_money, count(1) check_amount
+			from useData
+			group by group_id , hos_id , copy_code , analysis_code ,analysis_name ,  dept_id,use_month,depre_money,manage_depre_money
+		),
+		incomeSumData as ( <!-- 累计收入 -->
+			select  group_id , hos_id , copy_code , analysis_code , analysis_name , dept_id ,price,
+				depre_money,manage_depre_money ,sum(total_fee) income
+			from useData
+			group by group_id , hos_id , copy_code , analysis_code , analysis_name  , dept_id, price,depre_money,manage_depre_money
+		),
+		costBase as ( <!-- 支出基础数据 -->
+			select a.group_id , a.hos_id , a.copy_code , a.analysis_code , b.analysis_name , to_char(a.use_date,'yyyy') year , 
+				to_char(a.use_date,'mm') month ,a.dept_code dept_id, a.amount 
+			from ass_eq_use_consum_itemm a
+			left join v_ass_analysis_object_info b
+				on a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code
+				and a.analysis_code = b.analysis_code
+			where a.group_id = #{group_id}
+				and a.hos_id = #{hos_id}
+				and a.copy_code = #{copy_code}
+				<if test="analysis_code != null and analysis_code != '' ">
+				and a.analysis_code = #{analysis_code}
+				</if>
+				<if test="dept_id != null and dept_id != ''">
+					and a.dept_code = #{dept_id}
+				</if>
+		union all 
+			select a.group_id , a.hos_id , a.copy_code , a.analysis_code  , b.analysis_name , to_char(a.use_date,'yyyy') year , 
+				to_char(a.use_date,'mm') month , a.dept_code dept_id, a.amount
+			from ass_eq_use_consum_itemd a
+			left join v_ass_analysis_object_info b
+				on a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code
+				and a.analysis_code = b.analysis_code
+			where a.group_id = #{group_id}
+				and a.hos_id = #{hos_id}
+				and a.copy_code = #{copy_code}
+				<if test="analysis_code != null and analysis_code != '' ">
+				and a.analysis_code = #{analysis_code}
+				</if>
+				<if test="dept_id != null and dept_id != ''">
+					and a.dept_code = #{dept_id}
+				</if>
+		union all
+			select a.group_id , a.hos_id , a.copy_code , a.analysis_code ,b.analysis_name , a.year , a.month ,
+				b.dept_id, a.amount 
+			from ASS_OEQ_Used_Resource a
+			left join v_ass_analysis_object_info b
+				on a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code
+				and a.analysis_code = b.analysis_code
+			where a.group_id = #{group_id}
+				and a.hos_id = #{hos_id}
+				and a.copy_code = #{copy_code}
+				<if test="analysis_code != null and analysis_code != '' ">
+				and a.analysis_code = #{analysis_code}
+				</if>
+				<if test="dept_id != null and dept_id != ''">
+					and b.dept_id = #{dept_id}
+				</if>
+		),
+		costSumData as ( <!-- 累计支出 -->
+			select  group_id , hos_id , copy_code , analysis_code , analysis_name , dept_id , sum(amount) cost
+			from costBase
+			group by group_id , hos_id , copy_code , analysis_code , analysis_name , dept_id
+		)
+		SELECT 	a.group_id,	a.hos_id,a.copy_code,a.analysis_code ,a.analysis_name ,
+			a.dept_id ,hdd.dept_name, a.use_month , a.check_amount , nvl(b.price,0) price, nvl(b.price,0) inves_money ,
+			nvl(b.income,0) income ,nvl(c.cost,0) cost ,ROUND((nvl(b.income,0) - nvl(c.cost,0))/a.use_month* 12,2) inves_benefit,
+			case nvl(b.price,0) when 0 then 0 else ROUND(((nvl(b.income,0) - nvl(c.cost,0))/a.use_month* 12)/b.price*100,4) end rate ,
+			ROUND(nvl(b.price,0)/((nvl(b.income,0) - nvl(c.cost,0))/a.use_month* 12 + nvl(a.depre_money,0)+nvl(a.manage_depre_money,0)),2) period
+		FROM checkAmount a
+		left join incomeSumData b
+			on a.group_id = b.group_id
+			and a.hos_id = b.hos_id
+			and a.copy_code = b.copy_code
+			and a.analysis_code = b.analysis_code
+			and a.dept_id = b.dept_id
+		left join costSumData c
+			on a.group_id = c.group_id
+			and a.hos_id = c.hos_id
+			and a.copy_code = c.copy_code
+			and a.analysis_code = c.analysis_code
+			and a.dept_id = c.dept_id
+		left join hos_dept_dict hdd
+			on a.group_id = hdd.group_id
+			and a.hos_id = hdd.hos_id
+			and a.dept_id = hdd.dept_id ||','||hdd.dept_no
+		order by a.analysis_code asc
+	</select>
+	
+	<!-- 本量利分析报表查询-->
+	<select id="queryCvpAnalysis" parameterType="java.util.Map" resultMap="assBenefitAnalysis" >
+	
+		SELECT 
+			a.group_id,
+			a.hos_id,
+			a.copy_code,
+			a.analysis_code ,
+			z.analysis_name ,
+			a.user_id,
+			d.user_name ,
+			a.percent,
+			a.remark,
+			a.from_date,
+			a.to_date
+		FROM ASS_EQ_OPERATOR a
+		
+		left join sys_user  d
+			on  a.group_id = d.group_id
+			and a.hos_id = d.hos_id
+			and a.user_id = d.user_id
+			and d.is_stop = 0
+		left join ASS_Benefit_Analysis_Object  z
+        	on  a.group_id = z.group_id
+      		and a.hos_id = z.hos_id
+      		and a.copy_code = z.copy_code
+      		and a.analysis_code = z.analysis_code
+		where                     
+			a.group_id = #{group_id}
+			AND a.hos_id = #{hos_id}
+			AND a.copy_code = #{copy_code}
+			<if test="analysis_code != null and analysis_code != ''">
+			AND a.analysis_code = #{analysis_code}
+			</if>			
+			<if test="user_id != null and user_id != ''">
+			AND a.user_id = #{user_id}
+			</if>
+			<if test="percent != null and percent != ''">
+			AND a.percent = #{percent}
+			</if>
+			<if test="remark != null and remark != ''">
+			AND a.remark like '%' || #{remark} || '%'
+			</if>
+		order by a.analysis_code asc
+	</select>
+	<!-- 设备明细表查询-->
+	<select id="queryAssIncomAndCost" parameterType="java.util.Map" resultMap="assBenefitAnalysis" >
+	
+		SELECT 
+			a.group_id,
+			a.hos_id,
+			a.copy_code,
+			a.analysis_code ,
+			z.analysis_name ,
+			a.user_id,
+			d.user_name ,
+			a.percent,
+			a.remark,
+			a.from_date,
+			a.to_date
+		FROM ASS_EQ_OPERATOR a
+		
+		left join sys_user  d
+			on  a.group_id = d.group_id
+			and a.hos_id = d.hos_id
+			and a.user_id = d.user_id
+			and d.is_stop = 0
+		left join ASS_Benefit_Analysis_Object  z
+        	on  a.group_id = z.group_id
+      		and a.hos_id = z.hos_id
+      		and a.copy_code = z.copy_code
+      		and a.analysis_code = z.analysis_code
+		where                     
+			a.group_id = #{group_id}
+			AND a.hos_id = #{hos_id}
+			AND a.copy_code = #{copy_code}
+			<if test="analysis_code != null and analysis_code != ''">
+			AND a.analysis_code = #{analysis_code}
+			</if>			
+			<if test="user_id != null and user_id != ''">
+			AND a.user_id = #{user_id}
+			</if>
+			<if test="percent != null and percent != ''">
+			AND a.percent = #{percent}
+			</if>
+			<if test="remark != null and remark != ''">
+			AND a.remark like '%' || #{remark} || '%'
+			</if>
+		order by a.analysis_code asc
+	</select>
+	
+	
+	<!-- 贵重医疗设备使用效益分析表  查询 -->
+	<select id="queryAssUseBenefitAnalys" parameterType="java.util.Map" resultMap="assBenefitAnalysis" >
+		with useData as ( <!-- 使用记录数据 -->
+			select a.group_id , a.hos_id , a.copy_code , a.analysis_code ,b.analysis_name , a.year , a.month ,
+				a.total_fee ,a.alone_pay_num , b.ass_spec , b.amount , b.price , 
+				b.money ,a.use_date ,a.dept_code dept_id, b.acc_depre_amount 
+			from ass_eq_use_recordm a
+			left join v_ass_analysis_object_info b
+				on a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code
+				and a.analysis_code = b.analysis_code
+			where a.group_id = #{group_id}
+				and a.hos_id = #{hos_id}
+				and a.copy_code = #{copy_code}
+				<if test="analysis_code != null and analysis_code != '' ">
+				and a.analysis_code = #{analysis_code}
+				</if>
+				<if test="dept_id != null and dept_id != ''">
+					and a.dept_code = #{dept_id}
+				</if>
+		union all
+			select a.group_id , a.hos_id , a.copy_code , a.analysis_code ,b.analysis_name , a.year , a.month ,
+				a.total_fee ,a.alone_pay_num , b.ass_spec , b.amount , b.price , 
+				b.money ,a.use_date ,a.dept_code dept_id, b.acc_depre_amount 
+			from ass_eq_use_recordd a
+			left join v_ass_analysis_object_info b
+				on a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code
+				and a.analysis_code = b.analysis_code
+			where a.group_id = #{group_id}
+				and a.hos_id = #{hos_id}
+				and a.copy_code = #{copy_code}
+				<if test="analysis_code != null and analysis_code != '' ">
+				and a.analysis_code = #{analysis_code}
+				</if>
+				<if test="dept_id != null and dept_id != ''">
+					and a.dept_code = #{dept_id}
+				</if>
+		),
+		checkAmount as (<!-- 实际累计 -->
+			select group_id , hos_id , copy_code , analysis_code ,analysis_name , ass_spec , amount , price , 
+				money ,use_date , dept_id ,acc_depre_amount, count(1) use_num_sum
+			from useData
+			group by group_id , hos_id , copy_code , analysis_code ,analysis_name , ass_spec , amount , price , 
+				money ,use_date , dept_id ,acc_depre_amount
+		),
+		checkAmountPre as (<!-- 上年检查人次 -->
+			select group_id , hos_id , copy_code , analysis_code ,analysis_name , ass_spec , amount , price , 
+				money ,use_date , dept_id ,acc_depre_amount, count(1) pre_use_num
+			from useData
+			where year = ${year}-1
+			group by group_id , hos_id , copy_code , analysis_code ,analysis_name , ass_spec , amount , price , 
+				money ,use_date , dept_id ,acc_depre_amount
+		),
+		checkAmountYear as (<!-- 本年检查人次 -->
+			select group_id , hos_id , copy_code , analysis_code ,analysis_name , ass_spec , amount , price , 
+				money ,use_date , dept_id ,acc_depre_amount, count(1) year_use_num
+			from useData
+			where year = ${year}
+			group by group_id , hos_id , copy_code , analysis_code ,analysis_name , ass_spec , amount , price , 
+				money ,use_date , dept_id ,acc_depre_amount
+		),
+		incomeSumData as ( <!-- 实际累计收入 -->
+			select  group_id , hos_id , copy_code , analysis_code , analysis_name , ass_spec , amount , price , 
+				money ,use_date , dept_id ,acc_depre_amount , sum(total_fee) income_sum
+			from useData
+			group by group_id , hos_id , copy_code , analysis_code , analysis_name , ass_spec , amount , price , 
+				money ,use_date , dept_id , acc_depre_amount
+		),
+		incomeSumDataPre as ( <!-- 上年全年累计收入 -->
+			select  group_id , hos_id , copy_code , analysis_code , analysis_name , ass_spec , amount , price , 
+				money ,use_date , dept_id ,acc_depre_amount ,sum(total_fee) pre_income_sum
+			from useData
+			where year = ${year}-1
+			group by group_id , hos_id , copy_code , analysis_code , analysis_name , ass_spec , amount , price , 
+				money ,use_date , dept_id ,acc_depre_amount
+		),
+		incomeSumDataYear as ( <!-- 本年实际累计收入 -->
+			select  group_id , hos_id , copy_code , analysis_code , analysis_name , ass_spec , amount , price , 
+				money ,use_date , dept_id ,acc_depre_amount ,sum(total_fee) year_income
+			from useData
+			where year = ${year}
+			group by group_id , hos_id , copy_code , analysis_code , analysis_name , ass_spec , amount , price , 
+				money ,use_date , dept_id ,acc_depre_amount
+		)
+		SELECT a.group_id , a.hos_id , a.copy_code , a.analysis_code , a.analysis_name , a.ass_spec , a.amount , a.price , 
+				a.money ,a.use_date ,a.dept_id , b.dept_name , a.acc_depre_amount , nvl(a.use_num_sum,0) use_num ,<!-- 投决累计 暂时 按实际累计 取值  -->
+				nvl(a.use_num_sum,0) use_num_sum, nvl(c.pre_use_num,0) pre_use_num , null budg_num  , <!-- 预算数据 暂时不取 等预算系统开发完毕后 补充 -->
+				d.year_use_num , e.income_sum income , <!-- 投决累计 暂时 按实际累计 取值  -->
+				e.income_sum , f.pre_income_sum , null budg_income ,<!-- 预算数据 暂时不取 等预算系统开发完毕后 补充 -->
+				g.year_income
+		FROM checkAmount a
+		left join hos_dept_dict b
+			on	a.group_id = b.group_id
+			and a.hos_id = b.hos_id
+			and a.dept_id = b.dept_id ||','|| b.dept_no
+		left join checkAmountPre c
+			on	a.group_id = c.group_id
+			and a.hos_id = c.hos_id
+			and a.copy_code = c.copy_code
+			and a.analysis_code = c.analysis_code
+		left join checkAmountYear d
+			on	a.group_id = d.group_id
+			and a.hos_id = d.hos_id
+			and a.copy_code = d.copy_code
+			and a.analysis_code = d.analysis_code
+		left join incomeSumData e
+			on	a.group_id = e.group_id
+			and a.hos_id = e.hos_id
+			and a.copy_code = e.copy_code
+			and a.analysis_code = e.analysis_code
+		left join incomeSumDataPre f
+			on	a.group_id = f.group_id
+			and a.hos_id = f.hos_id
+			and a.copy_code = f.copy_code
+			and a.analysis_code = f.analysis_code
+		left join incomeSumDataYear  g
+			on	a.group_id = g.group_id
+			and a.hos_id = g.hos_id
+			and a.copy_code = g.copy_code
+			and a.analysis_code = g.analysis_code
+		
+		order by a.analysis_code asc
+	</select>
+
+</mapper>
+

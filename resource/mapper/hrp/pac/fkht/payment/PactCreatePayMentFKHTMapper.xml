@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.pac.dao.fkht.payment.PactCreatePayMentFKHTMapper">
+	<resultMap type="java.util.Map" id="queryResult">
+		<result property="pay_code" column="pay_code"/>
+		<result property="pay_date" column="pay_date"/>
+		<result property="sup_id" column="sup_id"/>
+		<result property="sup_no" column="sup_no"/>
+		<result property="sup_name" column="sup_name"/>
+		<result property="bill_code" column="bill_code"/>
+		<result property="meker_name" column="meker_name"/>
+		<result property="checker_name" column="checker_name"/>
+		<result property="confirmer_name" column="confirmer_name"/>
+		<result property="state" column="state"/>
+		<result property="state_name" column="state_name"/>
+		<result property="pact_code" column="pact_code"/>
+		<result property="pact_name" column="pact_name"/>
+		<result property="plan_detail" column="plan_detail"/>
+		<result property="plan_det_id" column="plan_det_id"/>
+		<result property="source_id" column="source_id"/>
+		<result property="source_name" column="source_name"/>
+		<result property="plan_money" column="plan_money"/>
+		<result property="pay_money" column="pay_money"/>
+		<result property="is_init" column="is_init"/>
+		<result property="plan_date" column="plan_date"/>
+	</resultMap>
+	
+	<select id="query" parameterType="java.util.Map" resultMap="queryResult">
+		SELECT 	
+	 	temp.PAY_CODE, TO_CHAR(temp.PAY_DATE,'yyyy-MM-dd') AS "pay_date",pmf.SUP_NO ,hs.SUP_NAME,temp.BILL_CODE, su1.USER_NAME AS "maker_name", su2.USER_NAME AS "checker_name", su3.USER_NAME AS "confirmer_name",data.value_name AS "state_name",temp.STATE,pmf.PACT_CODE,pmf.PACT_NAME,
+		ppf.PLAN_DETAIL_ID AS "plan_det_id",CONCAT(ppf.PLAN_DETAIL_ID, ppf.SUMMARY) AS "plan_detail",ppf.SOURCE_ID,hs2.SOURCE_NAME , ppf.PLAN_MONEY,sum(NVL(temp.PAY_MONEY,0)) AS "pay_money",pmf.is_init ,TO_CHAR(ppf.PAY_DATE,'yyyy-MM-dd') as "plan_date"
+		FROM PACT_MAIN_FKHT pmf 
+		INNER JOIN PACT_PLAN_FKHT ppf ON pmf.GROUP_ID = ppf.GROUP_ID AND pmf.HOS_ID = ppf.HOS_ID AND pmf.COPY_CODE = ppf.COPY_CODE AND pmf.PACT_CODE = ppf.PACT_CODE 
+		LEFT JOIN (
+			SELECT ppmf.PACT_CODE,ppmf.GROUP_ID,ppmf.HOS_ID,ppmf.COPY_CODE,ppmf.PAY_CODE,ppmf.PAY_DATE,ppmf.BILL_CODE,ppmf.STATE,ppmf.MAKER,ppmf.CONFIRMER,ppmf.CHECKER,pppf.PAY_MONEY,pppf.PLAN_DET_ID
+			FROM PACT_PAY_MAIN_FKHT ppmf 
+			LEFT JOIN PACT_PAY_PLAN_FKHT pppf ON ppmf.GROUP_ID = pppf.GROUP_ID AND ppmf.HOS_ID = pppf.HOS_ID AND ppmf.COPY_CODE = pppf.COPY_CODE AND ppmf.PACT_CODE = pppf.PACT_CODE AND ppmf.PAY_CODE = pppf.PAY_CODE
+		) temp ON pmf.GROUP_ID = temp.GROUP_ID AND pmf.HOS_ID = temp.HOS_ID AND pmf.COPY_CODE = temp.COPY_CODE AND pmf.PACT_CODE = temp.PACT_CODE AND ppf.PLAN_DETAIL_ID = temp.PLAN_DET_ID
+		LEFT JOIN HOS_SUP hs ON pmf.GROUP_ID = hs.GROUP_ID AND pmf.HOS_ID = hs.HOS_ID AND pmf.SUP_NO = hs.SUP_ID
+		LEFT JOIN SYS_USER su1 ON temp.GROUP_ID = su1.GROUP_ID AND temp.HOS_ID = su1.HOS_ID AND temp.MAKER = su1.USER_ID
+		LEFT JOIN SYS_USER su2 ON temp.GROUP_ID = su2.GROUP_ID AND temp.HOS_ID = su2.HOS_ID AND temp.CHECKER = su2.USER_ID
+		LEFT JOIN SYS_USER su3 ON temp.GROUP_ID = su3.GROUP_ID AND temp.HOS_ID = su3.HOS_ID AND temp.CONFIRMER = su3.USER_ID
+		LEFT JOIN PACT_DICT_DATA data ON temp.STATE = data.VALUE_CODE AND data.F_CODE = 'STATE'
+		LEFT JOIN HOS_SOURCE hs2 ON hs2.GROUP_ID = temp.GROUP_ID AND hs2.HOS_ID = temp.HOS_ID AND hs2.SOURCE_ID = ppf.SOURCE_ID
+		<where>
+			pmf.GROUP_ID = #{group_id,jdbcType=NUMERIC} AND pmf.HOS_ID = #{hos_id,jdbcType=NUMERIC} AND pmf.COPY_CODE = #{copy_code,jdbcType=VARCHAR}
+			<if test="pact_type_code != null and pact_type_code != ''">
+				and pmf.pact_type_code=#{pact_type_code,jdbcType=VARCHAR}
+			</if>
+			<if test="sup_no != null and sup_no != ''">
+				and pmf.sup_no=#{sup_no,jdbcType=VARCHAR}
+			</if>
+			<if test="pact_code != null and pact_code != ''">
+				and pmf.pact_code like upper(#{pact_code})||'%'
+			</if>
+			<if test="pact_code != null and pact_code != ''">
+				and temp.pay_code like upper(#{pay_code})||'%'
+			</if>
+			<if test="pact_name != null and pact_name != ''">
+				and pmf.pact_name like '%'||#{pact_name}||'%'
+			</if>
+			<if test="trade_type != null and trade_type != ''">
+				and temp.bill_code=#{bill_code,jdbcType=VARCHAR}
+			</if>
+			<if test="state != null and state != ''">
+				and temp.state=#{state,jdbcType=VARCHAR}
+			</if>
+			<if test="start_date != null and start_date != '' and end_date != null and end_date != ''">
+				and temp.pay_date BETWEEN to_date(#{start_date,jdbcType=TIMESTAMP},'yyyy-MM-dd') AND to_date(#{end_date,jdbcType=TIMESTAMP},'yyyy-MM-dd')
+			</if>
+		</where>
+		GROUP BY temp.PAY_CODE,temp.PAY_DATE,pmf.SUP_NO,hs.SUP_NAME,temp.BILL_CODE,su1.USER_NAME,su2.USER_NAME,su3.USER_NAME,data.value_name,temp.STATE,pmf.PACT_CODE,pmf.PACT_NAME,ppf.PLAN_DETAIL_ID, ppf.SUMMARY,ppf.SOURCE_ID,hs2.SOURCE_NAME,ppf.PLAN_MONEY,pmf.is_init,ppf.pay_date
+		ORDER BY temp.PAY_CODE,pmf.pact_code
+	</select>
+</mapper>

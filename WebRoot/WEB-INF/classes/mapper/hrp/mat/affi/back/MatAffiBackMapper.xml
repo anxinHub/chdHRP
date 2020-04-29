@@ -1,0 +1,1301 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.mat.dao.affi.back.MatAffiBackMapper">
+
+	<resultMap id="matAffiInMain" type="java.util.Map">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="in_id" column="in_id"/>
+		<result property="in_no" column="in_no"/> 
+		<result property="year" column="year"/>
+		<result property="month" column="month"/> 
+		<result property="bus_type_code" column="bus_type_code"/>
+		<result property="bus_type_name" column="bus_type_name"/>
+		<result property="sup_no" column="sup_no"/>
+		<result property="sup_id" column="sup_id"/>
+		<result property="sup_name" column="sup_name"/>
+		<result property="store_id" column="store_id"/>
+		<result property="store_no" column="store_no"/>
+		<result property="store_name" column="store_name"/>
+		<result property="brief" column="brief"/>
+		<result property="stocker" column="stocker"/>
+		<result property="stocker_name" column="stocker_name"/>
+		<result property="stock_type_code" column="stock_type_code"/>
+		<result property="maker" column="maker"/>
+		<result property="maker_name" column="maker_name"/>
+		<result property="in_date" column="in_date"/>
+		<result property="checker" column="checker"/>
+		<result property="checker_name" column="checker_name"/>
+		<result property="check_date" column="check_date"/>
+		<result property="confirmer" column="confirmer"/>
+		<result property="confirmer_name" column="confirmer_name"/>
+		<result property="confirm_date" column="confirm_date"/>
+		<result property="state" column="state"/>
+		<result property="state_name" column="state_name"/>
+		<result property="is_pay" column="is_pay"/>
+		<result property="pay_date" column="pay_date"/>
+		<result property="pay_money" column="pay_money"/>
+		<result property="is_pay_all" column="is_pay_all"/>
+		<result property="proj_id" column="proj_id"/>
+		<result property="check_code" column="check_code"/>
+		<result property="protocol_code" column="protocol_code"/>
+		<result property="amount_money" column="amount_money"/>
+	</resultMap>
+	
+	<resultMap id="matAffiInDetail" type="java.util.Map">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="in_id" column="in_id"/>
+		<result property="detail_id" column="detail_id"/>
+		<result property="inv_id" column="inv_id"/>
+		<result property="inv_no" column="inv_no"/>
+		<result property="inv_code" column="inv_code"/>
+		<result property="inv_name" column="inv_name"/>
+		<result property="inv_model" column="inv_model"/>
+		<result property="unit_code" column="unit_code"/>
+		<result property="unit_name" column="unit_name"/>
+		<result property="batch_no" column="batch_no"/>
+		<result property="price" column="price"/>
+		<result property="amount" column="amount"/>
+		<result property="amount_money" column="amount_money"/>
+		<result property="sell_price" column="sell_price"/>
+		<result property="sell_money" column="sell_money"/>
+		<result property="allot_price" column="allot_price"/>
+		<result property="allot_money" column="allot_money"/>
+		<result property="pack_code" column="pack_code"/>
+		<result property="pack_name" column="pack_name"/>
+		<result property="num_exchange" column="num_exchange"/>
+		<result property="pack_price" column="pack_price"/>
+		<result property="num" column="num"/>
+		<result property="bar_code" column="bar_code"/>
+		<result property="sn" column="sn"/>
+		<result property="inva_date" column="inva_date"/>
+		<result property="disinfect_date" column="disinfect_date"/>
+		<result property="location_id" column="location_id"/>
+		<result property="location_code" column="location_code"/>
+		<result property="location_name" column="location_name"/>
+		<result property="order_rela" column="order_rela"/>
+		<result property="note" column="note"/>
+	</resultMap>
+
+	<!-- 常备材料入库主查询 -->
+	<select id="query" parameterType="java.util.Map" resultMap="matAffiInMain" >
+		select temp.* from(
+			SELECT 
+				null group_id,null hos_id,null copy_code,null in_id,to_char('合计') in_no
+			    ,null brief,null store_id,null store_no,null store_name,null bus_type_code
+			    ,null bus_type_name,null sup_id,null sup_no,null sup_name,null stocker_name
+			    ,SUM(b.amount_money) AS amount_money,null in_date, null maker_name,null confirm_date,null confirmer_name
+			   , null as state ,null state_name	
+		    FROM mat_affi_in a
+		    LEFT JOIN mat_affi_in_detail b 
+		    ON 
+		    	a.group_id = b.group_id
+			    AND a.hos_id = b.hos_id
+			    AND a.copy_code = b.copy_code
+			    AND a.in_id = b.in_id
+			<where>
+				a.group_id = #{group_id,jdbcType=INTEGER}
+				AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+				and a.state != 5
+				<if test="begin_in_date != null and begin_in_date != ''">
+					AND to_char(a.in_date) &gt;= to_date(#{begin_in_date},'yyyy-MM-dd')
+				</if>
+				<if test="end_in_date != null and end_in_date != ''">
+					AND to_char(a.in_date) &lt;= to_date(#{end_in_date},'yyyy-MM-dd')
+				</if>
+				<if test="begin_confirm_date != null and begin_confirm_date != ''">
+					AND to_char(a.confirm_date) &gt;= to_date(#{begin_confirm_date},'yyyy-MM-dd')
+				</if>
+				<if test="end_confirm_date != null and end_confirm_date != ''">
+					AND to_char(a.confirm_date) &lt;= to_date(#{end_confirm_date},'yyyy-MM-dd')
+				</if>
+				<if test="bus_type_code != null and bus_type_code != ''">
+					AND a.bus_type_code = #{bus_type_code,jdbcType=VARCHAR}
+				</if>
+				<if test="state != null and state != ''">
+					AND a.state = #{state,jdbcType=VARCHAR}
+				</if>
+				<if test="store_id != null and store_id != ''">
+					AND a.store_id = #{store_id,jdbcType=VARCHAR}
+				</if>
+				<if test="sup_id != null and sup_id != ''">
+					AND a.sup_id = #{sup_id,jdbcType=VARCHAR}
+				</if>
+				<if test="in_no != null and in_no != ''">
+					AND a.in_no like '${in_no}%'
+				</if>
+			</where>     
+			UNION ALL 
+			SELECT 
+				a.group_id, a.hos_id, a.copy_code, a.in_id, to_char(a.in_no) in_no, a.brief, a.store_id, a.store_no, c.store_name,
+				a. bus_type_code, d.bus_type_name, a.sup_id, a.sup_no, h.sup_name, i.emp_name stocker_name, 
+				sum(b.amount_money) as amount_money, a.in_date, e.user_name as maker_name,  
+				a.confirm_date, f.user_name as confirmer_name, a.state,  
+				 case when a.state = 1 then '未审核'
+				when a.state = 2 then '已审核'
+				when a.state = '3' then '已确认'
+			  end state_name
+			FROM mat_affi_in a
+			LEFT JOIN mat_affi_in_detail b 
+				on a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code
+				and a.in_id = b.in_id
+			LEFT JOIN hos_store_dict c
+				on a.group_id = c.group_id
+				and a.hos_id = c.hos_id
+				and a.store_id = c.store_id
+				<if test="show_history == 1">
+					and a.store_no = c.store_no
+				</if>
+				<if test="show_history == 0">
+					and c.is_stop = 0
+				</if>
+			LEFT JOIN mat_bus_type d
+				on a.bus_type_code = d.bus_type_code
+				and d.is_stop = 0
+			LEFT JOIN sys_user e
+				on a.group_id = e.group_id
+				and a.hos_id = e.hos_id
+				and a.maker = e.user_id
+			LEFT JOIN sys_user f
+				on a.group_id = f.group_id
+				and a.hos_id = f.hos_id
+				and a.confirmer = f.user_id
+			LEFT JOIN mat_sys_list g
+				on g.table_code = 'mat_affi_in'
+				and g.field_code = 'STATE'
+				and a.state = g.field_value
+			LEFT JOIN hos_sup_dict h
+				on a.group_id = h.group_id
+				and a.hos_id = h.hos_id
+				and a.sup_id = h.sup_id
+				<if test="show_history == 1">
+					and a.sup_no = h.sup_no
+				</if>
+				<if test="show_history == 0">
+					and h.is_stop = 0
+				</if>
+			LEFT JOIN hos_emp i
+				on a.group_id = i.group_id
+				and a.hos_id = i.hos_id
+				and a.stocker = i.emp_id
+			<where>
+				a.group_id = #{group_id,jdbcType=INTEGER}
+				AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+				and a.state != 5 
+				<if test="begin_in_date != null and begin_in_date != ''">
+					AND to_char(a.in_date) &gt;= to_date(#{begin_in_date},'yyyy-MM-dd')
+				</if>
+				<if test="end_in_date != null and end_in_date != ''">
+					AND to_char(a.in_date) &lt;= to_date(#{end_in_date},'yyyy-MM-dd')
+				</if>
+				<if test="begin_confirm_date != null and begin_confirm_date != ''">
+					AND to_char(a.confirm_date) &gt;= to_date(#{begin_confirm_date},'yyyy-MM-dd')
+				</if>
+				<if test="end_confirm_date != null and end_confirm_date != ''">
+					AND to_char(a.confirm_date) &lt;= to_date(#{end_confirm_date},'yyyy-MM-dd')
+				</if>
+				<if test="bus_type_code != null and bus_type_code != ''">
+					AND a.bus_type_code = #{bus_type_code,jdbcType=VARCHAR}
+				</if> 
+				<if test="state != null and state != ''">
+					AND a.state = #{state,jdbcType=VARCHAR}
+				</if>
+				<if test="store_id != null and store_id != ''">
+					AND a.store_id = #{store_id,jdbcType=VARCHAR}
+				</if>
+				<if test="sup_id != null and sup_id != ''">
+					AND a.sup_id = #{sup_id,jdbcType=VARCHAR}
+				</if>
+				<if test="in_no != null and in_no != ''">
+					AND a.in_no like '${in_no}%'
+				</if>
+			</where>   
+			group by a.group_id, a.hos_id, a.copy_code, a.in_id, a.in_no, brief, a.store_id, a.store_no, c.store_name,
+				a. bus_type_code, d.bus_type_name, a.sup_id, a.sup_no, h.sup_name, i.emp_name, a.in_date, e.user_name,  
+				a.confirm_date, f.user_name, a.state, g.field_desc
+		) temp order by temp.in_id desc  
+	</select>
+	
+	<!-- 常备材料入库单据审核或消审 -->
+	<update id="auditOrUnAudit" parameterType="java.util.Map">
+		update mat_affi_in set 
+			state = #{state,jdbcType=INTEGER},
+			checker = #{checker,jdbcType=INTEGER},
+			check_date = #{check_date,jdbcType=DATE}
+		WHERE
+			group_id = #{group_id,jdbcType=INTEGER}
+			and hos_id = #{hos_id,jdbcType=INTEGER}
+			and copy_code = #{copy_code,jdbcType=VARCHAR}
+			and in_id = #{in_id,jdbcType=INTEGER}
+	</update>
+	
+	<!-- 常备材料入库单据审核或消审有待修改传入包含list的Map -->
+	<update id="auditOrUnAuditBatch" parameterType="java.util.List">
+		<foreach collection="list" index="index" item="item" open="begin" separator=";" close=";end;">
+			update mat_affi_in set 
+				state = #{item.state,jdbcType=INTEGER},
+				checker = #{item.checker,jdbcType=INTEGER},
+				check_date = #{item.check_date,jdbcType=DATE}
+			WHERE
+				group_id = #{item.group_id,jdbcType=INTEGER}
+				and hos_id = #{item.hos_id,jdbcType=INTEGER}
+				and copy_code = #{item.copy_code,jdbcType=VARCHAR}
+				and in_id = #{item.in_id,jdbcType=INTEGER}
+		</foreach>
+	</update>
+	
+	<select id="queryMatAffiBackDetailById" parameterType="java.util.Map"  resultType="java.util.TreeMap">
+		with w_midet as(
+			SELECT 
+				midet.group_id as group_id,
+				midet.hos_id as hos_id,
+				midet.copy_code as copy_code,
+				midet.in_id as in_id,
+				midet.detail_id as detail_id,
+				midet.inv_id as inv_id,
+				midet.inv_no as inv_no,
+				midet.batch_sn as batch_sn,
+				midet.batch_no as batch_no,
+				nvl(midet.price,0) as price,
+				nvl(midet.amount,0) as amount,
+				nvl(midet.sale_price,0) as sale_price,
+				nvl(midet.sale_money,0) as sale_money,
+				nvl(midet.sell_price,0) as sell_price,
+				nvl(midet.sell_money,0) as sell_money,
+				nvl(midet.allot_price,0) as allot_price,
+				nvl(midet.allot_money,0) as allot_money,
+				nvl(midet.amount_money,0) as amount_money,
+				midet.bar_code as bar_code,
+				midet.inva_date as inva_date,
+				midet.disinfect_date as disinfect_date,
+				midet.location_id as location_id,
+				midet.note as note,
+				mid.inv_code as inv_code,
+				mid.inv_name as inv_name,
+				mid.inv_model as inv_model,
+				mid.unit_code as unit_code,
+				hu.unit_name as unit_name,
+				mld.location_code as location_code,
+				mld.location_name as location_name,
+				nvl(mfb.left_amount,0) as cur_amount
+			FROM mat_affi_in_detail midet
+			left join mat_inv_dict mid 
+				on midet.group_id = mid.group_id and midet.hos_id = mid.hos_id 
+				and midet.copy_code = mid.copy_code and midet.inv_id = mid.inv_id 
+				and midet.inv_no = mid.inv_no
+			LEFT JOIN hos_unit hu 
+				ON mid.group_id = hu.group_id and mid.hos_id = hu.hos_id 
+				and mid.unit_code = hu.unit_code 
+			LEFT JOIN mat_location_dict mld 
+				on midet.group_id = mld.group_id and midet.hos_id = mld.hos_id 
+				and midet.copy_code = mld.copy_code and midet.location_id = mld.location_id 
+				and mld.is_stop=0
+			left join mat_affi_fifo mfb 
+				on midet.group_id = mfb.group_id and midet.hos_id = mfb.hos_id 
+				and midet.copy_code = mfb.copy_code and midet.inv_id = mfb.inv_id 
+				and midet.batch_sn= mfb.batch_sn and midet.batch_no = mfb.batch_no 
+				and midet.bar_code = mfb.bar_code and mfb.store_id = #{store_id,jdbcType=INTEGER}
+			where midet.group_id = #{group_id,jdbcType=INTEGER}
+				AND midet.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND midet.copy_code = #{copy_code,jdbcType=VARCHAR}
+				AND midet.in_id = #{in_id,jdbcType=INTEGER}
+			order by midet.detail_id asc             
+		),
+		w_mod as(
+			select 
+				inv_id,
+				batch_sn,
+				batch_no,
+				bar_code,
+				sum(amount) as amount
+			from(
+				--出库未确认单据
+				select 
+					inv_id as inv_id,
+					batch_sn as batch_sn,
+					batch_no as batch_no,
+					bar_code as bar_code,
+					sum(nvl(amount, 0)) as amount
+				from mat_affi_out mom 
+				left join mat_affi_out_detail matod
+					on mom.group_id = matod.group_id and mom.hos_id = matod.hos_id 
+					and mom.copy_code = matod.copy_code and mom.out_id = matod.out_id
+				where matod.group_id = #{group_id,jdbcType=INTEGER}
+					AND matod.hos_id = #{hos_id,jdbcType=INTEGER}
+					AND matod.copy_code = #{copy_code,jdbcType=VARCHAR}
+					AND mom.store_id = #{store_id,jdbcType=INTEGER}
+					<![CDATA[ 
+					AND mom.state < 3 
+					AND mom.bus_type_code <> '30' 
+					]]>
+				group by inv_id,batch_sn,batch_no,bar_code
+				--退货未确认单据
+				union all
+				select 
+					inv_id as inv_id,
+					batch_sn as batch_sn,
+					batch_no as batch_no,
+					bar_code as bar_code,
+					sum(nvl(amount, 0)) as amount
+				from mat_affi_in mim 
+				left join mat_affi_in_detail matid 
+					on mim.group_id = matid.group_id and mim.hos_id = matid.hos_id 
+					and mim.copy_code = matid.copy_code and mim.in_id = matid.in_id
+				where matid.group_id = #{group_id,jdbcType=INTEGER}
+					AND matid.hos_id = #{hos_id,jdbcType=INTEGER}
+					AND matid.copy_code = #{copy_code,jdbcType=VARCHAR}
+					AND mim.store_id = #{store_id,jdbcType=INTEGER}
+					<![CDATA[ 
+					AND mim.state < 3 
+					AND mim.in_id <> #{in_id,jdbcType=INTEGER} 
+					]]>
+					AND mim.bus_type_code = '29'
+				group by inv_id,batch_sn,batch_no,bar_code
+			)
+			group by inv_id, batch_sn, batch_no, bar_code
+			order by inv_id asc
+		)
+		select 
+			w_midet.group_id as group_id,
+			w_midet.hos_id as hos_id,
+			w_midet.copy_code as copy_code,
+			w_midet.in_id as in_id,
+			w_midet.inv_id as inv_id,
+			w_midet.inv_no as inv_no,
+			w_midet.batch_no as batch_no,
+			w_midet.price as price,
+			sum(nvl(w_midet.cur_amount, 0)) as cur_amount, 
+			sum(nvl(w_midet.cur_amount, 0) - nvl(w_mod.amount, 0)) AS imme_amount,
+			sum(nvl(w_midet.amount, 0)) as amount,
+			sum(nvl(w_midet.amount_money, 0)) as amount_money,
+			w_midet.sale_price as sale_price,
+			sum(nvl(w_midet.sale_money, 0)) as sale_money,
+			w_midet.sell_price as sell_price,
+			sum(nvl(w_midet.sell_money, 0)) as sell_money,
+			w_midet.allot_price as allot_price,
+			sum(nvl(w_midet.allot_money, 0)) as allot_money,
+			w_midet.bar_code as bar_code,
+			w_midet.inva_date as inva_date,
+			w_midet.disinfect_date as disinfect_date,
+			w_midet.location_id as location_id,
+			w_midet.note as note,
+			w_midet.inv_code as inv_code,
+			w_midet.inv_name as inv_name,
+			w_midet.inv_model as inv_model,
+			w_midet.unit_code as unit_code,
+			w_midet.unit_name as unit_name,
+			w_midet.location_code as location_code,
+			w_midet.location_name as location_name,
+			sum(nvl(w_midet.amount, 0)) as sum_amount,
+			'['||to_char(wm_concat('{"detail_id":'||w_midet.detail_id||',"inv_id":'||w_midet.inv_id
+			||',"inv_code":"'||to_char(w_midet.inv_code)||'","inv_name":"'||to_char(w_midet.inv_name)
+			||'","batch_sn":'||w_midet.batch_sn||',"cur_amount":'||w_midet.cur_amount
+			||',"imme_amount":'||(nvl(w_midet.cur_amount,0)-nvl(w_mod.amount,0))
+			||',"amount":'||w_midet.amount
+			||',"price":'||w_midet.price||',"amount_money":'||w_midet.amount_money
+			||',"sale_price":'||w_midet.sale_price||',"sale_money":'||w_midet.sale_money
+			||',"sell_price":'||w_midet.sell_price||',"sell_money":'||w_midet.sell_money
+			||'}'))||']' inv_detail_data
+		from w_midet w_midet
+		left join w_mod w_mod 
+			on w_midet.inv_id = w_mod.inv_id and  w_midet.batch_sn= w_mod.batch_sn 
+			and w_midet.batch_no= w_mod.batch_no and w_midet.bar_code= w_mod.bar_code
+		group by
+			w_midet.group_id, w_midet.hos_id, w_midet.copy_code, w_midet.in_id, w_midet.inv_id,
+			w_midet.inv_no, w_midet.batch_no, w_midet.price, w_midet.sale_price, w_midet.sell_price,
+			w_midet.allot_price, w_midet.bar_code, w_midet.inva_date, w_midet.disinfect_date,
+			w_midet.location_id, w_midet.note, w_midet.inv_code, w_midet.inv_name, w_midet.inv_model,
+			w_midet.unit_code, w_midet.unit_name, w_midet.location_code, w_midet.location_name
+		order by inv_detail_data
+	</select>
+	
+	<select id="queryMatAffiBackDetailByCode" parameterType="java.util.Map"  resultType="java.util.TreeMap">
+		SELECT 
+			mai.group_id, mai.hos_id, mai.copy_code, mai.in_id, mai.state, mai.store_id, 
+			maid.detail_id, maid.inv_id, maid.inv_no, maid.batch_sn, maid.batch_no, 
+			maid.price, maid.amount, nvl(maid.amount_money,0) as amount_money, 
+			nvl(maid.sale_price,0) as sale_price, nvl(maid.sale_money,0) as sale_money,
+			nvl(maid.sell_price,0) as sell_price, nvl(maid.sell_money,0) as sell_money,
+			nvl(maid.allot_price,0) as allot_price, nvl(maid.allot_money,0) as allot_money,
+			maid.bar_code, maid.inva_date, maid.disinfect_date, maid.location_id,
+			maid.note, mid.inv_code, mid.inv_name, mid.inv_model, mid.bid_code, 
+			mid.unit_code, hu.unit_name, mld.location_code, mld.location_name,mai.bus_type_code
+		FROM mat_affi_in mai 
+		left join mat_affi_in_detail maid
+			on mai.group_id = maid.group_id 
+			and mai.hos_id = maid.hos_id 
+			and mai.copy_code = maid.copy_code 
+			and mai.in_id = maid.in_id 
+		left join mat_inv_dict mid 
+			on maid.group_id = mid.group_id and maid.hos_id = mid.hos_id 
+			and maid.copy_code = mid.copy_code and maid.inv_id = mid.inv_id 
+			and maid.inv_no = mid.inv_no
+		LEFT JOIN hos_unit hu 
+			ON mid.group_id = hu.group_id and mid.hos_id = hu.hos_id 
+			and mid.unit_code = hu.unit_code 
+		LEFT JOIN mat_location_dict mld 
+			on maid.group_id = mld.group_id and maid.hos_id = mld.hos_id 
+			and maid.copy_code = mld.copy_code and maid.location_id = mld.location_id 
+			and mld.is_stop=0
+		WHERE mai.group_id = #{group_id,jdbcType=BIGINT}
+			AND mai.hos_id = #{hos_id,jdbcType=BIGINT}
+			AND mai.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND mai.in_id = #{in_id,jdbcType=BIGINT}
+	</select>
+	
+	<select id="queryAffiIn"  parameterType="java.util.Map"  resultType="java.util.TreeMap">
+		with w_mod as(
+			select 
+				inv_id,
+				batch_sn,
+				batch_no,
+				bar_code,
+				sum(amount) as amount
+			from(
+				--出库未确认单据
+				select 
+					inv_id,
+					batch_sn,
+					batch_no,
+					bar_code,
+					sum(nvl(amount, 0)) as amount
+				from mat_affi_out mom 
+				left join mat_affi_out_detail matod 
+					on mom.group_id = matod.group_id and mom.hos_id = matod.hos_id 
+					and mom.copy_code = matod.copy_code and mom.out_id = matod.out_id
+				where matod.group_id = #{group_id,jdbcType=INTEGER}
+					AND matod.hos_id = #{hos_id,jdbcType=INTEGER}
+					AND matod.copy_code = #{copy_code,jdbcType=VARCHAR}
+					AND mom.store_id = #{store_id,jdbcType=INTEGER}
+					<![CDATA[
+					AND mom.state < 3 
+					AND mom.bus_type_code <> '30'
+					]]>
+				group by inv_id, batch_sn, batch_no, bar_code
+				--退货未确认单据
+				union all
+				select 
+					inv_id as inv_id,
+					batch_sn as batch_sn,
+					batch_no as batch_no,
+					bar_code as bar_code,
+					-1 * sum(nvl(amount, 0)) as amount
+				from mat_affi_in mim
+				left join  mat_affi_in_detail matid
+					on mim.group_id = matid.group_id and mim.hos_id = matid.hos_id 
+					and mim.copy_code = matid.copy_code and mim.in_id = matid.in_id
+				where matid.group_id = #{group_id,jdbcType=INTEGER}
+					AND matid.hos_id = #{hos_id,jdbcType=INTEGER}
+					AND matid.copy_code = #{copy_code,jdbcType=VARCHAR}
+					AND mim.store_id = #{store_id,jdbcType=INTEGER}
+					<![CDATA[
+					AND mim.state < 3 
+					]]>
+					AND mim.bus_type_code = '29'
+				group by inv_id, batch_sn, batch_no, bar_code
+			)
+			group by inv_id, batch_sn, batch_no, bar_code
+			order by inv_id asc
+		)
+		select mim.group_id, mim.hos_id, mim.copy_code, mim.in_id, mim.in_no, mim.brief, hsd.sup_name, 
+			su.user_name as maker_name, mim.in_date, suc.user_name as confirmer_name, mim.confirm_date, 
+			sum(nvl(mfb.left_amount, 0) - nvl(w_mod.amount, 0)) as imme_amount
+		 ,midd.inv_id,midd.inv_code,midd.inv_name,midd.inv_model,mid.sn,mid.batch_no,mid.bar_code,mid.bar_code
+		 ,hfd.fac_name,midd.bid_code, mic.cert_code,mid.price,mid.amount,mid.amount_money
+		from mat_affi_in mim 
+		left join mat_affi_in_detail mid 
+			on mim.group_id = mid.group_id and mim.hos_id = mid.hos_id
+			and mim.copy_code = mid.copy_code and mim.in_id = mid.in_id
+		left join mat_affi_fifo mfb 
+			on mim.group_id = mfb.group_id and mim.hos_id = mfb.hos_id
+			and mim.copy_code = mfb.copy_code and mim.store_id = mfb.store_id
+			and mid.inv_id = mfb.inv_id and mid.batch_no = mfb.batch_no
+			and mid.batch_sn = mfb.batch_sn and mid.bar_code = mfb.bar_code
+		left join w_mod 
+			on mid.inv_id = w_mod.inv_id and mid.batch_no = w_mod.batch_no
+			and mid.batch_sn = w_mod.batch_sn and mid.bar_code = w_mod.bar_code
+		left join hos_sup_dict hsd 
+			on mim.group_id = hsd.group_id and mim.hos_id = hsd.hos_id
+			and mim.sup_id = hsd.sup_id and hsd.is_stop = 0
+		left join sys_user su 
+			on mim.group_id = su.group_id and su.hos_id = su.hos_id
+			and mim.maker = su.user_id 
+		left join sys_user suc 
+			on mim.group_id = suc.group_id and mim.hos_id = suc.hos_id
+			and mim.confirmer = suc.user_id
+		left join mat_inv_dict midd on
+			    mfb.group_id=midd.group_id
+			    and mfb.hos_id=midd.hos_id
+			    and mfb.copy_code=midd.copy_code
+			    and mfb.inv_id=midd.inv_id
+			    and midd.is_stop=0
+	 left join hos_fac_dict hfd on
+			midd.group_id=hfd.group_id
+			and midd.hos_id=hfd.hos_id
+			and midd.fac_id=hfd.fac_id
+			and midd.fac_no=hfd.fac_no
+	left join mat_inv_cert mic on mic.group_id = mid.group_id
+			and mic.hos_id = mid.hos_id
+			and mic.copy_code = mid.copy_code
+			and mic.cert_id = mid.cert_id  
+		where mim.group_id = #{group_id,jdbcType=INTEGER}
+			and mim.hos_id = #{hos_id,jdbcType=INTEGER}
+			and mim.copy_code = #{copy_code,jdbcType=VARCHAR}
+			and mim.store_id = #{store_id,jdbcType=INTEGER}
+			and mim.sup_id = #{sup_id,jdbcType=INTEGER}
+			<if test="in_no != null and in_no != ''">
+				AND mim.in_no = #{in_no,jdbcType=VARCHAR}
+			</if>
+				<if test="bid_code != null and bid_code != ''">
+				AND midd.bid_code = #{bid_code,jdbcType=VARCHAR}
+			</if>
+		
+				<if test="fac_id != null and fac_id != ''">
+				AND hfd.fac_id = #{fac_id,jdbcType=INTEGER}
+			</if>
+				<if test="inv_code != null and inv_code != ''">
+			
+				and (
+					midd.inv_code   like '%${inv_code}%'
+				     or midd.inv_name like '%${inv_code}%'
+				     or midd.alias like '%${inv_code}%'
+				     or upper(midd.spell_code) like '%${inv_code}%'
+				     or upper(midd.wbx_code) like '%${inv_code}%'
+				     or upper(midd.alias_spell) like '%${inv_code}%'
+				     or lower(midd.spell_code) like '%${inv_code}%'
+				     or lower(midd.wbx_code) like '%${inv_code}%'
+				     or lower(midd.alias_spell) like '%${inv_code}%'
+				     )
+			</if>
+			<if test="begin_in_date != null and begin_in_date != ''">
+				<![CDATA[AND mim.in_date >= #{begin_in_date,jdbcType=DATE}]]>
+			</if>
+			<if test="end_in_date != null and end_in_date != ''">
+				<![CDATA[AND mim.in_date <= #{end_in_date,jdbcType=DATE}]]>
+			</if>
+			and mim.state = 3
+		group by mim.group_id, mim.hos_id, mim.copy_code, mim.in_id, mim.in_no, mim.brief, hsd.sup_name, 
+			su.user_name, mim.in_date, suc.user_name, mim.confirm_date
+			 ,midd.inv_id,midd.inv_code,midd.inv_name,midd.inv_model,mid.sn,mid.batch_no,mid.bar_code,mid.bar_code
+			 ,hfd.fac_name,midd.bid_code, mic.cert_code,mid.price,mid.amount,mid.amount_money
+		having sum(nvl(mfb.left_amount, 0) - nvl(w_mod.amount, 0)) > 0
+		order by mim.in_id
+	</select>
+	
+	
+		<select id="queryMatAffiBackInSup"  parameterType="java.util.Map"  resultType="java.util.TreeMap">
+	with inv_temp as (
+		select a.group_id,
+		a.hos_id,
+		a.copy_code,
+		a.inv_id, --材料ID
+		e.inv_no, -- 材料变更号
+		e.inv_code, --材料编码
+		e.inv_name, --材料名称
+		e.inv_model, --规格型号
+		h.unit_name, --计量单位
+		f.mat_type_name, --材料类别名称
+		g.fac_name, --生成产商名称
+		e.spell_code, --拼音码
+		e.wbx_code, --五笔码
+		a.batch_no, --批号
+		a.bar_code, --条形码
+		sum(nvl(a.left_amount, 0)) as left_amount, --当前库存数量
+		sum(nvl(a.left_money, 0)) as left_money, --当前库存数量
+		a.price, --单价
+		nvl(a.sale_price, 0) as sale_price, --批发单价
+		nvl(e.sell_price, 0) as sell_price, --零售单价
+		a.location_id, --货位ID
+		b.location_code, --货位编码
+		b.location_name, --货位名称
+		cc.inva_date, --有效期
+		cc.disinfect_date, --灭菌日期
+		e.alias,
+		e.alias_spell,
+		a.sup_id,hsd.sup_name,e.bid_code
+		from mat_affi_fifo a
+		left join mat_location_dict b
+		on a.group_id = b.group_id
+		and a.hos_id = b.hos_id
+		and a.copy_code = b.copy_code
+		and a.location_id = b.location_id
+		and b.is_stop = 0
+		left join mat_affi_in_detail cc on a.group_id=cc.group_id and a.hos_id=cc.hos_id and a.copy_code=cc.copy_code 
+             and a.inv_id=cc.inv_id and a.batch_no=cc.batch_no and a.batch_sn = cc.batch_sn and a.bar_code=cc.bar_code
+             and a.price=cc.price
+        left join mat_affi_in dd on cc.group_id=dd.group_id and cc.hos_id=dd.hos_id and cc.copy_code=dd.copy_code
+        	and cc.in_id=dd.in_id
+		left join mat_inv_dict e
+		on a.group_id = e.group_id
+		and a.hos_id = e.hos_id
+		and a.copy_code = e.copy_code
+		and a.inv_id = e.inv_id
+		and e.is_stop=0
+	<!-- 	and e.use_state = 1 -->
+		left join mat_type_dict f
+		on a.group_id = f.group_id
+		and a.hos_id = f.hos_id
+		and a.copy_code = f.copy_code
+		and e.mat_type_id = f.mat_type_id
+		and f.is_stop = 0
+		left join hos_fac_dict g
+		on a.group_id = g.group_id
+		and a.hos_id = g.hos_id
+		and e.fac_id = g.fac_id
+		and e.fac_no = g.fac_no
+		left join hos_sup_dict hsd on
+		    a.group_id=hsd.group_id
+		    and a.hos_id=hsd.hos_id
+		    and a.sup_id=hsd.sup_id
+		    and hsd.is_stop=0
+		left join hos_unit h
+		on a.group_id = h.group_id
+		and a.hos_id = h.hos_id
+		and e.unit_code = h.unit_code
+		where a.group_id = #{group_id, jdbcType = INTEGER}
+		AND a.hos_id = #{hos_id, jdbcType = INTEGER}
+		AND a.copy_code = #{copy_code, jdbcType = VARCHAR}
+		AND a.store_id = #{store_id, jdbcType = INTEGER}
+		AND a.sup_id=#{sup_id, jdbcType = INTEGER} 
+		<if test="fac_id != null and fac_id != ''">
+			AND e.fac_id=#{fac_id, jdbcType = INTEGER} 
+		</if>
+			<if test="bid_code != null and bid_code != ''">
+			AND e.bid_code=#{bid_code, jdbcType = INTEGER} 
+		</if>
+		<if test="inv_code != null and inv_code != ''">
+			
+				and (
+					e.inv_code   like '%${inv_code}%'
+				     or e.inv_name like '%${inv_code}%'
+				     or e.alias like '%${inv_code}%'
+				     or upper(e.spell_code) like '%${inv_code}%'
+				     or upper(e.wbx_code) like '%${inv_code}%'
+				     or upper(e.alias_spell) like '%${inv_code}%'
+				     or lower(e.spell_code) like '%${inv_code}%'
+				     or lower(e.wbx_code) like '%${inv_code}%'
+				     or lower(e.alias_spell) like '%${inv_code}%'
+				     )
+			</if>
+	
+		and dd.bus_type_code in (1,27)
+		group by a.group_id,
+		a.hos_id,
+		a.copy_code,
+		a.inv_id,
+		e.inv_no,
+		e.inv_code,
+		e.inv_name,
+		e.spell_code,
+		e.alias,
+		e.alias_spell,
+		e.wbx_code,
+		a.batch_no,
+		a.bar_code,
+		a.price,
+		a.sale_price,
+		e.sell_price,
+		a.location_id,
+		b.location_code,
+		b.location_name,
+		cc.inva_date,
+		cc.disinfect_date,
+		e.inv_model,
+		f.mat_type_name,
+		g.fac_name,
+		h.unit_name,
+		a.sup_id,hsd.sup_name,e.bid_code
+		),
+		out_temp as (
+		select inv_id, batch_no, bar_code, price, sum(amount) amount
+		from(
+		--出库未确认
+		select
+		b.inv_id,
+		b.batch_no, --批号
+		b.bar_code, --条形码
+		b.price, --单价
+		sum(nvl(b.amount, 0)) as amount
+		from mat_affi_out a
+		left join mat_affi_out_detail b
+		on a.group_id = b.group_id and a.hos_id = b.hos_id
+		and a.copy_code = b.copy_code and a.out_id = b.out_id
+		where a.group_id = #{group_id,jdbcType=INTEGER}
+		AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+		AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+		AND a.store_id = #{store_id,jdbcType=VARCHAR}
+		AND <![CDATA[ a.state < 3 ]]>
+		AND <![CDATA[ a.bus_type_code <> '29' ]]>
+		<if test="out_id != null and out_id != ''">
+            <![CDATA[ AND a.out_id <> #{out_id,jdbcType=INTEGER} ]]>
+		</if>
+		group by b.inv_id, b.batch_no, b.bar_code, b.price
+		--退货未确认
+		union all
+		select
+		b.inv_id,
+		b.batch_no, --批号
+		b.bar_code, --条形码
+		b.price, --单价
+		-1 * sum(nvl(b.amount, 0)) as amount
+		from mat_affi_in a
+		left join mat_affi_in_detail b
+		on a.group_id = b.group_id and a.hos_id = b.hos_id
+		and a.copy_code = b.copy_code and a.in_id = b.in_id
+		where a.group_id = #{group_id,jdbcType=INTEGER}
+		AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+		AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+		AND a.store_id = #{store_id,jdbcType=INTEGER}
+		AND a.sup_id=#{sup_id,jdbcType=VARCHAR}
+		AND <![CDATA[ a.state < 3 ]]>
+		AND a.bus_type_code = '30'
+		<if test="in_id != null and in_id != ''">
+            <![CDATA[ AND a.in_id <> #{in_id,jdbcType=INTEGER} ]]>
+		</if>
+		group by b.inv_id, b.batch_no, b.bar_code, b.price
+		)
+		group by inv_id, batch_no, bar_code, price
+		)
+		select
+		a.group_id,
+		a.hos_id,
+		a.copy_code,
+		a.inv_id, --材料ID
+		a.inv_no, --材料变更号
+		a.inv_code, --材料编码
+		a.inv_name, --材料名称
+		a.inv_model, --规格型号
+		a.unit_name, --计量单位
+		a.mat_type_name, --材料类别名称
+		a.fac_name, --生成产商名称
+		a.batch_no, --批号
+		a.bar_code, --条形码
+		a.left_amount as cur_amount, --当前库存数量
+		(-1)*a.left_amount as amount,
+		(-1)*(nvl(a.price,0)*nvl(a.left_amount,0)) as amount_money,
+		a.left_money as cur_money, --当前库存金额
+		a.price, --单价
+		a.sale_price, --批发单价
+		a.sell_price, --零售单价
+		a.location_id, --货位ID
+		a.location_code, --货位编码
+		a.location_name, --货位名称
+		a.inva_date, --有效期
+		<!-- a.disinfect_date, --> --灭菌期
+		nvl(a.left_amount, 0) - nvl(b.amount, 0) AS imme_amount,a.sup_name,a.bid_code ,a.disinfect_date
+		from inv_temp a
+		left join out_temp b  
+		on a.inv_id = b.inv_id
+		and a.batch_no= b.batch_no
+		and a.bar_code= b.bar_code
+		and a.price = b.price
+	
+		and a.sup_id= #{sup_id,jdbcType=VARCHAR}
+		<where>
+			<if test="bus_type_code == null or bus_type_code != '21'">
+				and nvl(a.left_amount, 0) - nvl(b.amount, 0) > 0
+			</if>
+			<if test="key != null and key != ''">
+				and (
+				a.inv_code like '%${key}%' or
+				a.inv_name like '%${key}%'
+				or
+				a.spell_code like '%${key}%' or
+				a.wbx_code like '%${key}%' or
+				a.alias like '%${key}%' or
+				a.alias_spell like '%${key}%'
+				)
+			</if>
+		</where>
+		
+group by a.group_id, a.hos_id, a.copy_code, a.inv_id, a.inv_no
+  , a.inv_code, a.inv_name, a.inv_model, a.unit_name, a.mat_type_name
+  , a.fac_name, a.batch_no, a.bar_code, a.left_amount
+  ,a.price, a.left_money , a.price, a.sale_price, a.sell_price, a.location_id
+  , a.location_code, a.location_name, a.inva_date
+  ,b.amount , a.sup_name, a.bid_code ,a.disinfect_date
+  order by a.inv_code, a.inva_date
+	</select>
+	
+	<select id="queryAffiInDetail"  parameterType="java.util.Map"  resultType="java.util.TreeMap">
+		with w_mod as(
+			select 
+				inv_id,
+				batch_sn,
+				batch_no,
+				bar_code,
+				sum(amount) as amount
+			from(
+				--出库未确认单据
+				select 
+					inv_id,
+					batch_sn,
+					batch_no,
+					bar_code,
+					sum(nvl(amount, 0)) as amount
+				from mat_affi_out mom 
+				left join mat_affi_out_detail matod 
+					on mom.group_id = matod.group_id and mom.hos_id = matod.hos_id 
+					and mom.copy_code = matod.copy_code and mom.out_id = matod.out_id
+				where matod.group_id = #{group_id,jdbcType=INTEGER}
+					AND matod.hos_id = #{hos_id,jdbcType=INTEGER}
+					AND matod.copy_code = #{copy_code,jdbcType=VARCHAR}
+					AND mom.store_id = #{store_id,jdbcType=INTEGER}
+					<![CDATA[
+					AND mom.state < 3 
+					AND mom.bus_type_code <> '30' 
+					]]>
+				group by inv_id,batch_sn,batch_no,bar_code
+				--退货未确认单据
+				union all
+				select 
+					inv_id as inv_id,
+					batch_sn as batch_sn,
+					batch_no as batch_no,
+					bar_code as bar_code,
+					-1 * sum(nvl(amount, 0)) as amount
+				from mat_affi_in mim
+				left join  mat_affi_in_detail matid
+					on mim.group_id = matid.group_id and mim.hos_id = matid.hos_id 
+					and mim.copy_code = matid.copy_code and mim.in_id = matid.in_id
+				where matid.group_id = #{group_id,jdbcType=INTEGER}
+					AND matid.hos_id = #{hos_id,jdbcType=INTEGER}
+					AND matid.copy_code = #{copy_code,jdbcType=VARCHAR}
+					AND mim.store_id = #{store_id,jdbcType=INTEGER}
+					<![CDATA[
+					AND mim.state < 3 
+					]]>
+					AND mim.bus_type_code = '29'
+				group by inv_id,batch_sn,batch_no,bar_code
+			)
+			group by inv_id,batch_sn,batch_no,bar_code
+			order by inv_id asc
+		)
+		select mid.detail_id, mid.inv_id, inv.inv_no, inv.inv_code, inv.inv_name, inv.inv_model, mid.batch_no, 
+			mid.batch_sn, mid.bar_code, mid.price, sum(nvl(mfb.left_amount, 0) - nvl(w_mod.amount, 0)) as imme_amount
+		from mat_affi_in_detail mid
+		left join mat_affi_fifo mfb
+			on mid.group_id = mfb.group_id and mid.hos_id = mfb.hos_id
+			and mid.copy_code = mfb.copy_code and mfb.store_id = #{store_id,jdbcType=INTEGER}
+			and mid.inv_id = mfb.inv_id and mid.batch_no = mfb.batch_no
+			and mid.batch_sn = mfb.batch_sn and mid.bar_code = mfb.bar_code
+		left join w_mod
+			on mid.inv_id = w_mod.inv_id and mid.batch_no = w_mod.batch_no 
+			and mid.batch_sn = w_mod.batch_sn and mid.bar_code = w_mod.bar_code
+		left join mat_inv_dict inv
+			on mid.group_id = inv.group_id and mid.hos_id = inv.hos_id
+			and mid.copy_code = inv.copy_code and mid.inv_id = inv.inv_id
+			and inv.is_stop = 0
+		where mid.group_id = #{group_id,jdbcType=INTEGER}
+			and mid.hos_id = #{hos_id,jdbcType=INTEGER}
+			and mid.copy_code = #{copy_code,jdbcType=VARCHAR}
+			and mid.in_id = #{in_id,jdbcType=INTEGER}
+		group by mid.detail_id, mid.inv_id, inv.inv_no, inv.inv_code, inv.inv_name, inv.inv_model, 
+			mid.batch_no, mid.batch_sn, mid.bar_code, mid.price
+		<!-- 如果不显示即时库存为0的材料，取消注释 -->
+		--having sum(nvl(mfb.left_amount, 0) - nvl(w_mod.amount, 0)) > 0
+		order by mid.detail_id
+	</select>
+	
+	<select id="queryBackDetailByImp"  parameterType="java.util.Map"  resultType="java.util.TreeMap">
+		with tmp_imme as(
+			select 
+				inv_id,
+				batch_sn,
+				batch_no,
+				bar_code,
+				sum(amount) as amount
+			from(
+				--出库未确认单据
+				select 
+					inv_id,
+					batch_sn,
+					batch_no,
+					bar_code,
+					sum(nvl(amount, 0)) as amount
+				from mat_affi_out mom 
+				LEFT JOIN mat_affi_out_detail matod 
+					on mom.group_id = matod.group_id and mom.hos_id = matod.hos_id 
+					and mom.copy_code = matod.copy_code and mom.out_id = matod.out_id
+				where matod.group_id = #{group_id,jdbcType=INTEGER}
+					AND matod.hos_id = #{hos_id,jdbcType=INTEGER}
+					AND matod.copy_code = #{copy_code,jdbcType=VARCHAR}
+					AND mom.store_id = #{store_id,jdbcType=INTEGER}
+					<![CDATA[
+					AND mom.state < 3 
+					AND mom.bus_type_code <> '30'
+					]]>
+				group by inv_id,batch_sn,batch_no,bar_code
+				--退货未确认单据
+				union all
+				select 
+					inv_id,
+					batch_sn,
+					batch_no,
+					bar_code,
+					-1 * sum(nvl(amount, 0)) as amount
+				from mat_affi_in mim
+				LEFT JOIN  mat_affi_in_detail matid
+					on mim.group_id = matid.group_id and mim.hos_id = matid.hos_id 
+					and mim.copy_code = matid.copy_code and mim.in_id = matid.in_id
+				where matid.group_id = #{group_id,jdbcType=INTEGER}
+					AND matid.hos_id = #{hos_id,jdbcType=INTEGER}
+					AND matid.copy_code = #{copy_code,jdbcType=VARCHAR}
+					AND mim.store_id = #{store_id,jdbcType=INTEGER}
+					<![CDATA[
+					AND mim.state < 3 
+					]]>
+					AND mim.bus_type_code = '29'
+				group by inv_id,batch_sn,batch_no,bar_code
+			)
+			group by inv_id,batch_sn,batch_no,bar_code
+			order by inv_id asc
+		), 
+		tmp_detail as(  
+			select midet.group_id, midet.hos_id, midet.copy_code, midet.inv_id, midet.batch_no, midet.batch_sn, 
+				midet.bar_code, midet.price, nvl(midet.sale_price, 0) as sale_price, nvl(midet.sell_price, 0) as sell_price, 
+				nvl(midet.allot_price, 0) as allot_price,midet.inva_date, midet.disinfect_date, midet.location_id, 
+				sum(nvl(mfb.left_amount, 0)) as cur_amount, 
+				sum(nvl(mfb.left_amount, 0) - nvl(imme.amount, 0)) as imme_amount, 
+				-1*sum(nvl(mfb.left_amount, 0) - nvl(imme.amount, 0)) as amount,midet.in_id
+			from mat_affi_in_detail midet
+			LEFT JOIN mat_affi_fifo mfb
+				on midet.group_id = mfb.group_id and midet.hos_id = mfb.hos_id
+				and midet.copy_code = mfb.copy_code and mfb.store_id = #{store_id,jdbcType=INTEGER}
+				and midet.inv_id = mfb.inv_id and midet.batch_no = mfb.batch_no
+				and midet.batch_sn = mfb.batch_sn and midet.bar_code = mfb.bar_code
+			LEFT JOIN tmp_imme imme
+				on midet.inv_id = imme.inv_id and midet.batch_no = imme.batch_no 
+				and midet.batch_sn = imme.batch_sn and midet.bar_code = imme.bar_code
+			where midet.group_id = #{group_id,jdbcType=INTEGER}
+				and midet.hos_id = #{hos_id,jdbcType=INTEGER}
+				and midet.copy_code = #{copy_code,jdbcType=VARCHAR} 
+				<if test="sql!= null and sql != ''">
+					${sql}
+				</if>
+			group by midet.group_id, midet.hos_id, midet.copy_code, midet.inv_id, midet.batch_no, midet.batch_sn, 
+				midet.bar_code, midet.price, midet.sale_price, midet.sell_price, midet.allot_price, midet.inva_date, 
+				midet.disinfect_date, midet.location_id ,midet.in_id
+			having sum(nvl(mfb.left_amount, 0) - nvl(imme.amount, 0)) > 0
+			order by midet.inv_id, midet.inva_date, midet.bar_code, midet.batch_sn
+		), 
+		tmp_main as(
+			SELECT main.group_id, main.hos_id, main.copy_code, main.inv_id, main.batch_no, main.bar_code, 
+				main.inva_date, main.disinfect_date, main.location_id, main.price, main.amount, main.sale_price,
+				main.sell_price, main.allot_price, SUM(mfb.left_amount) AS cur_amount, 
+				SUM(mfb.left_amount) - main.out_amount AS imme_amount 
+			FROM (
+				SELECT detail.*, nvl(imme.amount, 0) AS out_amount
+      	FROM (
+					select group_id, hos_id, copy_code, inv_id, batch_no, bar_code, inva_date, disinfect_date, location_id,
+						price, SUM(amount) AS amount, sale_price, sell_price, allot_price 
+					from tmp_detail
+					group by group_id, hos_id, copy_code, inv_id, batch_no, bar_code, inva_date, disinfect_date, location_id,
+						price, sell_price, sale_price, sale_price, sell_price, allot_price
+				) detail
+        LEFT JOIN (
+          SELECT inv_id, batch_no, bar_code, SUM(amount) AS amount
+          FROM tmp_imme
+          GROUP BY inv_id, batch_no, bar_code
+        ) imme 
+        	ON detail.inv_id = imme.inv_id
+		      AND detail.batch_no = imme.batch_no
+		      AND detail.bar_code = imme.bar_code 
+			) main
+			LEFT JOIN mat_affi_fifo mfb
+				ON main.group_id = mfb.group_id AND main.hos_id = mfb.hos_id 
+				AND main.copy_code = mfb.copy_code AND main.inv_id = mfb.inv_id 
+				AND main.batch_no = mfb.batch_no AND main.bar_code = mfb.bar_code 
+				AND mfb.store_id = #{store_id,jdbcType=INTEGER}
+			group by main.group_id, main.hos_id, main.copy_code, main.inv_id, main.batch_no, main.bar_code,
+				main.inva_date, main.disinfect_date, main.location_id, main.price, main.amount, main.sale_price,
+				main.sell_price, main.allot_price, main.out_amount
+		)
+		select main.inv_id, mid.inv_no, mid.inv_code, mid.inv_name, mtd.mat_type_name, mid.inv_model, 
+			hu.unit_name, main.batch_no, main.bar_code, main.price, main.sale_price, main.sell_price, 
+			main.inva_date, main.disinfect_date, hfd.fac_name, main.location_id, mld.location_code, 
+			mld.location_name, main.cur_amount, main.imme_amount, main.amount, main.amount as sum_amount, 
+			main.amount * main.price as amount_money, main.amount * main.sale_price as sale_money, 
+			main.amount * main.sell_price as sell_money, 
+			'['||to_char(wm_concat('{"inv_id":'||detail.inv_id||',"inv_code":"'||to_char(mid.inv_code)
+			|| ',"disinfect_date":"' || main.disinfect_date ||'","inv_name":"'||to_char(mid.inv_name)||'","batch_sn":'||detail.batch_sn||',"cur_amount":'||detail.cur_amount
+			||',"imme_amount":'||detail.imme_amount||',"amount":'||detail.amount
+			||',"price":'||detail.price||',"amount_money":'||(detail.amount * detail.price)
+			||',"sale_price":'||detail.sale_price||',"sale_money":'||(detail.amount * detail.sale_price)
+			||',"sell_price":'||detail.sell_price||',"sell_money":'||(detail.amount * detail.sell_price)
+			||'}'))||']' as inv_detail_data
+		from tmp_main main
+			LEFT JOIN mat_inv_dict mid
+				on main.group_id = mid.group_id and main.hos_id = mid.hos_id
+				and main.copy_code = mid.copy_code and main.inv_id = mid.inv_id
+				and mid.is_stop = 0
+			LEFT JOIN mat_type_dict mtd
+				on main.group_id = mtd.group_id and main.hos_id = mtd.hos_id
+				and main.copy_code = mtd.copy_code and mid.mat_type_id = mtd.mat_type_id
+				and mtd.is_stop = 0
+			LEFT JOIN hos_fac_dict hfd
+				on main.group_id = hfd.group_id and main.hos_id = hfd.hos_id
+				and mid.fac_id = hfd.fac_id and mid.fac_no = hfd.fac_no
+			LEFT JOIN hos_unit hu 
+				ON main.group_id = hu.group_id and main.hos_id = hu.hos_id 
+				and mid.unit_code = hu.unit_code 
+			LEFT JOIN mat_location_dict mld 
+				on main.group_id = mld.group_id and main.hos_id = mld.hos_id 
+				and main.copy_code = mld.copy_code and main.location_id = mld.location_id 
+				and mld.is_stop=0
+			LEFT JOIN tmp_detail detail
+				ON main.inv_id = detail.inv_id
+				AND main.batch_no = detail.batch_no
+				AND main.bar_code = detail.bar_code
+		
+				
+		group by main.inv_id, mid.inv_no, mid.inv_code, mid.inv_name, mtd.mat_type_name, mid.inv_model, 
+			hu.unit_name, main.batch_no, main.bar_code, main.price, main.sale_price, main.sell_price, 
+			main.inva_date, main.disinfect_date, hfd.fac_name, main.location_id, mld.location_code, 
+			mld.location_name, main.cur_amount, main.imme_amount, main.amount, main.price, 
+			main.sale_price, main.sell_price 
+	</select>
+	
+	<!-- 判断材料库存是否充足 -->
+	<select id="existsMatAffiBackInvIsEnough" parameterType="java.util.List" resultType="String">
+		with list_temp as (
+			<foreach collection="list" item="item" index="index" separator=" union all " >
+				select    
+					#{item.group_id,jdbcType=INTEGER} as group_id, 
+					#{item.hos_id,jdbcType=INTEGER} as hos_id, 
+					#{item.copy_code,jdbcType=VARCHAR} as copy_code,  
+					#{item.store_id,jdbcType=INTEGER} as store_id, 
+					<if test="item.in_id != null and item.in_id != ''">
+						#{item.in_id,jdbcType=INTEGER} as in_id, 
+					</if>
+					<if test="item.in_id == null or item.in_id == ''">
+						0 as in_id, 
+					</if>
+					#{item.inv_id,jdbcType=VARCHAR} as inv_id, 
+					#{item.batch_no,jdbcType=INTEGER} as batch_no, 
+					<!-- #{item.batch_sn,jdbcType=INTEGER} as batch_sn, --> 
+					#{item.bar_code,jdbcType=INTEGER} as bar_code, 
+					<!-- #{item.location_id,jdbcType=VARCHAR} as location_id, -->
+					#{item.amount,jdbcType=INTEGER} as amount 
+				from dual
+			</foreach>
+		),
+		inv_temp as (
+			select 
+				group_id, 
+				hos_id, 
+				copy_code, 
+				store_id, 
+				inv_id, 
+				<!-- batch_sn, --> 
+				batch_no,  --批号
+				bar_code,  --条形码
+				amount, 
+				sum(imme_amount) as imme_amount 
+			 from (
+				--出库未确认数量
+				select 
+					lt.group_id, 
+					lt.hos_id, 
+					lt.copy_code, 
+					lt.store_id, 
+					lt.inv_id, 
+					<!-- lt.batch_sn, --> 
+					lt.batch_no,  --批号
+					lt.bar_code,  --条形码
+					lt.amount, 
+					sum(nvl(modet.amount, 0)) as imme_amount 
+				from list_temp lt
+				left join mat_affi_out mom 
+					on lt.group_id = mom.group_id and lt.hos_id = mom.hos_id 
+					and lt.copy_code = mom.copy_code and lt.store_id = mom.store_id 
+					<![CDATA[
+					and mom.state < 3 
+					and mom.bus_type_code <> '30'
+					]]>
+				left join mat_affi_out_detail modet
+					on lt.group_id = modet.group_id and lt.hos_id = modet.hos_id 
+					and lt.copy_code = modet.copy_code and mom.out_id = modet.out_id 
+					and lt.inv_id = modet.inv_id and lt.batch_no = modet.batch_no 
+					<!-- and lt.batch_sn = modet.batch_sn --> and lt.bar_code = modet.bar_code 
+				group by lt.group_id, lt.hos_id, lt.copy_code, lt.store_id, lt.inv_id, <!-- lt.batch_sn, --> lt.batch_no, lt.bar_code, lt.amount 
+				--退货未确认数量
+				union all
+				select 
+					lt.group_id, 
+					lt.hos_id, 
+					lt.copy_code, 
+					lt.store_id, 
+					lt.inv_id, 
+					<!-- lt.batch_sn, -->  
+					lt.batch_no,  --批号
+					lt.bar_code,  --条形码
+					lt.amount, 
+					-1 * sum(nvl(midet.amount, 0)) as imme_amount  --退货记录的是负数
+				from list_temp lt
+				left join mat_affi_in mim 
+					on lt.group_id = mim.group_id and lt.hos_id = mim.hos_id 
+					and lt.copy_code = mim.copy_code and lt.store_id = mim.store_id 
+					<![CDATA[ 
+					and lt.in_id <> mim.in_id and mim.state < 3 
+					]]> 
+					and mim.bus_type_code = '29'
+				left join mat_affi_in_detail midet
+					on lt.group_id = midet.group_id and lt.hos_id = midet.hos_id 
+					and lt.copy_code = midet.copy_code and mim.in_id = midet.in_id 
+					and lt.inv_id = midet.inv_id and lt.batch_no = midet.batch_no 
+					<!-- and lt.batch_sn = midet.batch_sn --> and lt.bar_code = midet.bar_code 
+				group by lt.group_id, lt.hos_id, lt.copy_code, lt.store_id, lt.inv_id, <!-- lt.batch_sn, --> lt.batch_no, lt.bar_code, lt.amount 
+			)
+			group by group_id, hos_id, copy_code, store_id, inv_id, <!-- batch_sn, --> batch_no, bar_code, amount 
+		)
+		select to_char(wm_concat(to_char('<![CDATA[</br>]]>'||mid.inv_code||' '||mid.inv_name)))
+		from inv_temp it
+		left join (
+			select group_id,hos_id,copy_code,store_id,inv_id,batch_no,bar_code,price,sum(nvl(out_amount,0)) out_amount,sum(nvl(left_amount,0)) left_amount
+			from mat_affi_fifo
+			group by group_id,hos_id,copy_code,store_id,inv_id,batch_no,bar_code,price
+		) mfb
+			on it.group_id = mfb.group_id and it.hos_id = mfb.hos_id
+			and it.copy_code = mfb.copy_code and it.store_id = mfb.store_id
+			and it.inv_id = mfb.inv_id and it.batch_no = mfb.batch_no
+			<!-- and it.batch_sn = mfb.batch_sn --> and it.bar_code = mfb.bar_code
+		left join mat_inv_dict mid
+			on it.group_id = mid.group_id and it.hos_id = mid.hos_id
+			and it.copy_code = mid.copy_code and it.inv_id = mid.inv_id
+			and mid.is_stop = 0 and mid.is_com = 1
+		where <![CDATA[mfb.left_amount - it.imme_amount + it.amount < 0]]>
+	</select>
+	
+	<select id="queryMatAffiInDetailForCopy" parameterType="java.util.Map" resultType="java.util.Map" >
+		SELECT a.group_id, a.hos_id, a.copy_code, a.inv_id, a.inv_no, b.inv_code, b.inv_name, a.batch_no, a.price, a.bar_code,  
+			sum(nvl(a.amount, 0)) amount, nvl(a.sale_price, 0) sale_price, sum(nvl(a.sale_money, 0)) as sale_money, 
+			nvl(a.sell_price, 0) sell_price, sum(nvl(a.sell_money, 0)) sell_money, nvl(a.allot_price, 0) allot_price, 
+			sum(nvl(a.allot_money, 0)) allot_money, sum(nvl(a.amount_money, 0)) amount_money, a.inva_date, 
+			a.disinfect_date, a.location_id, a.note
+		FROM MAT_AFFI_IN_DETAIL a
+		LEFT JOIN MAT_INV_DICT b
+			ON a.group_id = b.group_id AND a.hos_id = b.hos_id
+			AND a.copy_code = b.copy_code AND a.inv_id = b.inv_id
+			AND b.is_stop = 0 
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND a.in_id = #{in_id,jdbcType=INTEGER}
+		GROUP BY a.group_id, a.hos_id, a.copy_code, a.inv_id, a.inv_no, b.inv_code, b.inv_name, a.batch_no, a.price, a.bar_code,  
+			a.sale_price, a.sell_price, a.allot_price, a.inva_date, a.disinfect_date, a.location_id, a.note
+		ORDER BY a.inv_id
+	</select>
+	
+	<!--查询明细  -->
+	<select id="queryDetails" parameterType="java.util.Map" resultType="java.util.Map">
+		with detail_tmp as (
+			SELECT 
+				a.group_id, a.hos_id, a.copy_code, a.in_id, to_char(a.in_no) in_no, a.brief, a.store_id, a.store_no, 
+				c.store_name,a. bus_type_code, d.bus_type_name, a.sup_id, a.sup_no, h.sup_name, i.emp_name stocker_name, 
+				a.in_date, e.user_name as maker_name,a.confirm_date, f.user_name as confirmer_name, a.state,
+				b.amount,b.price,b.amount_money,mid.inv_code,mid.inv_name,mid.inv_id,mid.inv_no,mid.inv_model,hu.unit_name,
+				hfd.fac_name,b.batch_no,b.bar_code
+			FROM mat_affi_in a
+			LEFT JOIN mat_affi_in_detail b  on a.group_id = b.group_id
+				and a.hos_id = b.hos_id and a.copy_code = b.copy_code and a.in_id = b.in_id
+			left join mat_inv_dict mid on b.group_id=mid.group_id and b.hos_id=mid.hos_id and b.copy_code=mid.copy_code
+				and b.inv_id=mid.inv_id and b.inv_no=mid.inv_no
+			left join hos_fac_dict hfd on mid.group_id=hfd.group_id and mid.hos_id=hfd.hos_id 
+				and mid.fac_id=hfd.fac_id and mid.fac_no=hfd.fac_no
+			left join hos_unit hu on mid.group_id=hu.group_id and mid.hos_id=hu.hos_id and mid.unit_code=hu.unit_code
+				and hu.is_stop=0
+			LEFT JOIN hos_store_dict c on a.group_id = c.group_id
+				and a.hos_id = c.hos_id and a.store_id = c.store_id and a.store_no = c.store_no
+			LEFT JOIN mat_bus_type d on a.bus_type_code = d.bus_type_code and d.is_stop = 0
+			LEFT JOIN sys_user e on a.group_id = e.group_id and a.hos_id = e.hos_id and a.maker = e.user_id
+			LEFT JOIN sys_user f on a.group_id = f.group_id and a.hos_id = f.hos_id and a.confirmer = f.user_id
+			LEFT JOIN mat_sys_list g on g.table_code = 'mat_affi_in' and g.field_code = 'STATE' and a.state = g.field_value
+			LEFT JOIN hos_sup_dict h on a.group_id = h.group_id and a.hos_id = h.hos_id and a.sup_id = h.sup_id 
+				and a.sup_no = h.sup_no
+			LEFT JOIN hos_emp i on a.group_id = i.group_id and a.hos_id = i.hos_id and a.stocker = i.emp_id
+			<where>
+					a.group_id = #{group_id,jdbcType=INTEGER}
+				AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+				<if test="begin_in_date != null and begin_in_date != ''">
+					AND to_char(a.in_date) &gt;= to_date(#{begin_in_date},'yyyy-MM-dd')
+				</if>
+				<if test="end_in_date != null and end_in_date != ''">
+					AND to_char(a.in_date) &lt;= to_date(#{end_in_date},'yyyy-MM-dd')
+				</if>
+				<if test="begin_confirm_date != null and begin_confirm_date != ''">
+					AND to_char(a.confirm_date) &gt;= to_date(#{begin_confirm_date},'yyyy-MM-dd')
+				</if> 
+				<if test="end_confirm_date != null and end_confirm_date != ''">
+					AND to_char(a.confirm_date) &lt;= to_date(#{end_confirm_date},'yyyy-MM-dd')
+				</if>
+				<if test="bus_type_code != null and bus_type_code != ''">
+					AND a.bus_type_code = #{bus_type_code,jdbcType=VARCHAR}
+				</if>
+				<if test="state != null and state != ''">
+					AND a.state = #{state,jdbcType=VARCHAR}
+				</if>
+				<if test="store_id != null and store_id != ''">
+					AND a.store_id = #{store_id,jdbcType=VARCHAR}
+				</if>
+				<if test="sup_id != null and sup_id != ''">
+					AND a.sup_id = #{sup_id,jdbcType=VARCHAR}
+				</if>
+				<if test="in_no != null and in_no != ''">
+					AND a.in_no like '${in_no}%'
+				</if>
+				<if test="batch_no != null and batch_no != ''">
+					AND b.batch_no like '%${batch_no}%'
+				</if>
+				<if test="inv_code != null and inv_code != ''">
+					AND (
+							mid.inv_code like '%${inv_code}%'
+							or upper(mid.inv_name) like '%${inv_code}%'
+							or upper(mid.inv_model) like '%${inv_code}%'
+							or upper(mid.spell_code) like '%${inv_code}%'
+							or upper(mid.wbx_code) like '%${inv_code}%'
+							or upper(mid.bid_code) like '%${inv_code}%'
+							or lower(mid.spell_code) like '%${inv_code}%'
+							or lower(mid.bid_code) like '%${inv_code}%'
+							or lower(mid.wbx_code) like '%${inv_code}%'
+							or lower(mid.inv_name) like '%${inv_code}%'
+							or mid.alias like '%${inv_code}%'
+					)
+				</if>
+			</where>   
+		),sum_tmp as (
+			select 
+				null group_id, null hos_id, null copy_code, null in_id, '合计' in_no, null brief, null store_id, null store_no, 
+				null store_name,null bus_type_code, null bus_type_name, null sup_id, null sup_no, null sup_name, null stocker_name, 
+				null in_date, null maker_name,null confirm_date, null confirmer_name, null state,
+				sum(amount) amount,null price,sum(amount_money) amount_money, null inv_code,null inv_name,null inv_id,
+				null inv_no,null inv_model,null unit_name,null fac_name,null batch_no,null bar_code
+			from detail_tmp	
+		)
+		
+		select  group_id,  hos_id,  copy_code,  in_id,  in_no,  brief,  store_id,  store_no, 
+			store_name, bus_type_code,  bus_type_name,  sup_id,  sup_no,  sup_name,  stocker_name, 
+			in_date,  maker_name, confirm_date,  confirmer_name,  state,
+			amount, price,amount_money,  inv_code, inv_name, inv_id,
+			inv_no, inv_model, unit_name, fac_name, batch_no, bar_code
+		from detail_tmp
+		union all
+		select   group_id,  hos_id,  copy_code,  in_id,  in_no,  brief,  store_id,  store_no, 
+			store_name, bus_type_code,  bus_type_name,  sup_id,  sup_no,  sup_name,  stocker_name, 
+			in_date,  maker_name, confirm_date,  confirmer_name,  state,
+			amount, price,amount_money,  inv_code, inv_name, inv_id,
+			inv_no, inv_model, unit_name, fac_name, batch_no, bar_code
+		from sum_tmp
+		order by in_id desc,in_no,in_date,inv_code
+	</select>
+	
+</mapper>
+

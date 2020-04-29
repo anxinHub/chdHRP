@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8" ?> 
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.acc.dao.termend.monthend.AccIncomCostMapper">
+	<resultMap type="com.chd.hrp.acc.entity.HrpAccSelect" id="hrpAccSelect">
+		<result property="id" column="id" />
+		<result property="text" column="text" />
+	</resultMap>
+
+	<select id="addAccIncomCostVouch" statementType="CALLABLE" parameterType="java.util.Map" resultType="String"> 
+		<![CDATA[
+			{call acc_monthend_incomcost(#{group_id,jdbcType=INTEGER}, #{hos_id,jdbcType=INTEGER}, 
+				#{copy_code,jdbcType=VARCHAR}, #{user_id,jdbcType=INTEGER}, #{acc_year,jdbcType=VARCHAR}, 
+				#{acc_month,jdbcType=VARCHAR}, #{template_id,jdbcType=INTEGER}, #{subj_type_code,jdbcType=VARCHAR}, 
+				#{vouch_id,jdbcType=INTEGER}, #{vouch_no,jdbcType=VARCHAR}, #{msg, mode=OUT, jdbcType=VARCHAR})}
+		]]> 
+	</select>
+	
+	<!-- 收支科目本期发生额 -->
+	<select id="queryIncomCostSubjMoney" parameterType="java.util.Map" resultType="java.util.TreeMap"> 
+		select a.subj_code, c.subj_name_all as subj_name, c.subj_type_code, 
+			c.subj_dire, c.is_check, c.is_cash, c.subj_nature_code, 
+			sum(b.this_od) debit, sum(b.this_od_w) debit_w, 
+			0 credit, 0 credit_w
+		from acc_termend_template_detail a
+		left join ${sum_table} b
+			on a.group_id = b.group_id and a.hos_id = b.hos_id
+			and a.copy_code = b.copy_code and a.subj_code = b.subj_code
+		left join acc_subj c
+			on a.group_id = c.group_id and a.hos_id = c.hos_id
+			and a.copy_code = c.copy_code and b.acc_year = c.acc_year 
+			and a.subj_code = c.subj_code
+		where a.group_id = #{group_id,jdbcType=INTEGER} 
+			and a.hos_id = #{hos_id,jdbcType=INTEGER}
+			and a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			and a.template_id = #{template_id,jdbcType=INTEGER}
+			and b.acc_year = #{acc_year,jdbcType=VARCHAR}
+			and b.acc_month = #{acc_month,jdbcType=VARCHAR}
+			and c.kind_code = #{kind_code,jdbcType=VARCHAR}
+			and c.is_stop = 0 and c.is_last = 1 
+			<if test="source_id != null and source_id != ''">
+			and b.check7_id = #{source_id,jdbcType=INTEGER}
+			</if>
+		group by a.subj_code, c.subj_name_all, c.subj_type_code, c.subj_dire, c.is_check, c.is_cash, c.subj_nature_code
+		having <![CDATA[sum(b.this_od) <> 0]]>
+		union all
+		select a.subj_code, c.subj_name_all as subj_name, c.subj_type_code, 
+			c.subj_dire, c.is_check, c.is_cash, c.subj_nature_code, 
+			0 debit, 0 debit_w, 
+			sum(b.this_oc) credit, sum(b.this_oc_w) credit_w
+		from acc_termend_template_detail a
+		left join ${sum_table} b
+			on a.group_id = b.group_id and a.hos_id = b.hos_id
+			and a.copy_code = b.copy_code and a.subj_code = b.subj_code
+		left join acc_subj c
+			on a.group_id = c.group_id and a.hos_id = c.hos_id
+			and a.copy_code = c.copy_code and b.acc_year = c.acc_year 
+			and a.subj_code = c.subj_code
+		where a.group_id = #{group_id,jdbcType=INTEGER} 
+			and a.hos_id = #{hos_id,jdbcType=INTEGER}
+			and a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			and a.template_id = #{template_id,jdbcType=INTEGER}
+			and b.acc_year = #{acc_year,jdbcType=VARCHAR}
+			and b.acc_month = #{acc_month,jdbcType=VARCHAR}
+			and c.kind_code = #{kind_code,jdbcType=VARCHAR}
+			and c.is_stop = 0 and c.is_last = 1 
+			<if test="source_id != null and source_id != ''">
+			and b.check7_id = #{source_id,jdbcType=INTEGER}
+			</if>
+		group by a.subj_code, c.subj_name_all, c.subj_type_code, c.subj_dire, c.is_check, c.is_cash, c.subj_nature_code
+		having <![CDATA[sum(b.this_oc) <> 0]]>
+		order by subj_code
+	</select>
+	
+	<select id="querySubjAllFirm" resultMap="hrpAccSelect">
+		SELECT
+			subj_code id,
+			subj_code||' '||SUBJ_NAME_ALL text
+		FROM ACC_SUBJ
+		where   group_id = #{group_id}
+				and hos_id = #{hos_id}
+				and copy_code = #{copy_code}	
+				and acc_year = #{acc_year}
+				and is_last = 1
+				and subj_type_code in ('04','05','06')
+				<if test="key != null and key != ''">
+					and (
+						SUBJ_CODE like '${key}%' or
+						SUBJ_NAME like '%${key}%' or
+						SUBJ_NAME_ALL like '%${key}%'
+						or
+						spell_code like '%${key}%' or
+						wbx_code like '%${key}%'
+					)
+				</if>
+		order by SUBJ_CODE
+	</select>
+</mapper>
+

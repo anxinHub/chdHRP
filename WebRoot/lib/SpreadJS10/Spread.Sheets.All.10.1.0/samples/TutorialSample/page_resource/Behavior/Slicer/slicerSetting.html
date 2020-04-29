@@ -1,0 +1,305 @@
+﻿<!doctype html>
+<html>
+<head>
+    <title>Spread.Sheets - Slicer Usage</title>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+
+    <link href="../../../external/spreadjs/css/gc.spread.sheets.excel2013white.10.1.0.css" rel="stylesheet" type="text/css" />
+
+    <script src="../../../external/external/jquery-1.8.2.min.js" type="text/javascript"></script>
+
+    <script type="text/javascript" src="../../../external/spreadjs/gc.spread.sheets.all.10.1.0.min.js"></script>
+
+    <script id="scriptInit" type="text/javascript">
+        /*code_begin*/
+        $(document).ready(function () {
+            var spread = new GC.Spread.Sheets.Workbook(document.getElementById("ss"));
+            spread.suspendPaint();
+            var sheet = spread.getActiveSheet();
+            dataColumns = ["Name", "City", "Birthday", "Sex", "Weight", "Height"];
+            data = [
+                ["bob", "NewYork", "1968/6/8", "man", "80", "180"],
+                ["Betty", "NewYork", "1972/7/3", "woman", "72", "168"],
+                ["Gary", "NewYork", "1964/3/2", "man", "71", "179"],
+                ["Hunk", "Washington", "1972/8/8", "man", "80", "171"],
+                ["Cherry", "Washington", "1986/2/2", "woman", "58", "161"],
+                ["Eva", "Washington", "1993/2/15", "woman", "71", "180"]];
+            sheet.tables.addFromDataSource("table1", 1, 1, data);
+
+            sheet.getRange(-1, 1, -1, 6).width(80);
+
+            var table = sheet.tables.findByName("table1");
+            table.setColumnName(0, dataColumns[0]);
+            table.setColumnName(1, dataColumns[1]);
+            table.setColumnName(2, dataColumns[2]);
+            table.setColumnName(3, dataColumns[3]);
+            table.setColumnName(4, dataColumns[4]);
+            table.setColumnName(5, dataColumns[5]);
+
+            var slicer1 = sheet.slicers.add("slicer1", "table1", "Height");
+            slicer1.position(new GC.Spread.Sheets.Point(100, 180));
+
+            bindSlicerEvent(spread);
+            spread.resumePaint();
+
+            $(".option-row").find("input").attr("disabled", true);
+            $(".option-row").find("select").attr("disabled", true);
+            $("#protect_sheet").attr("disabled", false);
+            clearSlicerSetting();
+        });
+
+        function bindSlicerEvent(spread) {
+            spread.bind(GC.Spread.Sheets.Events.SlicerChanged, function (event, args) {
+                var sheet = args.sheet;
+                var slicer = args.slicer;
+                if (!slicer) {
+                    return;
+                }
+                var propertyName = args.propertyName;
+                if (propertyName === "isSelected") {
+                    if (slicer.isSelected()) {
+                        $(".option-row").find("input").attr("disabled", false);
+                        $(".option-row").find("select").attr("disabled", false);
+                        initSlicerSetting(sheet, slicer);
+                    }
+                    else {
+                        $(".option-row").find("input").attr("disabled", true);
+                        $(".option-row").find("select").attr("disabled", true);
+                        $("#protect_sheet").attr("disabled", false);
+                    }
+                }
+            });
+
+            var sheet = spread.getActiveSheet();
+            // protect sheet
+            $("#protect_sheet").bind("change", { "sheet": sheet }, function (e) {
+                sheet.options.isProtected = $(this).prop("checked");
+            });
+
+            // slicer sort state
+            $("#sort_state").bind("change", { "sheet": sheet }, function (e) {
+                setSlicerProperty(e.data, "sortState", $("#sort_state>option:selected").text());
+            });
+
+            // lock slicer
+            $("#lock_slicer").bind("change", { "sheet": sheet }, function (e) {
+                setSlicerProperty(e.data, "isLocked", $(this).prop("checked"));
+            });
+
+            // slicer fixed position
+            $("#fix_position").bind("change", { "sheet": sheet }, function (e) {
+                setSlicerProperty(e.data, "fixedPosition", $(this).prop("checked"));
+            });
+
+            // slicer dynamic move and dynamic size
+            $("#slicer_move_size").bind("change", { "sheet": sheet }, function (e) {
+                $(this).prop("checked") && setSlicerProperty(e.data, "moveAndSize", true);
+            });
+
+            $("#slicer_move_no_size").bind("change", { "sheet": sheet }, function (e) {
+                $(this).prop("checked") && setSlicerProperty(e.data, "moveAndNoSize", true);
+            });
+
+            $("#slicer_no_move_size").bind("change", { "sheet": sheet }, function (e) {
+                $(this).prop("checked") && setSlicerProperty(e.data, "noMoveAndSize", true);
+            });
+
+            $("#slicer_style").bind("change", { "sheet": sheet }, function (e) {
+                var slicerStyle = null;
+                switch ($("#slicer_style").val()) {
+                    case "light1":
+                        slicerStyle = GC.Spread.Sheets.Slicers.SlicerStyles.light1();
+                        break;
+                    case "light2":
+                        slicerStyle = GC.Spread.Sheets.Slicers.SlicerStyles.light2();
+                        break;
+                    case "light3":
+                        slicerStyle = GC.Spread.Sheets.Slicers.SlicerStyles.light3();
+                        break;
+                    case "light4":
+                        slicerStyle = GC.Spread.Sheets.Slicers.SlicerStyles.light4();
+                        break;
+                    case "light5":
+                        slicerStyle = GC.Spread.Sheets.Slicers.SlicerStyles.light5();
+                        break;
+                    case "light6":
+                        slicerStyle = GC.Spread.Sheets.Slicers.SlicerStyles.light6();
+                        break;
+                    case "other1":
+                        slicerStyle = GC.Spread.Sheets.Slicers.SlicerStyles.other1();
+                        break;
+                    case "other2":
+                        slicerStyle = GC.Spread.Sheets.Slicers.SlicerStyles.other2();
+                        break;
+                    case "dark1":
+                        slicerStyle = GC.Spread.Sheets.Slicers.SlicerStyles.dark1();
+                        break;
+                    case "dark2":
+                        slicerStyle = GC.Spread.Sheets.Slicers.SlicerStyles.dark2();
+                        break;
+                    case "dark3":
+                        slicerStyle = GC.Spread.Sheets.Slicers.SlicerStyles.dark3();
+                        break;
+                    case "dark4":
+                        slicerStyle = GC.Spread.Sheets.Slicers.SlicerStyles.dark4();
+                        break;
+                    case "dark5":
+                        slicerStyle = GC.Spread.Sheets.Slicers.SlicerStyles.dark5();
+                        break;
+                    case "dark6":
+                        slicerStyle = GC.Spread.Sheets.Slicers.SlicerStyles.dark6();
+                        break;
+                }
+                setSlicerProperty(e.data, "style", slicerStyle);
+            });
+        }
+
+        function setSlicerProperty(data, property, value) {
+            var sheet = data && data.sheet;
+            if (!needChangeSlicer(sheet)) {
+                return;
+            }
+            var selectedSlicers = getSelectedSlicers(sheet);
+            for (var item in selectedSlicers) {
+                var slicer = selectedSlicers[item];
+                switch (property) {
+                    case "sortState":
+                        slicer.sortState(GC.Spread.Sheets.SortState[value]);
+                        break;
+                    case "isLocked":
+                        slicer.isLocked(value);
+                        break;
+                    case "fixedPosition":
+                        slicer.fixedPosition(value);
+                        break;
+                    case "moveAndSize":
+                        slicer.dynamicMove(true);
+                        slicer.dynamicSize(true);
+                        break;
+                    case "moveAndNoSize":
+                        slicer.dynamicMove(true);
+                        slicer.dynamicSize(false);
+                        break;
+                    case "noMoveAndSize":
+                        slicer.dynamicMove(false);
+                        slicer.dynamicSize(false);
+                        break;
+                    case "style":
+                        slicer.style(value);
+                        break;
+                }
+            }
+        }
+
+        function initSlicerSetting(sheet, slicer) {
+            $("#sort_state").val(slicer.sortState());
+            $("#protect_sheet").prop("checked", sheet.isProtected);
+            $("#lock_slicer").prop("checked", slicer.isLocked());
+            $("#fix_position").prop("checked", slicer.fixedPosition());
+            var dynamicMove = slicer.dynamicMove(),
+                dynamicSize = slicer.dynamicSize();
+            if (!dynamicMove) {
+                $("#slicer_no_move_size").prop("checked", true);
+            }
+            if (dynamicMove && !dynamicSize) {
+                $("#slicer_move_no_size").prop("checked", true);
+            }
+            if (dynamicMove && dynamicSize) {
+                $("#slicer_move_size").prop("checked", true);
+            }
+        }
+
+        function clearSlicerSetting() {
+            $("#sort_state").val(1);
+            $("#protect_sheet").prop("checked", false);
+            $("#lock_slicer").prop("checked", true);
+            $("#fix_position").prop("checked", false);
+            $("#slicer_move_size").prop("checked", true);
+        }
+
+        function getSelectedSlicers(sheet) {
+            if (!sheet) {
+                return null;
+            }
+            var slicers = sheet.slicers.all();
+            if (!slicers || $.isEmptyObject(slicers)) {
+                return null;
+            }
+            var selectedSlicers = [];
+            for (var item in slicers) {
+                var slicer = slicers[item];
+                if (slicer.isSelected()) {
+                    selectedSlicers.push(slicer);
+                }
+            }
+            return selectedSlicers;
+        }
+
+        function needChangeSlicer(sheet) {
+            if (!sheet) {
+                return false;
+            }
+            var selectedSlicers = getSelectedSlicers(sheet);
+            if (!selectedSlicers || selectedSlicers.length === 0) {
+                return false;
+            }
+            return true;
+        }
+        /*code_end*/
+    </script>
+
+</head>
+<body>
+    <div class="sample-turtorial">
+        <div id="ss" style="width: 100%; height: 480px; border: 1px solid gray;"></div>
+        <div class="demo-options">
+            <div class="option-row">
+                <label for="sort_state" style="width:auto;">Sort State:</label>
+                <select id="sort_state">
+                    <option value="0">none</option>
+                    <option value="1">ascending</option>
+                    <option value="2">descending</option>
+                </select>
+                <label for="slicer_style" style="width:auto; margin-left: 20px;">Build-in Styles:</label>
+                <select id="slicer_style">
+                    <option value="light1">Light1</option>
+                    <option value="light2">Light2</option>
+                    <option value="light3">Light3</option>
+                    <option value="light4">Light4</option>
+                    <option value="light5">Light5</option>
+                    <option value="light6">Light6</option>
+                    <option value="other1">Other1</option>
+                    <option value="other2">Other2</option>
+                    <option value="dark1">Dark1</option>
+                    <option value="dark2">Dark2</option>
+                    <option value="dark3">Dark3</option>
+                    <option value="dark4">Dark4</option>
+                    <option value="dark5">Dark5</option>
+                    <option value="dark6">Dark6</option>
+                </select>
+            </div>
+            <div class="option-row">
+                <input type="checkbox" id="protect_sheet" />
+                <label for="protect_sheet">Protect Sheet</label>
+                <input type="checkbox" id="lock_slicer" checked />
+                <label for="lock_slicer">Lock Slicer</label>
+                <input type="checkbox" id="fix_position" />
+                <label for="fix_position">Fix Position</label>
+            </div>
+            <div class="option-row">
+                <input type="radio" name="dynamic_move_size" value="move_size" id="slicer_move_size" checked />
+                <label for="slicer_move_size" style="display: inline-block;">Move and size with cells</label>
+            </div>
+            <div class="option-row">
+                <input type="radio" name="dynamic_move_size" value="move_no_size" id="slicer_move_no_size" />
+                <label for="slicer_move_no_size" style="display: inline-block;">Move and don't size with cells</label>
+            </div>
+            <div class="option-row">
+                <input type="radio" name="dynamic_move_size" value="no_move_size" id="slicer_no_move_size" />
+                <label for="slicer_no_move_size" style="display: inline-block;">Don't move and size with cells</label>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,1206 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+
+	<sql id="mat_account_report_invStock" type="proc" desc="材料库存汇总"><![CDATA[
+		CREATE OR REPLACE PROCEDURE mat_account_report_invStock(
+        p_group_id number,
+        p_hos_id number,
+        p_copy_code varchar2,
+        p_begin_year varchar2,
+        p_begin_month varchar2,
+        p_end_year varchar2,
+        p_end_month varchar2,
+        p_store_type number,
+        p_store_id number, --仓库ID
+        p_type_level number, --物资类别级次 
+        p_user_id number, --过滤权限
+        p_is_charge number, --是否收费
+        resultData OUT MAT_REPORT.matreportinvstock--ref cursor
+      )
+      IS
+        ddl_sql varchar2(8000);
+        head_sql varchar2(8000);
+        table_name varchar2(200);--动态表名称
+        is_flag number(2,0); --判断状态
+      BEGIN
+            
+        /*获取结果集的动态表头*/
+          select ','||WM_CONCAT(to_char('item' || show_id || ' number(18,6)')) into head_sql
+          from mat_show_set
+          where group_id = p_group_id
+            and hos_id = p_hos_id
+            and copy_code = p_copy_code
+            and show_flag = 1;
+
+            --EXECUTE IMMEDIATE 'drop Table t_balance';
+            --EXECUTE IMMEDIATE 'drop Table t_bus';
+          /*创建结果集临时表*/
+          select count(1) into is_flag from user_tables where table_name=upper('t_result');
+          if is_flag=1 then
+            EXECUTE IMMEDIATE 'drop Table t_result';
+          end if;
+          execute immediate 'Create Global Temporary Table t_result(
+              mat_type_code nvarchar2(20),
+              mat_type_name nvarchar2(40),
+              begin_money number(18,6),
+              bal_money number(18,6),
+              add_sum_money number(18,6),
+              reduct_sum_money number(18,6),
+              end_money number(18,6),
+              row_index number(16,0),
+              type_level number(4,0),
+              is_last number(4,0)'||head_sql||'
+              )On COMMIT Delete ROWS';
+
+
+          /*创建期初数据临时表*/
+          SELECT COUNT(1) INTO is_flag FROM USER_TABLES WHERE TABLE_NAME = UPPER('t_balance') ;
+          IF is_flag = 1 THEN
+            EXECUTE IMMEDIATE 'drop Table t_balance';
+          END IF;
+          execute immediate '
+              Create Global Temporary Table t_balance(
+              mat_type_code nvarchar2(20),
+              begin_money number(18,6)
+          )On COMMIT Delete ROWS';
+
+
+          /*创建业务数据临时表*/
+          SELECT COUNT(1) INTO is_flag FROM USER_TABLES WHERE TABLE_NAME = UPPER('t_bus') ;
+          IF is_flag =1 THEN
+            EXECUTE IMMEDIATE 'drop Table t_bus';
+          END IF;
+          execute immediate '
+              Create Global Temporary Table t_bus(
+                bus_type_code nvarchar2(6),
+                mat_type_code nvarchar2(20),
+                amount_money number(18,6)
+          )On COMMIT Delete ROWS';
+
+
+        /*  p_type_level= 99 时为末级  */
+       if p_type_level = 99
+         then
+           
+        /*按级次插入所有物资类别*/
+        ddl_sql := 'insert into t_result(mat_type_code, mat_type_name, row_index, type_level, is_last)
+          select distinct d.mat_type_code, d.mat_type_name , 1, d.type_level, 
+            case 
+              when d.type_level = ' || p_type_level || ' then 1 
+              else d.is_last
+            end 
+          from mat_store_inv a
+          inner join mat_inv_dict b
+            on a.group_id = b.group_id
+            and a.hos_id = b.hos_id
+            and a.copy_code = b.copy_code
+            and a.inv_id = b.inv_id
+            and b.is_charge = ' || p_is_charge || '
+              and b.is_stop = 0
+          left join mat_type_dict c
+            on a.group_id = c.group_id
+            and a.hos_id = c.hos_id
+            and a.copy_code = c.copy_code
+            and b.mat_type_id = c.mat_type_id
+            and c.is_stop = 0
+          left join mat_type_dict d
+            on a.group_id = d.group_id
+            and a.hos_id = d.hos_id
+            and a.copy_code = d.copy_code
+            and d.is_stop = 0
+            and d.type_level <= ' || p_type_level || '
+            and c.mat_type_code like d.mat_type_code || ''%''
+          where a.group_id = ' || p_group_id || '
+            and a.hos_id = ' || p_hos_id || '
+            and a.copy_code = ''' || p_copy_code || '''
+            and (
+              (' || p_store_type || ' = 0 and a.store_id = ' || p_store_id || ')
+              or
+              (' || p_store_type || ' = 1 and a.store_id in (
+                select store_id from mat_store_detail
+                where group_id = ' || p_group_id || '
+                  and hos_id = ' || p_hos_id || '
+                  and set_id = ' || p_store_id || '
+              ))
+            )
+            and ( d.is_last = 1)
+            and b.is_stop = 0
+            and exists(
+              select 1 from v_user_data_perm  
+              where group_id = a.group_id 
+                and hos_id = a.hos_id 
+                and perm_code = a.store_id 
+                and table_code = ''HOS_STORE_DICT'' 
+                and user_id = ' || p_user_id || ' 
+                and is_read = 1 and is_write = 1 
+            )
+          order by d.mat_type_code';
+         
+          else 
+              /*按级次插入所有物资类别*/
+        ddl_sql := 'insert into t_result(mat_type_code, mat_type_name, row_index, type_level, is_last)
+          select distinct d.mat_type_code, d.mat_type_name , 1, d.type_level, 
+            case 
+              when d.type_level = ' || p_type_level || ' then 1 
+              else d.is_last
+            end 
+          from mat_store_inv a
+          inner join mat_inv_dict b
+            on a.group_id = b.group_id
+            and a.hos_id = b.hos_id
+            and a.copy_code = b.copy_code
+            and a.inv_id = b.inv_id
+            and b.is_charge = ' || p_is_charge || '
+              and b.is_stop = 0
+          left join mat_type_dict c
+            on a.group_id = c.group_id
+            and a.hos_id = c.hos_id
+            and a.copy_code = c.copy_code
+            and b.mat_type_id = c.mat_type_id
+            and c.is_stop = 0
+          left join mat_type_dict d
+            on a.group_id = d.group_id
+            and a.hos_id = d.hos_id
+            and a.copy_code = d.copy_code
+            and d.is_stop = 0
+            and d.type_level <= ' || p_type_level || '
+            and c.mat_type_code like d.mat_type_code || ''%''
+          where a.group_id = ' || p_group_id || '
+            and a.hos_id = ' || p_hos_id || '
+            and a.copy_code = ''' || p_copy_code || '''
+            and (
+              (' || p_store_type || ' = 0 and a.store_id = ' || p_store_id || ')
+              or
+              (' || p_store_type || ' = 1 and a.store_id in (
+                select store_id from mat_store_detail
+                where group_id = ' || p_group_id || '
+                  and hos_id = ' || p_hos_id || '
+                  and set_id = ' || p_store_id || '
+              ))
+            )
+           
+            and b.is_stop = 0
+            and exists(
+              select 1 from v_user_data_perm  
+              where group_id = a.group_id 
+                and hos_id = a.hos_id 
+                and perm_code = a.store_id 
+                and table_code = ''HOS_STORE_DICT'' 
+                and user_id = ' || p_user_id || ' 
+                and is_read = 1 and is_write = 1 
+            )
+          order by d.mat_type_code';
+             end if ;
+               
+       -- dbms_output.put_line(ddl_sql);
+        execute immediate ddl_sql;
+
+        /*插入合计行*/
+        ddl_sql := 'insert into t_result(mat_type_code, mat_type_name, row_index)
+          values(''合计'', '''', 2)';
+        --dbms_output.put_line(ddl_sql);
+        execute immediate ddl_sql;
+
+        /*插入所选期间期初数据*/
+        ddl_sql := 'insert into t_balance(mat_type_code, begin_money)
+          select c.mat_type_code, sum(a.in_money) - sum(a.out_money) as begin_money
+          from mat_inv_balance a
+          left join mat_inv_dict b
+            on a.group_id = b.group_id
+            and a.hos_id = b.hos_id
+            and a.copy_code = b.copy_code
+            and a.inv_id = b.inv_id
+            and b.is_charge = ' || p_is_charge || '
+            and b.is_stop = 0
+          left join mat_type_dict c
+            on a.group_id = c.group_id
+            and a.hos_id = c.hos_id
+            and a.copy_code = c.copy_code
+            and b.mat_type_id = c.mat_type_id
+            and c.is_stop = 0
+          where a.group_id = ' || p_group_id || '
+            and a.hos_id = ' || p_hos_id || '
+            and a.copy_code = ''' || p_copy_code || '''
+            and (
+              (' || p_store_type || ' = 0 and a.store_id = ' || p_store_id || ')
+              or
+              (' || p_store_type || ' = 1 and a.store_id in (
+                select store_id from mat_store_detail
+                where group_id = ' || p_group_id || '
+                  and hos_id = ' || p_hos_id || '
+                  and set_id = ' || p_store_id || '
+              ))
+            )
+            and year || month < ''' || p_begin_year || p_begin_month || '''
+            and exists(
+              select 1 from v_user_data_perm  
+              where group_id = a.group_id 
+                and hos_id = a.hos_id 
+                and perm_code = a.store_id 
+                and table_code = ''HOS_STORE_DICT'' 
+                and user_id = ' || p_user_id || ' 
+                and is_read = 1 and is_write = 1 
+            )
+          group by c.mat_type_code';
+      --  dbms_output.put_line(ddl_sql);
+        execute immediate ddl_sql;
+
+        /*取期初金额*/
+        ddl_sql := 'update t_result a set begin_money =
+          (select sum(begin_money) from t_balance b where b.mat_type_code like a.mat_type_code||''%'')
+          where a.row_index <> 2
+            and EXISTS(select sum(begin_money) from t_balance b where b.mat_type_code like a.mat_type_code||''%'')';
+        --dbms_output.put_line(ddl_sql);
+        execute immediate ddl_sql;
+
+        /*更新合计行*/
+        ddl_sql := 'update t_result set begin_money = (select cast(sum(nvl(begin_money, 0)) as number(18,6)) from t_result where row_index = 1 and is_last = 1)
+          where row_index = 2';
+        --dbms_output.put_line(ddl_sql);
+        execute immediate ddl_sql;
+
+        /*插入所选期间业务发生数据*/
+        ddl_sql := 'insert into t_bus(bus_type_code, mat_type_code, amount_money)
+          select bus_type_code, mat_type_code, sum(amount_money) as amount_money
+          from(
+            --入库数据
+            select b.bus_type_code, d.mat_type_code, sum(a.amount_money) as amount_money
+            from mat_in_detail a
+            left join mat_in_main b
+              on a.group_id = b.group_id
+              and a.hos_id = b.hos_id
+              and a.copy_code = b.copy_code
+              and a.in_id = b.in_id
+            left join mat_inv_dict c
+              on a.group_id = c.group_id
+              and a.hos_id = c.hos_id
+              and a.copy_code = c.copy_code
+              and a.inv_id = c.inv_id
+              and a.inv_no = c.inv_no
+              and c.is_charge = ' || p_is_charge || '
+            left join mat_type_dict d
+              on a.group_id = d.group_id
+              and a.hos_id = d.hos_id
+              and a.copy_code = d.copy_code
+              and c.mat_type_id = d.mat_type_id
+              and d.is_stop = 0
+            where a.group_id = ' || p_group_id || '
+              and a.hos_id = ' || p_hos_id || '
+              and a.copy_code = ''' || p_copy_code || '''
+              and b.state >= 3
+              and b.year || b.month >= ''' || p_begin_year || p_begin_month || '''
+              and b.year || b.month <= ''' || p_end_year || p_end_month || '''
+              and (
+                (' || p_store_type || ' = 0 and b.store_id = ' || p_store_id || ')
+                or
+                (' || p_store_type || ' = 1 and b.store_id in (
+                  select store_id from mat_store_detail
+                  where group_id = ' || p_group_id || '
+                    and hos_id = ' || p_hos_id || '
+                    and set_id = ' || p_store_id || '
+                ))
+              )
+              and exists(
+                select 1 from v_user_data_perm  
+                where group_id = a.group_id 
+                  and hos_id = a.hos_id 
+                  and perm_code = b.store_id 
+                  and table_code = ''HOS_STORE_DICT'' 
+                  and user_id = ' || p_user_id || ' 
+                  and is_read = 1 and is_write = 1 
+              )
+            group by b.bus_type_code, d.mat_type_code
+            --出库数据
+            union all
+            select b.bus_type_code, d.mat_type_code, sum(a.amount_money) as amount_money
+            from mat_out_detail a
+            left join mat_out_main b
+              on a.group_id = b.group_id
+              and a.hos_id = b.hos_id
+              and a.copy_code = b.copy_code
+              and a.out_id = b.out_id
+            left join mat_inv_dict c
+              on a.group_id = c.group_id
+              and a.hos_id = c.hos_id
+              and a.copy_code = c.copy_code
+              and a.inv_id = c.inv_id
+              and a.inv_no = c.inv_no
+              and c.is_charge = ' || p_is_charge || '
+            left join mat_type_dict d
+              on a.group_id = d.group_id
+              and a.hos_id = d.hos_id
+              and a.copy_code = d.copy_code
+              and c.mat_type_id = d.mat_type_id
+              and d.is_stop = 0
+            where a.group_id = ' || p_group_id || '
+              and a.hos_id = ' || p_hos_id || '
+              and a.copy_code = ''' || p_copy_code || '''
+              and b.state >= 3
+              and b.year || b.month >= ''' || p_begin_year || p_begin_month || '''
+              and b.year || b.month <= ''' || p_end_year || p_end_month || '''
+              and (
+                (' || p_store_type || ' = 0 and b.store_id = ' || p_store_id || ')
+                or
+                (' || p_store_type || ' = 1 and b.store_id in (
+                  select store_id from mat_store_detail
+                  where group_id = ' || p_group_id || '
+                    and hos_id = ' || p_hos_id || '
+                    and set_id = ' || p_store_id || '
+                ))
+              )
+              and exists(
+                select 1 from v_user_data_perm  
+                where group_id = a.group_id 
+                  and hos_id = a.hos_id 
+                  and perm_code = b.store_id 
+                  and table_code = ''HOS_STORE_DICT'' 
+                  and user_id = ' || p_user_id || ' 
+                  and is_read = 1 and is_write = 1 
+              )
+            group by b.bus_type_code, d.mat_type_code
+          ) data
+          group by bus_type_code, mat_type_code';
+        --dbms_output.put_line(ddl_sql);
+        execute immediate ddl_sql;
+
+        /*处理本期数据*/
+        declare
+          v_show_id number(16,0); --显示列ID
+          v_direction_flag number(2,0); --方向
+          v_sql varchar2(4000);
+          TYPE cur_addShow IS REF CURSOR; --定义游标指针
+          v_cursor cur_addShow; --定义游标变量
+        begin
+          open v_cursor for
+            select show_id, direction_flag from mat_show_set
+            where group_id = p_group_id
+              and hos_id = p_hos_id
+              and copy_code = p_copy_code
+              and show_flag = 1;
+          loop
+            FETCH v_cursor INTO v_show_id, v_direction_flag;--从游标中取一条记录，存放到变量v_show_id中
+            EXIT WHEN v_cursor%NOTFOUND;
+
+            /*添加显示列*/
+            /*由于oracle临时表执行ddl语句会清空表中原有数据所以动态列的创建放在构建临时表时
+            v_sql := 'alter table t_result add item' || v_show_id || ' number(18,6)';
+            --dbms_output.put_line(v_sql);
+            execute immediate v_sql;*/
+
+            /*取对应金额*/
+            v_sql := 'update t_result a set item' || v_show_id || ' =
+              (
+                select sum(amount_money)
+                from (
+                  select mat_type_code, sum(amount_money) as amount_money
+                  from t_bus a
+                  join mat_show_detail b
+                    on b.group_id = ' || p_group_id || '
+                    and b.hos_id = ' || p_hos_id || '
+                    and b.copy_code = ''' || p_copy_code || '''
+                    and b.show_id = ' || v_show_id || '
+                    and a.bus_type_code = b.bus_type_code
+                  group by mat_type_code
+                )bus
+                where bus.mat_type_code like a.mat_type_code || ''%''
+              )
+              where row_index <> 2
+                and EXISTS(
+                  select sum(amount_money)
+                  from (
+                    select mat_type_code, sum(amount_money) as amount_money
+                    from t_bus a
+                    join mat_show_detail b
+                      on b.group_id = ' || p_group_id || '
+                      and b.hos_id = ' || p_hos_id || '
+                      and b.copy_code = ''' || p_copy_code || '''
+                      and b.show_id = ' || v_show_id || '
+                      and a.bus_type_code = b.bus_type_code
+                    group by mat_type_code
+                  )bus
+                  where bus.mat_type_code like a.mat_type_code || ''%''
+                )';
+            --dbms_output.put_line(v_sql);
+            execute immediate v_sql;
+
+            /*更新合计行*/
+            v_sql := 'update t_result set item' || v_show_id || ' = (select cast(sum(nvl(item' || v_show_id || ', 0)) as number(18,6)) from t_result where row_index = 1 and is_last = 1)
+              where row_index = 2';
+            --dbms_output.put_line(v_sql);
+            execute immediate v_sql;
+
+            /*更新本期合计列（计算方式为累加计算）*/
+            if v_direction_flag = 1
+              then
+                /*增加项*/
+                v_sql := 'update t_result set add_sum_money = nvl(add_sum_money, 0) + nvl(item' || v_show_id || ', 0)';
+            else
+              /*减少项*/
+              v_sql := 'update t_result set reduct_sum_money = nvl(reduct_sum_money, 0) + nvl(item' || v_show_id || ', 0)';
+            end if;
+            --dbms_output.put_line(v_sql);
+            execute immediate v_sql;
+
+          end loop;
+          CLOSE v_cursor;--关闭游标
+        end;
+
+        /*期末等于期初+增加合计-减少合计（begin_money+sum_add_money-sum_reduct_money）*/
+        ddl_sql := 'update t_result set end_money = nvl(begin_money, 0) + nvl(add_sum_money, 0) - nvl(reduct_sum_money, 0)';
+        --dbms_output.put_line(ddl_sql);
+        execute immediate ddl_sql;
+
+        /*返回结果集游标*/
+        open resultData for 'select * from t_result order by row_index, mat_type_code';
+
+      END mat_account_report_invStock;
+
+
+	]]></sql>
+	
+	
+	<sql id="MAT_ACCOUNT_INVSTOCK_FIM" type="proc" desc="材料库存(财务)汇总"><![CDATA[
+		CREATE OR REPLACE PROCEDURE MAT_ACCOUNT_INVSTOCK_FIM(
+        p_group_id number,
+        p_hos_id number,
+        p_copy_code varchar2,
+        p_begin_year varchar2,
+        p_begin_month varchar2,
+        p_end_year varchar2,
+        p_end_month varchar2,
+        p_store_type number,
+        p_store_id number, --仓库ID
+        resultData OUT MAT_REPORT.matreportinvstock--ref cursor
+        ) is
+        ddl_sql varchar2(8000);
+        head_sql varchar2(8000);
+        table_name varchar2(200);--动态表名称
+        is_flag number(2,0); --判断状态
+      BEGIN
+        /*获取结果集的动态表头*/
+          select ','||WM_CONCAT(to_char('item' || show_id || ' number(18,6)')) into head_sql
+          from mat_show_set
+          where group_id = p_group_id
+            and hos_id = p_hos_id
+            and copy_code = p_copy_code
+            and show_flag = 1;
+
+            --EXECUTE IMMEDIATE 'drop Table t_balance';
+            --EXECUTE IMMEDIATE 'drop Table t_bus';
+          /*创建结果集临时表*/
+          select count(1) into is_flag from user_tables where table_name=upper('t_result');
+          if is_flag=1 then
+            EXECUTE IMMEDIATE 'drop Table t_result';
+          end if;
+          execute immediate 'Create Global Temporary Table t_result(
+              fim_type_code nvarchar2(20),
+              fim_type_name nvarchar2(40),
+              begin_money number(18,6),
+              bal_money number(18,6),
+              add_sum_money number(18,6),
+              reduct_sum_money number(18,6),
+              end_money number(18,6),
+              row_index number(16,0),
+              is_last number(4,0)'||head_sql||'
+              )On COMMIT Delete ROWS';
+              --  t_result表中包含以上及以下字段
+              --is_last number(4,0)',1,2,3,4,5,6,20,21,22,23,24,25'
+
+          /*创建期初数据临时表*/
+          SELECT COUNT(1) INTO is_flag FROM USER_TABLES WHERE TABLE_NAME = UPPER('t_balance') ;
+          IF is_flag = 1 THEN
+            EXECUTE IMMEDIATE 'drop Table t_balance';
+          END IF;
+          execute immediate '
+              Create Global Temporary Table t_balance(
+              fim_type_code nvarchar2(20),
+              begin_money number(18,6)
+          )On COMMIT Delete ROWS';
+
+
+          /*创建业务数据临时表*/
+          SELECT COUNT(1) INTO is_flag FROM USER_TABLES WHERE TABLE_NAME = UPPER('t_bus') ;
+          IF is_flag =1 THEN
+            EXECUTE IMMEDIATE 'drop Table t_bus';
+          END IF;
+          execute immediate '
+              Create Global Temporary Table t_bus(
+                bus_type_code nvarchar2(6),
+                fim_type_code nvarchar2(20),
+                amount_money number(18,6)
+          )On COMMIT Delete ROWS';
+
+
+        /*插入所有物资财务类别*/
+        ddl_sql := 'insert into t_result(fim_type_code, fim_type_name, row_index,  is_last)
+            select distinct a.fim_type_code, a.fim_type_name , 1,b.is_last
+              end
+                from mat_fim_type a 
+                left join mat_type b
+                  on a.fim_type_code=b.fim_type_code
+                  and a.group_id = b.group_id
+                  and a.hos_id = b.hos_id
+                  and a.copy_code = b.copy_code
+                left join mat_inv c 
+                  on c.mat_type_id = b.mat_type_id
+                  and c.group_id = b.group_id
+                  and c.hos_id = b.hos_id
+                  and c.copy_code = b.copy_code
+                left join MAT_STORE_INV  d 
+                  on d.inv_id = c.inv_id
+                  and d.group_id = c.group_id
+                  and d.hos_id= c.hos_id
+                  and d.copy_code = c.copy_code
+            where a.group_id = ' || p_group_id || '
+              and a.hos_id = ' || p_hos_id || '
+              and a.copy_code = ''' || p_copy_code || '''
+              and (
+                (' || p_store_type || ' = 0 and d.store_id = ' || p_store_id || ')
+                or
+                (' || p_store_type || ' = 1 and d.store_id in (
+                  select store_id from mat_store_detail
+                  where group_id = ' || p_group_id || '
+                    and hos_id = ' || p_hos_id || '
+                    and set_id = ' || p_store_id || '
+                ))
+              )
+            and b.is_last = 1
+          order by a.fim_type_code';
+        dbms_output.put_line(ddl_sql);
+        execute immediate ddl_sql;
+
+        /*插入合计行*/
+        ddl_sql := 'insert into t_result(fim_type_code, fim_type_name, row_index)
+          values(''合计'', '''', 2)';
+        --dbms_output.put_line(ddl_sql);
+        execute immediate ddl_sql;
+
+        /*插入所选期间期初数据*/
+        ddl_sql := 'insert into t_balance(fim_type_code, begin_money)
+          select mft.fim_type_code, sum(a.in_money) - sum(a.out_money) as begin_money
+          from mat_inv_balance a
+          left join mat_inv b
+            on a.group_id = b.group_id
+            and a.hos_id = b.hos_id
+            and a.copy_code = b.copy_code
+            and a.inv_id = b.inv_id
+          left join mat_type c
+            on a.group_id = c.group_id
+            and a.hos_id = c.hos_id
+            and a.copy_code = c.copy_code
+            and b.mat_type_id = c.mat_type_id
+            and c.is_stop = 0
+          left join mat_fim_type mft 
+            on mft.group_id = c.group_id
+            and mft.hos_id = c.hos_id
+            and mft.copy_code = c.copy_code
+            and mft.fim_type_code = c.fim_type_code
+          where a.group_id = ' || p_group_id || '
+            and a.hos_id = ' || p_hos_id || '
+            and a.copy_code = ''' || p_copy_code || '''
+            and (
+              (' || p_store_type || ' = 0 and a.store_id = ' || p_store_id || ')
+              or
+              (' || p_store_type || ' = 1 and a.store_id in (
+                select store_id from mat_store_detail
+                where group_id = ' || p_group_id || '
+                  and hos_id = ' || p_hos_id || '
+                  and set_id = ' || p_store_id || '
+              ))
+            )
+            and year || month < ''' || p_begin_year || p_begin_month || '''
+          group by mft.fim_type_code';
+        dbms_output.put_line(ddl_sql);
+        execute immediate ddl_sql;
+
+        /*取期初金额*/
+        ddl_sql := 'update t_result a set begin_money =
+          (select sum(begin_money) from t_balance b where b.fim_type_code = a.fim_type_code)
+          where a.row_index <> 2
+            and EXISTS(select sum(begin_money) from t_balance b where b.fim_type_code = a.fim_type_code)';
+        --dbms_output.put_line(ddl_sql);
+        execute immediate ddl_sql;
+
+        /*更新合计行*/
+        ddl_sql := 'update t_result set begin_money = (select cast(sum(nvl(begin_money, 0)) as number(18,6)) from t_result where row_index = 1 and is_last = 1)
+          where row_index = 2';
+        --dbms_output.put_line(ddl_sql);
+        execute immediate ddl_sql;
+
+        /*插入所选期间业务发生数据*/
+        ddl_sql := 'insert into t_bus(bus_type_code, fim_type_code, amount_money)
+          select bus_type_code, fim_type_code, sum(amount_money) as amount_money
+          from(
+            --入库数据
+            select b.bus_type_code, mft.fim_type_code, sum(a.amount_money) as amount_money
+            from mat_in_detail a
+            left join mat_in_main b
+              on a.group_id = b.group_id
+              and a.hos_id = b.hos_id
+              and a.copy_code = b.copy_code
+              and a.in_id = b.in_id
+            left join mat_inv c
+              on a.group_id = c.group_id
+              and a.hos_id = c.hos_id
+              and a.copy_code = c.copy_code
+              and a.inv_id = c.inv_id
+            left join mat_type d
+              on a.group_id = d.group_id
+              and a.hos_id = d.hos_id
+              and a.copy_code = d.copy_code
+              and c.mat_type_id = d.mat_type_id
+              and d.is_stop = 0
+              and d.is_last=1
+            left join mat_fim_type mft 
+              on mft.group_id = d.group_id
+              and mft.hos_id = d.hos_id
+              and mft.copy_code = d.copy_code
+              and mft.fim_type_code = d.fim_type_code
+            where a.group_id = ' || p_group_id || '
+              and a.hos_id = ' || p_hos_id || '
+              and a.copy_code = ''' || p_copy_code || '''
+              and b.state >= 3
+              and b.year || b.month >= ''' || p_begin_year || p_begin_month || '''
+              and b.year || b.month <= ''' || p_end_year || p_end_month || '''
+              and (
+                (' || p_store_type || ' = 0 and b.store_id = ' || p_store_id || ')
+                or
+                (' || p_store_type || ' = 1 and b.store_id in (
+                  select store_id from mat_store_detail
+                  where group_id = ' || p_group_id || '
+                    and hos_id = ' || p_hos_id || '
+                    and set_id = ' || p_store_id || '
+                ))
+              )
+            group by b.bus_type_code, mft.fim_type_code
+            --出库数据
+            union all
+            select b.bus_type_code, mft.fim_type_code, sum(a.amount_money) as amount_money
+            from mat_out_detail a
+            left join mat_out_main b
+              on a.group_id = b.group_id
+              and a.hos_id = b.hos_id
+              and a.copy_code = b.copy_code
+              and a.out_id = b.out_id
+            left join mat_inv c
+              on a.group_id = c.group_id
+              and a.hos_id = c.hos_id
+              and a.copy_code = c.copy_code
+              and a.inv_id = c.inv_id
+            left join mat_type d
+              on a.group_id = d.group_id
+              and a.hos_id = d.hos_id
+              and a.copy_code = d.copy_code
+              and c.mat_type_id = d.mat_type_id
+              and d.is_stop = 0
+              and d.is_last=1
+            left join mat_fim_type mft 
+              on mft.group_id = d.group_id
+              and mft.hos_id = d.hos_id
+              and mft.copy_code = d.copy_code
+              and mft.fim_type_code = d.fim_type_code
+            where a.group_id = ' || p_group_id || '
+              and a.hos_id = ' || p_hos_id || '
+              and a.copy_code = ''' || p_copy_code || '''
+              and b.state >= 3
+              and b.year || b.month >= ''' || p_begin_year || p_begin_month || '''
+              and b.year || b.month <= ''' || p_end_year || p_end_month || '''
+              and (
+                (' || p_store_type || ' = 0 and b.store_id = ' || p_store_id || ')
+                or
+                (' || p_store_type || ' = 1 and b.store_id in (
+                  select store_id from mat_store_detail
+                  where group_id = ' || p_group_id || '
+                    and hos_id = ' || p_hos_id || '
+                    and set_id = ' || p_store_id || '
+                ))
+              )
+            group by b.bus_type_code,mft.fim_type_code
+          ) data
+          group by bus_type_code, fim_type_code';
+        dbms_output.put_line(ddl_sql);
+        execute immediate ddl_sql;
+
+        /*处理本期数据*/
+        declare
+          v_show_id number(16,0); --显示列ID
+          v_direction_flag number(2,0); --方向
+          v_sql varchar2(4000);
+          TYPE cur_addShow IS REF CURSOR; --定义游标指针
+          v_cursor cur_addShow; --定义游标变量
+        begin
+          open v_cursor for
+            select show_id, direction_flag from mat_show_set
+            where group_id = p_group_id
+              and hos_id = p_hos_id
+              and copy_code = p_copy_code
+              and show_flag = 1;
+          loop
+            FETCH v_cursor INTO v_show_id, v_direction_flag;--从游标中取一条记录，存放到变量v_show_id中
+            EXIT WHEN v_cursor%NOTFOUND;
+
+            /*添加显示列*/
+            /*由于oracle临时表执行ddl语句会清空表中原有数据所以动态列的创建放在构建临时表时
+            v_sql := 'alter table t_result add item' || v_show_id || ' number(18,6)';
+            --dbms_output.put_line(v_sql);
+            execute immediate v_sql;*/
+
+            /*取对应金额*/
+            v_sql := 'update t_result a set item' || v_show_id || ' =
+              (
+                select sum(amount_money)
+                from (
+                  select fim_type_code, sum(amount_money) as amount_money
+                  from t_bus a
+                  join mat_show_detail b
+                    on b.group_id = ' || p_group_id || '
+                    and b.hos_id = ' || p_hos_id || '
+                    and b.copy_code = ''' || p_copy_code || '''
+                    and b.show_id = ' || v_show_id || '
+                    and a.bus_type_code = b.bus_type_code
+                  group by fim_type_code
+                )bus
+                where bus.fim_type_code = a.fim_type_code
+              )
+              where row_index <> 2
+                and EXISTS(
+                  select sum(amount_money)
+                  from (
+                    select fim_type_code, sum(amount_money) as amount_money
+                    from t_bus a
+                    join mat_show_detail b
+                      on b.group_id = ' || p_group_id || '
+                      and b.hos_id = ' || p_hos_id || '
+                      and b.copy_code = ''' || p_copy_code || '''
+                      and b.show_id = ' || v_show_id || '
+                      and a.bus_type_code = b.bus_type_code
+                    group by fim_type_code
+                  )bus
+                  where bus.fim_type_code = a.fim_type_code  
+                )';
+            --dbms_output.put_line(v_sql);
+            execute immediate v_sql;
+
+            /*更新合计行*/
+            v_sql := 'update t_result set item' || v_show_id || ' = (select cast(sum(nvl(item' || v_show_id || ', 0)) as number(18,6)) from t_result where row_index = 1 and is_last = 1)
+              where row_index = 2';
+            --dbms_output.put_line(v_sql);
+            execute immediate v_sql;
+
+            /*更新本期合计列（计算方式为累加计算）*/
+            if v_direction_flag = 1
+              then
+                /*增加项*/
+                v_sql := 'update t_result set add_sum_money = nvl(add_sum_money, 0) + nvl(item' || v_show_id || ', 0)';
+            else
+              /*减少项*/
+              v_sql := 'update t_result set reduct_sum_money = nvl(reduct_sum_money, 0) + nvl(item' || v_show_id || ', 0)';
+            end if;
+            --dbms_output.put_line(v_sql);
+            execute immediate v_sql;
+
+          end loop;
+          CLOSE v_cursor;--关闭游标
+        end;
+
+        /*期末等于期初+增加合计-减少合计（begin_money+sum_add_money-sum_reduct_money）*/
+        ddl_sql := 'update t_result set end_money = nvl(begin_money, 0) + nvl(add_sum_money, 0) - nvl(reduct_sum_money, 0)';
+        --dbms_output.put_line(ddl_sql);
+        execute immediate ddl_sql;
+
+        /*返回结果集游标*/
+        open resultData for 'select * from t_result  order by row_index, fim_type_code';
+
+	end mat_account_invStock_Fim;
+	]]></sql>
+	
+	<sql id="mat_store_inv_stock" type="proc" desc="材料库存(财务)汇总"><![CDATA[
+	create or replace procedure mat_store_inv_stock (
+  p_group_id number,
+  p_hos_id number,
+  p_copy_code varchar2,
+  p_begin_year varchar2,
+  p_begin_month varchar2,
+  p_end_year varchar2,
+  p_end_month varchar2,
+  p_store_type number,
+  p_store_id number,
+  resultData OUT MAT_REPORT.matreportinvstock--ref cursor
+) is
+  v_head_sql varchar2(8000); --获取结果集动态字段的sql语句
+  v_head varchar2(8000); --结果集的动态字段
+  v_sql varchar2(8000);--sql语句
+  is_flag number(2,0); --存储临时表状态状态
+  type ref_cursor_type is ref cursor;
+  ref_cursor ref_cursor_type;--公共游标
+  v_bus_type_code mat_show_set.show_id%type;--业务类型编码
+  v_fim_type_code mat_fim_type.fim_type_code%type;--财务类型编码
+  v_amount_money number(18,6);--总金额
+  v_direction_flag number(4);--业务类型出入库方向
+begin
+  /**===================创建临时表========================================================================**/
+  /*获取结果集的动态表头*/
+  v_head_sql:='select distinct mft.fim_type_code
+          from mat_fim_type mft
+          left join mat_type_dict mt
+          on mt.group_id=mft.group_id
+          and mt.hos_id=mft.hos_id
+          and mt.copy_code=mft.copy_code
+          and mt.fim_type_code=mft.fim_type_code
+          and mt.is_stop=0
+          and mt.is_last=1
+          left join mat_inv_dict mid
+          on mid.group_id=mid.group_id
+          and mid.hos_id=mid.hos_id
+          and mid.copy_code=mid.copy_code
+          and mid.mat_type_id=mid.mat_type_id
+          and mid.is_stop=0
+          left join mat_store_inv msi
+          on msi.group_id=mid.group_id
+          and msi.hos_id=mid.hos_id
+          and msi.copy_code=mid.copy_code
+          and msi.inv_id=mid.inv_id
+          left join mat_store_detail msd
+          on msd.group_id=msi.group_id
+          and msd.hos_id=msi.hos_id
+          and msd.store_id=msi.store_id
+          where mft.group_id = ' || p_group_id || '
+          and mft.hos_id = ' || p_hos_id || '
+          and mft.copy_code = ''' || p_copy_code || '''
+          and (
+            (' || p_store_type || ' = 0 and msi.store_id = ' || p_store_id || ')
+            or
+            (' || p_store_type || ' = 1 and msd.set_id = ' || p_store_id || ' ))
+          order by mft.fim_type_code';
+  open ref_cursor for v_head_sql;
+  loop
+   fetch ref_cursor into v_fim_type_code;
+   exit when ref_cursor%notfound;
+   v_head:=v_head||','||v_fim_type_code||' number(18,6)';
+  end loop;
+  close ref_cursor;
+  /*创建结果集临时表*/
+  select count(1) into is_flag from user_tables where table_name=upper('t_result');
+  if is_flag=1 then
+    EXECUTE IMMEDIATE 'drop Table t_result';
+  end if;
+  execute immediate 'Create Global Temporary Table t_result(
+          bus_type_code number(18),
+          bus_type_name varchar2(40),
+          direction_flag number(4),
+          direction_name varchar2(40),
+          is_last number(4),
+          sum_money number(18,6)'||v_head||'
+          )On COMMIT Delete ROWS';
+  /*创建期初数据临时表*/
+  SELECT COUNT(1) INTO is_flag FROM USER_TABLES WHERE TABLE_NAME = UPPER('t_start') ;
+  IF is_flag = 1 THEN
+    EXECUTE IMMEDIATE 'drop Table t_start';
+  END IF;
+  execute immediate '
+          Create Global Temporary Table t_start(
+          fim_type_code varchar2(20),
+          amount_money number(18,6)
+          )On COMMIT Delete ROWS';
+  /*创建业务数据临时表*/
+  SELECT COUNT(1) INTO is_flag FROM USER_TABLES WHERE TABLE_NAME = UPPER('t_during') ;
+  IF is_flag =1 THEN
+    EXECUTE IMMEDIATE 'drop Table t_during';
+  END IF;
+  execute immediate '
+          Create Global Temporary Table t_during(
+          bus_type_code varchar2(6),
+          fim_type_code varchar2(20),
+          amount_money number(18,6)
+          )On COMMIT Delete ROWS';        
+  /**===================创建结果集中 行结构========================================================================**/
+  /*添加期初数据行*/
+  v_sql:='insert into t_result(bus_type_code,bus_type_name,direction_flag,direction_name,is_last)
+          select 99,''期初结存'',0,'''',0 from dual'; 
+  execute immediate v_sql;
+  /*添加业务类型数据行*/      
+  v_sql:='insert into t_result(bus_type_code,bus_type_name,direction_flag,direction_name,is_last)
+          select show_id,show_name,direction_flag,
+          case 
+           when direction_flag=1 then ''本期增加''
+           when direction_flag=2 then ''本期减少''
+           else ''''
+          end  direction_name,
+          1 is_last
+          from mat_show_set
+          where group_id = '|| p_group_id ||'
+          and hos_id = '||p_hos_id ||'
+          and copy_code = '||p_copy_code||'
+          and show_flag = 1
+          order by direction_flag,show_id';
+  execute immediate v_sql;
+  /*添加业务类型合计数据行*/
+  v_sql:='insert into t_result(bus_type_code,bus_type_name,direction_flag,direction_name,is_last)
+          select 99,''合计'',1,''本期增加'',0 from dual'; 
+  execute immediate v_sql;
+  v_sql:='insert into t_result(bus_type_code,bus_type_name,direction_flag,direction_name,is_last)
+          select 99,''合计'',2,''本期减少'',0 from dual'; 
+  execute immediate v_sql;  
+  /**添加期末数据行**/
+  v_sql:='insert into t_result(bus_type_code,bus_type_name,direction_flag,direction_name,is_last)
+          select 99,''期末结存'',99,'''',0 from dual'; 
+  execute immediate v_sql;  
+  /**===================汇总所需数据,添加到临时表中========================================================================**/
+  /*添加期初数据*/
+  v_sql:='insert into t_start(fim_type_code,amount_money)
+          select mft.fim_type_code, sum(nvl(a.in_money,0)) - sum(nvl(a.out_money,0)) as amount_money
+          from mat_inv_balance a
+          left join mat_inv b
+          on a.group_id = b.group_id
+          and a.hos_id = b.hos_id
+          and a.copy_code = b.copy_code
+          and a.inv_id = b.inv_id
+          left join mat_type c
+          on a.group_id = c.group_id
+          and a.hos_id = c.hos_id
+          and a.copy_code = c.copy_code
+          and b.mat_type_id = c.mat_type_id
+          and c.is_stop = 0
+          left join mat_fim_type mft 
+          on mft.group_id = c.group_id
+          and mft.hos_id = c.hos_id
+          and mft.copy_code = c.copy_code
+          and mft.fim_type_code = c.fim_type_code
+          where a.group_id = ' || p_group_id || '
+          and a.hos_id = ' || p_hos_id || '
+          and a.copy_code = ''' || p_copy_code || '''
+          and (
+            (' || p_store_type || ' = 0 and a.store_id = ' || p_store_id || ')
+            or
+            (' || p_store_type || ' = 1 and a.store_id in (
+              select store_id from mat_store_detail
+              where group_id = ' || p_group_id || '
+                and hos_id = ' || p_hos_id || '
+                and set_id = ' || p_store_id || '
+            ))
+          )
+          and year || month < ''' || p_begin_year || p_begin_month || '''
+          group by mft.fim_type_code';
+  execute immediate v_sql;
+  /*添加业务类型,财务类型数据*/
+  v_sql:='insert into t_during(bus_type_code, fim_type_code, amount_money)
+          select bus_type_code, fim_type_code, sum(nvl(amount_money,0)) as amount_money
+          from(
+            --入库数据
+            select msd.show_id bus_type_code, mft.fim_type_code, sum(nvl(a.amount_money,0)) as amount_money
+            from mat_in_detail a
+            left join mat_in_main b
+              on a.group_id = b.group_id
+              and a.hos_id = b.hos_id
+              and a.copy_code = b.copy_code
+              and a.in_id = b.in_id
+            left join mat_show_detail msd
+              on msd.group_id=b.group_id
+              and msd.hos_id=b.hos_id
+              and msd.copy_code=b.copy_code
+              and msd.bus_type_code=b.bus_type_code
+            left join mat_inv c
+              on a.group_id = c.group_id
+              and a.hos_id = c.hos_id
+              and a.copy_code = c.copy_code
+              and a.inv_id = c.inv_id
+            left join mat_type d
+              on a.group_id = d.group_id
+              and a.hos_id = d.hos_id
+              and a.copy_code = d.copy_code
+              and c.mat_type_id = d.mat_type_id
+              and d.is_stop = 0
+              and d.is_last=1
+            left join mat_fim_type mft 
+              on mft.group_id = d.group_id
+              and mft.hos_id = d.hos_id
+              and mft.copy_code = d.copy_code
+              and mft.fim_type_code = d.fim_type_code
+            where a.group_id = ' || p_group_id || '
+              and a.hos_id = ' || p_hos_id || '
+              and a.copy_code = ''' || p_copy_code || '''
+              and b.state >= 3
+              and b.year || b.month >= ''' || p_begin_year || p_begin_month || '''
+              and b.year || b.month <= ''' || p_end_year || p_end_month || '''
+              and (
+                (' || p_store_type || ' = 0 and b.store_id = ' || p_store_id || ')
+                or
+                (' || p_store_type || ' = 1 and b.store_id in (
+                  select store_id from mat_store_detail
+                  where group_id = ' || p_group_id || '
+                    and hos_id = ' || p_hos_id || '
+                    and set_id = ' || p_store_id || '
+                ))
+              )
+            group by msd.show_id, mft.fim_type_code
+            --出库数据
+            union all
+            select msd.show_id bus_type_code, mft.fim_type_code, sum(nvl(a.amount_money,0)) as amount_money
+            from mat_out_detail a
+            left join mat_out_main b
+              on a.group_id = b.group_id
+              and a.hos_id = b.hos_id
+              and a.copy_code = b.copy_code
+              and a.out_id = b.out_id
+            left join mat_show_detail msd
+              on msd.group_id=b.group_id
+              and msd.hos_id=b.hos_id
+              and msd.copy_code=b.copy_code
+              and msd.bus_type_code=b.bus_type_code
+            left join mat_inv c
+              on a.group_id = c.group_id
+              and a.hos_id = c.hos_id
+              and a.copy_code = c.copy_code
+              and a.inv_id = c.inv_id
+            left join mat_type d
+              on a.group_id = d.group_id
+              and a.hos_id = d.hos_id
+              and a.copy_code = d.copy_code
+              and c.mat_type_id = d.mat_type_id
+              and d.is_stop = 0
+              and d.is_last=1
+            left join mat_fim_type mft 
+              on mft.group_id = d.group_id
+              and mft.hos_id = d.hos_id
+              and mft.copy_code = d.copy_code
+              and mft.fim_type_code = d.fim_type_code
+            where a.group_id = ' || p_group_id || '
+              and a.hos_id = ' || p_hos_id || '
+              and a.copy_code = ''' || p_copy_code || '''
+              and b.state >= 3
+              and b.year || b.month >= ''' || p_begin_year || p_begin_month || '''
+              and b.year || b.month <= ''' || p_end_year || p_end_month || '''
+              and (
+                (' || p_store_type || ' = 0 and b.store_id = ' || p_store_id || ')
+                or
+                (' || p_store_type || ' = 1 and b.store_id in (
+                  select store_id from mat_store_detail
+                  where group_id = ' || p_group_id || '
+                    and hos_id = ' || p_hos_id || '
+                    and set_id = ' || p_store_id || '
+                ))
+              )
+            group by msd.show_id,mft.fim_type_code
+          ) data
+          group by bus_type_code, fim_type_code';       
+  execute immediate v_sql;       
+  /**===================修改结果集中数据========================================================================**/       
+  open ref_cursor for v_head_sql;
+  loop 
+    fetch ref_cursor into v_fim_type_code;--添加一列数据
+    exit when ref_cursor%notfound; 
+      open resultData for '
+            select show_id bus_type_code, direction_flag
+            from mat_show_set
+            where group_id = '|| p_group_id ||'
+            and hos_id = '||p_hos_id ||'
+            and copy_code = '||p_copy_code||'
+            and show_flag = 1
+            order by direction_flag, show_id ';   
+      loop
+        fetch resultData into v_bus_type_code,v_direction_flag;
+        exit when resultData%notfound;
+              /**业务类型-财务类型**/
+              v_sql:='update t_result
+                      set '||v_fim_type_code||'=(
+                          select amount_money
+                          from t_during
+                          where bus_type_code='''||v_bus_type_code||'''
+                          and fim_type_code='''||v_fim_type_code||'''
+                      )
+                      where bus_type_code='''||v_bus_type_code||'''';
+              execute immediate v_sql;
+              v_sql:='update t_result
+                      set sum_money =nvl(sum_money,0)+nvl('||v_fim_type_code||',0)
+                      where bus_type_code='''||v_bus_type_code||'''';
+              execute immediate v_sql;    
+      end loop;
+      close resultData;
+      /**期初数据-财务类型数据**/
+      v_sql:='update t_result
+              set '||v_fim_type_code||'=(
+                      select amount_money
+                      from t_start
+                      where fim_type_code='''||v_fim_type_code||'''
+              )
+              where bus_type_code=99
+              and direction_flag=0';
+      execute immediate v_sql;  
+      v_sql:='update t_result
+              set sum_money =nvl(sum_money,0)+nvl('||v_fim_type_code||',0)
+              where bus_type_code=99
+              and direction_flag=0';
+      execute immediate v_sql; 
+      /**合计行-本期增加**/    
+      v_sql:='update t_result
+              set '||v_fim_type_code||'=(
+                  select sum(nvl('||v_fim_type_code||',0))
+                  from t_result
+                  where direction_flag=1
+                  and is_last=1
+              )
+              where bus_type_code=99
+              and direction_flag=1';
+     execute immediate v_sql; 
+     v_sql:='update t_result
+              set sum_money =nvl(sum_money,0)+nvl('||v_fim_type_code||',0)
+              where bus_type_code=99
+              and direction_flag=1';
+     execute immediate v_sql; 
+     /**合计行-本期减少**/  
+     v_sql:='update t_result
+            set '||v_fim_type_code||'=(
+                  select sum(nvl('||v_fim_type_code||',0))
+                  from t_result
+                  where direction_flag=2
+                  and is_last=1
+            )
+            where bus_type_code=99
+            and direction_flag=2';
+    execute immediate v_sql;
+    v_sql:='update t_result
+            set sum_money =nvl(sum_money,0)+nvl('||v_fim_type_code||',0)
+            where bus_type_code=99
+            and direction_flag=2';
+    execute immediate v_sql;     
+    /**修改期末数据**/
+    v_sql:='update t_result
+            set '||v_fim_type_code||'=(
+                select sum(nvl(amount_money,0))
+                from (
+                     select sum(nvl('||v_fim_type_code||',0)) amount_money
+                     from t_result
+                     where bus_type_code=''99''
+                     and direction_flag=''0''
+                     union all
+                     select sum(nvl('||v_fim_type_code||',0))
+                     from t_result
+                     where bus_type_code=''99''
+                     and direction_flag=''1''
+                     union all
+                     select -sum(nvl('||v_fim_type_code||',0))
+                     from t_result
+                     where bus_type_code=''99''
+                     and direction_flag=''2''  
+                )
+            )
+            where bus_type_code=99
+            and direction_flag=99';
+    execute immediate v_sql;  
+    v_sql:='update t_result
+            set sum_money =nvl(sum_money,0)+nvl('||v_fim_type_code||',0)
+            where bus_type_code=99
+            and direction_flag=99';
+    execute immediate v_sql;   
+  end loop;  
+  close ref_cursor;     
+     
+ 
+  /**===================返回结果集========================================================================**/
+  open resultData for 'select * from  t_result order by direction_flag,bus_type_code';
+  
+end;
+	
+	]]></sql>
+</root>
+

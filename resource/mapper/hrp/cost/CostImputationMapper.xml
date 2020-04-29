@@ -1,0 +1,626 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.cost.dao.CostImputationMapper">
+
+	<resultMap id="costImputation" type="com.chd.hrp.cost.entity.CostImputation">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="year_month" column="year_month" />
+		<result property="amount" column="amount" />
+		<result property="source_code" column="source_code" />
+		<result property="source_name" column="source_name" />
+		<result property="dept_code" column="dept_code" />
+		<result property="dept_name" column="dept_name" />
+		<result property="cost_item_code" column="cost_item_code" />
+		<result property="cost_item_name" column="cost_item_name" />
+		
+		<result property="dept_id" column="dept_id" />
+		<result property="dept_no" column="dept_no" />
+		<result property="source_id" column="source_id" />
+		<result property="cost_item_id" column="cost_item_id" />
+		<result property="cost_item_no" column="cost_item_no" />
+	</resultMap>
+
+	
+	<select id="queryCostImputation" parameterType="java.util.Map" resultMap="costImputation">
+
+		
+ 
+ SELECT tmp.group_id as group_id, tmp.hos_id as hos_id, tmp.copy_code as copy_code, tmp.year_month as year_month, nvl(SUM(tmp.amount), 0) AS amount
+      , tmp.dept_code AS dept_code, tmp.dept_name AS dept_name, tmp.source_code AS source_code, tmp.source_name AS source_name, tmp.cost_item_code AS cost_item_code
+      , tmp.cost_item_name AS cost_item_name,
+      		tmp.dept_id as dept_id,
+            tmp.dept_no as dept_no,
+            tmp.source_id as source_id,
+            tmp.cost_item_id as cost_item_id,
+            tmp.cost_item_no as cost_item_no
+
+ from (
+
+    SELECT 
+            cewd.group_id,cewd.hos_id, cewd.copy_code, cewd.year_month,
+            cewd.dept_id,
+            cewd.dept_no,
+            1 as source_id,
+            cidn.cost_item_id,
+            cidn.cost_item_no,
+            nvl(sum(cewd.wage1),0)+nvl(sum(cewd.wage2),0) as amount,
+            hdd.dept_code as dept_code,
+            hdd.dept_name as dept_name,
+            '001' AS source_code,
+             '自筹资金' AS source_name,
+             cidn.cost_item_code as cost_item_code,
+            cidn.cost_item_name as cost_item_name
+        FROM COST_EMP_WAGE_DETAIL cewd
+left join HOS_DEPT_DICT hdd on cewd.group_id = hdd.group_id and cewd.hos_id = hdd.hos_id and cewd.dept_id = hdd.dept_id
+<if test="is_flag == 1 ">
+		and cewd.dept_no = hdd.dept_no 
+</if>
+<if test="is_flag == 0 or is_flag == ''">
+		and hdd.is_stop=0
+</if>
+left join HOS_EMP_DICT hed on cewd.group_id = hed.group_id and cewd.hos_id = hed.hos_id and cewd.emp_id = hed.emp_id 
+<if test="is_flag == 1 ">
+		and cewd.emp_no = hed.emp_no
+</if>
+<if test="is_flag == 0 or is_flag == ''">
+		and hed.is_stop=0
+</if>
+left join COST_WAGE_COST_RELA cwcr on cewd.group_id = cwcr.group_id and cewd.hos_id = cwcr.hos_id and cewd.copy_code = cwcr.copy_code and cewd.emp_kind_code = cwcr.emp_kind_code 
+and cewd.year_month = cwcr.year_month 
+LEFT JOIN COST_ITEM_DICT_NO cidn ON cewd.group_id = cidn.group_id and cewd.hos_id = cidn.hos_id and cewd.copy_code = cidn.copy_code and cwcr.cost_item_id = cidn.cost_item_id
+<if test="is_flag == 1 ">
+		and cwcr.cost_item_no = cidn.cost_item_no
+</if>
+<if test="is_flag == 0 or is_flag == ''">
+		and cidn.is_stop=0
+</if>
+
+    	<where>
+			<if test="group_id != null and group_id != ''">
+				AND cewd.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND cewd.hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				AND cewd.copy_code = #{copy_code}
+			</if>
+			<if test="year_month != null and year_month != ''">
+				AND cewd.year_month = #{year_month}
+			</if>
+			<if test="dept_id != null and dept_id != ''">
+				AND cewd.dept_id = #{dept_id}
+			</if>
+			<if test="dept_no != null and dept_no != ''">
+				AND cewd.dept_no = #{dept_no}
+			</if>
+<!-- 			<if test="source_id != null and source_id != ''">
+				AND cewd.source_id = #{source_id}
+			</if> -->
+			<if test="dept_code != null and dept_code != ''">
+				AND hdd.dept_code = #{dept_code}
+			</if>
+			<if test="amount != null and amount != ''">
+				AND cewd.amount = #{amount}
+			</if>
+			<if test="cost_item_id != null and cost_item_id != ''">
+				AND cidn.cost_item_id = #{cost_item_id}
+			</if>
+			<if test="cost_item_no != null and cost_item_no != ''">
+				AND cidn.cost_item_no = #{cost_item_no}
+			</if>
+			
+		</where>
+		 group by cewd.group_id,cewd.hos_id, cewd.copy_code, cewd.year_month,hdd.dept_code,hdd.dept_name,cidn.cost_item_code,cidn.cost_item_name
+		 ,cewd.dept_id,
+            cewd.dept_no,
+            cidn.cost_item_id,
+            cidn.cost_item_no
+		 
+
+union all 
+
+     SELECT cmd.group_id, cmd.hos_id, cmd.copy_code, cmd.year_month,
+     cmd.dept_id,
+            cmd.dept_no,
+            cmd.source_id,
+            cmcr.cost_item_id,
+            cmcr.cost_item_no,
+      nvl(sum(cmd.amount),0) as amount,
+      hdd.dept_code AS dept_code,
+      hdd.dept_name AS dept_name,
+      hs.source_code AS source_code,
+      hs.source_name AS source_name,
+      cidn.cost_item_code as cost_item_code,
+      cidn.cost_item_name as cost_item_name
+    FROM COST_MATERIAL_DETAIL cmd
+    LEFT JOIN hos_dept_dict hdd ON cmd.dept_id = hdd.dept_id 
+<if test="is_flag == 1 ">
+		and cmd.dept_no = hdd.dept_no 
+</if>
+<if test="is_flag == 0 or is_flag == ''">
+		and hdd.is_stop=0
+</if>
+      AND cmd.group_id = hdd.group_id AND cmd.hos_id = hdd.hos_id
+    LEFT JOIN COST_MATE_ARRT cma ON cmd.mate_id = cma.mate_id AND cmd.group_id = cma.group_id AND cmd.hos_id = cma.hos_id AND cma.copy_code = cmd.copy_code
+    LEFT JOIN COST_MATE_COST_RELA cmcr ON cmd.group_id = cmcr.group_id  and cmd.hos_id = cmcr.hos_id and cmd.copy_code = cmcr.copy_code and cma.mate_type_id = cmcr.mate_type_id and cmd.year_month = cmcr.year_month
+    LEFT JOIN COST_ITEM_DICT_NO cidn ON cmd.group_id = cidn.group_id and cmd.hos_id = cidn.hos_id and cmd.copy_code = cidn.copy_code and cmcr.cost_item_id = cidn.cost_item_id
+<if test="is_flag == 1 ">
+		and cmcr.cost_item_no = cidn.cost_item_no
+</if>
+<if test="is_flag == 0 or is_flag == ''">
+		and cidn.is_stop=0
+</if>
+    LEFT JOIN HOS_SOURCE hs ON cmd.source_id = hs.source_id AND cmd.group_id = hs.group_id AND cmd.hos_id = hs.hos_id
+		<where>
+			<if test="group_id != null and group_id != ''">
+				AND cmd.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND cmd.hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				AND cmd.copy_code = #{copy_code}
+			</if>
+			<if test="year_month != null and year_month != ''">
+				AND cmd.year_month = #{year_month}
+			</if>
+			<if test="dept_id != null and dept_id != ''">
+				AND cmd.dept_id = #{dept_id}
+			</if>
+			<if test="dept_no != null and dept_no != ''">
+				AND cmd.dept_no = #{dept_no}
+			</if>
+			<if test="source_id != null and source_id != ''">
+				AND cmd.source_id = #{source_id}
+			</if>
+			<if test="source_code != null and source_code != ''">
+				AND hs.source_code = #{source_code}
+			</if>
+			<if test="dept_code != null and dept_code != ''">
+				AND hdd.dept_code = #{dept_code}
+			</if>
+			<if test="amount != null and amount != ''">
+				AND cmd.amount = #{amount}
+			</if>
+			<if test="cost_item_id != null and cost_item_id != ''">
+				AND cidn.cost_item_id = #{cost_item_id}
+			</if>
+			<if test="cost_item_no != null and cost_item_no != ''">
+				AND cidn.cost_item_no = #{cost_item_no}
+			</if>
+			
+		</where>
+		group by cmd.group_id, cmd.hos_id, cmd.copy_code, cmd.year_month, hdd.dept_code, hdd.dept_name,  hs.source_code,  hs.source_name,cidn.cost_item_code, cidn.cost_item_name
+		,cmd.dept_id,
+            cmd.dept_no,
+            cmd.source_id,
+            cmcr.cost_item_id,
+            cmcr.cost_item_no
+union all 
+            
+SELECT cid.group_id, cid.hos_id, cid.copy_code, cid.year_month,
+cid.dept_id,
+            cid.dept_no,
+            cid.source_id,
+            cicr.cost_item_id,
+            cicr.cost_item_no,
+      nvl(sum(cid.depre_amount),0) as amount,
+      hdd.dept_code AS dept_code,
+      hdd.dept_name AS dept_name,
+      hs.source_code AS source_code,
+      hs.source_name AS source_name,
+      cidn.cost_item_code as cost_item_code,
+      cidn.cost_item_name as cost_item_name
+    FROM COST_IASSET_DETAIL cid
+    LEFT JOIN hos_dept_dict hdd ON cid.dept_id = hdd.dept_id 
+<if test="is_flag == 1 ">
+		and cid.dept_no = hdd.dept_no 
+</if>
+<if test="is_flag == 0 or is_flag == ''">
+		and hdd.is_stop=0
+</if>
+ AND cid.group_id = hdd.group_id AND cid.hos_id = hdd.hos_id
+    LEFT JOIN COST_IASSET_ARRT cia ON cid.asset_id = cia.asset_id AND cid.group_id = cia.group_id AND cid.hos_id = cia.hos_id AND cia.copy_code = cid.copy_code
+    LEFT JOIN COST_IASSET_TYPE_ARRT cita ON cia.asset_type_id = cita.asset_type_id AND cid.group_id = cita.group_id AND cid.hos_id = cita.hos_id AND cid.copy_code = cita.copy_code
+    LEFT JOIN COST_IASSET_COST_RELA cicr ON cia.asset_type_id = cicr.asset_type_id AND cid.group_id = cicr.group_id AND cid.hos_id = cicr.hos_id AND cid.copy_code = cicr.copy_code
+    LEFT JOIN COST_ITEM_DICT_NO cidn ON cid.group_id = cidn.group_id and cid.hos_id = cidn.hos_id and cid.copy_code = cidn.copy_code and cicr.cost_item_id = cidn.cost_item_id
+<if test="is_flag == 1 ">
+		and cicr.cost_item_no = cidn.cost_item_no
+</if>
+<if test="is_flag == 0 or is_flag == ''">
+		and cidn.is_stop=0
+</if>
+    LEFT JOIN HOS_SOURCE hs ON cid.source_id = hs.source_id AND cid.group_id = hs.group_id AND cid.hos_id = hs.hos_id
+   <where>
+			<if test="group_id != null and group_id != ''">
+				AND cid.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND cid.hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				AND cid.copy_code = #{copy_code}
+			</if>
+			<if test="year_month != null and year_month != ''">
+				AND cid.year_month = #{year_month}
+			</if>
+			<if test="dept_id != null and dept_id != ''">
+				AND cid.dept_id = #{dept_id}
+			</if>
+			<if test="dept_no != null and dept_no != ''">
+				AND cid.dept_no = #{dept_no}
+			</if>
+			<if test="source_id != null and source_id != ''">
+				AND cid.source_id = #{source_id}
+			</if>
+			<if test="source_code != null and source_code != ''">
+				AND hs.source_code = #{source_code}
+			</if>
+			<if test="dept_code != null and dept_code != ''">
+				AND hdd.dept_code = #{dept_code}
+			</if>
+			<if test="amount != null and amount != ''">
+				AND cid.amount = #{amount}
+			</if>
+			<if test="cost_item_id != null and cost_item_id != ''">
+				AND cidn.cost_item_id = #{cost_item_id}
+			</if>
+			<if test="cost_item_no != null and cost_item_no != ''">
+				AND cidn.cost_item_no = #{cost_item_no}
+			</if>
+			
+		</where>
+		  group by  cid.group_id, cid.hos_id, cid.copy_code, cid.year_month, hdd.dept_code, hdd.dept_name,  hs.source_code,  hs.source_name,cidn.cost_item_code, cidn.cost_item_name
+			,cid.dept_id,
+            cid.dept_no,
+            cid.source_id,
+            cicr.cost_item_id,
+            cicr.cost_item_no
+union all 
+
+SELECT cfd.group_id, cfd.hos_id, cfd.copy_code, cfd.year_month,
+			cfd.dept_id,
+            cfd.dept_no,
+            cfd.source_id,
+            cfcr.cost_item_id,
+            cfcr.cost_item_no,
+      nvl(sum(cfd.depre_amount),0) as amount,
+      hdd.dept_code AS dept_code,
+      hdd.dept_name AS dept_name,
+      hs.source_code AS source_code,
+      hs.source_name AS source_name,
+      cidn.cost_item_code as cost_item_code,
+      cidn.cost_item_name as cost_item_name
+    FROM COST_FASSET_DETAIL cfd
+    LEFT JOIN hos_dept_dict hdd ON cfd.dept_id = hdd.dept_id 
+<if test="is_flag == 1 ">
+		and cfd.dept_no = hdd.dept_no 
+</if>
+<if test="is_flag == 0 or is_flag == ''">
+		and hdd.is_stop=0
+</if>
+     AND cfd.group_id = hdd.group_id AND cfd.hos_id = hdd.hos_id
+    LEFT JOIN COST_FASSET_ARRT cfa ON cfd.asset_id = cfa.asset_id AND cfd.group_id = cfa.group_id AND cfd.hos_id = cfa.hos_id AND cfa.copy_code = cfd.copy_code
+    LEFT JOIN COST_FASSET_COST_RELA cfcr ON cfa.asset_type_id = cfcr.asset_type_id AND cfd.group_id = cfcr.group_id AND cfd.hos_id = cfcr.hos_id AND cfd.copy_code = cfcr.copy_code
+    LEFT JOIN COST_ITEM_DICT_NO cidn ON cfd.group_id = cidn.group_id and cfd.hos_id = cidn.hos_id and cfd.copy_code = cidn.copy_code and cfcr.cost_item_id = cidn.cost_item_id
+<if test="is_flag == 1 ">
+		and cfcr.cost_item_no = cidn.cost_item_no
+</if>
+<if test="is_flag == 0 or is_flag == ''">
+		and cidn.is_stop=0
+</if>
+    LEFT JOIN HOS_SOURCE hs ON cfd.source_id = hs.source_id AND cfd.group_id = hs.group_id AND cfd.hos_id = hs.hos_id
+    	<where>
+			<if test="group_id != null and group_id != ''">
+				AND cfd.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND cfd.hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				AND cfd.copy_code = #{copy_code}
+			</if>
+			<if test="year_month != null and year_month != ''">
+				AND cfd.year_month = #{year_month}
+			</if>
+			<if test="dept_id != null and dept_id != ''">
+				AND cfd.dept_id = #{dept_id}
+			</if>
+			<if test="dept_no != null and dept_no != ''">
+				AND cfd.dept_no = #{dept_no}
+			</if>
+			<if test="source_id != null and source_id != ''">
+				AND cfd.source_id = #{source_id}
+			</if>
+			<if test="source_code != null and source_code != ''">
+				AND hs.source_code = #{source_code}
+			</if>
+			<if test="dept_code != null and dept_code != ''">
+				AND hdd.dept_code = #{dept_code}
+			</if>
+			<if test="amount != null and amount != ''">
+				AND cfd.amount = #{amount}
+			</if>
+			<if test="cost_item_id != null and cost_item_id != ''">
+				AND cidn.cost_item_id = #{cost_item_id}
+			</if>
+			<if test="cost_item_no != null and cost_item_no != ''">
+				AND cidn.cost_item_no = #{cost_item_no}
+			</if>
+			
+		</where>
+		 group by cfd.group_id, cfd.hos_id, cfd.copy_code, cfd.year_month, hdd.dept_code, hdd.dept_name, hs.source_code, hs.source_name,cidn.cost_item_code,cidn.cost_item_name
+	,cfd.dept_id,
+            cfd.dept_no,
+            cfd.source_id,
+            cfcr.cost_item_id,
+            cfcr.cost_item_no
+	
+	union all
+	
+	SELECT 
+            crd.group_id,
+            crd.hos_id,
+            crd.copy_code,
+            crd.year_month,
+            crd.dept_id,
+            crd.dept_no,
+            crd.source_id,
+            crd.cost_item_id,
+            crd.cost_item_no, 
+            crd.amount as amount,
+            hdd.dept_code as dept_code,
+            hdd.dept_name as dept_name,
+            hs.source_code as source_code,
+            hs.source_name as source_name,
+            cidn.cost_item_code as cost_item_code,
+            cidn.cost_item_name as cost_item_name 
+        FROM COST_RISK_DETAIL crd
+left join hos_dept_dict hdd on crd.group_id = hdd.group_id and crd.hos_id = hdd.hos_id and crd.dept_id = hdd.dept_id 
+<if test="is_flag == 1 ">
+		and crd.dept_no = hdd.dept_no
+</if>
+<if test="is_flag == 0 or is_flag == ''">
+		and hdd.is_stop=0
+</if>
+left join  COST_ITEM_DICT_NO cidn on crd.cost_item_id = cidn.cost_item_id
+<if test="is_flag == 1 ">
+		and crd.cost_item_no = cidn.cost_item_no 
+</if>
+<if test="is_flag == 0 or is_flag == ''">
+		and cidn.is_stop=0
+</if>
+and crd.group_id = cidn.group_id and crd.hos_id = cidn.hos_id and crd.copy_code = cidn.copy_code
+left join HOS_SOURCE hs on crd.group_id = hs.group_id and crd.hos_id = hs.hos_id and crd.source_id = hs.source_id
+	<where>                   
+			    <if test="group_id != null and group_id != ''">
+                    AND crd.group_id = #{group_id}
+               </if>
+			    <if test="hos_id != null and hos_id != ''">
+                    AND crd.hos_id = #{hos_id}
+               </if>
+			    <if test="copy_code != null and copy_code != ''">
+                    AND crd.copy_code = #{copy_code}
+               </if>
+			    <if test="year_month != null and year_month != ''">
+                    AND crd.year_month = #{year_month}
+               </if>
+			    <if test="dept_id != null and dept_id != ''">
+                    AND crd.dept_id = #{dept_id}
+               </if>
+			    <if test="dept_no != null and dept_no != ''">
+                    AND crd.dept_no = #{dept_no}
+               </if>
+			    <if test="cost_item_id != null and cost_item_id != ''">
+                    AND crd.cost_item_id = #{cost_item_id}
+               </if>
+			    <if test="cost_item_no != null and cost_item_no != ''">
+                    AND crd.cost_item_no = #{cost_item_no}
+               </if>
+			    <if test="source_id != null and source_id != ''">
+                    AND hs.source_id = #{source_id}
+               </if>
+			    <if test="amount != null and amount != ''">
+                    AND crd.amount = #{amount}
+               </if>
+        </where>   
+        
+        union all
+        
+        SELECT 
+            cdd.group_id,
+            cdd.hos_id,
+            cdd.copy_code,
+            cdd.year_month,
+            cdd.dept_id,
+            cdd.dept_no,
+            cdd.source_id,
+            cdd.cost_item_id,
+            cdd.cost_item_no, 
+             cdd.amount as amount,
+            hdd.dept_code as dept_code,
+            hdd.dept_name as dept_name,
+            hs.source_code as source_code,
+            hs.source_name as source_name,
+            cidn.cost_item_code as cost_item_code,
+            cidn.cost_item_name as cost_item_name 
+FROM COST_DRUG_DETAIL cdd
+left join hos_dept_dict hdd on cdd.group_id = hdd.group_id and cdd.hos_id = hdd.hos_id and cdd.dept_id = hdd.dept_id 
+<if test="is_flag == 1 ">
+		and cdd.dept_no = hdd.dept_no 
+</if>
+<if test="is_flag == 0 or is_flag == ''">
+		and hdd.is_stop=0
+</if>
+left join  COST_ITEM_DICT_NO cidn  on cdd.cost_item_id = cidn.cost_item_id 
+<if test="is_flag == 1 ">
+		and cdd.cost_item_no = cidn.cost_item_no  
+</if>
+<if test="is_flag == 0 or is_flag == ''">
+		and cidn.is_stop=0
+</if>
+and cdd.group_id = cidn.group_id and cdd.hos_id = cidn.hos_id and cdd.copy_code = cidn.copy_code
+left join HOS_SOURCE hs on cdd.group_id = hs.group_id and cdd.hos_id = hs.hos_id and cdd.source_id = hs.source_id
+			<where>  
+			    <if test="group_id != null and group_id != ''">
+                    AND cdd.group_id = #{group_id}
+               </if>
+			    <if test="hos_id != null and hos_id != ''">
+                    AND cdd.hos_id = #{hos_id}
+               </if>
+			    <if test="copy_code != null and copy_code != ''">
+                    AND cdd.copy_code = #{copy_code}
+               </if>
+			    <if test="year_month != null and year_month != ''">
+                    AND cdd.year_month = #{year_month}
+               </if>
+			    <if test="dept_id != null and dept_id != ''">
+                    AND cdd.dept_id = #{dept_id}
+               </if>
+			    <if test="dept_no != null and dept_no != ''">
+                    AND cdd.dept_no = #{dept_no}
+               </if>
+			    <if test="cost_item_id != null and cost_item_id != ''">
+                    AND cdd.cost_item_id = #{cost_item_id}
+               </if>
+			    <if test="cost_item_no != null and cost_item_no != ''">
+                    AND cdd.cost_item_no = #{cost_item_no}
+               </if>
+			    <if test="source_id != null and source_id != ''">
+                    AND cdd.source_id = #{source_id}
+               </if>
+			    <if test="amount != null and amount != ''">
+                    AND cdd.amount = #{amount}
+               </if>
+        </where>  
+        
+        union all
+        
+        SELECT 
+            cod.group_id,
+            cod.hos_id,
+            cod.copy_code,
+            cod.year_month,
+             cod.dept_id,
+            cod.dept_no,
+            cod.source_id,
+            cod.cost_item_id,
+            cod.cost_item_no,
+            cod.amount,
+            hdd.dept_code,
+            hdd.dept_name,
+            hs.source_code,
+            hs.source_name,
+           cidn.cost_item_code,
+            cidn.cost_item_name
+        FROM COST_OHTER_DETAIL cod
+left join hos_dept_dict hdd on cod.group_id = hdd.group_id and cod.hos_id = hdd.hos_id and cod.dept_id = hdd.dept_id 
+<if test="is_flag == 1 ">
+		and cod.dept_no = hdd.dept_no
+</if>
+<if test="is_flag == 0 or is_flag == ''">
+		and hdd.is_stop=0
+</if>
+
+left join  COST_ITEM_DICT_NO cidn on cod.cost_item_id = cidn.cost_item_id 
+<if test="is_flag == 1 ">
+		and cod.cost_item_no = cidn.cost_item_no 
+</if>
+<if test="is_flag == 0 or is_flag == ''">
+		and cidn.is_stop=0
+</if>
+and cod.group_id = cidn.group_id and cod.hos_id = cidn.hos_id and cod.copy_code = cidn.copy_code
+left join HOS_SOURCE hs on cod.group_id = hs.group_id and cod.hos_id = hs.hos_id and cod.source_id = hs.source_id
+
+			<where>         
+			    <if test="group_id != null and group_id != ''">
+                    AND cod.group_id = #{group_id}
+               </if>
+			    <if test="hos_id != null and hos_id != ''">
+                    AND cod.hos_id = #{hos_id}
+               </if>
+			    <if test="copy_code != null and copy_code != ''">
+                    AND cod.copy_code = #{copy_code}
+               </if>
+			    <if test="year_month != null and year_month != ''">
+                    AND cod.year_month = #{year_month}
+               </if>
+			    <if test="dept_id != null and dept_id != ''">
+                    AND cod.dept_id = #{dept_id}
+               </if>
+			    <if test="dept_no != null and dept_no != ''">
+                    AND cod.dept_no = #{dept_no}
+               </if>
+			    <if test="cost_item_id != null and cost_item_id != ''">
+                    AND cod.cost_item_id = #{cost_item_id}
+               </if>
+			    <if test="cost_item_no != null and cost_item_no != ''">
+                    AND cod.cost_item_no = #{cost_item_no}
+               </if>
+			    <if test="source_id != null and source_id != ''">
+                    AND cod.source_id = #{source_id}
+               </if>
+			    <if test="amount != null and amount != ''">
+                    AND cod.amount = #{amount}
+               </if>
+        </where> 
+        	 
+)  tmp
+
+   <where>
+			<if test="group_id != null and group_id != ''">
+				AND tmp.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND tmp.hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				AND tmp.copy_code = #{copy_code}
+			</if>
+			<if test="year_month != null and year_month != ''">
+				AND tmp.year_month = #{year_month}
+			</if>
+			<if test="dept_id != null and dept_id != ''">
+				AND tmp.dept_id = #{dept_id}
+			</if>
+			<if test="dept_no != null and dept_no != ''">
+				AND tmp.dept_no = #{dept_no}
+			</if>
+			<if test="source_id != null and source_id != ''">
+				AND tmp.source_id = #{source_id}
+			</if>
+			<if test="source_code != null and source_code != ''">
+				AND tmp.source_code = #{source_code}
+			</if>
+			<if test="dept_code != null and dept_code != ''">
+				AND tmp.dept_code = #{dept_code}
+			</if>
+			<if test="amount != null and amount != ''">
+				AND tmp.amount = #{amount}
+			</if>
+			<if test="cost_item_id != null and cost_item_id != ''">
+				AND tmp.cost_item_id = #{cost_item_id}
+			</if>
+			<if test="cost_item_no != null and cost_item_no != ''">
+				AND tmp.cost_item_no = #{cost_item_no}
+			</if>
+			<if test="source_id != null and source_id != ''">
+				AND tmp.source_id = #{source_id}
+			</if>
+			
+		</where>
+		  group by tmp.group_id, tmp.hos_id, tmp.copy_code, tmp.year_month, tmp.dept_code, tmp.dept_name, tmp.source_code, tmp.source_name, tmp.cost_item_code, tmp.cost_item_name
+		  ,tmp.dept_id,
+            tmp.dept_no,
+            tmp.source_id,
+            tmp.cost_item_id,
+            tmp.cost_item_no
+
+			order by tmp.group_id asc
+	</select>
+
+</mapper>
+

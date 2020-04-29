@@ -1,0 +1,262 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.hr.dao.nursing.HrAdministrationAbilityMapper">
+	<resultMap id="hrSelect" type="java.util.Map">
+		<result property="id" column="id"/>
+		<result property="text" column="text"/>
+	</resultMap>
+	
+	<resultMap id="hrAdmin" type="com.chd.hrp.hr.entity.nursing.HrAdministrationAbility">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="year" column="year"/>
+		<result property="emp_code" column="emp_code"/>
+		<result property="emp_id" column="emp_id"/>
+		<result property="emp_name" column="emp_name"/>
+		<result property="duty_code" column="duty_code"/>
+		<result property="duty_name" column="duty_name"/>
+		<result property="title_code" column="title_code"/>
+		<result property="title_name" column="title_name"/>
+		<result property="level_code" column="level_code"/>
+		<result property="level_name" column="level_name"/>
+		<result property="imtheme" column="imtheme"/>
+		<result property="prize" column="prize"/>
+		<result property="prize_name" column="prize_name"/>
+		<result property="state" column="state"/>
+			<result property="state_name" column="state_name"/>
+		<result property="note" column="note"/>
+	</resultMap>
+		
+	<resultMap id="hrAdminMap" type="java.util.Map">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="year" column="year"/>
+		<result property="emp_code" column="emp_code"/>
+		<result property="emp_id" column="emp_id"/>
+		<result property="emp_name" column="emp_name"/>
+		<result property="duty_code" column="duty_code"/>
+		<result property="duty_name" column="duty_name"/>
+		<result property="title_code" column="title_code"/>
+		<result property="title_name" column="title_name"/>
+		<result property="level_code" column="level_code"/>
+		<result property="level_name" column="level_name"/>
+		<result property="imtheme" column="imtheme"/>
+		<result property="prize" column="prize"/>
+		<result property="field_col_name" column="field_col_name"/>
+		<result property="state" column="state"/>
+			<result property="state_name" column="state_name"/>
+		<result property="note" column="note"/>
+	</resultMap>
+	
+	<insert id="addBatch" parameterType="java.util.List" >
+		INSERT INTO HR_ADMIN (
+			group_id,
+			hos_id,
+			year,
+			emp_id,
+			duty_code,
+			title_code,
+			level_code,
+			imtheme,
+			prize,
+			state,
+			note
+		) (
+		<foreach collection="list" item="item" index="index" separator=" union all " >
+			select 		
+				#{item.group_id,jdbcType=INTEGER},
+				#{item.hos_id,jdbcType=INTEGER},
+				#{item.year,jdbcType=VARCHAR},
+				#{item.emp_id,jdbcType=VARCHAR},
+				#{item.duty_code,jdbcType=VARCHAR},
+				#{item.title_code,jdbcType=VARCHAR},
+				#{item.level_code,jdbcType=VARCHAR},
+				#{item.imtheme,jdbcType=VARCHAR},
+				#{item.prize,jdbcType=VARCHAR},
+				#{item.state,jdbcType=INTEGER},
+				#{item.note,jdbcType=VARCHAR}
+		    from dual
+		</foreach>
+		)
+	</insert>
+	
+	<delete id="deleteHrAdmin" parameterType="java.util.Map">
+		DELETE FROM hr_admin 
+		where group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			<if test="year != null and year != ''">
+				AND year = #{year,jdbcType=VARCHAR}
+			</if>
+			<if test="emp_id != null and emp_id != ''">
+				AND emp_id = #{emp_id,jdbcType=INTEGER}
+			</if>
+	</delete>
+	
+	<delete id="deleteAdministrationAbility" parameterType="java.util.List">
+		DELETE FROM hr_admin 
+		<where>
+			<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+				<if test="item.group_id != null and item.group_id != ''">
+				 group_id = #{item.group_id,jdbcType=INTEGER}
+				</if>
+				<if test="item.hos_id != null and item.hos_id != ''">
+				AND hos_id = #{item.hos_id,jdbcType=INTEGER}
+				</if>
+				<if test="item.year != null and item.year != ''">
+				AND year = #{item.year,jdbcType=VARCHAR}
+				</if>
+				<if test="item.emp_id != null and item.emp_id != ''">
+				AND emp_id = #{item.emp_id,jdbcType=VARCHAR}
+				</if>
+			</foreach>
+	    </where>  
+	</delete>
+	
+	<select id="query" parameterType="java.util.Map" resultMap="hrAdmin" >
+	
+		SELECT 
+		   	ht.group_id,
+	   		ht.hos_id,
+		    ht.year,
+		    ht.emp_id,
+		    he.emp_code emp_code,
+		    he.emp_name emp_name,
+		    ht.duty_code,
+		    hd.duty_name duty_name,
+		    ht.title_code,
+		    ht.level_code,
+		    ht.imtheme,
+		    ht.prize,
+		    t.field_col_name as field_col_name,
+		    ht.state,
+		    case when ht.state = 0 then '新建' when ht.state = 1 then '提交' else '' end state_name ,
+		    ht.note
+    	FROM HR_ADMIN ht 
+	    left join hos_emp he on ht.emp_id=he.emp_id and ht.group_id=he.group_id and ht.hos_id=he.hos_id
+	    left join hos_duty hd on ht.duty_code=hd.duty_code and ht.group_id=hd.group_id and ht.hos_id=hd.hos_id
+	    left join hr_fiied_data t on ht.prize=t.field_col_code and t.field_tab_code='DIC_PRIZE' and t.group_id=ht.group_id and   t.hos_id=ht.hos_id
+		<where>
+				ht.group_id = #{group_id,jdbcType=INTEGER}
+			AND ht.hos_id = #{hos_id,jdbcType=INTEGER}
+			<if test="teach_date != null and teach_date != ''">
+			AND ht.teach_date = #{teach_date,jdbcType=VARCHAR}
+			</if>
+			<if test="emp_id != null and emp_id != ''">
+			AND ht.emp_id = #{emp_id,jdbcType=INTEGER}
+			</if>
+			<if test="duty_code != null and duty_code != ''">
+			AND ht.duty_code = #{duty_code,jdbcType=VARCHAR}
+			</if>
+			<if test="title_code != null and title_code != ''">
+			AND ht.title_code = #{title_code,jdbcType=VARCHAR}
+			</if>
+			<if test="level_code != null and level_code != ''">
+			AND ht.level_code = #{level_code,jdbcType=VARCHAR}
+			</if>
+			<if test="prize != null and prize != ''">
+			AND ht.prize = #{prize,jdbcType=VARCHAR}
+			</if>
+			<if test="state != null and state != ''">
+			AND ht.state = #{state,jdbcType=INTEGER}
+			</if>
+			<if test="note != null and note != ''">
+			AND ht.note = #{note,jdbcType=VARCHAR}
+			</if>
+			<if test="year != null and year != ''">
+				AND ht.year = #{year,jdbcType=VARCHAR}
+			</if>
+			<if test="emp_code !=null and emp_code !=''">
+	 		AND he.emp_code like '%${emp_code}%'
+			</if>
+			<if test="emp_name !=null and emp_name !=''">
+			AND  he.emp_name like  '%${emp_name}%'
+			</if>
+			<if test="dept_no !=null and dept_no !=''">
+	 		AND he.dept_no=#{dept_no}
+			</if>
+		</where> 
+		order by he.emp_code
+	</select>
+		<select id="queryByCode" resultMap="hrAdmin"  parameterType="java.util.Map" >
+	
+		SELECT 
+		group_id,
+		hos_id,
+		year,
+		emp_id,
+		duty_code,
+		title_code,
+		level_code,
+		imtheme,
+		prize,
+		state,
+		note
+		FROM hr_admin 
+		WHERE 
+		group_id = #{group_id,jdbcType=INTEGER}   and 
+		hos_id = #{hos_id,jdbcType=INTEGER}   and 
+		year = #{year,jdbcType=VARCHAR}   and 
+		emp_id = #{emp_id,jdbcType=VARCHAR} 
+	
+	</select>
+	<select  id="queryAdmin" resultType="java.util.Map" >
+		select field_col_code, field_col_name
+		from hr_fiied_data 
+		where field_tab_code='DIC_PRIZE' 
+			AND group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+	   <if test="prize != null and prize != ''">
+	   		and (
+	   			field_col_code =#{prize,jdbcType=VARCHAR} or
+	   			field_col_name =#{prize,jdbcType=VARCHAR}
+	   		)
+		   		
+		</if>
+	</select>
+	<select id="queryHrHosDuty" parameterType="java.util.Map" resultMap="hrSelect" >
+		SELECT  duty_code id ,duty_name text  
+		FROM hos_duty 
+		<where>
+			<if test="duty_code !=null and duty_code !=''">
+			 	and duty_code like '%${duty_code}%' or duty_name like '%${duty_code}%'
+			</if>
+			AND group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+		</where>
+	</select>
+		
+	<select id="queryPrize" parameterType="java.util.Map" resultMap="hrSelect" >
+		SELECT  t.field_col_code id ,t.field_col_name text  FROM hr_fiied_data t
+		<where>
+			t.field_tab_code='DIC_PRIZE'
+			<if test="group_id != null and group_id != ''">
+				AND t.group_id = #{group_id,jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND t.hos_id = #{hos_id,jdbcType=INTEGER}
+			</if>
+			<if test="duty_code !=null and duty_code !=''">
+			 and (t.duty_code like '%${duty_code}%' or t.duty_name like '%${duty_code}%')
+			</if>
+		</where>
+		
+	</select>
+	
+	<select id="queryHrAdministrationAbilityByEmpId" parameterType="java.util.List" resultType="java.util.Map" >
+		 with list_temp as (
+			<foreach collection="list" item="item" index="index" separator=" union all " >
+				select    
+					#{item.group_id,jdbcType=INTEGER} as group_id, 
+					#{item.hos_id,jdbcType=INTEGER} as hos_id, 
+					#{item.year,jdbcType=VARCHAR} as year,
+					#{item.emp_id,jdbcType=INTEGER} as emp_id
+				from dual
+			</foreach>
+		)
+		select a.group_id,a.hos_id,a.year,a.emp_id,c.emp_code,c.emp_name
+		from list_temp a
+		join hr_admin b on a.group_id=b.group_id and a.hos_id=b.hos_id and a.year=b.year and a.emp_id=b.emp_id
+		left join hos_emp c on b.group_id=c.group_id and b.hos_id=c.hos_id and b.emp_id=c.emp_id and c.is_stop = 0
+	</select> 
+	
+</mapper>

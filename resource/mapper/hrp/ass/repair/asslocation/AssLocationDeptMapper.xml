@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.ass.dao.repair.asslocation.AssLocationDeptMapper">
+
+	<resultMap type="java.util.Map" id="deptTree">
+		<result property="pId" column="pId" />
+		<result property="id" column="id" />
+		<result property="name" column="name" />
+	</resultMap>
+	
+	<select id="queryHosDeptTree" resultMap="deptTree" parameterType="java.util.Map">
+		select dept_id || ',' || dept_no as dept_id, dept_code as id , dept_name as name, super_code as pId
+			  from hos_dept_dict 
+			  where group_id = #{group_id}
+			  and  hos_id = #{hos_id}
+			  and  is_stop = 0
+			  and  is_disable = 0
+			
+			 order by dept_code
+	</select>
+	<select id="queryAssLocationDept" resultType="java.util.Map" parameterType="java.util.Map">
+		
+	 select ald.group_id,
+	        ald.hos_id,
+	        ald.copy_code,
+	        ald.dept_id||','||hdd.dept_no as dept_id,
+	        hdd.dept_code,
+	        hdd.dept_name,
+	        ald.loc_code,
+	        al.loc_name,
+	        al.super_code,
+	        al.is_last,
+	        al.spell_code,
+	        al.wbx_code
+	   from ass_location_dept ald
+	   left join ass_location al
+	     on ald.group_id = al.group_id
+	    and ald.hos_id = al.hos_id
+	    and ald.copy_code = al.copy_code
+	    and ald.loc_code = al.loc_code
+	   left join hos_dept_dict hdd
+	     on ald.group_id = hdd.group_id
+	    and ald.hos_id = hdd.hos_id
+	    and ald.dept_id = hdd.dept_id
+	    and hdd.is_stop = 0
+	    and hdd.is_disable = 0
+	    where ald.group_id =  #{group_id}
+	    and ald.hos_id =  #{hos_id}
+	    and ald.copy_code =  #{copy_code}
+	    and ald.dept_id 
+	    	in( select dept_id  
+				  from hos_dept_dict 
+				  where is_stop = 0
+				  and   is_disable = 0
+				 start with dept_id =  #{dept_id}
+				connect by prior dept_code = super_code
+				)
+		order by  al.loc_code	
+	</select>
+	<select id="queryByCode" parameterType="java.util.Map" resultType="java.util.Map">
+		select group_id, hos_id, copy_code, dept_id, loc_code
+			  from ass_location_dept
+			 where group_id = #{group_id}
+			   and hos_id = #{hos_id}
+			   and copy_code = #{copy_code}
+			   and dept_id = #{dept_id}
+			   and loc_code = #{new_loc_code}
+	</select>
+	<select id="queryAssLocationDeptByCode" parameterType="java.util.Map" resultType="java.util.Map">
+		 select ald.group_id,
+	        ald.hos_id,
+	        ald.copy_code,
+	        ald.dept_id||','||hdd.dept_no as dept_id,
+	        hdd.dept_code,
+	        hdd.dept_name,
+	        ald.loc_code,
+	        al.loc_name,
+	        al.super_code,
+	        al.is_last,
+	        al.spell_code,
+	        al.wbx_code
+	   from ass_location_dept ald
+	   left join ass_location al
+	     on ald.group_id = al.group_id
+	    and ald.hos_id = al.hos_id
+	    and ald.copy_code = al.copy_code
+	    and ald.loc_code = al.loc_code
+	   left join hos_dept_dict hdd
+	     on ald.group_id = hdd.group_id
+	    and ald.hos_id = hdd.hos_id
+	    and ald.dept_id = hdd.dept_id
+	    and hdd.is_stop = 0
+	    and hdd.is_disable = 0
+		 where ald.group_id = #{group_id}
+		   and ald.hos_id = #{hos_id}
+		   and ald.copy_code = #{copy_code}
+		   and ald.dept_id = #{dept_id}
+		   and ald.loc_code = #{loc_code}
+	</select>
+	<insert id="addLocationDpt" parameterType="java.util.List">
+		insert into ass_location_dept
+		  (group_id, hos_id, copy_code, dept_id, loc_code)
+		 <foreach collection="list" index="index" item="item" separator=" union all " >
+		 	select 
+		 	#{item.group_id},
+		 	#{item.hos_id},
+		 	#{item.copy_code},
+		 	#{item.dept_id},
+		 	#{item.loc_code}
+		 	from dual
+		 </foreach>
+	</insert>
+	
+	<select id="queryDeptIdBySuperId" parameterType="java.util.Map" resultType="String">
+		select dept_id  
+		  from hos_dept_dict 
+		  where group_id = #{group_id}
+		  and hos_id =  #{hos_id}
+		  and is_stop = 0
+		  and   is_disable = 0
+		  and is_last = 1
+		 start with dept_id = #{dept_id}
+		connect by prior dept_code = super_code
+	</select>
+	
+	<update id="updateassLocationDept" parameterType="java.util.Map">
+		update ass_location_dept
+		   set  
+		       loc_code =  #{new_loc_code}
+		 where group_id =  #{group_id}
+		   and hos_id =  #{hos_id}
+		   and copy_code =  #{copy_code}
+		   and dept_id =  #{dept_id}
+		   and loc_code = #{old_loc_code}
+		
+	</update>
+	<delete id="deleteAssLocationDeptBatch" parameterType="java.util.List" >
+	delete ass_location_dept
+	 where
+	<foreach collection="list" index="index" open="(" separator="or" close=")" item="item" >
+	    group_id = #{item.group_id}
+          and hos_id = #{item.hos_id}
+          and copy_code = #{item.copy_code}
+          and dept_id = #{item.dept_id}
+          and loc_code = #{item.loc_code}
+	</foreach>
+		
+                 
+	</delete>
+</mapper>

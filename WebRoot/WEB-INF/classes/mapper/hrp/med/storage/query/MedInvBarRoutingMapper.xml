@@ -1,0 +1,312 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.med.dao.storage.query.MedInvBarRoutingMapper">
+
+	<resultMap id="medStorageQueryInvBarRoutingMap" type="java.util.Map">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="store_code" column="store_code" />
+		<result property="store_name" column="store_name" />
+		<result property="med_type_code" column="med_type_code" />
+		<result property="med_type_name" column="med_type_name" />
+		<result property="inv_code" column="inv_code" />
+		<result property="inv_name" column="inv_name" />
+		<result property="inv_model" column="inv_model" />
+		<result property="fac_name" column="fac_name" />
+		<result property="unit_name" column="unit_name" />
+		<result property="batch_no" column="batch_no" />
+		<result property="bar_code" column="bar_code" />
+		<result property="price" column="price" />
+		<result property="amount" column="amount" />
+		<result property="money" column="money" />
+		<result property="sup_name" column="sup_name"/>
+	</resultMap>
+
+
+	<select id="queryMedStorageQueryInvBarRouting" parameterType="java.util.Map" resultMap="medStorageQueryInvBarRoutingMap">
+		with temp as (
+			select
+				mfb.group_id,mfb.hos_id,to_char(mfb.copy_code) as copy_code, hsd.store_name,mid.inv_code,mid.inv_name,
+				mid.inv_model,hfd.fac_name,hu.unit_name,mfb.sup_id,hsdd.sup_name,mtd.med_type_code,mtd.med_type_name,
+				<if test="show_batch != null and show_batch != '' ">
+					mfb.batch_no, 
+				</if>
+				<if test="show_bar != null and show_bar != '' ">
+					mfb.bar_code, 
+				</if>
+				mfb.price,
+				sum(mfb.left_amount) as amount,sum(mfb.left_money) as money
+			from med_fifo_balance mfb
+			left join med_inv_dict mid
+				on mfb.group_id = mid.group_id and mfb.hos_id = mid.hos_id 
+				and mfb.copy_code = mid.copy_code and mfb.inv_id = mid.inv_id 
+				and mid.is_stop = 0
+			left join hos_fac_dict hfd
+				on mid.group_id = hfd.group_id and mid.hos_id = hfd.hos_id 
+				and mid.fac_id = hfd.fac_id and mid.fac_no = hfd.fac_no
+			left join hos_unit hu
+				on mid.group_id = hu.group_id and mid.hos_id = hu.hos_id 
+				and mid.unit_code = hu.unit_code and hu.is_stop = 0
+			left join hos_sup_dict hsdd
+				on mfb.group_id = hsdd.group_id and mfb.hos_id = hsdd.hos_id
+				and mfb.sup_id = hsdd.sup_id and hsdd.is_stop = 0
+			left join med_type_dict mtd
+				on mid.group_id = mtd.group_id and mid.hos_id = mtd.hos_id 
+				and mid.copy_code = mtd.copy_code and mid.med_type_id = mtd.med_type_id 
+				and mtd.is_stop = 0 
+			left join hos_store_dict hsd 
+				on mfb.group_id = hsd.group_id and mfb.hos_id = hsd.hos_id 
+				and mfb.store_id = hsd.store_id and hsd.is_stop = 0 
+			WHERE
+				mfb.group_id = #{group_id}
+				and mfb.hos_id = #{hos_id}
+				and mfb.copy_code = #{copy_code}
+				<!-- 2017/05/19 过滤已停用的药品 -->
+				and mid.inv_code is not null
+				<!-- 只显示有权限的库房信息 -->
+				and to_char(mfb.store_id) in (
+					select perm_code from v_user_data_perm  
+					where group_id = #{group_id,jdbcType=INTEGER}
+						and hos_id = #{hos_id,jdbcType=INTEGER}
+						and table_code = 'HOS_STORE_DICT'
+						and user_id = #{user_id,jdbcType=INTEGER}
+						and is_read = 1 and is_write = 1 
+				)
+				<if test="store_id != null and store_id != '' ">
+					and mfb.store_id = #{store_id}
+				</if>
+				<if test="store_id == null or store_id == '' ">
+					and to_char(mfb.store_id) in (
+						select perm_code from v_user_data_perm  
+						where group_id = #{group_id}
+						and hos_id = #{hos_id}
+						and table_code = 'HOS_STORE_DICT'
+						and user_id = #{user_id}
+						and is_read = 1 and is_write = 1 
+					)
+				</if>
+				<if test="med_type_id != null and med_type_id != '' ">
+					and to_char(mid.med_type_id) in(
+						select med_type_id from med_type
+						start with group_id = #{group_id,jdbcType=INTEGER}
+							and hos_id = #{hos_id,jdbcType=INTEGER}
+							and copy_code = #{copy_code,jdbcType=VARCHAR} 
+							and med_type_id = #{med_type_id,jdbcType=INTEGER}
+						connect by prior med_type_code = super_code
+					)
+				</if>
+				<if test="inv_info != null and inv_info != '' ">
+					and (
+						mid.inv_name like '%'||#{inv_info}||'%'
+				     	or mid.alias like '%'||#{inv_info}||'%'
+				     	or mid.inv_code like '%'||#{inv_info}||'%'
+                        or upper(mid.spell_code) like '%'||upper(#{inv_info})||'%'
+                        or  upper(mid.wbx_code) like '%'||upper(#{inv_info})||'%'
+					)
+				</if>
+				<if test="batch_no != null and batch_no != '' ">
+		      		and mfb.batch_no like '%'||#{batch_no}||'%'
+				</if>
+				<if test="bar_code != null and bar_code != '' ">
+		      		and mfb.bar_code like '%'||#{bar_code}||'%'
+				</if>
+				and (#{only_bar,jdbcType=INTEGER} = 0 or nvl(mfb.bar_code, '-') &lt;&gt; '-')
+				<if test="is_charge != null and is_charge != '' ">
+					and mid.is_charge = #{is_charge}
+				</if>
+				<if test="sup_id != null and sup_id != '' ">
+					and mfb.sup_id = #{sup_id}
+				</if>
+				<if test="zeroStore != null and zeroStore != '' ">
+					and mfb.left_amount &lt;&gt; 0  
+				</if>
+				<if test="inv_model != null and inv_model != ''">
+					and (mid.inv_model like '%'||#{inv_model}||'%'or
+						mid.inv_name like '%'||#{inv_model}||'%'
+						or mid.inv_code like '%'||#{inv_model}||'%'
+						or mid.spell_code like '%'||#{inv_model}||'%'
+						or mid.wbx_code like '%'||#{inv_model}||'%'
+					)
+				</if>  
+			group by mfb.group_id,mfb.hos_id,mfb.copy_code,mid.inv_code, hsd.store_name, mid.inv_name, mid.inv_model,
+				hfd.fac_name,hu.unit_name,mfb.sup_id,hsdd.sup_name,mtd.med_type_code, mtd.med_type_name,
+				<if test="show_batch != null and show_batch != '' ">
+					mfb.batch_no, 
+				</if>
+				<if test="show_bar != null and show_bar != '' ">
+					mfb.bar_code, 
+				</if>
+				mfb.price
+		)
+		<if test="is_com != null and is_com != '' ">
+		, temp2 as (
+			select maf.group_id,maf.hos_id,maf.copy_code,mid.inv_code, hsd.store_name, mid.inv_name, mid.inv_model,
+				hfd.fac_name,hu.unit_name,maf.sup_id,hsdd.sup_name,mtd.med_type_code,mtd.med_type_name,
+				<if test="show_batch != null and show_batch != '' ">
+					maf.batch_no, 
+				</if>
+				<if test="show_bar != null and show_bar != '' ">
+					maf.bar_code, 
+				</if>
+				maf.price, sum(maf.left_amount) as amount, sum(maf.left_money) as money
+			from med_affi_fifo maf
+			left join med_inv_dict mid
+				on maf.group_id = mid.group_id and maf.hos_id = mid.hos_id 
+				and maf.copy_code = mid.copy_code and maf.inv_id = mid.inv_id 
+				and mid.is_stop = 0
+			left join hos_fac_dict hfd
+				on mid.group_id = hfd.group_id and mid.hos_id = hfd.hos_id 
+				and mid.fac_id = hfd.fac_id and mid.fac_no=hfd.fac_no
+			left join hos_unit hu
+				on mid.group_id = hu.group_id and mid.hos_id = hu.hos_id 
+				and mid.unit_code = hu.unit_code and hu.is_stop = 0
+			left join hos_sup_dict hsdd
+				on maf.group_id = hsdd.group_id and maf.hos_id = hsdd.hos_id
+				and maf.sup_id = hsdd.sup_id and hsdd.is_stop = 0 
+			left join med_type_dict mtd
+				on mid.group_id = mtd.group_id and mid.hos_id = mtd.hos_id 
+				and mid.copy_code = mtd.copy_code and mid.med_type_id = mtd.med_type_id 
+				and mtd.is_stop = 0 
+			left join hos_store_dict hsd 
+				on maf.group_id = hsd.group_id and maf.hos_id = hsd.hos_id 
+				and maf.store_id = hsd.store_id and hsd.is_stop = 0 
+			WHERE
+				maf.group_id = #{group_id}
+				and maf.hos_id = #{hos_id}
+				and maf.copy_code = #{copy_code}
+				<!-- 2017/05/19 过滤已停用的药品 -->
+				and mid.inv_code is not null
+				<!-- 只显示有权限的库房信息 -->
+				and to_char(maf.store_id) in (
+					select perm_code from v_user_data_perm  
+					where group_id = #{group_id,jdbcType=INTEGER}
+						and hos_id = #{hos_id,jdbcType=INTEGER}
+						and table_code = 'HOS_STORE_DICT'
+						and user_id = #{user_id,jdbcType=INTEGER}
+						and is_read = 1 and is_write = 1 
+				)
+				<if test="store_id != null and store_id != '' ">
+					and maf.store_id = #{store_id}
+				</if>
+				<if test="store_id == null or store_id == '' ">
+					and to_char(maf.store_id) in (
+						select perm_code from v_user_data_perm  
+						where group_id = #{group_id}
+						and hos_id = #{hos_id}
+						and table_code = 'HOS_STORE_DICT'
+						and user_id = #{user_id}
+						and is_read = 1 and is_write = 1 
+					)
+				</if>
+				<if test="med_type_id != null and med_type_id != '' ">
+					and to_char(mid.med_type_id) in(
+						select med_type_id from med_type
+						start with group_id = #{group_id,jdbcType=INTEGER}
+							and hos_id = #{hos_id,jdbcType=INTEGER}
+							and copy_code = #{copy_code,jdbcType=VARCHAR} 
+							and med_type_id = #{med_type_id,jdbcType=INTEGER}
+						connect by prior med_type_code = super_code
+					)
+				</if>
+				<if test="inv_info != null and inv_info != '' ">
+					and (
+						mid.inv_name like '%'||#{inv_info}||'%'
+				     	or mid.alias like '%'||#{inv_info}||'%'
+				     	or mid.inv_code like '%'||#{inv_info}||'%'
+                        or upper(mid.spell_code) like '%'||upper(#{inv_info})||'%'
+                        or  upper(mid.wbx_code) like '%'||upper(#{inv_info})||'%'
+					)
+				</if>
+				<if test="batch_no != null and batch_no != '' ">
+		      		and maf.batch_no like '%'||#{batch_no}||'%'
+				</if>
+				<if test="bar_code != null and bar_code != '' ">
+		      		and maf.bar_code like '%'||#{bar_code}||'%'
+				</if>
+				and (#{only_bar,jdbcType=INTEGER} = 0 or nvl(maf.bar_code, '-') &lt;&gt; '-')
+				<if test="is_charge != null and is_charge != '' ">
+					and mid.is_charge = #{is_charge}
+				</if>
+				<if test="sup_id != null and sup_id != '' ">
+					and maf.sup_id = #{sup_id}
+				</if>
+				<if test="zeroStore != null and zeroStore != '' ">
+					and maf.left_amount &lt;&gt; 0  
+				</if>
+				<if test="inv_model != null and inv_model != ''">
+					and (mid.inv_model like '%'||#{inv_model}||'%'or
+						mid.inv_name like '%'||#{inv_model}||'%'
+						or mid.inv_code like '%'||#{inv_model}||'%'
+						or mid.spell_code like '%'||#{inv_model}||'%'
+						or mid.wbx_code like '%'||#{inv_model}||'%'
+					)
+				</if>  
+			group by maf.group_id,maf.hos_id,maf.copy_code,mid.inv_code, hsd.store_name, mid.inv_name, mid.inv_model, 
+				hfd.fac_name,hu.unit_name,maf.sup_id,hsdd.sup_name,mtd.med_type_code,mtd.med_type_name,
+				<if test="show_batch != null and show_batch != '' ">
+					maf.batch_no, 
+				</if>
+				<if test="show_bar != null and show_bar != '' ">
+					maf.bar_code, 
+				</if>
+				maf.price
+		)
+		</if>
+		,temp3 as (
+			select group_id, hos_id, copy_code, store_name, inv_code, inv_name, inv_model, fac_name, unit_name,
+				sup_id, sup_name, med_type_code, med_type_name,
+           		<if test="show_batch != null and show_batch != '' ">
+					batch_no,
+				</if>
+           		<if test="show_bar != null and show_bar != '' ">
+					bar_code,
+				</if>
+           		price, amount, money 
+           	from temp a
+			<if test="is_com != null and is_com != '' ">
+			union all 
+			select group_id, hos_id, copy_code, store_name, inv_code, inv_name, inv_model, fac_name, unit_name, 
+				sup_id, sup_name, med_type_code, med_type_name,
+           		<if test="show_batch != null and show_batch != '' ">
+					batch_no, 
+				</if>
+           		<if test="show_bar != null and show_bar != '' ">
+					bar_code, 
+				</if>
+           		price, amount, money
+			from temp2 b	
+			</if>
+		) 
+		select group_id, hos_id, copy_code, store_name, to_char(inv_code) inv_code, inv_name, inv_model, fac_name, unit_name, 
+			sup_id, sup_name, med_type_code, med_type_name,
+           	<if test="show_batch != null and show_batch != '' ">
+				batch_no, 
+			</if>
+           	<if test="show_bar != null and show_bar != '' ">
+				bar_code, 
+			</if>
+			price, amount, money 
+        from temp3 c
+		union all
+		select 
+			NULL AS group_id, NULL AS hos_id, NULL AS copy_code, NULL AS store_name, to_char('合计') AS inv_code, NULL AS inv_name, 
+			NULL AS inv_model, NULL AS fac_name, NULL AS unit_name, NULL AS sup_id, NULL AS sup_name, 
+			NULL AS med_type_code, NULL AS med_type_name, 
+			<if test="show_batch != null and show_batch != '' ">
+				NULL AS batch_no, 
+			</if>
+			<if test="show_bar != null and show_bar != '' ">
+				NULL AS bar_code, 
+			</if>
+			NULL AS price,  sum(d.amount) as amount, SUM(d.money) AS money
+		from temp3 d
+		order by inv_code
+		<if test="bar_code != null and bar_code != '' ">
+			, bar_code
+	   </if>
+		
+	</select>
+
+</mapper>
+

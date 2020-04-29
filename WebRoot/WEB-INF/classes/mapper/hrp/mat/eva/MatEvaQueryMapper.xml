@@ -1,0 +1,320 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.mat.dao.eva.MatEvaQueryMapper">
+	
+	<resultMap id="matEvaReportMain" type="java.util.Map">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="sup_code" column="sup_code"/>
+		<result property="sup_name" column="sup_name"/>
+		<result property="sup_num" column="sup_num"/>
+		<result property="avg_score" column="avg_score"/>
+		<result property="sup_id" column="sup_id"/>
+		<result property="sup_no" column="sup_no"/>
+	</resultMap>
+	
+	<select id="queryMatEvaReportMain" resultMap="matEvaReportMain" parameterType="java.util.Map">
+		with main_temp as (
+			select mesm.group_id,
+			       mesm.hos_id,
+			       mesm.copy_code,
+			       mesm.sup_id,
+			       mesm.sup_no,
+			       hsd.sup_code,
+			       hsd.sup_name,
+			       count(1) sup_num,
+			       round(sum(mesm.get_score) / count(1), 2) avg_score
+			  from MAT_EVA_SUP_MAIN mesm
+			  left join hos_sup_dict hsd
+			    on mesm.group_id = hsd.group_id
+			   and mesm.hos_id = hsd.hos_id
+			   and mesm.sup_id = hsd.sup_id
+			   and mesm.sup_no = hsd.sup_no
+			  <where>
+			  	<if test="group_id != null and group_id != ''">
+					and mesm.group_id = #{group_id}
+				</if>
+				<if test="hos_id != null and hos_id != ''">
+					and mesm.hos_id = #{hos_id}
+				</if>
+				<if test="copy_code != null and copy_code != ''">
+					and mesm.copy_code = #{copy_code}
+				</if> 
+				<if test="begin_date != null and begin_date != ''">
+					and to_char(mesm.eva_date, 'yyyy-MM-dd') &gt;= #{begin_date}
+				</if>
+				<if test="end_date != null and end_date != ''">
+					and to_char(mesm.eva_date, 'yyyy-MM-dd') &lt;= #{end_date}
+				</if>
+				<if test="sup_id != null and sup_id != ''">
+					and mesm.sup_id = #{sup_id}
+				</if>
+			   </where> 
+			 group by mesm.group_id,
+			          mesm.hos_id,
+			          mesm.copy_code,
+			          mesm.sup_id,
+			          mesm.sup_no,
+			       	  hsd.sup_code,
+			          hsd.sup_name
+		), detail_temp as (
+			select mest.group_id,
+			       mest.hos_id,
+			       mest.copy_code,
+			       mest.eva_code,
+			       mest.target_code,
+			       case
+			         when mest.get_score = 0 then
+			          nvl(mest.full_score, 0) * nvl(mest.scale_point, 0) - nvl(sum(mesd.deduct_score), 0)
+			         when mest.get_score > 0 then
+			          nvl(mest.get_score, 0) - nvl(sum(mesd.deduct_score), 0)
+			       end get_score
+			  from mat_eva_sup_target mest
+			  left join mat_eva_sup_deduct mesd
+			    on mest.group_id = mesd.group_id
+			   and mest.hos_id = mesd.hos_id
+			   and mest.copy_code = mesd.copy_code
+			   and mest.eva_code = mesd.eva_code
+			   and mest.target_code = mesd.target_code
+			  <where>
+				<if test="group_id != null and group_id != ''">
+					and mest.group_id = #{group_id}
+				</if>
+				<if test="hos_id != null and hos_id != ''">
+					and mest.hos_id = #{hos_id}
+				</if>
+				<if test="copy_code != null and copy_code != ''">
+					and mest.copy_code = #{copy_code}
+				</if>
+				<if test="target_code != null and target_code != ''">
+					and mest.target_code = #{target_code}
+				</if>
+			   </where> 
+			 group by mest.group_id,
+			          mest.hos_id,
+			          mest.copy_code,
+			          mest.eva_code,
+			          mest.target_code,
+			          mest.get_score,
+			          mest.full_score,
+			          mest.scale_point
+		), avg_temp as (
+			select group_id, hos_id, copy_code, sup_id, sup_no, ${selectsql}
+			  from (select mest.group_id,
+			               mest.hos_id,
+			               mest.copy_code,
+			               mest.target_code,
+			               mesm.sup_id,
+			               mesm.sup_no,
+			               round(sum(mest.get_score) / count(1), 2) avg_target_score
+			          from detail_temp mest
+			          left join MAT_EVA_SUP_MAIN mesm
+			            on mesm.group_id = mest.group_id
+			           and mesm.hos_id = mest.hos_id
+			           and mesm.copy_code = mest.copy_code
+			           and mesm.eva_code = mest.eva_code
+			          <where>
+			          	<if test="group_id != null and group_id != ''">
+							and mest.group_id = #{group_id}
+						</if>
+						<if test="hos_id != null and hos_id != ''">
+							and mest.hos_id = #{hos_id}
+						</if>
+						<if test="copy_code != null and copy_code != ''">
+							and mest.copy_code = #{copy_code}
+						</if> 
+						<if test="begin_date != null and begin_date != ''">
+							and to_char(mesm.eva_date, 'yyyy-MM-dd') &gt;= #{begin_date}
+						</if>
+						<if test="end_date != null and end_date != ''">
+							and to_char(mesm.eva_date, 'yyyy-MM-dd') &lt;= #{end_date}
+						</if>
+						<if test="sup_id != null and sup_id != ''">
+							and mesm.sup_id = #{sup_id}
+						</if>
+			          </where>
+			         group by mest.group_id,
+			                  mest.hos_id,
+			                  mest.copy_code,
+			                  mest.target_code,
+			                  mesm.sup_id,
+			                  mesm.sup_no) pivot(sum(avg_target_score) for target_code in(${pivotsql}))
+		)
+		select group_id, hos_id, copy_code, sup_id, sup_no, sup_name, sup_num, avg_score, rownum || '/' || ( select count(1) from main_temp) sup_rank, ${selectsql}
+		  from(
+		select atm.*, mt.sup_code || ' ' || mt.sup_name as sup_name, mt.sup_num, mt.avg_score
+		  from main_temp mt
+		  left join avg_temp atm
+		    on mt.group_id = atm.group_id and mt.hos_id = atm.hos_id and mt.copy_code = atm.copy_code and mt.sup_id = atm.sup_id and mt.sup_no = atm.sup_no
+		 order by mt.avg_score desc) t
+	</select>
+	
+	<select id="queryMatEvaReportDetail" resultType="java.util.Map" parameterType="java.util.Map">
+		with detail_temp as (
+			select mest.group_id,
+			       mest.hos_id,
+			       mest.copy_code,
+			       mest.eva_code,
+			       mest.target_code,
+			       case
+			         when mest.get_score = 0 then
+			          nvl(mest.full_score, 0) * nvl(mest.scale_point, 0) - nvl(sum(mesd.deduct_score), 0)
+			         when mest.get_score > 0 then
+			          nvl(mest.get_score, 0) - nvl(sum(mesd.deduct_score), 0)
+			       end get_score
+			  from mat_eva_sup_target mest
+			  left join mat_eva_sup_deduct mesd
+			    on mest.group_id = mesd.group_id
+			   and mest.hos_id = mesd.hos_id
+			   and mest.copy_code = mesd.copy_code
+			   and mest.eva_code = mesd.eva_code
+			   and mest.target_code = mesd.target_code
+			   <where>
+				<if test="group_id != null and group_id != ''">
+					and mest.group_id = #{group_id}
+				</if>
+				<if test="hos_id != null and hos_id != ''">
+					and mest.hos_id = #{hos_id}
+				</if>
+				<if test="copy_code != null and copy_code != ''">
+					and mest.copy_code = #{copy_code}
+				</if>
+				<if test="target_code != null and target_code != ''">
+					and mest.target_code = #{target_code}
+				</if>
+			   </where>   
+			 group by mest.group_id,
+			          mest.hos_id,
+			          mest.copy_code,
+			          mest.eva_code,
+			          mest.target_code,
+			          mest.get_score,
+			          mest.full_score,
+			          mest.scale_point
+		), data_temp as (
+			select group_id, hos_id, copy_code, eva_code, eva_date, get_score, ${selectsql}
+			  from (select mesm.group_id,
+			               mesm.hos_id,
+			               mesm.copy_code,
+			               mesm.eva_code,
+			               mesm.eva_date,
+			               mesm.get_score,
+			               dt.target_code,
+			               dt.get_score target_score
+			          from mat_eva_sup_main mesm
+			          left join detail_temp dt
+			            on mesm.group_id = dt.group_id
+			           and mesm.hos_id = dt.hos_id
+			           and mesm.copy_code = dt.copy_code
+			           and mesm.eva_code = dt.eva_code
+			         <where>
+			          	<if test="group_id != null and group_id != ''">
+							and mesm.group_id = #{group_id}
+						</if>
+						<if test="hos_id != null and hos_id != ''">
+							and mesm.hos_id = #{hos_id}
+						</if>
+						<if test="copy_code != null and copy_code != ''">
+							and mesm.copy_code = #{copy_code}
+						</if> 
+						<if test="begin_date != null and begin_date != ''">
+							and to_char(mesm.eva_date, 'yyyy-MM-dd') &gt;= #{begin_date}
+						</if>
+						<if test="end_date != null and end_date != ''">
+							and to_char(mesm.eva_date, 'yyyy-MM-dd') &lt;= #{end_date}
+						</if>
+						<if test="sup_id != null and sup_id != ''">
+							and mesm.sup_id = #{sup_id}
+						</if>
+			          </where>
+			         order by mesm.eva_date) pivot (sum(target_score) for target_code in(${pivotsql})) 
+		)
+		select group_id, hos_id, copy_code, eva_code, to_char(eva_date, 'yyyy-MM-dd') eva_date, get_score, ${selectsql} from data_temp	
+		union all
+		select null group_id, null hos_id, null copy_code, null eva_code, '统计平均分' eva_date, round(avg(get_score), 2) get_score, ${avgsql} from data_temp		         
+	</select>
+	
+	<resultMap id="matEvaSchemeTarget" type="java.util.Map">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="target_code" column="target_code"/>
+		<result property="target_name" column="target_name"/>
+		<result property="scheme_code" column="scheme_code"/>
+		<result property="weight" column="weight"/>
+		<result property="full_score" column="full_score"/>
+		<result property="sort_code" column="sort_code"/>
+		<result property="note" column="note"/>
+	</resultMap>
+	
+	<select id="queryMatEvaSchemeTarget" resultMap="matEvaSchemeTarget" parameterType="java.util.Map">
+		
+		select mest.group_id,
+		       mest.hos_id,
+		       mest.copy_code,
+		       mest.scheme_code,
+		       mest.target_code,
+		       met.target_name,
+		       mest.full_score,
+		       mest.weight,
+		       mest.sort_code,
+		       mest.note
+		  from MAT_EVA_SCHEME_TARGET mest
+		  left join mat_eva_target met
+		    on mest.group_id = met.group_id
+		   and mest.hos_id = met.hos_id
+		   and mest.copy_code = met.copy_code
+		   and mest.target_code = met.target_code
+		<where>
+			<if test="group_id != null and group_id != ''">
+				and mest.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and mest.hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				and mest.copy_code = #{copy_code}
+			</if>
+			<if test="scheme_code != null and scheme_code != ''">
+				and mest.scheme_code = #{scheme_code}
+			</if>
+			<if test="target_code != null and target_code != ''">
+				and mest.target_code = #{target_code}
+			</if>
+		</where>
+		order by mest.target_code
+	</select>
+	
+	<resultMap id="matEvaSchemeTargetSelect" type="java.util.Map">
+		<result property="id" column="id"/>
+		<result property="text" column="text"/>
+	</resultMap>
+	
+	<select id="queryMatEvaTarget" resultMap="matEvaSchemeTargetSelect" parameterType="java.util.Map">
+		
+		select mest.target_code id,
+		       met.target_name text
+		  from MAT_EVA_SCHEME_TARGET mest
+		  left join mat_eva_target met
+		    on mest.group_id = met.group_id
+		   and mest.hos_id = met.hos_id
+		   and mest.copy_code = met.copy_code
+		   and mest.target_code = met.target_code
+		<where>
+			<if test="group_id != null and group_id != ''">
+				and mest.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and mest.hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				and mest.copy_code = #{copy_code}
+			</if>
+			<if test="scheme_code != null and scheme_code != ''">
+				and mest.scheme_code = #{scheme_code}
+			</if>
+		</where>
+		order by mest.target_code
+	</select>
+</mapper>
+

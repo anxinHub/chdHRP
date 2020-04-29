@@ -1,0 +1,332 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.htc.dao.info.basic.HtcProDeptDictMapper">
+
+	<resultMap id="proDeptDict" type="com.chd.hrp.htc.entity.info.basic.HtcProDeptDict">
+       	<result property="group_id" column="group_id"/>
+        <result property="hos_id" column="hos_id"/>
+        <result property="copy_code" column="copy_code"/>
+        <result property="proj_dept_id" column="proj_dept_id"/>
+        <result property="proj_dept_code" column="proj_dept_code"/>
+        <result property="proj_dept_name" column="proj_dept_name"/>
+        <result property="natur_code" column="natur_code"/>
+        <result property="natur_name" column="natur_name"/>
+        <result property="is_stop" column="is_stop"/>
+        <result property="is_last" column="is_last"/>
+        <result property="spell_code" column="spell_code"/>
+        <result property="wbx_code" column="wbx_code"/>
+	</resultMap>
+	
+       <insert id="addHtcProDept" useGeneratedKeys="true" >
+                 insert into htc_proj_dept
+                 (group_id,
+                  hos_id,
+                  copy_code,
+                  proj_dept_id,
+                  proj_dept_code,
+                  proj_dept_name,
+                  natur_code,
+                  is_stop,
+                  is_last,
+                  spell_code,
+                  wbx_code
+                 )
+                 values
+                 (#{group_id},
+                  #{hos_id},
+                  #{copy_code},
+                  #{proj_dept_id},
+                  #{proj_dept_code},
+                  #{proj_dept_name},
+                  #{natur_code},
+                  #{is_stop},
+                  #{is_last},
+                  #{spell_code},
+                  #{wbx_code}
+                 )
+       </insert>
+       
+       <insert id="addHtcProDeptDict" useGeneratedKeys="true" >
+                 insert into htc_proj_dept_dict
+                 ( proj_dept_no,
+                  group_id,
+                  hos_id,
+                  copy_code,
+                  proj_dept_id,
+                  proj_dept_code,
+                  proj_dept_name,
+                  natur_code,
+                  is_stop,
+                  is_last,
+                  spell_code,
+                  wbx_code,
+                  user_code,
+                  create_date,
+                  dlog,
+                  is_disable
+                 )
+                 values
+                 (
+                  #{proj_dept_no},
+                  #{group_id},
+                  #{hos_id},
+                  #{copy_code},
+                  #{proj_dept_id},
+                  #{proj_dept_code},
+                  #{proj_dept_name},
+                  #{natur_code},
+                  #{is_stop},
+                  #{is_last},
+                  #{spell_code},
+                  #{wbx_code},
+                  #{user_code},
+                  #{create_date},
+                  #{dlog},
+                  #{is_disable}
+                 )
+       </insert>
+	
+	<select id="queryProjDeptSeq"  resultType="java.lang.Long">
+		select htc_proj_dept_seq.nextval as inv_id from dual
+	</select>
+	
+	<select id="queryProjDeptDictSeq"  resultType="java.lang.Long">
+		select htc_proj_dept_dict_seq.nextval as inv_id from dual
+	</select>
+	
+	 <insert id="synchroHtcProDept" parameterType="java.util.Map" >
+	              
+				               
+			begin
+			   
+			insert into htc_proj_dept
+			  (group_id,
+			   hos_id,
+			   copy_code,
+			   proj_dept_id,
+			   proj_dept_code,
+			   proj_dept_name,
+			   natur_code,
+			   is_stop,
+			   is_last,
+			   spell_code,
+			   wbx_code)
+			  select hd.group_id,
+			         hd.hos_id,
+			         #{copy_code} copy_code,
+			         htc_proj_dept_dict_seq.nextval proj_dept_id,
+			         hd.dept_code,
+			         hd.dept_name,
+			         ada.natur_code,
+			         hd.is_stop,
+			         hd.is_last,
+			         hd.spell_code,
+			         hd.wbx_code
+			    from hos_dept_dict hd
+			    left join acc_dept_attr ada
+			      on hd.group_id = ada.group_id
+			     and hd.hos_id = ada.hos_id
+			     and hd.dept_id = ada.dept_id
+			   where ada.type_code in ('01', '02')
+			     and not exists (select 1
+			            from htc_proj_dept hpd
+			           where hpd.group_id = hd.group_id
+			             and hpd.hos_id = hd.hos_id
+			             and hpd.proj_dept_code = hd.dept_code);
+			insert into htc_proj_dept_dict
+			  (proj_dept_no,
+			   group_id,
+			   hos_id,
+			   copy_code,
+			   proj_dept_id,
+			   proj_dept_code,
+			   proj_dept_name,
+			   natur_code,
+			   is_stop,
+			   is_last,
+			   spell_code,
+			   wbx_code,
+			   user_code,
+			   create_date,
+			   dlog,
+			   is_disable)
+			  select htc_proj_dept_seq.nextval proj_dept_no,
+			         hdd.group_id,
+			         hdd.hos_id,
+			         #{copy_code} copy_code,
+			         hpd.proj_dept_id,
+			         hdd.dept_code,
+			         hdd.dept_name,
+			         ada.natur_code,
+			         hdd.is_stop,
+			         hdd.is_last,
+			         hdd.spell_code,
+			         hdd.wbx_code,
+			         hdd.user_code,
+			         hdd.create_date,
+			         hdd.dlog,
+			         is_disable
+			    from hos_dept_dict hdd
+			    left join acc_dept_attr ada
+			      on hdd.group_id = ada.group_id
+			     and hdd.hos_id = ada.hos_id
+			     and hdd.dept_id = ada.dept_id
+			    left join htc_proj_dept hpd
+			      on hpd.group_id = hdd.group_id
+			     and hpd.hos_id = hdd.hos_id
+			     and hpd.proj_dept_code = hdd.dept_code
+			   where ada.type_code in ('01', '02')
+			     and not exists
+			   (select 1
+			            from htc_proj_dept_dict hpdd
+			           where hpdd.group_id = hdd.group_id
+			             and hpdd.hos_id = hdd.hos_id
+			             and hpdd.proj_dept_code = hdd.dept_code);
+			
+			end;
+				 
+	  </insert> 
+	
+	
+	<update id="updateHtcProDept" parameterType="java.util.Map">
+    
+	       update htc_proj_dept set
+	            proj_dept_code = #{proj_dept_code},
+		        proj_dept_name = #{proj_dept_name}, 
+		        natur_code = #{natur_code}, 
+		        is_stop = #{is_stop}, 
+		        is_last = #{is_last},
+		        spell_code = #{spell_code}, 
+		        wbx_code = #{wbx_code}  
+	        where group_id = #{group_id} 
+	        and hos_id = #{hos_id}
+	        and copy_code = #{copy_code}
+	        and proj_dept_id = #{proj_dept_id}
+   
+	</update>
+	
+	<update id="updateHtcProDeptDict" parameterType="java.util.Map">
+    
+	       update htc_proj_dept_dict set
+	            proj_dept_code = #{proj_dept_code},
+		        proj_dept_name = #{proj_dept_name}, 
+		        natur_code = #{natur_code}, 
+		        is_stop = #{is_stop}, 
+		        is_last = #{is_last},
+		        spell_code = #{spell_code}, 
+		        wbx_code = #{wbx_code},
+		        user_code=#{user_code},
+                create_date= #{create_date},
+                dlog= #{dlog},
+                is_disable=#{is_disable}
+	        where group_id = #{group_id} 
+	        and hos_id = #{hos_id}
+	        and copy_code = #{copy_code}
+	        and proj_dept_id = #{proj_dept_id}
+	        and is_disable = 0
+   
+	</update>
+	
+	<update id="updateHtcProDeptDictState" parameterType="java.util.Map">
+
+		update htc_proj_dept_dict set
+		is_disable = 1 
+		where group_id = #{group_id}
+		and hos_id = #{hos_id}
+		and proj_dept_id = #{proj_dept_id}
+		and is_disable = 0
+	</update>
+	
+	 <delete id="deleteBatchHtcProDept" parameterType="java.util.List">
+   
+          delete from htc_proj_dept where
+      	 <foreach collection="list" index="index" item="item" separator="or" >
+		  (
+			    group_id = #{item.group_id} 
+		    and hos_id = #{item.hos_id}
+		    and copy_code = #{item.copy_code}
+		    and proj_dept_id = #{item.proj_dept_id}  
+		  )
+		</foreach>
+
+    </delete>
+    
+     <delete id="deleteBatchHtcProDeptDict" parameterType="java.util.List">
+   
+          delete from htc_proj_dept_dict where
+      	 <foreach collection="list" index="index" item="item" separator="or" >
+		  (
+			    group_id = #{item.group_id} 
+		    and hos_id = #{item.hos_id}
+		    and copy_code = #{item.copy_code}
+		    and proj_dept_id = #{item.proj_dept_id}  
+		  )
+		</foreach>
+
+    </delete>
+	   
+	   <select id="queryHtcProDeptByCode" resultMap="proDeptDict" parameterType="java.util.Map">
+	            select 
+					 hpdd.group_id,
+					 hpdd.hos_id,
+					 hpdd.copy_code,
+					 hpdd.proj_dept_id,
+					 hpdd.proj_dept_code,
+					 hpdd.proj_dept_name,
+					 hpdd.natur_code,
+					 adn.natur_name,
+					 hpdd.is_stop,
+					 hpdd.is_last,
+					 hpdd.spell_code,
+					 hpdd.wbx_code
+					from htc_proj_dept hpdd
+					left join acc_dept_natur adn
+					on hpdd.natur_code = adn.natur_code
+					where hpdd.group_id = #{group_id}
+					and hpdd.hos_id = #{hos_id}
+					and hpdd.copy_code = #{copy_code}
+			    <if test="proj_dept_id != null and proj_dept_id != ''">
+                    and hpdd.proj_dept_id = #{proj_dept_id}
+               </if>
+				<if test="proj_dept_code != null and proj_dept_code != ''">
+                    and hpdd.proj_dept_code = #{proj_dept_code}
+               </if>
+	   </select>
+	   
+	    <select id="queryHtcProDept" resultMap="proDeptDict" parameterType="java.util.Map">
+					select 
+					 hpdd.group_id,
+					 hpdd.hos_id,
+					 hpdd.copy_code,
+					 hpdd.proj_dept_id,
+					 hpdd.proj_dept_code,
+					 hpdd.proj_dept_name,
+					 hpdd.natur_code,
+					 adn.natur_name,
+					 hpdd.is_stop,
+					 hpdd.is_last,
+					 hpdd.spell_code,
+					 hpdd.wbx_code
+					from htc_proj_dept hpdd
+					left join acc_dept_natur adn
+					on hpdd.natur_code = adn.natur_code
+					where hpdd.group_id = #{group_id}
+					and hpdd.hos_id = #{hos_id}
+					and hpdd.copy_code = #{copy_code}
+					<if test="proj_dept_code != null and proj_dept_code != ''">
+                    and hpdd.proj_dept_code = #{proj_dept_code}
+                    </if>
+                    <if test="natur_code != null and natur_code != ''">
+                    and hpdd.natur_code = #{natur_code}
+                    </if>
+                    <if test="is_stop != null and is_stop != ''">
+                     and hpdd.is_stop = #{is_stop}
+                    </if>
+                     <if test="is_last != null and is_last != ''">
+                     and hpdd.is_last = #{is_last}
+                    </if>
+                    order by  hpdd.group_id,hpdd.hos_id,hpdd.copy_code,hpdd.proj_dept_code
+	   </select>
+	   
+</mapper>
+

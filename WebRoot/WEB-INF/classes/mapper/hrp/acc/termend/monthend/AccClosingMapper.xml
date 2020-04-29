@@ -1,0 +1,403 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.acc.dao.termend.monthend.AccClosingMapper">
+	<resultMap id="accYearMonth" type="com.chd.hrp.acc.entity.AccYearMonth" >
+		<result property="template_id" column="template_id" />
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="acc_year" column="acc_year" />
+		<result property="acc_month" column="acc_month" />
+		<result property="year_month" column="year_month" />
+		<result property="acc_flag" column="acc_flag" />
+		<result property="acc_user" column="acc_user" />
+		<result property="acc_date" column="acc_date" />
+		<result property="cash_flag" column="cash_flag" />
+		<result property="cash_user" column="cash_user" />
+		<result property="cash_date" column="cash_date" />
+		<result property="wage_flag" column="wage_flag" />
+		<result property="wage_user" column="wage_user" />
+		<result property="wage_date" column="wage_date" />
+	</resultMap>
+	
+	<resultMap id="accVouch" type="com.chd.hrp.acc.entity.AccVouch">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="vouch_id" column="vouch_id" />
+		<result property="year_month" column="year_month" />
+		<result property="acc_year" column="acc_year" />
+		<result property="acc_month" column="acc_month" />
+		<result property="vouch_type_code" column="vouch_type_code" />
+		<result property="vouch_type_name" column="vouch_type_name" />
+		<result property="vouch_type_short" column="vouch_type_short" />
+		<result property="vouch_no" column="vouch_no" />
+		<result property="debit" column="debit" />
+		<result property="credit" column="credit" />
+		<result property="create_name" column="create_name" />
+		<result property="state_name" column="state_name" />
+	</resultMap>
+	
+	<select id="queryAccClosing" parameterType="java.util.Map" resultMap="accYearMonth"> 
+		select acc_year||'.'||acc_month year_month, b.user_name acc_name, acc_date, 
+			c.user_name cash_name, cash_date, d.user_name wage_name, wage_date
+		from acc_year_month a
+		left join sys_user b
+			on a.group_id = b.group_id
+			and a.hos_id = b.hos_id
+			and a.acc_user = b.user_id
+		left join sys_user c
+			on a.group_id = c.group_id
+			and a.hos_id = c.hos_id
+			and a.cash_user = c.user_id
+		left join sys_user d
+			on a.group_id = d.group_id
+			and a.hos_id = d.hos_id
+			and a.wage_user = d.user_id
+		where 
+			a.group_id = #{group_id} 
+			AND a.hos_id = #{hos_id} 
+			AND a.copy_code = #{copy_code} 
+			AND a.acc_year = #{acc_year}
+	</select>
+	
+	<select id="queryAccClosingCountVouch" parameterType="java.util.Map" resultType="String"> 
+		with t_vouch as (
+			select count(*) countVouch, 0 countVouchDetail 
+			from acc_vouch 
+			where group_id = #{group_id} 
+				and hos_id = #{hos_id} 
+				and copy_code = #{copy_code} 
+				and acc_year = #{acc_year}
+				and acc_month = #{acc_month}
+				and state = '99'
+		),t_vouch_detail as(
+		  select 0 countVouch, count(*) countVouchDetail 
+		  from acc_vouch a
+		  left join acc_vouch_detail b 
+		    on a.group_id = b.group_id
+		    and a.hos_id = b.hos_id
+		    and a.copy_code = b.copy_code
+		    and a.vouch_id = b.vouch_id
+		  where a.group_id = #{group_id} 
+				and a.hos_id = #{hos_id} 
+				and a.copy_code = #{copy_code} 
+				and a.acc_year = #{acc_year}
+				and a.acc_month = #{acc_month}
+				and a.state = '99'
+		)
+		select '{"countVouch":"'||SUM(countVouch)||'","countVouchDetail":"'||SUM(countVouchDetail)||'"}' 
+		from (
+		       select countVouch, countVouchDetail from t_vouch 
+		       union all 
+		       select countVouch, countVouchDetail from t_vouch_detail 
+		)t 
+	</select>
+	
+	<select id="queryAccClosingCheck" parameterType="java.util.Map" resultType="Integer"> 
+		select count(1) from ${table_name}
+		where group_id = #{group_id}
+			and hos_id = #{hos_id}
+			and copy_code = #{copy_code}
+			<if test="acc_year != null and acc_year != '' and table_name != 'sys_mod_start'">
+				and acc_year = #{acc_year}
+			</if>
+			<if test="acc_year != null and acc_year != '' and table_name == 'sys_mod_start'">
+				and start_year = #{acc_year}
+			</if>
+			<if test="acc_month != null and acc_month != '' and table_name != 'acc_vouch_check' and table_name != 'sys_mod_start'">
+				and acc_month = #{acc_month}
+			</if>
+			<if test="acc_month != null and acc_month != '' and table_name == 'sys_mod_start'">
+				and start_month = #{acc_month}
+			</if>
+			<if test="cname != null and cname != ''">
+				and ${cname} = #{cvalue}
+			</if>
+			<if test="cname1 != null and cname1 != ''">
+				and ${cname1} &lt;&gt; #{cvalue}
+			</if>
+	</select>
+	
+	<select id="queryAccClosingCheckVouch" parameterType="java.util.Map" resultMap="accVouch"> 
+		select a.group_id, a.hos_id, a.copy_code, a.vouch_id, a.acc_year||'.'||a.acc_month year_month, c.vouch_type_name,
+			c.vouch_type_short, a.vouch_no, sum(nvl(b.debit, 0)) debit, sum(nvl(b.credit, 0)) credit, d.user_name create_name, e.state_name
+		from acc_vouch a 
+		left join acc_vouch_detail b
+			on a.group_id = b.group_id
+			and a.hos_id = b.hos_id
+			and a.copy_code = b.copy_code
+			and a.vouch_id = b.vouch_id
+		left join acc_vouch_type c
+			on a.group_id = c.group_id
+			and a.hos_id = c.hos_id
+			and a.copy_code = c.copy_code
+			and a.vouch_type_code = c.vouch_type_code
+		left join sys_user d
+			on a.group_id = d.group_id
+			and a.hos_id = d.hos_id
+			and a.create_user = d.user_id
+		left join acc_vouch_state e
+			on a.group_id = e.group_id
+			and a.hos_id = e.hos_id
+			and a.copy_code = e.copy_code
+			and a.state = e.state
+		where 
+			a.group_id = #{group_id} 
+			AND a.hos_id = #{hos_id} 
+			AND a.copy_code = #{copy_code} 
+			AND a.acc_year = #{acc_year}
+			AND a.acc_month = #{acc_month}
+			<if test="subj_code != null and subj_code != ''">
+				AND b.subj_code = #{subj_code}
+			</if>
+			<![CDATA[
+				AND state <> 99
+				AND state <> 0
+			]]> 
+		group by a.group_id, a.hos_id, a.copy_code, a.vouch_id, a.acc_year, a.acc_month, 
+			c.vouch_type_name, c.vouch_type_short, a.vouch_no, d.user_name, e.state_name 
+	</select>
+	<select id="queryAccClosingCheckLederToCheck" parameterType="java.util.Map" resultMap="accVouch"> 
+		select * from(
+			select #{acc_year}||'.'||#{acc_month} year_month, a.group_id, a.hos_id, a.copy_code, a.subj_code, a.subj_name, 
+				sum(nvl(b.this_od, 0)) debit, sum(nvl(b.this_oc, 0)) credit,
+				sum(nvl(c.this_od, 0)) debit_w, sum(nvl(c.this_oc, 0)) credit_w
+			from acc_subj a
+			left join acc_leder b
+				on a.group_id = b.group_id and a.hos_id = b.hos_id and a.copy_code = b.copy_code
+				and a.subj_code = b.subj_code and a.acc_year = b.acc_year
+			left join acc_leder_check c
+				on a.group_id = c.group_id and a.hos_id = c.hos_id and a.copy_code = c.copy_code
+				and a.subj_code = c.subj_code and a.acc_year = c.acc_year and b.acc_month = c.acc_month
+			where a.group_id = #{group_id} and a.hos_id = #{hos_id} and a.copy_code = #{copy_code} 
+				and a.acc_year = #{acc_year} and b.acc_month = #{acc_month}
+			group by a.group_id, a.hos_id, a.copy_code, a.subj_code, a.subj_name
+			)
+		where debit + credit &lt;&gt; debit_w + credit_w
+	</select>
+	
+	<select id="queryAccClosingCheckLederToVouch" parameterType="java.util.Map" resultMap="accVouch"> 
+		select * from(
+			select #{acc_year}||'.'||#{acc_month} year_month, a.group_id, a.hos_id, a.copy_code, a.subj_code, a.subj_name, 
+				sum(nvl(b.this_od, 0)) debit, sum(nvl(b.this_oc, 0)) credit,
+				sum(nvl(c.this_od, 0)) debit_w, sum(nvl(c.this_oc, 0)) credit_w
+			from acc_subj a
+			left join acc_leder b
+				on a.group_id = b.group_id and a.hos_id = b.hos_id and a.copy_code = b.copy_code
+				and a.subj_code = b.subj_code and a.acc_year = b.acc_year
+			left join (
+				select b.subj_code, sum(nvl(b.debit, 0)) this_od, sum(nvl(b.credit, 0)) this_oc from acc_vouch a
+				left join acc_vouch_detail b
+					on a.group_id = b.group_id and a.hos_id = b.hos_id 
+					and a.copy_code = b.copy_code and a.vouch_id = b.vouch_id
+				where a.group_id = #{group_id} and a.hos_id = #{hos_id} and a.copy_code = #{copy_code} 
+					and a.acc_year = #{acc_year} and a.acc_month = #{acc_month} and a.state = '99'
+				group by b.subj_code
+			) c
+				on a.subj_code = c.subj_code
+			where a.group_id = #{group_id} and a.hos_id = #{hos_id} and a.copy_code = #{copy_code} 
+				and a.acc_year = #{acc_year} and b.acc_month = #{acc_month}
+			group by a.group_id, a.hos_id, a.copy_code, a.subj_code, a.subj_name
+			)
+		where debit + credit &lt;&gt; debit_w + credit_w
+	</select>
+	
+	<!-- 添加下一期间账 -->
+	<insert id="addAccClosingNextLeder"  parameterType="java.util.Map">
+		insert into ACC_LEDER(group_id, hos_id, copy_code, acc_year, acc_month, subj_code, bal_os, this_od, this_oc, sum_od, sum_oc, end_os, 
+			bal_os_w, this_od_w, this_oc_w, sum_od_w, sum_oc_w, end_os_w)
+		select al.group_id, al.hos_id, al.copy_code, #{acc_year_next} acc_year, #{acc_month_next} acc_month, asubj1.subj_code, al.end_os, 0, 0, 
+			case #{acc_month_next} when '01' then 0 else al.sum_od end, 
+			case #{acc_month_next} when '01' then 0 else al.sum_oc end, 
+			al.end_os, al.end_os_w, 0, 0, 
+			case #{acc_month_next} when '01' then 0 else al.sum_od_w end, 
+			case #{acc_month_next} when '01' then 0 else al.sum_oc_w end,
+			al.end_os_w 
+		from ACC_LEDER al inner join acc_subj asubj on al.group_id = asubj.group_id and  al.hos_id = asubj.hos_id
+		and al.copy_code = asubj.copy_code and al.subj_code = asubj.subj_code and al.acc_year = asubj.acc_year
+		inner join acc_subj asubj1 on asubj.group_id = asubj1.group_id and asubj.hos_id = asubj1.hos_id
+		and asubj.copy_code = asubj1.copy_code and asubj.subj_code = asubj1.subj_code and asubj1.acc_year =#{acc_year_next}
+		where al.group_id = #{group_id} and al.hos_id = #{hos_id} and al.copy_code = #{copy_code} 
+			and al.acc_year = #{acc_year} and al.acc_month = #{acc_month} 
+			<if test="acc_month_next != acc_year">
+				and al.end_os &lt;&gt;0
+			</if>
+		<if test="acc_month_next == '01'">
+			UNION ALL
+				<!-- 需要建立下一年度的年初账 -->
+				select al.group_id, al.hos_id, al.copy_code, #{acc_year_next} acc_year, '00' acc_month, asubj1.subj_code, 
+					al.end_os, 0, 0, 0, 0, al.end_os, al.end_os_w, 0, 0, 0, 0, al.end_os_w 
+				from ACC_LEDER al inner join acc_subj asubj on al.group_id = asubj.group_id and  al.hos_id = asubj.hos_id
+				and al.copy_code = asubj.copy_code and al.subj_code = asubj.subj_code and al.acc_year = asubj.acc_year
+				inner join acc_subj asubj1 on asubj.group_id = asubj1.group_id and asubj.hos_id = asubj1.hos_id
+				and asubj.copy_code = asubj1.copy_code and asubj.subj_code = asubj1.subj_code and asubj1.acc_year = #{acc_year_next}
+				where al.group_id = #{group_id} and al.hos_id = #{hos_id} and al.copy_code = #{copy_code} 
+					and al.acc_year = #{acc_year} and al.acc_month = #{acc_month}
+				<if test="acc_month_next != acc_year">
+					and al.end_os &lt;&gt;0
+				</if>
+		</if>
+		<!-- order by acc_month -->
+	</insert>
+	
+	<!-- 添加下一期间辅助账 -->
+	<insert id="addAccClosingNextCheckLeder" parameterType="java.util.Map">
+		insert into ACC_LEDER_CHECK(group_id, hos_id, copy_code, acc_year, acc_month, subj_code, bal_os, this_od, this_oc, sum_od, sum_oc, end_os, 
+			bal_os_w, this_od_w, this_oc_w, sum_od_w, sum_oc_w, end_os_w
+			<if test="strCheck != null and strCheck !=''">
+				, ${strCheck}
+			</if>
+		)
+		select alc.group_id, alc.hos_id, alc.copy_code, #{acc_year_next} acc_year, #{acc_month_next} acc_month, asubj1.subj_code, alc.end_os, 0, 0, 
+			case #{acc_month_next} when '01' then 0 else alc.sum_od end, 
+			case #{acc_month_next} when '01' then 0 else alc.sum_oc end, 
+			end_os, end_os_w, 0, 0, 
+			case #{acc_month_next} when '01' then 0 else alc.sum_od_w end, 
+			case #{acc_month_next} when '01' then 0 else alc.sum_oc_w end,
+			end_os_w
+			<if test="strCheck != null and strCheck !=''">
+				, ${strCheck}
+			</if>
+		from ACC_LEDER_CHECK alc inner join acc_subj asubj on alc.group_id = asubj.group_id and  alc.hos_id = asubj.hos_id
+		and alc.copy_code = asubj.copy_code and alc.subj_code = asubj.subj_code and alc.acc_year = asubj.acc_year
+		inner join acc_subj asubj1 on asubj.group_id = asubj1.group_id and asubj.hos_id = asubj1.hos_id
+		and asubj.copy_code = asubj1.copy_code and asubj.subj_code = asubj1.subj_code and asubj1.acc_year = #{acc_year_next}
+		where alc.group_id = #{group_id} and alc.hos_id = #{hos_id} and alc.copy_code = #{copy_code} 
+		and alc.acc_year = #{acc_year} and alc.acc_month = #{acc_month}
+		<if test="acc_month_next != acc_year">
+			and alc.end_os &lt;&gt;0
+		</if>
+		<if test="acc_month_next == '01'">
+			UNION ALL
+				<!-- 需要建立下一年度的年初账 -->
+				select alc.group_id, alc.hos_id, alc.copy_code, #{acc_year_next} acc_year, '00' acc_month, asubj1.subj_code, 
+					alc.end_os, 0, 0, 0, 0, alc.end_os, alc.end_os_w, 0, 0, 0, 0,
+					alc.end_os_w
+					<if test="strCheck != null and strCheck !=''">
+						, ${strCheck}
+					</if> 
+				from ACC_LEDER_CHECK alc 
+				inner join acc_subj asubj on alc.group_id = asubj.group_id and  alc.hos_id = asubj.hos_id
+				and alc.copy_code = asubj.copy_code and alc.subj_code = asubj.subj_code and alc.acc_year = asubj.acc_year
+				inner join acc_subj asubj1 on asubj.group_id = asubj1.group_id and asubj.hos_id = asubj1.hos_id
+				and asubj.copy_code = asubj1.copy_code and asubj.subj_code = asubj1.subj_code and asubj1.acc_year = #{acc_year_next}
+				where alc.group_id = #{group_id} and alc.hos_id = #{hos_id} and alc.copy_code = #{copy_code} 
+				and alc.acc_year = #{acc_year} and alc.acc_month = #{acc_month}
+				<if test="acc_month_next != acc_year">
+					and alc.end_os &lt;&gt;0
+				</if>
+		</if>
+		<!-- order by acc_month -->
+	</insert>
+	
+	<!-- 年结复制往来账 -->
+	<insert id="copyAccClosingVeriVouchCkeck" parameterType="java.util.Map">
+		insert into ACC_VOUCH_CHECK(vouch_check_id, group_id, hos_id, copy_code, acc_year, subj_code, summary,  
+			debit, credit, con_no, check_no, business_no, occur_date, due_date, pay_type_code, debit_w, credit_w, is_init ,old_check_id, bal_amt 
+			<if test="strCheck != null and strCheck !=''">
+				, ${strCheck}
+			</if>
+		)
+		select substr(cast(dbms_random.value as varchar2(38)),2,15), a.group_id, a.hos_id, a.copy_code, #{acc_year_next}, asubj1.subj_code, 
+			case when instr(a.summary, '【上年结转】') > 0 then a.summary else '【上年结转】' || a.summary end, 
+			case when a.debit !=0 then a.debit - nvl(a.bal_amt, 0) else 0 end,
+			case when a.credit!=0 then a.credit - nvl(a.bal_amt, 0) else 0 end,
+			a.con_no, a.check_no, a.business_no, 
+			case when to_char(sysdate, 'yyyy') &lt;&gt; #{acc_year_next} then to_date(#{acc_year_next}||'-01-01', 'yyyy-mm-dd') else sysdate end, 
+			a.due_date, a.pay_type_code, a.debit_w, a.credit_w, 1, a.vouch_check_id, 0 
+			<if test="strCheck1 != null and strCheck1 !=''">
+				, ${strCheck1}
+			</if>
+		from acc_vouch_check a
+		left join acc_subj b
+		inner join acc_subj asubj1 on b.group_id = asubj1.group_id and b.hos_id = asubj1.hos_id
+		and b.copy_code = asubj1.copy_code and b.subj_code = asubj1.subj_code and asubj1.acc_year = #{acc_year_next}
+		on a.group_id = b.group_id and a.hos_id = b.hos_id
+		and a.copy_code = b.copy_code and a.acc_year = b.acc_year
+		and a.subj_code = b.subj_code
+		where a.group_id = #{group_id} and a.hos_id = #{hos_id} and a.copy_code = #{copy_code} 
+			and a.acc_year = #{acc_year} and b.subj_nature_code in ('04','05')
+			and a.debit + a.credit &lt;&gt; nvl(a.bal_amt, 0)
+	</insert>
+	
+	<!-- 判断本期间是否已结账 -->
+	<select id="existsAccClosing" parameterType="java.util.Map" resultType="java.lang.Integer">
+		SELECT count(1) 
+		FROM acc_year_month 
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND acc_year || acc_month &lt;= #{acc_year,jdbcType=VARCHAR} || #{acc_month,jdbcType=VARCHAR}
+			AND nvl(${flag_filed}, 0) = 0
+	</select>
+	
+	<!-- 修改结账标志 -->
+	<update id="updateAccClosing" parameterType="java.util.Map">
+		UPDATE ACC_YEAR_MONTH
+		SET 
+				acc_flag = #{acc_flag,jdbcType=INTEGER}, 
+				acc_user = #{acc_user,jdbcType=INTEGER}, 
+				acc_date = #{acc_date,jdbcType=DATE}
+		WHERE
+			group_id = #{group_id,jdbcType=INTEGER} 
+			AND hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND copy_code = #{copy_code,jdbcType=VARCHAR} 
+			AND acc_year = #{acc_year,jdbcType=VARCHAR}
+			AND acc_month = #{acc_month,jdbcType=VARCHAR}
+	</update>
+	
+	<!-- 反结删除期间账 -->
+	<delete id="deleteAccClosing" parameterType="java.util.Map">
+		DELETE from ${table_name} 
+		WHERE
+			group_id = #{group_id,jdbcType=INTEGER} 
+			AND hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND copy_code = #{copy_code,jdbcType=INTEGER} 
+			AND acc_year = #{acc_year,jdbcType=INTEGER}
+			<if test="acc_month != null and acc_month !='' and table_name != null and table_name != 'acc_vouch_check'">
+				AND (acc_month = #{acc_month,jdbcType=INTEGER}
+				<if test="acc_month == '01'">
+					OR acc_month = '00'
+				</if>
+				)
+			</if>
+			<if test="table_name != null and table_name == 'acc_vouch_check'">
+				AND is_init=1
+			</if>
+	</delete>
+	
+	<select id="getAccClosingCheckNamesBySubj" resultType="java.lang.String" parameterType="java.util.Map">
+		select '{"checkNames":"'||to_char(wm_concat(check_type_name))||'","checkColumns":"'||
+			to_char(wm_concat(case when is_sys = 0 then column_check||'_id' else column_check end))||'"}' name 
+		from acc_check_type 
+		where group_id = #{group_id} 
+			AND hos_id = #{hos_id} 
+			AND copy_code = #{copy_code}
+			AND instr((
+				select check1||',' ||check2||',' ||check3||',' ||check4||',' ||check5||',' ||check6||',' 
+					||check7||',' ||check8||',' ||check9||',' ||check10||','
+				from acc_subj
+				where group_id = #{group_id} 
+					AND hos_id = #{hos_id} 
+					AND copy_code = #{copy_code} 
+					AND acc_year = #{acc_year}
+					AND subj_code = #{subj_code}
+			),check_type_id||',')>0
+		order by sort_code
+	</select>
+	
+	<select id="queryAccClosingUnAccountVouch" parameterType="java.util.Map" resultType="java.lang.Integer"> 
+		select count(1) from acc_vouch 
+		where group_id = #{group_id} 
+			AND hos_id = #{hos_id} 
+			AND copy_code = #{copy_code} 
+			AND acc_year = #{acc_year} 
+			AND acc_month = #{acc_month} 
+			<![CDATA[
+				AND state <> 99
+				AND state <> 0
+			]]> 
+	</select>
+</mapper>
+

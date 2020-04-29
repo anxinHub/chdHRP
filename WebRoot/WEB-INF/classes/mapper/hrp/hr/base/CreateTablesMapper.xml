@@ -1,0 +1,299 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.hr.dao.base.CreateTablesMapper">
+
+	<!-- 抽取出来的公共部分 -->
+	<sql id="commonSql">
+		<choose>
+			<when test="fields.fileTypeLength == 0">
+			${fields.col_code} ${fields.data_type} 
+			</when>
+			<when test="fields.fileTypeLength == 1">
+				${fields.col_code} ${fields.data_type}(${fields.filed_length}) 
+			</when>
+			<when test="fields.fileTypeLength == 2">
+				${fields.col_code}
+				${fields.data_type}(${fields.filed_length},${fields.prec}) 
+			</when>
+			<otherwise>
+				${fields.col_code}
+				${fields.data_type_code}<if test="fields.data_type_code == 'VARCHAR2' or fields.data_type_code == 'NUMBER'">(${fields.filed_length})</if>
+			</otherwise>
+		</choose>
+		<!-- <if test="fields.is_m">
+			NOT NULL  
+		</if> -->
+	</sql>
+	
+	<!-- 创建表 -->
+	<update id="createTable" parameterType="java.util.Map">
+		<foreach collection="tableMap" index="key" item="value">
+		declare
+		  tableExistedCount number := 0;
+		begin
+		  select count(1)
+		    into tableExistedCount
+		    from user_tables t
+		   where t.table_name = upper('${key}');
+		
+		  if tableExistedCount > 0 then
+		  
+		    execute immediate 'drop table ${key} cascade constraints';
+		    tableExistedCount := 0;
+		  end if;
+		
+		  if tableExistedCount = 0 then
+		    execute immediate '
+		                             
+		  CREATE TABLE "${key}" 
+		   (
+		    <foreach collection="value" item="fields" separator=",">
+				<include refid="commonSql"></include>
+			</foreach>
+		   )';
+		  execute immediate '
+		  ALTER TABLE "${key}" ADD CONSTRAINT "PK_${key}" PRIMARY KEY (
+			<foreach collection="value" item="fields" separator=",">
+				<if test="fields.is_pk != null and fields.is_pk == 1">
+					${fields.col_code}
+				</if>
+			</foreach>
+		  )';
+		  
+		  END if;
+		END;
+		</foreach>
+	</update>
+	
+	<!-- 创建表 -->
+    <update id="createTableStruc" parameterType="java.util.Map">
+        <foreach collection="tableMap" index="key" item="value">
+        declare
+          tableExistedCount number := 0;
+        begin
+          select count(1)
+            into tableExistedCount
+            from user_tables t
+           where t.table_name = upper('${key}');
+        
+          if tableExistedCount > 0 then
+          
+            execute immediate 'drop table ${key} cascade constraints';
+            tableExistedCount := 0;
+          end if;
+        
+          if tableExistedCount = 0 then
+            execute immediate '
+                                     
+          CREATE TABLE "${key}" 
+           (
+            <foreach collection="value" item="fields" separator=",">
+                <include refid="commonSql"></include>
+            </foreach>
+           )';
+          execute immediate '
+          ALTER TABLE "${key}" ADD CONSTRAINT "PK_${key}" PRIMARY KEY (
+            <foreach collection="value" item="fields" separator=",">
+                <if test="fields.is_pk != null and fields.is_pk == 1">
+                    ${fields.col_code}
+                </if>
+            </foreach>
+          )';
+          
+          END if;
+        END;
+        </foreach>
+    </update>
+	
+	<!-- 创建表的主键 -->
+	<update id="createPk" parameterType="java.util.Map">
+		<!-- <foreach collection="tableMap" index="key" item="value">
+			declare 
+				num number(4);
+			begin 
+		      	select count(1) into  num from user_constraints t
+		      	where t.table_name = upper('${key}')
+		        	and t.constraint_type = 'P';
+		      	if num > 0   then 
+		          execute immediate 'alter table ${key} drop constraint PK_${key} cascade'; 
+		      	end if;
+		      
+		      	execute immediate 'alter table ${key}
+		              add constraint PK_${key} primary key (
+		              	<foreach collection="value" item="fields" separator=",">
+								${fields}
+						</foreach>
+		              )'; 
+			end; 
+		</foreach> -->
+			${sql}
+	</update>
+	
+	<!-- 验证表是否存在 -->
+	<select id="findTableCountByTableName" resultType="int" parameterType="String">
+		select count(1) from user_tables
+		where table_name = upper(#{tableName})
+	</select>
+	
+	<!-- 验证表是否存在 存在则删除-->
+	<delete id="dorpTableByName" parameterType="String">
+		declare 
+		      num   number; 
+		begin 
+		      select count(1) into num from all_tables where TABLE_NAME = upper('${tableName}'); 
+		      if   num=1   then 
+		          execute immediate 'drop table ${tableName}'; 
+		      end   if; 
+		end; 
+	</delete>
+	
+	<!-- 根据表名查询表的结构 -->
+	<resultMap type="com.chd.hrp.hr.entity.base.TableColumns" id="tableColumns">
+		<result property="table_name" column="table_name"/>
+		<result property="column_name" column="column_name"/>
+		<result property="data_type" column="data_type"/>
+		<result property="data_length" column="data_length"/>
+		<result property="data_precision" column="data_precision"/>
+		<result property="data_scale" column="data_scale"/>
+		<result property="nullable" column="nullable"/>
+		<result property="default_length" column="default_length"/>
+		<result property="data_default" column="data_default"/>
+		<result property="column_key" column="column_key"/>
+	</resultMap>
+	<select id="findTableEnsembleByTableName" resultMap="tableColumns" parameterType="String">
+		select 
+			utc.table_name,
+	       	utc.column_name,
+	       	utc.data_type,
+	       	utc.data_length,
+	       	utc.data_precision,
+	       	utc.data_scale,
+	       	utc.nullable,
+	       	utc.default_length,
+	       	utc.data_default,
+	       	t.constraint_type column_key
+		  from user_tab_columns utc
+		  left join (
+		       select
+		         col.column_name,constraint_type
+		        from
+		         user_constraints con,user_cons_columns col
+		        where
+		         con.constraint_name=col.constraint_name and con.constraint_type='P'
+		         and col.table_name= upper('${tableName}')
+		  ) t
+		  on utc.column_name = t.column_name
+		 where table_name = upper('${tableName}')
+	</select>
+	
+	<select id="findTableColumnByTableName" parameterType="String" resultType="String">
+		select 
+	       	utc.column_name
+		  from user_tab_columns utc
+		  left join (
+		       select
+		         col.column_name,constraint_type
+		        from
+		         user_constraints con,user_cons_columns col
+		        where
+		         con.constraint_name=col.constraint_name and con.constraint_type='P'
+		         and col.table_name= upper('${tableName}')
+		  ) t
+		  on utc.column_name = t.column_name
+		 where table_name = upper('${tableName}')
+	</select>
+	
+	<!-- 增加字段 -->
+	<update id="addTableField" parameterType="java.util.Map">
+		
+		<foreach collection="tableMap" index="key" item="fields" separator=";">
+			declare
+			    columnExistedCount number:= 0 ;
+			begin
+			    select count(1)
+			      into columnExistedCount
+			      from user_tab_columns t
+			     where t.table_name = upper('${key}')
+			       and t.column_name = upper('${fields.col_code}');
+			     
+			    if columnExistedCount = 0 then  
+			      execute immediate 'alter table ${key} add <include refid="commonSql"></include>';
+			      execute immediate 'comment on column ${key}.${fields.col_code} is ''${fields.col_name}''';
+			    end if;
+			    
+			    <!-- if columnExistedCount > 0 then  
+			      execute immediate 'alter table ${key} drop column ${fields.col_code}';
+			      execute immediate 'alter table ${key} add <include refid="commonSql"></include>';
+			      execute immediate 'comment on column ${key}.${fields.col_code} is ''${fields.col_name}''';
+			    end if; -->
+			END ;
+		</foreach>
+		
+	</update>
+	
+	<!-- 删除字段 -->
+	<delete id="removeTableField" parameterType="java.util.Map">
+		<foreach collection="tableMap" index="key" item="field" separator=";">
+			declare
+			  num number;
+			begin
+			  select count(1)
+			    into num
+			    from cols
+			   where table_name = upper('${key}')
+			     and column_name = upper('${field}');
+			  if num > 0 then
+			      execute immediate 'alter table ${key} drop column ${field}';
+			  end if;
+			end;
+		</foreach>
+	</delete>
+	
+	<!-- 修改字段 -->
+	<update id="modifyTableField" parameterType="java.util.Map">
+	
+		<foreach collection="tableMap" index="key" item="fields" separator=";">
+			declare
+			    columnExistedCount number:= 0 ;
+			begin
+			    select count(1)
+			      into columnExistedCount
+			      from user_tab_columns t
+			     where t.table_name = upper('${key}')
+			       and t.column_name = upper('${fields.col_code}');
+			     
+			    <!-- if columnExistedCount = 0 then  
+			      execute immediate 'alter table ${key} add <include refid="commonSql"></include>';
+			      execute immediate 'comment on column ${key}.${fields.col_code} is ''${fields.col_name}''';
+			    end if; -->
+			    
+			    if columnExistedCount > 0 then  
+			      execute immediate 'alter table ${key} modify <include refid="commonSql"></include>';
+			      execute immediate 'comment on column ${key}.${fields.col_code} is ''${fields.col_name}''';
+			    end if;
+			END ;
+		</foreach>
+		
+	</update>
+	
+	
+	<!-- 删除主键字段 -->
+	<delete id="dropKeyTableField" parameterType="java.lang.String">
+	
+			declare 
+				num number(4);
+			begin 
+		      select count(1) into  num from user_constraints t
+		      where t.table_name = upper('${tab_code}')
+		        and t.constraint_type = 'P';
+		      if num > 0   then 
+		          execute immediate 'alter table ${tab_code} drop constraint PK_${tab_code} cascade'; 
+		      end if;
+			end; 
+		
+	</delete>
+	
+	<select id="findTableDateCountByTableName" parameterType="java.lang.String" resultType="int">
+	   select count(0) from ${tableName}
+	</select>
+</mapper>

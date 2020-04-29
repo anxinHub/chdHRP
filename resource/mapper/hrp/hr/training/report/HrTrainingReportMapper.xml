@@ -1,0 +1,415 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.hr.dao.training.report.HrTrainReportMapper">
+
+<select id="queryTrainSignReport" resultType="java.util.Map" parameterType="java.util.Map">
+select plan.plan_id,plan.train_title,nvl(htso."0",0) s0,nvl(htso."1",0) s1,nvl(htso."2",0) s2,nvl(htso."3",0) s3,nvl(htso."4",0) s4, nvl(ht.emcount,0) emcount,dept.dept_id,dept.dept_name,htclass.train_date,htclass.time_begin,htclass.time_end 
+from (
+       select * from(
+               select plan_id,count(emp_id) ec,
+               nvl(sign_case,0) sign_case from  HR_TRAIN_SIGN_IN hts 
+               where group_id=#{group_id} and hos_id=#{hos_id}   
+                group by plan_id,sign_case
+         )
+        PIVOT ( SUM(ec) FOR  sign_case IN (0,1,2,3,4))
+      ) htso 
+    inner join HR_TRAIN_PLAN plan on plan.plan_id=htso.plan_id 
+    inner join (select count(emp_id) emcount,plan_id  from hr_train_object group by plan_id) ht on plan.plan_id=ht.plan_id
+    inner join HOS_DEPT dept on plan.group_id=dept.group_id and plan.hos_id=dept.hos_id and plan.dept_id=dept.dept_id
+    inner join HR_TRAIN_CLASS htclass on plan.group_id=htclass.group_id and plan.hos_id=htclass.hos_id and plan.plan_id=htclass.plan_id
+     <where>
+			<if test="train_title != null and train_title != ''">
+				and plan.train_title like '%${train_title}%'
+			</if>
+			<if test="dept_id != null and dept_id != ''">
+				and dept.dept_id= #{dept_id}
+			</if>
+			<if test="train_time != null and train_time != ''">
+				and  to_char(htclass.train_date,'yyyy-mm') = #{train_time}
+			</if>
+	</where>
+    order by htclass.train_date,dept.dept_id
+
+	</select>
+	<select id="queryExaminReport" resultType="java.util.Map"
+		parameterType="java.util.Map">
+		    
+  	 select htso.*,her.*,plan.train_title, nvl(htso."1", 0) as e1, nvl(htso."2", 0) as e2, nvl(ht.emcount,0) emcount,dept.dept_id,dept.dept_name,htclass.train_date,htclass.time_begin,htclass.time_end from (
+          select * from (         
+            select plan_id,count(emp_id) ec, nvl(IS_PASS,0) IS_PASS from HR_EXAM_RESULT
+            where  group_id=#{group_id} and hos_id=#{hos_id}
+            group by plan_id,IS_PASS )
+            PIVOT ( SUM(ec) FOR  IS_PASS IN (1,2)) htso2
+         ) htso 
+        inner join (
+          select plan_id,max(score) maxscore,min(score) minsocre ,avg(score) avgsocre from HR_EXAM_RESULT group by plan_id
+        ) her on htso.plan_id=her.plan_id
+        inner join HR_TRAIN_PLAN plan on plan.plan_id=htso.plan_id 
+        inner join (select count(emp_id) emcount,plan_id  from hr_train_object group by plan_id) ht on plan.plan_id=ht.plan_id
+        inner join HOS_DEPT dept on plan.group_id=dept.group_id and plan.hos_id=dept.hos_id and plan.dept_id=dept.dept_id
+        inner join HR_TRAIN_CLASS htclass on plan.group_id=htclass.group_id and plan.hos_id=htclass.hos_id and plan.plan_id=htclass.plan_id
+    <where>
+			<if test="train_title != null and train_title != ''">
+				and plan.train_title like '%${train_title}%'
+			</if>
+			<if test="dept_id != null and dept_id != ''">
+				and dept.dept_id= #{dept_id}
+			</if>
+			<if test="train_time != null and train_time != ''">
+				and  to_char(htclass.train_date,'yyyy-mm') = #{train_time}
+			</if>
+	</where>
+    order by dept.dept_id,htclass.train_date
+    
+	</select>
+	<select id="queryBukaoreport" resultType="java.util.Map" parameterType="java.util.Map">
+
+		  select htso.*,her.*,plan.train_title,nvl(htso."1", 0) as e1, nvl(htso."2", 0) as e2,   nvl(here.bkempcount, 0) emcount,dept.dept_id,dept.dept_name,htclass.train_date,htclass.time_begin,htclass.time_end from (
+          select * from (         
+            select plan_id,count(emp_id) ec, nvl(IS_PASS,0) IS_PASS from HR_BUKAO_EMP
+            where  group_id=#{group_id} and hos_id=#{hos_id} 
+            group by plan_id,IS_PASS )
+            PIVOT ( SUM(ec) FOR  IS_PASS IN (1,2)) htso2
+         ) htso 
+        inner join (
+          select plan_id,max(score) maxscore,min(score) minsocre ,avg(score) avgsocre from HR_BUKAO_EMP group by plan_id
+        ) her on htso.plan_id=her.plan_id
+        
+        inner join HR_TRAIN_PLAN plan on plan.plan_id=htso.plan_id 
+        inner join (select count(emp_id) emcount,plan_id  from hr_train_object group by plan_id) ht on plan.plan_id=ht.plan_id
+         inner join(select count(emp_id) bkempcount , plan_id from  HR_EXAM_RESULT where is_pass=2  group by plan_id) here
+    on plan.plan_id=here.plan_id
+        inner join HOS_DEPT dept on plan.group_id=dept.group_id and plan.hos_id=dept.hos_id and plan.dept_id=dept.dept_id
+        inner join HR_TRAIN_CLASS htclass on plan.group_id=htclass.group_id and plan.hos_id=htclass.hos_id and plan.plan_id=htclass.plan_id
+        <where>
+			<if test="train_title != null and train_title != ''">
+				and plan.train_title like '%${train_title}%'
+			</if>
+			<if test="dept_id != null and dept_id != ''">
+				and dept.dept_id= #{dept_id}
+			</if>
+			<if test="train_time != null and train_time != ''">
+				and  to_char(htclass.train_date,'yyyy-mm') = #{train_time}
+			</if>
+	</where>
+	order by dept.dept_id,htclass.train_date
+	</select>
+		<select id="queryTrainByPerson" resultType="java.util.Map"
+		parameterType="java.util.Map">
+
+		select obj.emp_id, plan.plan_id, plan.train_title,case when plan.is_cert ='0' then '否' when plan.is_cert ='1' then '是' else '否'
+	end as is_cert_name,htc.train_date as htctrain_date, htc.train_site
+	, htc.teacher, htc.train_date, case when her.is_pass = '2' then hbe.score else her.score
+  end as score
+	, case 
+		when her.is_pass = '1' then '是'
+		when hbe.is_pass = '1'  then  '是'
+      else '否'
+	end as is_pass_name ,case 
+		when her.is_pass = '1' then plan.credit_hour
+		when hbe.is_pass = '1'  then plan.credit_hour
+      else 0
+	end as xuefen,htec.cert_path,htec.cert_code
+from HR_TRAIN_OBJECT obj
+inner join HR_TRAIN_PLAN plan on obj.group_id = plan.group_id
+and obj.hos_id = plan.hos_id
+and plan.plan_id = obj.plan_id 
+inner join HR_TRAIN_CLASS htc on obj.group_id = htc.group_id
+and obj.hos_id = htc.hos_id
+and htc.plan_id = obj.plan_id 
+  left join HR_EXAM_RESULT her on obj.group_id = her.group_id
+and obj.hos_id = her.hos_id
+and her.plan_id = obj.plan_id
+and obj.emp_id = her.emp_id 
+left join hr_bukao_emp hbe on hbe.group_id = her.group_id
+and hbe.hos_id = her.hos_id
+and her.plan_id = hbe.plan_id
+and hbe.emp_id = her.emp_id 
+left join HR_TRAIN_EMP_CERT htec on obj.group_id = htec.group_id
+and obj.hos_id = htec.hos_id
+and htec.plan_id = obj.plan_id
+and obj.emp_id = htec.emp_id 
+		<where>
+			<if test="group_id != null and group_id != ''">
+				AND  obj.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND  obj.hos_id = #{hos_id}
+			</if>
+			<if test="emp_id != null and emp_id != ''">
+				AND obj.emp_id = #{emp_id}
+			</if>
+			 <if test="year != null and year != ''">
+				AND to_char(htc.train_date,'yyyy') = #{year}
+			</if>
+
+		</where>
+		order by htc.train_date
+	</select>
+	
+	
+	<select id="queryTrainAllReport" resultType="java.util.Map" parameterType="java.util.Map">
+ 		select dept.dept_name,htp.dept_id,htp.dept_no,htp.TRAIN_OBJECT,htc.train_date,htc.train_site,htc.teacher,htc.train_content,nvl(htsc."1",0) s1,nvl(htsc."2",0) s2,nvl(htsc."3",0) s3,nvl(htsc."4",0) s4,htsc.plan_id,nvl(hte."1",0) e1,nvl(hte."2",0) e2,nvl(hte."0",0) e0,nvl(hte."HIGHEST_SCORE",0) highest_score,nvl(hte."LOWEST_SCORE",0) lowest_score,nvl(hte."AVE_SCORE",0) ave_score  , nvl(hte."EMP", 0) as emp,nvl(hb.emp_num,0) emp_num,nvl(htb."1",0) b1,nvl(htb."2",0) b2,nvl(htb."0",0) b0,nvl(htb."HIGHEST_SCORE",0) bhighest_score,nvl(htb."LOWEST_SCORE",0) blowest_score,nvl(htb."AVE_SCORE",0) bave_score,
+          (
+                 select count(emp_id) from HR_TRAIN_OBJECT 
+              where group_id=#{group_id} and  hos_id=#{hos_id} and  plan_id=#{plan_id}
+          ) as emp_count
+     from HR_TRAIN_PLAN htp  
+    inner join HR_TRAIN_CLASS htc on htp.group_id=htc.group_id and htp.hos_id=htc.hos_id and htp.plan_id=htc.plan_id 
+    left join  Hos_Dept dept on htp.dept_id=dept.dept_id
+    
+    left join(
+      select * from(
+      select plan_id,count(emp_id) ec,sign_case from Hr_Train_Sign_In where plan_id=#{plan_id} group by plan_id,sign_case) 
+      PIVOT ( SUM(ec) FOR  sign_case IN (1,2,3,4))
+    )htsc on htp.plan_id=htsc.plan_id
+    
+    left join(
+  		 select * from(
+         select * from(
+                 select plan_id as pid,count(emp_id) emp, max(SCORE) as HIGHEST_SCORE, min(SCORE) as LOWEST_SCORE , avg(SCORE) as AVE_SCORE   from HR_EXAM_RESULT 
+                  where plan_id =  #{plan_id} group by plan_id
+         ) her1 left join ( 
+                select * from (
+                  select plan_id, count(emp_id) as ec
+                    , nvl(IS_PASS, 0) as IS_PASS
+                   
+                  from HR_EXAM_RESULT
+                  where plan_id = #{plan_id}
+                  group by plan_id, IS_PASS
+                )
+                pivot (sum(ec) for IS_PASS in (0,1, 2))
+    ) her2 
+    
+    on her1.pid=her2.plan_id
+    
+    ) 
+    ) hte on htp.plan_id=hte.plan_id
+    
+    left join HR_BUKAO hb on htp.group_id=hb.group_id and htp.hos_id=hb.hos_id and htp.plan_id=hb.plan_id
+    
+     left join(
+   		select * from(
+         select * from(
+                 select plan_id, max(SCORE) as HIGHEST_SCORE, min(SCORE) as LOWEST_SCORE , avg(SCORE) as AVE_SCORE   from HR_BUKAO_EMP 
+                  where plan_id =  #{plan_id} group by plan_id
+         ) hbm1 left join ( 
+                select * from (
+                  select plan_id, count(emp_id) as ec
+                    , nvl(IS_PASS, 0) as IS_PASS
+                   
+                  from HR_BUKAO_EMP
+                  where plan_id =  #{plan_id}
+                  group by plan_id, IS_PASS
+                )
+                pivot (sum(ec) for IS_PASS in (0,1, 2))
+    ) htb1 
+    
+    on hbm1.plan_id=htb1.plan_id
+    
+    )
+    ) htb on htp.plan_id=hte.plan_id
+    
+    where htp.group_id=#{group_id} and htp.hos_id=#{hos_id} and htp.plan_id=#{plan_id}
+	
+	</select>
+	 
+	 <select id="queryReportEvaluateById" resultType="java.util.Map" parameterType="java.util.Map">
+
+	SELECT 
+		group_id,
+		hos_id,
+		train_date
+		FROM HR_TRAIN_EVALUATE 
+		where
+		
+				 group_id = #{group_id}
+				AND hos_id = #{hos_id}
+		
+			AND plan_id = #{plan_id}
+			
+			</select>
+	 
+	<insert id="add" useGeneratedKeys="true">
+
+		INSERT INTO HR_TRAIN_EVALUATE (
+		<trim suffix="" suffixOverrides=",">
+				group_id
+				,
+				hos_id
+				,
+				plan_id,
+				 dept_id,
+               	   dept_no,
+                   train_object,
+                   train_date,
+                   train_site,
+                   teacher,
+                   emp_num,
+                   train_content,
+                   
+                   
+                   sign_plan_num,
+                   in_late_num,
+                   sign_fact_num,
+                   out_early_num,
+                   absent_num,
+                   sign_rate,
+                   
+                   
+                   exam_plan_num,
+                   highest_score,
+                   exam_fact_num,
+                   lowest_score,
+                   exam_rate,
+                   ave_score,
+                   pass_num,
+                   pass_rate,
+                   
+                   exam_plan_num2,
+                   highest_score2,
+                   exam_fact_num2 ,
+                   lowest_score2,
+                   exam_rate2,
+                   ave_score2,
+                   pass_num2,
+                   pass_rate2,
+                   
+                   else_note,
+		</trim>
+		) VALUES (
+		<trim suffix="" suffixOverrides=",">
+			<if test="group_id != null and group_id != ''">
+				#{group_id,jdbcType=INTEGER}
+				,
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				#{hos_id,jdbcType=INTEGER}
+				,
+			</if>
+			#{plan_id,jdbcType=INTEGER},
+			#{ dept_id,jdbcType=INTEGER},
+               	   #{dept_no,jdbcType=INTEGER},
+                  #{ train_object,jdbcType=VARCHAR},
+                 TO_DATE( #{ train_date},'yyyy-mm-dd'),
+                  #{ train_site,jdbcType=VARCHAR},
+                  #{ teacher,jdbcType=INTEGER},
+                   #{emp_num,jdbcType=INTEGER},
+                   #{train_content,jdbcType=VARCHAR},
+                   
+                   
+                  #{ sign_plan_num,jdbcType=INTEGER},
+                  #{ in_late_num,jdbcType=INTEGER},
+                  #{ sign_fact_num,jdbcType=INTEGER},
+                   #{out_early_num,jdbcType=INTEGER},
+                   #{absent_num,jdbcType=INTEGER},
+                  #{ sign_rate,jdbcType=INTEGER},
+                   
+                   
+                  #{ exam_plan_num,jdbcType=INTEGER},
+                  #{ highest_score,jdbcType=INTEGER},
+                  #{ exam_fact_num,jdbcType=INTEGER},
+                  #{ lowest_score,jdbcType=INTEGER},
+                  #{ exam_rate,jdbcType=INTEGER},
+                  #{ ave_score,jdbcType=INTEGER},
+                   #{pass_num,jdbcType=INTEGER},
+                  #{ pass_rate,jdbcType=INTEGER},
+                   
+                   #{exam_plan_num2,jdbcType=INTEGER},
+                  #{ highest_score2,jdbcType=INTEGER},
+                  #{ exam_fact_num2 ,jdbcType=INTEGER},
+                  #{ lowest_score2,jdbcType=INTEGER},
+                  #{ exam_rate2,jdbcType=INTEGER},
+                   #{ave_score2,jdbcType=INTEGER},
+                  #{ pass_num2,jdbcType=INTEGER},
+                  #{ pass_rate2,jdbcType=INTEGER},
+                   
+                   #{else_note,jdbcType=VARCHAR}
+		</trim>
+		)
+
+	</insert>
+	 <update id="update" parameterType="java.util.Map">
+
+		UPDATE HR_TRAIN_EVALUATE
+		<trim prefix="SET" suffixOverrides=",">
+			dept_id=#{ dept_id,jdbcType=INTEGER},
+               	 dept_no=  #{dept_no,jdbcType=INTEGER},
+                  train_object=#{ train_object,jdbcType=VARCHAR},
+                 train_date=   TO_DATE( #{ train_date},'yyyy-mm-dd'),
+                 train_site= #{ train_site,jdbcType=VARCHAR},
+                  teacher=#{ teacher,jdbcType=INTEGER},
+                  emp_num= #{emp_num,jdbcType=INTEGER},
+                   train_content=#{train_content,jdbcType=VARCHAR},
+                   
+                   
+                sign_plan_num=  #{ sign_plan_num,jdbcType=INTEGER},
+                  in_late_num=#{ in_late_num,jdbcType=INTEGER},
+                 sign_fact_num= #{ sign_fact_num,jdbcType=INTEGER},
+                   out_early_num=#{out_early_num,jdbcType=INTEGER},
+                 absent_num=  #{absent_num,jdbcType=INTEGER},
+                 sign_rate= #{ sign_rate,jdbcType=INTEGER},
+                   
+                   
+                 exam_plan_num= #{ exam_plan_num,jdbcType=INTEGER},
+                  highest_score=#{ highest_score,jdbcType=INTEGER},
+                  exam_fact_num=#{ exam_fact_num,jdbcType=INTEGER},
+                 lowest_score= #{ lowest_score,jdbcType=INTEGER},
+                  exam_rate=#{ exam_rate,jdbcType=INTEGER},
+                 ave_score= #{ ave_score,jdbcType=INTEGER},
+                   pass_num=#{pass_num,jdbcType=INTEGER},
+                  pass_rate=#{ pass_rate,jdbcType=INTEGER},
+                   
+                  exam_plan_num2= #{exam_plan_num2,jdbcType=INTEGER},
+                highest_score2=  #{ highest_score2,jdbcType=INTEGER},
+                 exam_fact_num2= #{ exam_fact_num2 ,jdbcType=INTEGER},
+                 lowest_score2= #{ lowest_score2,jdbcType=INTEGER},
+                 exam_rate2= #{ exam_rate2,jdbcType=INTEGER},
+                   ave_score2=#{ave_score2,jdbcType=INTEGER},
+                 pass_num2= #{ pass_num2,jdbcType=INTEGER},
+                pass_rate2=  #{ pass_rate2,jdbcType=INTEGER},
+                   
+                  else_note= #{else_note,jdbcType=VARCHAR}
+		</trim>
+		<where>
+			
+				AND group_id = #{group_id,jdbcType=INTEGER}
+			
+				AND hos_id = #{hos_id,jdbcType=INTEGER}
+		
+				AND plan_id = #{plan_id,jdbcType=INTEGER}
+		
+
+		</where>
+	</update>
+	 
+	 <select id="queryReportEvaluateTable" resultType="java.util.Map" parameterType="java.util.Map">
+select hte.group_id, hte.hos_id, hte.plan_id, hte.dept_id, hd.dept_name
+  , hte.dept_no, hte.train_object, hte.train_date, hte.train_site, hte.teacher
+  , hte.emp_num, hte.train_content, nvl(hte.sign_plan_num,0) sign_plan_num,nvl( hte.in_late_num,0) in_late_num, nvl(hte.sign_fact_num,0) sign_fact_num
+  , nvl(hte.out_early_num,0)out_early_num, nvl(hte.absent_num,0) absent_num, hte.sign_rate, nvl(hte.exam_plan_num,0) exam_plan_num, nvl(hte.highest_score,0) highest_score
+  , nvl(hte.exam_fact_num,0) exam_fact_num, nvl(hte.lowest_score,0) lowest_score,nvl( hte.exam_rate,0) exam_rate, nvl(hte.ave_score,0) ave_score, nvl(hte.pass_num,0) pass_num
+  , hte.pass_rate, nvl(hte.exam_plan_num2,0) exam_plan_num2, nvl(hte.highest_score2,0)highest_score2, nvl(hte.exam_fact_num2,0) exam_fact_num2, nvl(hte.lowest_score2,0) lowest_score2
+  , hte.exam_rate2, nvl(hte.ave_score2,0)ave_score2, nvl(hte.pass_num2,0) pass_num2, hte.pass_rate2, hte.else_note
+                    from HR_TRAIN_EVALUATE hte left join hos_dept_dict hd on 
+                     hte.dept_id=hd.dept_id and hte.dept_no=hd.dept_no and hte.group_id=hd.group_id and hte.hos_id=hd.hos_id
+                    and hd.is_stop=0 and hd.is_disable=0
+                    where hte.group_id=#{group_id} and hte.hos_id=#{hos_id} and hte.plan_id=#{plan_id}	
+	 
+	 </select>
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 
+	 <select id="queryUser" resultType="java.util.Map" parameterType="java.util.Map">
+	select he.emp_id,he.emp_code,he.emp_name,hd.dept_name,hk.kind_name from hos_emp he left join hos_dept hd  on he.dept_id=hd.dept_id and he.group_id=hd.group_id
+and he.hos_id=hd.hos_id left join hos_emp_kind hk on he.kind_code=hk.kind_code and he.group_id=hk.group_id and he.hos_id=hk.hos_id
+ where he.group_id=#{group_id} and he.hos_id=#{hos_id} and he.emp_id=#{emp_code}	 
+	 
+	 </select>
+</mapper>
+

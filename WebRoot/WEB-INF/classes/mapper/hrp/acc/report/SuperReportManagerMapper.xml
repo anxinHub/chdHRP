@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.acc.dao.report.SuperReportManagerMapper">
+
+	<!-- 报表管理页面  -->
+	<!-- 报表管理页面，查询报表的所有实例 -->
+	<select id="querySuperReportInstanceList" parameterType="java.util.Map" resultType="com.chd.hrp.acc.entity.report.RepInstance">
+	
+		select i.acc_year,i.acc_month,i.report_code,d.report_name,i.mod_code,
+		case i.acc_month when '00' then '' when '14' then '第一季度' when '15' then '第二季度' when '16' then '第三季度' when '17' then '第四季度' when '18' then '上半年' when '19' then '下半年' else acc_month end acc_month_name,
+		case d.report_type when 1 then '1 普通报表' when 2 then '2 月报' when 3 then '3 季报' when 4 then '4 半年报' when 5 then '5 年报' end report_type_name,
+		d.report_type,u.user_name,i.create_date
+		from REP_INSTANCE i 
+		inner join REP_DEFINE d on d.report_code=i.report_code and d.group_id=i.group_id and d.hos_id=i.hos_id and d.copy_code=i.copy_code and d.mod_code=i.mod_code
+   		inner join sys_user u on i.user_id=u.user_id and i.group_id=u.group_id and i.hos_id=u.hos_id
+		where i.report_code=#{report_code} and  i.group_id = #{group_id} and i.hos_id = #{hos_id} and i.copy_code = #{copy_code}  and i.mod_code=#{mod_code}
+		<if test="acc_year != null and acc_year != ''">
+			and i.acc_year=#{acc_year}
+		</if>
+		order by i.acc_year desc,i.acc_month desc
+	</select>
+	
+	<!-- 报表管理页面，删除报表实例 -->
+	<delete id="deleteBatchSuperReportInstance" parameterType="java.util.List">
+		DELETE FROM REP_INSTANCE 
+		WHERE report_code=#{report_code} and group_id=#{group_id} and hos_id=#{hos_id} 
+		and copy_code=#{copy_code} and mod_code=#{mod_code} and
+		<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+			acc_year = #{item.acc_year} and acc_month = #{item.acc_month}
+		</foreach>
+	</delete>
+	
+	
+	<!-- 报表字典页面  -->
+	<!-- 报表字典页面，查询所有报表字典 -->
+	<select id="querySuperReportDictList" parameterType="java.util.Map" resultType="com.chd.hrp.acc.entity.report.RepDefineDict">
+		select d.dict_code,d.dict_name,d.mod_code,m.mod_name,d.is_sys,d.is_stop,
+		case d.is_sys when 1 then '是' else '否' end is_sys_name,
+		case d.is_stop when 1 then '是' else '否' end is_stop_name
+		from REP_DEFINE_DICT d
+		inner join sys_mod m on d.mod_code=m.mod_code
+		where d.group_id=#{group_id} and d.hos_id=#{hos_id} and d.copy_code=#{copy_code} 
+		<if test="mod_code != null and mod_code != ''">
+			and d.mod_code=#{mod_code}
+		</if>
+		order by d.sort_code,d.dict_code
+	</select>
+	
+	<!--报表字典页面，添加报表字典  -->
+	<insert id="insertSuperReportDict" parameterType="java.util.Map" >
+		insert into REP_DEFINE_DICT(dict_code,group_id,hos_id,copy_code,mod_code,dict_name,dict_sql,dict_check_sql,is_sys,is_stop,sort_code,note)
+		values(#{dict_code},#{group_id},#{hos_id},#{copy_code},#{mod_code},#{dict_name},#{dict_sql},#{dict_check_sql},0,#{is_stop},#{sort_code},#{note})
+	</insert>
+	
+	<!-- -报表字典页面，修改报表字典-->
+	<update id="updateSuperReport" parameterType="java.util.Map" >
+		update REP_DEFINE_DICT set dict_name=#{dict_name},
+		dict_sql=#{dict_sql},
+		dict_check_sql=#{dict_check_sql},
+		is_stop=#{is_stop},
+		sort_code=#{sort_code},
+		note=#{note},
+		mod_code=#{mod_code}
+		where  group_id = #{group_id} and hos_id = #{hos_id} 
+		and copy_code = #{copy_code}  and dict_code=#{dict_code}
+	</update>
+	
+	<!-- 报表字典页面，删除报表字典检查字典是否被使用 -->
+	<select id="querySuperReportDictByUse" parameterType="java.util.List" resultType="String">
+		select p.dict_code 
+		from rep_define_para p
+		where p.group_id=#{group_id} and p.hos_id=#{hos_id} and p.copy_code=#{copy_code} and 
+		<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+			dict_code=#{item}
+		</foreach>
+	</select>
+	
+	<!-- 报表字典页面，删除报表字典 -->
+	<delete id="deleteBatchSuperReportDict" parameterType="java.util.List">
+		DELETE FROM REP_DEFINE_DICT 
+		WHERE group_id=#{group_id} and hos_id=#{hos_id} and copy_code=#{copy_code}  and
+		<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+			dict_code=#{item}
+		</foreach>
+	</delete>
+	
+	
+	<!-- 报表字典页面，根据字典编码查询报表字典 -->
+	<select id="querySuperReportDictByCode" parameterType="java.util.Map" resultType="com.chd.hrp.acc.entity.report.RepDefineDict">
+		select d.dict_code,d.dict_name,d.mod_code,d.is_sys,d.is_stop,d.dict_sql,d.dict_check_sql,d.sort_code,d.note 
+		from REP_DEFINE_DICT d
+		where d.group_id=#{group_id} and d.hos_id=#{hos_id} and d.copy_code=#{copy_code} 
+		and d.dict_code=#{dict_code}
+	</select>
+	
+	<!--报表字典页面，验证字典SQL  -->
+	<select id="querySuperReportDictSqlValidate" parameterType="java.util.Map" resultType="java.util.Map">
+		${dict_sql}
+	</select>
+	
+	
+	<!-- 报表元素页面 -->
+	<!-- 查询报表元素SQL -->
+	<select id="querySuperReportEleSql" parameterType="String" resultType="String">
+		select ele_sql from REP_DEFINE_ELE 
+		where group_id=#{group_id} and hos_id=#{hos_id} and copy_code=#{copy_code} and ele_code=#{ele_code}
+	</select>
+	
+	<!--报表元素页面，添加报表元素  -->
+	<insert id="insertSuperReportEle" parameterType="java.util.Map" >
+		insert  into rep_define_ele(GROUP_ID,HOS_ID,COPY_CODE,MOD_CODE, ELE_CODE, ELE_NAME, ELE_GROUP, ELE_TYPE, SORT_CODE, IS_STOP, IS_SYS,ele_sql,NOTE)
+		values(#{group_id},#{hos_id},#{copy_code},#{mod_code}, #{ele_code}, #{ele_name}, #{ele_group}, #{ele_type}, #{sort_code}, #{is_stop},#{is_sys},#{ele_sql},#{note})
+	</insert>
+	
+	<!--报表元素页面，添加报表元素参数  -->
+	<insert id="insertSuperReportElePara" parameterType="java.util.List" >
+		insert  into rep_define_para(GROUP_ID,HOS_ID,COPY_CODE,ELE_CODE, PARA_CODE, PARA_NAME, PARA_TYPE, PARA_JSON, DICT_CODE, SORT_CODE,is_stop)
+		<foreach collection="list" item="item" index="index" separator=" union all ">
+			select
+				#{item.group_id,jdbcType=NUMERIC},#{item.hos_id,jdbcType=NUMERIC},#{item.copy_code,jdbcType=VARCHAR},#{item.ele_code,jdbcType=VARCHAR},#{item.para_code,jdbcType=VARCHAR},
+				#{item.para_name,jdbcType=VARCHAR},#{item.para_type,jdbcType=VARCHAR},#{item.para_json,jdbcType=VARCHAR},#{item.dict_code,jdbcType=VARCHAR},#{item.sort_code,jdbcType=VARCHAR},#{item.is_stop,jdbcType=VARCHAR}
+			from dual
+		</foreach>
+	</insert>
+
+
+	<!--报表元素页面，删除报表元素  -->
+	<delete id="deleteSuperReportEle" parameterType="java.util.List">
+		DELETE FROM rep_define_ele WHERE group_id=#{group_id} and hos_id=#{hos_id} and copy_code=#{copy_code} and ele_code=#{ele_code}
+	</delete>
+	
+	<!--报表元素页面，删除报表元素参数  -->
+	<delete id="deleteSuperReportElePara" parameterType="java.util.List">
+		DELETE FROM rep_define_para WHERE group_id=#{group_id} and hos_id=#{hos_id} and copy_code=#{copy_code} and ele_code=#{ele_code}
+	</delete>
+
+	
+	<!--报表元素页面，修改报表元素  -->
+	<update id="updateSuperReportEle" parameterType="java.util.Map" >
+		update rep_define_ele set 
+		ele_name=#{ele_name},
+		ele_group=#{ele_group},
+		ele_type=#{ele_type},
+		sort_code=#{sort_code},
+		is_stop=#{is_stop},
+        ele_sql = #{ele_sql},  
+		note=#{note},mod_code=#{mod_code}
+		where group_id=#{group_id} and hos_id=#{hos_id} and copy_code=#{copy_code} and ele_code=#{ele_code}
+	</update>
+	
+	<!--重新加载系统存储过程并修改内置数据对应大数据对象  -->
+	<update id="updateSuperReportEleSql" parameterType="java.util.Map" >
+		update rep_define_ele set 
+        ele_sql = #{ele_sql}
+		where group_id=#{group_id} and hos_id=#{hos_id} and copy_code=#{copy_code} and ele_code=#{ele_code}
+	</update>
+	
+	<!--重新加载系统存储过程并修改内置数据对应大数据对象  -->
+	<update id="updateSuperReportDsSql" parameterType="java.util.Map" >
+		update rep_dataset set 
+        	sqlcontent = #{ele_sql} 
+		where group_id=#{group_id} and hos_id=#{hos_id} and copy_code=#{copy_code} and ds_code=#{ele_code}
+	</update>
+	
+	<!-- 根据报表元素删除存储过程函数视图 -->
+	<select id="deleteSuperVouchByProcFunView" statementType="CALLABLE" parameterType="java.util.Map">
+		<![CDATA[
+		{call rep_proc_fun_view_del(
+	        #{ele_code},#{ele_type}
+		)}
+		]]>
+	</select>
+		<select id="getReportQuery" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from REP_REPORT_QUERY 
+		where group_id=#{group_id} and hos_id=#{hos_id} and copy_code=#{copy_code} 
+		and rep_code=#{rep_code}
+	</select>
+</mapper>
+

@@ -1,0 +1,552 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.mat.dao.storage.maintain.MatMaintainMapper">
+
+	 
+	<resultMap id="matMaintainDetail" type="java.util.Map"> 
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="mt_detail_id" column="mt_detail_id"/>
+		<result property="mt_detail_id" column="mt_detail_id"/>
+		<result property="mt_id" column="mt_id"/>
+		<result property="mt_no" column="mt_no"/>
+		<result property="pack_code" column="pack_code"/>
+		<result property="inv_id" column="inv_id"/>
+		<result property="inv_no" column="inv_no"/>
+		<result property="inv_code" column="inv_code"/>
+		<result property="inv_name" column="inv_name"/>
+		<result property="inv_model" column="inv_model"/>
+		<result property="fac_name" column="fac_name"/>
+		<result property="unit_name" column="unit_name"/>
+		<result property="batch_no" column="batch_no"/>
+		<result property="store_inva_date" column="store_inva_date"/>
+		<result property="mt_inva_date" column="mt_inva_date"/>
+		<result property="disinfect_date" column="disinfect_date"/>
+		<result property="store_amount" column="store_amount"/>
+		<result property="mt_amount" column="mt_amount"/>
+		<result property="pkg_quality" column="pkg_quality"/>
+		<result property="app_quality" column="app_quality"/>
+		<result property="mt_quality" column="mt_quality"/>
+		<result property="cold_quality" column="cold_quality"/>
+		<result property="location_id" column="location_id"/>
+		<result property="location_name" column="location_name"/>
+		<result property="cert_id" column="cert_id"/>
+		<result property="suggestion" column="suggestion"/>
+		<result property="remark" column="remark"/>
+		<result property="cert_code" column="cert_code"/>
+	</resultMap>
+	<resultMap type="java.util.Map" id="matMaintainMain">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="mt_id" column="mt_id"/>
+		<result property="mt_no" column="mt_no"/>
+		<result property="store_id" column="store_id"/>
+		<result property="store_no" column="store_no"/>
+		<result property="store_name" column="store_name"/>
+		<result property="mat_type_id" column="mat_type_id"/>
+		<result property="mat_type_no" column="mat_type_no"/>
+		<result property="mat_type_code" column="mat_type_code"/>
+		<result property="mat_type_name" column="mat_type_name"/>
+		<result property="maker" column="maker"/>
+		<result property="maker_name" column="maker_name"/>
+		<result property="make_date" column="make_date"/>
+		<result property="brief" column="brief"/>
+	</resultMap>
+	
+	<insert id="addMatMaintainMainAndDetailByStoreAndMatType" parameterType="java.util.Map">
+ 		 insert into mat_maintain_detail
+		   (group_id,hos_id,copy_code, mt_id,mt_no,mt_detail_id,inv_id,inv_no,
+		    batch_no,location_id,store_inva_date,mt_inva_date,store_amount, 
+		    mt_amount,pkg_quality,app_quality, mt_quality,cold_quality,suggestion,remark)
+		 select 
+		 	group_id,hos_id,copy_code, mt_id,mt_no,
+		 	mat_maintain_detail_seq.nextval as mt_detail_id,inv_id,
+		 	inv_no,batch_no,location_id,store_inva_date,mt_inva_date,
+		 	store_amount, mt_amount,pkg_quality,app_quality, mt_quality,cold_quality,
+		 	suggestion,remark
+		 from  (
+	     	select mfb.group_id, mfb.hos_id,to_char(mfb.copy_code) as copy_code,
+		        #{mt_id,jdbcType=INTEGER} mt_id,#{mt_no,jdbcType=INTEGER} mt_no,
+		        mid.inv_id,mid.inv_no,mfb.batch_no,msi.location_id,
+		        t_date.inva_date as store_inva_date,t_date.inva_date as mt_inva_date,
+		        sum(mfb.left_amount) as store_amount,sum(mfb.left_amount) as mt_amount,
+		        1 as pkg_quality,1 as app_quality,1 as mt_quality,1 as cold_quality,'' as suggestion,'' as remark 
+		        from mat_fifo_balance mfb
+		        left join mat_inv_dict mid
+		          on mfb.group_id = mid.group_id
+		         and mfb.hos_id = mid.hos_id
+		         and mfb.copy_code = mid.copy_code
+		         and mfb.inv_id = mid.inv_id
+		         and mid.is_stop = 0
+		        left join (SELECT 
+		                          mind.inv_id,
+		                          mind.price,
+		                          mind.batch_no,
+		                          mind.batch_sn,
+		                          mind.bar_code,
+		                          max(mind.inva_date) inva_date,
+		                          mind.location_id,
+                                  mim.store_id
+		                     FROM mat_in_main mim
+		                     LEFT JOIN mat_in_detail mind
+		                       ON mim.group_id = mind.group_id
+		                      AND mim.hos_id = mind.hos_id
+		                      AND mim.copy_code = mind.copy_code
+		                      AND mim.in_id = mind.in_id
+		                    WHERE mim.group_id = #{group_id,jdbcType = INTEGER}
+		                      AND mim.hos_id = #{hos_id,jdbcType = INTEGER}
+		                      AND mim.copy_code = #{copy_code,jdbcType = VARCHAR}
+		                      AND mim.state = 3
+                              group by mind.inv_id,
+                                  mind.price,
+                                  mind.batch_no,
+                                  mind.batch_sn,
+                                  mind.bar_code,
+                                  mind.location_id,
+                                  mim.store_id
+		                   ) t_date
+		          on mfb.inv_id = t_date.inv_id
+		         and mfb.batch_sn = t_date.batch_sn
+		         and mfb.batch_no = t_date.batch_no
+		         and mfb.bar_code = t_date.bar_code
+		         and mfb.price = t_date.price
+                 and mfb.store_id = t_date.store_id
+		        left join mat_store_inv msi
+		          on mfb.group_id = msi.group_id
+		         and mfb.hos_id = msi.hos_id
+		         and mfb.copy_code = msi.copy_code
+		         and mfb.store_id = msi.store_id
+		         and mfb.inv_id = msi.inv_id
+		       left join mat_type_dict mtd
+		       on mtd.group_id=mid.group_id
+		       and mtd.hos_id=mid.hos_id
+		       and mtd.copy_code=mid.copy_code
+		       and mtd.mat_type_id=mid.mat_type_id
+		       and mtd.mat_type_no=mid.mat_type_no
+		      <where>
+		        mfb.group_id = #{group_id}
+		        and mfb.hos_id = #{hos_id}
+		        and mfb.copy_code = #{copy_code}
+		        and mfb.left_amount &lt;&gt; 0  
+		        and mid.inv_code is not null
+		        and to_char(mfb.store_id) in (
+		          select perm_code from v_user_data_perm  
+		          where group_id = #{group_id,jdbcType=INTEGER}
+		            and hos_id = #{hos_id,jdbcType=INTEGER}
+		            and table_code = 'HOS_STORE_DICT'
+		            and user_id = #{user_id,jdbcType=INTEGER}
+		            and is_read = 1 and is_write = 1 
+		        )
+		        <if test="store_id != null and store_id != '' ">
+		          and mfb.store_id = #{store_id}
+		        </if>
+		        <if test="mat_type_code != null and mat_type_code != '' ">
+		          and mtd.mat_type_code like '${mat_type_code}%'
+		        </if>
+		      </where>     
+		      group by 
+		        mfb.group_id, mfb.hos_id,mfb.copy_code,mid.inv_id,
+		        mid.inv_code,mid.inv_no,mfb.batch_no,
+		        msi.location_id,
+                t_date.inva_date
+		        having sum(mfb.left_amount)  &lt;&gt; 0
+		        order by mid.inv_code 
+	     )
+	</insert>
+	
+	<select id="queryStoreExistInvForMaintain" parameterType="java.util.Map" resultMap="matMaintainDetail">
+		      
+      select mfb.group_id,
+             mfb.hos_id,
+             to_char(mfb.copy_code) as copy_code,
+             mid.inv_code,
+             mid.inv_id,
+             mid.inv_no,
+             mid.inv_name,
+             mid.inv_model,
+             hfd.fac_name,
+             hu.unit_name,
+             mfb.batch_no,
+             t_date.cert_id,
+             t_date.pack_code,
+             t_date.disinfect_date,
+             max(t_date.inva_date) as store_inva_date,
+             max(t_date.inva_date) as mt_inva_date,
+             sum(mfb.left_amount) as store_amount,
+             sum(mfb.left_amount) as mt_amount,
+             1 as pkg_quality,
+             1 as app_quality,
+             1 as mt_quality,
+             mfb.location_id,
+             mld.location_name,
+             '' as suggestion,
+             '' as remark
+        from mat_fifo_balance mfb
+        left join mat_inv_dict mid
+          on mfb.group_id = mid.group_id
+         and mfb.hos_id = mid.hos_id
+         and mfb.copy_code = mid.copy_code
+         and mfb.inv_id = mid.inv_id
+         and mid.is_stop = 0
+        left join mat_type_dict mtd
+        on mtd.group_id=mid.group_id
+        and mtd.hos_id=mid.hos_id
+        and mtd.copy_code=mid.copy_code
+        and mtd.mat_type_id=mid.mat_type_id
+        and mtd.is_stop=0
+        left join (SELECT mim.confirm_date,
+                          mind.inv_id,
+                          mind.price,
+                          mind.batch_no,
+                          mind.bar_code,
+                          mind.inva_date,
+                          mind.cert_id,
+                          mind.pack_code,
+                          mind.disinfect_date
+                     FROM mat_in_main mim
+                     LEFT JOIN mat_in_detail mind
+                       ON mim.group_id = mind.group_id
+                      AND mim.hos_id = mind.hos_id
+                      AND mim.copy_code = mind.copy_code
+                      AND mim.in_id = mind.in_id
+                    WHERE mim.group_id = #{group_id,jdbcType = INTEGER}
+                      AND mim.hos_id = #{hos_id,jdbcType = INTEGER}
+                      AND mim.copy_code = #{copy_code,jdbcType = VARCHAR}
+                      AND mim.state = 3
+                   ) t_date
+          on mfb.inv_id = t_date.inv_id
+         and mfb.batch_sn = t_date.batch_sn
+         and mfb.batch_no = t_date.batch_no
+         and mfb.bar_code = t_date.bar_code
+         and mfb.price = t_date.price
+        left join hos_fac_dict hfd
+          on mid.group_id = hfd.group_id
+         and mid.hos_id = hfd.hos_id
+         and mid.fac_id = hfd.fac_id
+         and mid.fac_no = hfd.fac_no
+        left join hos_unit hu
+          on mid.group_id = hu.group_id
+         and mid.hos_id = hu.hos_id
+         and mid.unit_code = hu.unit_code
+         and hu.is_stop = 0
+        left join mat_store_inv msi
+          on mfb.group_id = msi.group_id
+         and mfb.hos_id = msi.hos_id
+         and mfb.copy_code = msi.copy_code
+         and mfb.store_id = msi.store_id
+         and mfb.inv_id = msi.inv_id
+        left join mat_location_dict mld
+          on msi.group_id = mld.group_id
+         and msi.hos_id = mld.hos_id
+         and msi.location_id = mld.location_id
+         and mld.is_stop = 0
+      <where>
+        mfb.group_id = #{group_id}
+        and mfb.hos_id = #{hos_id}
+        and mfb.copy_code = #{copy_code}
+        and mfb.left_amount &lt;&gt; 0  
+        and mid.inv_code is not null
+        and to_char(mfb.store_id) in (
+          select perm_code from v_user_data_perm  
+          where group_id = #{group_id,jdbcType=INTEGER}
+            and hos_id = #{hos_id,jdbcType=INTEGER}
+            and table_code = 'HOS_STORE_DICT'
+            and user_id = #{user_id,jdbcType=INTEGER}
+            and is_read = 1 and is_write = 1 
+        )
+        <if test="store_id != null and store_id != '' ">
+          and mfb.store_id = #{store_id}
+        </if>
+        <if test="mat_type_code != null and mat_type_code != '' ">
+          and mtd.mat_type_code like '${mat_type_code}%'
+        </if>
+      </where>     
+      group by 
+        mfb.group_id,mfb.hos_id,mfb.copy_code,mid.inv_id,mid.inv_no,t_date.cert_id,mid.inv_code,mid.inv_name,mid.inv_model,
+        hfd.fac_name,hu.unit_name,mfb.batch_no,mfb.location_id,mld.location_name ,t_date.disinfect_date,t_date.pack_code
+        having sum(mfb.left_amount)  &lt;&gt; 0
+        order by mid.inv_code 
+
+   
+	
+	</select>
+	<!-- 养护主表序列 -->
+	<select id="queryMatMaintainMainSeq" resultType="java.lang.Long" useCache="false" flushCache="true">
+		select mat_maintain_main_seq.nextval from dual
+	</select>
+	<!-- 养护明细序列 -->
+	<select id="queryMatMaintainDetailSeq" resultType="java.lang.Long" useCache="false" flushCache="true">
+		select mat_maintain_detail_seq.nextval from dual
+	</select>
+	<!-- 批量添加养护记录明细 -->
+	<insert id="addMatMaintainDetailBatch"  parameterType="java.util.List">
+		<foreach collection="list" item="item"  index="index" open=" begin " close="; end;" separator=";">
+			insert into mat_maintain_detail(
+			 	group_id,hos_id,copy_code,mt_id,mt_no,mt_detail_id,inv_id,batch_no
+			 	<if test="item.inv_no!=null and item.inv_no!=''">,inv_no</if>
+			 	<if test="item.mt_inva_date!=null and item.mt_inva_date!=''">,mt_inva_date</if>
+			 	<if test="item.store_inva_date!=null and item.store_inva_date!=''">,store_inva_date</if>
+			 	<if test="item.disinfect_date!=null and item.disinfect_date!=''">,disinfect_date</if>
+			 	<if test="item.location_id!=null and item.location_id!=''">,location_id</if>
+			 	<if test="item.cert_id!=null and item.cert_id!=''">,cert_id</if>
+			 	<if test="item.pack_code!=null and item.pack_code!=''">,pack_code</if>
+			 	<if test="item.store_amount!=null and item.store_amount!=''">,store_amount</if>
+			 	<if test="item.mt_amount!=null and item.mt_amount!=''">,mt_amount</if>
+			 	<if test="item.pkg_quality!=null and item.pkg_quality!=''">,pkg_quality</if>
+			 	<if test="item.app_quality!=null and item.app_quality!=''">,app_quality</if>
+			 	<if test="item.mt_quality!=null and item.mt_quality!=''">,mt_quality</if>
+			 	<if test="item.cold_quality!=null and item.cold_quality!=''">,cold_quality</if>
+			 	<if test="item.suggestion!=null and item.suggestion!=''">,suggestion</if>
+			 	<if test="item.remark!=null and item.remark!=''">,remark</if>
+			)values(
+			    #{item.group_id,jdbcType=INTEGER},#{item.hos_id,jdbcType=INTEGER},
+			    #{item.copy_code,jdbcType=VARCHAR},#{item.mt_id,jdbcType=INTEGER},
+			    #{item.mt_no,jdbcType=VARCHAR},#{item.mt_detail_id,jdbcType=INTEGER},
+			    #{item.inv_id,jdbcType=INTEGER}, #{item.batch_no,jdbcType=VARCHAR}
+				<if test="item.inv_no!= null and item.inv_no!= ''">, #{item.inv_no,jdbcType=INTEGER}</if>
+				<if test="item.mt_inva_date!= null and item.mt_inva_date!= ''">, to_date(#{item.mt_inva_date,jdbcType=VARCHAR},'yyyy-MM-dd')</if>
+				<if test="item.store_inva_date!= null and item.store_inva_date!= ''">, to_date(#{item.store_inva_date,jdbcType=VARCHAR},'yyyy-MM-dd')</if>
+				<if test="item.disinfect_date!= null and item.disinfect_date!= ''">, to_date(#{item.disinfect_date,jdbcType=VARCHAR},'yyyy-MM-dd')</if>
+				<if test="item.location_id!= null and item.location_id!= ''">, #{item.location_id,jdbcType=INTEGER}</if>
+				<if test="item.cert_id!= null and item.cert_id!= ''">, #{item.cert_id,jdbcType=INTEGER}</if>
+				<if test="item.pack_code!= null and item.pack_code!= ''">, #{item.pack_code,jdbcType=INTEGER}</if>
+				<if test="item.store_amount!= null and item.store_amount!= ''">, #{item.store_amount,jdbcType=NUMERIC}</if>
+				<if test="item.mt_amount!= null and item.mt_amount!= ''">, #{item.mt_amount,jdbcType=NUMERIC}</if>
+				<if test="item.pkg_quality!= null and item.pkg_quality!= ''">, #{item.pkg_quality,jdbcType=INTEGER}</if>
+				<if test="item.app_quality!= null and item.app_quality!= ''">, #{item.app_quality,jdbcType=INTEGER}</if>
+				<if test="item.mt_quality!= null and item.mt_quality!= ''">, #{item.mt_quality,jdbcType=INTEGER}</if>
+				<if test="item.cold_quality!= null and item.cold_quality!= ''">, #{item.cold_quality,jdbcType=INTEGER}</if>
+				<if test="item.suggestion!= null and item.suggestion!= ''">, #{item.suggestion,jdbcType=VARCHAR}</if>
+				<if test="item.remark!= null and item.remark!= ''">, #{item.remark,jdbcType=VARCHAR}</if>
+				
+			)
+		</foreach>
+	</insert>
+	<insert id="addMatMaintainMain" parameterType="java.util.Map" >
+		insert into mat_maintain_main
+		(   group_id, hos_id, copy_code, mt_id, mt_no
+			<if test="store_id!= null and store_id!= ''">, store_id</if>
+			<if test="store_no!= null and store_no!= ''">, store_no</if>
+			<if test="make_date!= null and make_date!= ''">, make_date</if>
+			<if test="maker!= null and maker!= ''">, maker</if>
+			<if test="brief!= null and brief!= ''">, brief</if>
+		)values(
+			#{group_id,jdbcType=INTEGER},#{hos_id,jdbcType=INTEGER},
+		    #{copy_code,jdbcType=VARCHAR},#{mt_id,jdbcType=INTEGER},
+		    #{mt_no,jdbcType=VARCHAR}
+		    <if test="store_id!= null and store_id!= ''">, #{store_id,jdbcType=INTEGER}</if>
+			<if test="store_no!= null and store_no!= ''">, #{store_no,jdbcType=INTEGER}</if>
+			<if test="make_date!= null and make_date!= ''">, to_date(#{make_date,jdbcType=VARCHAR},'yyyy-MM-dd')</if>
+			<if test="maker!= null and maker!= ''">, #{maker,jdbcType=INTEGER}</if>
+			<if test="brief!= null and brief!= ''">, #{brief,jdbcType=VARCHAR}</if>
+		)
+	</insert>
+	
+	<!-- 通过主键查询养护记录主表的一条记录 -->
+	<select id="queryMatMaintainMainByID" parameterType="java.util.Map" resultMap="matMaintainMain">
+		select 
+		     mmm.group_id, mmm.hos_id, mmm.copy_code, mmm.mt_id, mmm.mt_no, 
+		     mmm.store_id, mmm.store_no, mmm.make_date, 
+		     mmm.maker, mmm.brief
+		from mat_maintain_main mmm
+		where mmm.group_id=#{group_id,jdbcType=INTEGER}
+		and mmm.hos_id=#{hos_id,jdbcType=INTEGER}
+		and mmm.copy_code=#{copy_code,jdbcType=VARCHAR}
+		and mmm.mt_id=#{mt_id,jdbcType=INTEGER}
+	</select>
+	
+	<select id="queryMatMaintainDetailByMtID" parameterType="java.util.Map" resultMap="matMaintainDetail">
+		select 
+		  mmd.group_id,mmd.hos_id,mmd.copy_code,mmd.mt_id,mmd.mt_no,
+		  mmd.mt_detail_id,mmd.inv_id,mmd.inv_no,mmd.batch_no,
+		  mmd.mt_inva_date,mmd.store_inva_date,
+		  mmd.location_id,mmd.cert_id,mfb.left_amount store_amount,
+		  mmd.mt_amount,mmd.pkg_quality,mmd.app_quality,mmd.mt_quality,
+		  mmd.suggestion,mmd.remark,mid.inv_code,mid.inv_name,mid.inv_model,
+		  hu.unit_name,hfd.fac_name,mld.location_name,mmd.cold_quality,mic.cert_code
+		from mat_maintain_detail mmd
+		left join mat_maintain_main mmm
+		on mmm.group_id=mmd.group_id
+		and mmm.hos_id=mmd.hos_id
+		and mmm.copy_code=mmd.copy_code  
+		and mmm.mt_id=mmd.mt_id
+		and mmm.mt_no=mmd.mt_no
+		left join  mat_inv_dict mid
+		on mid.group_id=mmd.group_id
+		and mid.hos_id=mmd.hos_id
+		and mid.copy_code=mmd.copy_code
+		and mid.inv_id=mmd.inv_id
+		and mid.inv_no=mmd.inv_no
+		left join (
+				select max(a.cert_id) as cert_id, a.inv_id, a.group_id, a.hos_id
+					, a.copy_code
+				from mat_prod_cert b
+					left join mat_prod_cert_inv a on a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code
+				and a.cert_id = b.cert_id 
+				where a.group_id = #{group_id,jdbcType=INTEGER}
+					and a.hos_id = #{hos_id,jdbcType=INTEGER}
+					and a.copy_code = #{copy_code,jdbcType=VARCHAR} 
+					and b.check_state = 2
+				group by a.inv_id, a.group_id, a.hos_id, a.copy_code
+				order by a.inv_id   
+			) mcr on mid.group_id = mcr.group_id
+			and mid.hos_id = mcr.hos_id
+			and mid.copy_code = mcr.copy_code
+			and mid.inv_id = mcr.inv_id 
+			left join mat_prod_cert mic on mcr.group_id = mic.group_id
+			and mcr.hos_id = mic.hos_id
+			and mcr.copy_code = mic.copy_code
+			and mcr.cert_id = mic.cert_id 
+		
+		left join mat_type_dict mtd
+		on mtd.group_id=mid.group_id
+		and mtd.hos_id=mid.hos_id
+		and mtd.copy_code=mid.copy_code
+		and mtd.mat_type_id=mid.mat_type_id
+		and mtd.mat_type_no=mid.mat_type_no
+		left join hos_unit hu
+		on hu.group_id=mid.group_id
+		and hu.hos_id=mid.hos_id
+		and hu.unit_code=mid.unit_code
+		left join hos_fac_dict hfd
+		on hfd.group_id=mid.group_id
+		and hfd.hos_id=mid.hos_id
+		and hfd.fac_id=mid.fac_id
+		and hfd.fac_no=mid.fac_no
+		left join mat_location_dict mld
+		on mld.group_id=mmd.group_id
+		and mld.hos_id=mmd.hos_id
+		and mld.copy_code=mmd.copy_code
+		and mld.location_id=mmd.location_id
+		and mld.store_id= mmm.store_id
+		and mld.is_stop=0
+		left join (
+	    	select group_id, hos_id, copy_code, inv_id, batch_no, store_id, sum(left_amount) left_amount
+	    	from mat_fifo_balance
+	    	group by group_id, hos_id, copy_code, inv_id, batch_no, store_id
+         	) mfb 	
+	    on mmd.group_id = mfb.group_id
+	    and mmd.hos_id = mfb.hos_id
+	    and mmd.copy_code = mfb.copy_code
+	    and mmd.inv_id = mfb.inv_id
+	    and mmd.batch_no = mfb.batch_no
+      	and mmm.store_id = mfb.store_id 
+		where mmd.group_id=#{group_id,jdbcType=INTEGER}
+		and mmd.hos_id=#{hos_id,jdbcType=INTEGER}
+		and mmd.copy_code=#{copy_code,jdbcType=VARCHAR} 
+		and mmd.mt_id=#{mt_id,jdbcType=INTEGER}
+		<if test="inv_code != null and inv_code != ''">
+            AND (
+               mid.inv_code like '%${inv_code}%'
+              or upper(mid.inv_name) like '%${inv_code}%'
+              or upper(mid.inv_model) like '%${inv_code}%'
+              or upper(mid.spell_code) like '%${inv_code}%'
+              or upper(mid.wbx_code) like '%${inv_code}%'
+              or upper(mid.bid_code) like '%${inv_code}%'
+              or lower(mid.spell_code) like '%${inv_code}%'
+              or lower(mid.bid_code) like '%${inv_code}%'
+              or lower(mid.wbx_code) like '%${inv_code}%'
+              or lower(mid.inv_name) like '%${inv_code}%'
+            
+          )
+        </if>
+        <if test="mat_type_code!=null and mat_type_code!=''">
+        	and mtd.mat_type_code like '${mat_type_code}%'
+        </if>
+
+	
+	</select>
+	
+	<!-- 批量删除养护记录表明细 -->
+	<delete id="deleteMatMaintainDetailBatch" parameterType="java.util.List">
+		delete from mat_maintain_detail
+		where 1!=1
+		<foreach collection="list" item="item">
+			or mt_detail_id =#{item.mt_detail_id,jdbcType=INTEGER}
+		</foreach>
+	</delete>
+	
+	<!-- 修改养护记录主表信息 -->
+	<update id="updateMatMaintainMain" parameterType="java.util.Map">
+		update mat_maintain_main
+		set mt_id=#{mt_id,jdbcType=INTEGER}
+		<if test="brief!=null and brief!=''">,brief=#{brief,jdbcType=VARCHAR}</if>
+		where mt_id=#{mt_id,jdbcType=INTEGER}
+	</update>
+	
+	<!-- 查询养护记录主表信息 -->
+	<select id="queryMatMaintainMain" parameterType="java.util.Map" resultMap="matMaintainMain">
+		select 
+		  mmm.group_id,mmm.hos_id,mmm.copy_code,mmm.mt_id,
+		  mmm.mt_no,mmm.store_id,mmm.store_no,mmm.brief,
+		  mmm.make_date,mmm.maker,
+		  hsd.store_name,su.user_name maker_name
+		from mat_maintain_main mmm
+		left join hos_store_dict hsd
+		on hsd.group_id=mmm.group_id
+		and hsd.hos_id=mmm.hos_id
+		and hsd.store_id=mmm.store_id
+		and hsd.is_stop=0
+		left join sys_user su
+		on su.group_id=mmm.group_id
+		and su.hos_id=mmm.hos_id
+		and su.copy_code=mmm.copy_code
+		and su.user_id=mmm.maker
+		<where>
+			<if test="store_id!=null and store_id!=''">
+				mmm.store_id=#{store_id,jdbcType=INTEGER}
+			</if>
+		</where>
+		order by mmm.mt_no
+	</select>
+	
+	<!-- 删除养护记录主表 -->
+	<delete id="deleteMatMaintainMain" parameterType="java.util.List">
+		DELETE FROM mat_maintain_main 
+		where 1!=1
+			<foreach collection="list" item="item" >
+			 or  (1=1
+				<if test="item.group_id != null and item.group_id != ''">
+					and group_id = #{item.group_id,jdbcType=INTEGER}
+				</if>
+				<if test="item.hos_id != null and item.hos_id != ''">
+					AND hos_id = #{item.hos_id,jdbcType=INTEGER}
+				</if>
+				<if test="item.copy_code != null and item.copy_code != ''">
+					AND copy_code = #{item.copy_code,jdbcType=VARCHAR}
+				</if>
+				<if test="item.mt_id != null and item.mt_id != ''">
+					AND mt_id = #{item.mt_id,jdbcType=INTEGER}
+				</if>
+			)
+			</foreach>
+	</delete>
+	
+	
+	<delete id="deleteMatMaintainDetail" parameterType="java.util.List">
+		DELETE FROM mat_maintain_detail 
+		where 1!=1
+			<foreach collection="list" item="item" >
+			or (1=1
+				<if test="item.group_id != null and item.group_id != ''">
+					and group_id = #{item.group_id,jdbcType=INTEGER}
+				</if>
+				<if test="item.hos_id != null and item.hos_id != ''">
+					AND hos_id = #{item.hos_id,jdbcType=INTEGER}
+				</if>
+				<if test="item.copy_code != null and item.copy_code != ''">
+					AND copy_code = #{item.copy_code,jdbcType=VARCHAR}
+				</if>
+				<if test="item.mt_id != null and item.mt_id != ''">
+					AND mt_id = #{item.mt_id,jdbcType=INTEGER}
+				</if>
+			)	
+			</foreach>
+	</delete>
+	
+</mapper>
+

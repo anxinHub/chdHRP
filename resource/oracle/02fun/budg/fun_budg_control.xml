@@ -1,0 +1,2332 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+    <sql id="fun_budg_mat_matoutplan" type="fun" desc=""><![CDATA[
+       CREATE OR REPLACE FUNCTION fun_budg_mat_matoutplan(prm_group_id  IN VARCHAR2, --集团
+                                              prm_hos_id    IN VARCHAR2, --医院
+                                              prm_copy_code    IN VARCHAR2, --账套
+                                              prm_budg_year IN VARCHAR2, --年度
+                                              prm_budg_month IN VARCHAR2, --月份
+                                              prm_dept_id IN VARCHAR2, --预算科室Id
+                                              prm_cont_l IN VARCHAR2, --控制层次
+                                              prm_cont_p IN VARCHAR2, --控制期间
+                                              prm_mat_type_id  IN VARCHAR2, --预算项 物资分类
+                                              prm_budg_table in VARCHAR2 --预算表
+                                              ) RETURN number
+        IS
+            item_money  number ;
+        BEGIN
+            if prm_budg_table ='BUDG_MAT'
+            then
+            select sum(cost_budg) into item_money
+             from BUDG_MAT
+             where group_id =prm_group_id
+               and hos_id=prm_hos_id
+               and copy_code=prm_copy_code
+               and year=prm_budg_year
+               and((prm_cont_p ='03' and month= prm_budg_month)
+                  or (prm_cont_p ='02' and month <= prm_budg_month)
+                  or prm_cont_p ='01'
+                 )
+               and (prm_mat_type_id =-1 or mat_type_id =prm_mat_type_id)
+               and (prm_dept_id =0 or dept_id =prm_dept_id );
+            end if;
+            
+            if item_money is null then
+                return -1;
+            else
+                return item_money;
+            end if;
+            EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+                return -1;
+            WHEN OTHERS THEN
+                return -1; 
+        END fun_budg_mat_matoutplan;
+    ]]></sql>
+    <sql id="fun_budg_mat_matoutexec" type="fun" desc=""><![CDATA[
+      CREATE OR REPLACE FUNCTION fun_budg_mat_matoutexec(prm_group_id  IN VARCHAR2, --集团
+                                              prm_hos_id    IN VARCHAR2, --医院
+                                              prm_copy_code    IN VARCHAR2, --账套
+                                              prm_budg_year IN VARCHAR2, --年度
+                                              prm_budg_month IN VARCHAR2, --月份
+                                              prm_dept_id IN VARCHAR2, --科室Id
+                                              prm_cont_l IN VARCHAR2, --控制层次
+                                              prm_cont_p IN VARCHAR2, --控制期间
+                                              prm_mat_type_id  IN VARCHAR2, --预算项 物资分类
+                                              prm_work_table in VARCHAR2, --预算表
+                                              prm_work_table_state in VARCHAR2, --业务表状态值
+                                              prm_re_link in VARCHAR2, --预算关联环节
+                                              prm_re_state in VARCHAR2, --预算关联环节业务表状态值
+                                              prm_work_select_id in varchar2, --去掉本次选择的表
+                                              prm_year_begin_date in varchar2, --年启始日期
+                                              prm_year_end_date in varchar2,   --年末日期
+                                              prm_month_begin_date in varchar2, --月启日期
+                                              prm_month_end_date in varchar2  --月末日期
+                                              ) RETURN number
+        IS
+            exec_money number ;
+            re_money number ;
+            re_state varchar2(20);
+            re_sql varchar2(4000);
+        BEGIN
+           
+            if prm_work_table ='BUDG_MAT' 
+            then
+        
+            select sum(mod.amount_money) into exec_money
+            from MAT_OUT_MAIN mom
+           left join mat_out_detail mod
+                on mom.group_id=mod.group_id
+                and mom.hos_id=mod.hos_id
+                and mom.copy_code=mod.copy_code
+                and mom.out_id=mod.out_id
+            left join mat_inv_dict mi
+                on mod.group_id=mi.group_id
+                and mod.hos_id=mi.hos_id
+                and mod.copy_code=mi.copy_code
+                and mod.inv_id=mi.inv_id
+                and mi.is_stop=0
+            left join mat_type_dict  mt2
+               on mi.group_id =mt2.group_id
+               and mi.hos_id =mt2.hos_id
+               and mi.copy_code=mt2.copy_code
+               and mi.mat_type_id = mt2.mat_type_id
+               and mt2.is_stop =0
+            left join hos_dept_dict hdd
+                 on mom.group_id =hdd.group_id
+                 and mom.hos_id =hdd.hos_id
+                 and mom.dept_id = hdd.dept_id
+                 and hdd.is_stop = 0  
+            left join
+               (
+               select mt.mat_type_code,mt.mat_type_id
+            from  BUDG_C_DET bcd
+             left join mat_type_dict mt
+               on bcd.group_id = mt.group_id
+               and bcd.hos_id = mt.hos_id
+               and bcd.copy_code=mt.copy_code
+               and bcd.item_code = mt.mat_type_id
+               and mt.is_stop =0
+               where bcd.group_id =prm_group_id
+                 and bcd.hos_id =prm_hos_id
+                 and bcd.copy_code =prm_copy_code
+                 and bcd.budg_year =prm_budg_year
+                 and bcd.plan_code ='0103'
+                 and mod_code ='04'
+                 and link_code ='MAT_OUT'
+                 and bcd.cont_w is not null
+                 and bcd.cont_l is not null
+                 and bcd.cont_p is not null
+               ) budg_type_table on mt2.mat_type_code like budg_type_table.mat_type_code ||'%'
+             left join (
+                select ada.dept_id, hd.dept_code from ACC_DEPT_ATTR ada
+                 left join hos_dept_dict hd on ada.group_id=hd.group_id
+                      and ada.hos_id =hd.hos_id
+                      and ada.dept_id = hd.dept_id
+                      and hd.is_stop =0
+                   where ada.group_id =prm_group_id
+                   and ada.hos_id=prm_hos_id
+                   and ada.is_budg =1
+             ) budg_dept_table on hdd.dept_code like budg_dept_table.dept_code||'%'
+        
+             where mom.group_id=prm_group_id
+             and mom.hos_id=prm_hos_id
+             and mom.copy_code=prm_copy_code
+             
+             and mom.state in (
+                 SELECT REGEXP_SUBSTR ( prm_work_table_state , '[^,]+', 1,rownum) state
+                        from dual connect by rownum <=LENGTH (prm_work_table_state) - LENGTH (regexp_replace(prm_work_table_state, ',', ''))+1
+             )
+             
+             and mom.out_id not in (
+                 SELECT REGEXP_SUBSTR ( prm_work_select_id , '[^,]+', 1,rownum) out_id
+                        from dual connect by rownum <=LENGTH (prm_work_select_id) - LENGTH (regexp_replace(prm_work_select_id, ',', ''))+1
+             )
+             
+             and (
+                 ( prm_cont_p ='03' and ((mom.out_date between to_date(prm_month_begin_date,'YYYY-MM-DD') and to_date(prm_month_end_date,'YYYY-MM-DD')) or (mom.check_date between to_date(prm_month_begin_date,'YYYY-MM-DD')   and to_date(prm_month_end_date,'YYYY-MM-DD') )  or (to_date(to_char(mom.confirm_date,'YYYY-MM-DD'),'YYYY-MM-DD')  between to_date(prm_month_begin_date,'YYYY-MM-DD')  and to_date(prm_month_end_date,'YYYY-MM-DD')  )))
+                   or
+                 ( prm_cont_p ='02' and ((mom.out_date between to_date(prm_year_begin_date,'YYYY-MM-DD') and to_date(prm_month_end_date,'YYYY-MM-DD')) or (mom.check_date between to_date(prm_year_begin_date,'YYYY-MM-DD')   and  to_date(prm_month_end_date,'YYYY-MM-DD')  ) or (to_date(to_char(mom.confirm_date,'YYYY-MM-DD'),'YYYY-MM-DD') between to_date(prm_year_begin_date,'YYYY-MM-DD')   and to_date(prm_month_end_date,'YYYY-MM-DD')  )))
+                  or
+                 ( prm_cont_p ='01' and ((mom.out_date between to_date(prm_year_begin_date,'YYYY-MM-DD')   and to_date(prm_year_end_date,'YYYY-MM-DD')) or (mom.check_date between to_date(prm_year_begin_date,'YYYY-MM-DD')  and to_date(prm_year_end_date,'YYYY-MM-DD') ) or (to_date(to_char(mom.confirm_date,'YYYY-MM-DD'),'YYYY-MM-DD') between to_date(prm_year_begin_date,'YYYY-MM-DD')   and to_date(prm_year_end_date,'YYYY-MM-DD')   )))
+             )
+             
+            and (prm_dept_id =0 or budg_dept_table.dept_id =prm_dept_id )
+            and (prm_mat_type_id =-1
+                 or (prm_mat_type_id =-2 and budg_type_table.mat_type_id is not null)
+                 or budg_type_table.mat_type_id = prm_mat_type_id
+                )
+            
+            ;
+             end if;
+            
+            if prm_re_link = 'MAT_APPLY' 
+            then
+              select use_state into re_state from budg_c_main bcd 
+              where  bcd.group_id =prm_group_id
+                 and bcd.hos_id =prm_hos_id
+                 and bcd.copy_code =prm_copy_code
+                 and bcd.budg_year =prm_budg_year
+                 and bcd.plan_code ='0103'
+                 and mod_code ='04'
+                 and link_code ='MAT_APPLY';
+                 
+                 re_sql := ' select fun_budg_mat_matapplyexec( ' || prm_group_id ||',' || prm_hos_id 
+                            ||','''|| prm_copy_code ||''' , '''|| prm_budg_year || ''','''|| prm_budg_month ||''' ,'
+                            || prm_dept_id || ',''' || prm_cont_l ||''','''|| prm_cont_p ||''','
+                            || prm_mat_type_id ||','''||prm_work_table||''','''|| re_state ||''','''','''',''0'','''
+                            || prm_year_begin_date ||''','''|| prm_year_end_date||''','''
+                            || prm_month_begin_date ||''','''|| prm_month_end_date||''' ) from dual ';
+                          
+                       
+               EXECUTE IMMEDIATE re_sql INTO re_money;
+            end if;
+            
+            return nvl(exec_money,0)+nvl(re_money,0);
+            
+        
+        EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+                return 0;
+            WHEN OTHERS THEN
+                return 0;
+        
+        END fun_budg_mat_matoutexec;
+    ]]></sql>
+    <sql id="fun_budg_medcost_matoutplan" type="fun" desc=""><![CDATA[
+       CREATE OR REPLACE FUNCTION fun_budg_medcost_matoutplan(prm_group_id  IN VARCHAR2, --集团
+                                              prm_hos_id    IN VARCHAR2, --医院
+                                              prm_copy_code    IN VARCHAR2, --账套
+                                              prm_budg_year IN VARCHAR2, --年度
+                                              prm_budg_month IN VARCHAR2, --月份
+                                              prm_dept_id IN VARCHAR2, --预算科室Id
+                                              prm_cont_l IN VARCHAR2, --控制层次
+                                              prm_cont_p IN VARCHAR2, --控制期间
+                                              prm_cost_subj_code  IN VARCHAR2, --预算项 预算科目
+                                              prm_budg_table in VARCHAR2, --预算表,
+                                              prm_link_code in VARCHAR2 --控制环节 
+                                              ) RETURN number
+        IS
+            item_money  number ;
+        BEGIN
+            if prm_budg_table ='BUDG_MED_COST' 
+            then
+            select sum(cost_budg) into item_money
+             from BUDG_MED_COST
+             where group_id =prm_group_id
+               and hos_id=prm_hos_id
+               and copy_code=prm_copy_code
+               and budg_year=prm_budg_year
+               and( ( prm_cont_p ='03' and month= prm_budg_month )
+                  or (prm_cont_p ='02' and month <= prm_budg_month )
+                  or prm_cont_p ='01'
+                 )
+               and (prm_cost_subj_code =-1 
+                   or  (prm_cost_subj_code =-2 and subj_code in 
+                       (
+                       select bcd.item_code 
+                       from  BUDG_C_DET bcd
+                       where bcd.group_id =prm_group_id
+                         and bcd.hos_id =prm_hos_id
+                         and bcd.copy_code =prm_copy_code
+                         and bcd.budg_year =prm_budg_year
+                         and bcd.plan_code ='01'
+                         and bcd.link_code =prm_link_code
+                       )
+                    )
+                    or subj_code =prm_cost_subj_code 
+               )
+               and (prm_dept_id =0 or dept_id =prm_dept_id );
+               
+            elsif prm_budg_table ='BUDG_MED_COST_DY' 
+            then
+            select sum(budg_value) into item_money
+             from BUDG_MED_COST_DY
+             where group_id =prm_group_id
+               and hos_id=prm_hos_id
+               and copy_code=prm_copy_code
+               and budg_year=prm_budg_year
+               and( prm_cont_p ='01')
+               and (prm_cost_subj_code =-1 
+                   or  (prm_cost_subj_code =-2 and subj_code in 
+                       (
+                       select bcd.item_code 
+                       from  BUDG_C_DET bcd
+                       where bcd.group_id =prm_group_id
+                         and bcd.hos_id =prm_hos_id
+                         and bcd.copy_code =prm_copy_code
+                         and bcd.budg_year =prm_budg_year
+                         and bcd.plan_code ='01'
+                         and bcd.link_code =prm_link_code
+                       )
+                    )
+                    or subj_code =prm_cost_subj_code 
+               )
+               and (prm_dept_id =0 or dept_id =prm_dept_id );
+            elsif prm_budg_table ='BUDG_MED_COST_HY' 
+            then
+            select sum(budg_value) into item_money
+             from BUDG_MED_COST_HY
+             where group_id =prm_group_id
+               and hos_id=prm_hos_id
+               and copy_code=prm_copy_code
+               and budg_year=prm_budg_year
+               and( prm_cont_p ='01')
+               and (prm_cost_subj_code =-1 
+                   or  (prm_cost_subj_code =-2 and subj_code in 
+                       (
+                       select bcd.item_code 
+                       from  BUDG_C_DET bcd
+                       where bcd.group_id =prm_group_id
+                         and bcd.hos_id =prm_hos_id
+                         and bcd.copy_code =prm_copy_code
+                         and bcd.budg_year =prm_budg_year
+                         and bcd.plan_code ='01'
+                         and bcd.link_code =prm_link_code
+                       )
+                    )
+                    or subj_code =prm_cost_subj_code 
+               )
+               and (prm_dept_id =0 );
+               
+            end if;
+            
+            if item_money is null then
+                return -1;
+            else
+                return item_money;
+            end if;
+        
+        EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+                return -1;
+            WHEN OTHERS THEN
+                return -1;
+        
+        END fun_budg_medcost_matoutplan;
+    
+    ]]></sql>
+    <sql id="fun_budg_medcost_matoutexec" type="fun" desc=""><![CDATA[
+       CREATE OR REPLACE FUNCTION fun_budg_medcost_matoutexec(prm_group_id  IN VARCHAR2, --集团
+                                              prm_hos_id    IN VARCHAR2, --医院
+                                              prm_copy_code    IN VARCHAR2, --账套
+                                              prm_budg_year IN VARCHAR2, --年度
+                                              prm_budg_month IN VARCHAR2, --月份
+                                              prm_dept_id IN VARCHAR2, --科室Id
+                                              prm_cont_l IN VARCHAR2, --控制层次
+                                              prm_cont_p IN VARCHAR2, --控制期间
+                                              prm_mat_type_id  IN VARCHAR2, --预算项 物资分类 预算支出科目
+                                              prm_work_table in VARCHAR2, --业务表
+                                              prm_work_table_state in VARCHAR2, --业务表状态值
+                                              prm_re_link in VARCHAR2, --预算关联环节
+                                              prm_re_state in VARCHAR2, --预算关联环节业务表状态值
+                                              prm_work_select_id in varchar2, --去掉本次选择的表
+                                              prm_year_begin_date in varchar2, --年启始日期
+                                              prm_year_end_date in varchar2,   --年末日期
+                                              prm_month_begin_date in varchar2, --月启日期
+                                              prm_month_end_date in varchar2  --月末日期
+                                              ) RETURN number
+        IS
+            exec_money number ;
+            re_money number ;
+            re_money2 number ;
+            re_state varchar2(20);
+            re_sql varchar2(4000);
+        BEGIN
+           
+            if prm_work_table ='BUDG_MED_COST' or prm_work_table ='BUDG_MED_COST_DY' or prm_work_table ='BUDG_MED_COST_HY'
+            then   
+            select sum(mod.amount_money) into exec_money
+            from MAT_OUT_MAIN mom
+           left join mat_out_detail mod
+                on mom.group_id=mod.group_id
+                and mom.hos_id=mod.hos_id
+                and mom.copy_code=mod.copy_code
+                and mom.out_id=mod.out_id
+            left join mat_inv_dict mi
+                on mod.group_id=mi.group_id
+                and mod.hos_id=mi.hos_id
+                and mod.copy_code=mi.copy_code
+                and mod.inv_id=mi.inv_id
+                and mi.is_stop =0
+            left join mat_type_dict  mt2
+               on mi.group_id =mt2.group_id
+               and mi.hos_id =mt2.hos_id
+               and mi.copy_code=mt2.copy_code
+               and mi.mat_type_id = mt2.mat_type_id
+               and mt2.is_stop =0
+            left join
+                     ( 
+                     select mtd.mat_type_code,cost_subj_code 
+                       from BUDG_MAT_TYPE_SUBJ bmts
+                       left join mat_type_dict mtd 
+                      on mtd.group_id= bmts.group_id
+                      and mtd.hos_id = bmts.hos_id
+                      and mtd.copy_code =bmts.copy_code
+                      and mtd.mat_type_id = bmts.mat_type_id
+                      and mtd.is_stop =0
+                      where bmts.group_id =prm_group_id
+                      and bmts.hos_id = prm_hos_id
+                      and bmts.copy_code= prm_copy_code
+                      and bmts.budg_year =prm_budg_year
+                    ) budg_subj on mt2.mat_type_code like budg_subj.mat_type_code ||'%'
+                    
+            left join hos_dept_dict hdd
+                 on mom.group_id =hdd.group_id
+                 and mom.hos_id =hdd.hos_id
+                 and mom.dept_id = hdd.dept_id
+                 and hdd.is_stop = 0                 
+            left join
+               (
+               select bcd.item_code cost_subj_code, bcd.cont_l,bcd.cont_p,bcd.cont_w
+            from  BUDG_C_DET bcd
+               where bcd.group_id =prm_group_id
+                 and bcd.hos_id =prm_hos_id
+                 and bcd.copy_code =prm_copy_code
+                 and bcd.budg_year =prm_budg_year
+                 and bcd.plan_code ='01'
+                 and bcd.mod_code ='04'
+                 and bcd.link_code ='MAT_OUT'
+                 and (prm_mat_type_id = -2 or 
+                     (
+                     prm_mat_type_id !=-2 and bcd.cont_w in('02','03') and bcd.cont_l is not null and bcd.cont_p is not null
+                     )
+                    )
+               ) budg_type_table on budg_subj.cost_subj_code=budg_type_table.cost_subj_code
+             left join (
+                select ada.dept_id, hd.dept_code from ACC_DEPT_ATTR ada
+                 left join hos_dept_dict hd on ada.group_id=hd.group_id
+                      and ada.hos_id =hd.hos_id
+                      and ada.dept_id = hd.dept_id
+                      and hd.is_stop =0
+                   where ada.group_id =prm_group_id
+                   and ada.hos_id=prm_hos_id
+                   and ada.is_budg =1
+             ) budg_dept_table on hdd.dept_code like budg_dept_table.dept_code||'%'
+             left join (
+              select duty_dept_id, dept_id, subj_code
+              from BUDG_COST_DUTY_DEPT bcdd
+              where bcdd.group_id = prm_group_id
+                and bcdd.hos_id = prm_hos_id
+                and bcdd.copy_code = prm_copy_code
+                and bcdd.budg_year = prm_budg_year
+            ) duty_dept_table on budg_dept_table.dept_id = duty_dept_table.dept_id
+                and budg_type_table.cost_subj_code = duty_dept_table.subj_code 
+                
+             where mom.group_id=prm_group_id
+             and mom.hos_id=prm_hos_id
+             and mom.copy_code=prm_copy_code
+             and (mom.bus_type_code!=15 or mom.bus_type_code!=32)
+             and mom.state in (
+                 SELECT REGEXP_SUBSTR ( prm_work_table_state , '[^,]+', 1,rownum) state
+                        from dual connect by rownum <=LENGTH (prm_work_table_state) - LENGTH (regexp_replace(prm_work_table_state, ',', ''))+1
+             )
+             
+             and mom.out_id not in (
+                 SELECT REGEXP_SUBSTR ( prm_work_select_id , '[^,]+', 1,rownum) out_id
+                        from dual connect by rownum <=LENGTH (prm_work_select_id) - LENGTH (regexp_replace(prm_work_select_id, ',', ''))+1
+             )
+             
+             and (
+                 ( prm_cont_p ='03' and ((mom.out_date between to_date(prm_month_begin_date,'YYYY-MM-DD') and to_date(prm_month_end_date,'YYYY-MM-DD')) or (mom.check_date between to_date(prm_month_begin_date,'YYYY-MM-DD')   and to_date(prm_month_end_date,'YYYY-MM-DD') )  or (to_date(to_char(mom.confirm_date,'YYYY-MM-DD'),'YYYY-MM-DD') between to_date(prm_month_begin_date,'YYYY-MM-DD')  and to_date(prm_month_end_date,'YYYY-MM-DD')  )))
+                   or
+                 ( prm_cont_p ='02' and ((mom.out_date between to_date(prm_year_begin_date,'YYYY-MM-DD') and to_date(prm_month_end_date,'YYYY-MM-DD')) or (mom.check_date between to_date(prm_year_begin_date,'YYYY-MM-DD')   and  to_date(prm_month_end_date,'YYYY-MM-DD')  ) or (to_date(to_char(mom.confirm_date,'YYYY-MM-DD'),'YYYY-MM-DD') between to_date(prm_year_begin_date,'YYYY-MM-DD')   and to_date(prm_month_end_date,'YYYY-MM-DD')  )))
+                  or
+                 ( prm_cont_p ='01' and ((mom.out_date between to_date(prm_year_begin_date,'YYYY-MM-DD')   and to_date(prm_year_end_date,'YYYY-MM-DD')) or (mom.check_date between to_date(prm_year_begin_date,'YYYY-MM-DD')  and to_date(prm_year_end_date,'YYYY-MM-DD') ) or (to_date(to_char(mom.confirm_date,'YYYY-MM-DD'),'YYYY-MM-DD') between to_date(prm_year_begin_date,'YYYY-MM-DD')   and to_date(prm_year_end_date,'YYYY-MM-DD')   )))
+             )  
+            and (prm_dept_id =0 or ((prm_cont_l!='02' and budg_dept_table.dept_id =prm_dept_id) 
+                                     or  (prm_cont_l ='02' and duty_dept_table.duty_dept_id =prm_dept_id)
+                                   )
+                 )
+            and (prm_mat_type_id =-1 
+                    or (prm_mat_type_id =-2 and budg_type_table.cost_subj_code is not null)
+                    or budg_type_table.cost_subj_code = prm_mat_type_id
+                )            
+            ;
+             end if;
+            
+            if instr(prm_re_link , 'MAT_APPLY' )>0
+            then
+              select use_state into re_state from budg_c_main bcd 
+              where  bcd.group_id =prm_group_id
+                 and bcd.hos_id =prm_hos_id
+                 and bcd.copy_code =prm_copy_code
+                 and bcd.budg_year =prm_budg_year
+                 and bcd.plan_code ='01'
+                 and mod_code ='04'
+                 and link_code ='MAT_APPLY';
+                 
+                 re_sql := ' select fun_budg_medcost_matapplyexec( ' || prm_group_id ||',' || prm_hos_id 
+                            ||','''|| prm_copy_code ||''' , '''|| prm_budg_year || ''','''|| prm_budg_month ||''' ,'
+                            || prm_dept_id || ',''' || prm_cont_l ||''','''|| prm_cont_p ||''','
+                            || prm_mat_type_id ||','''|| prm_work_table ||''','''|| re_state ||''','''','''',''0'','''
+                            || prm_year_begin_date ||''','''|| prm_year_end_date||''','''
+                            || prm_month_begin_date ||''','''|| prm_month_end_date||''' ) from dual ';                                          
+               EXECUTE IMMEDIATE re_sql INTO re_money;
+            end if;  
+            
+            return nvl(exec_money,0)+nvl(re_money,0);
+            
+        EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+                return 0;
+            WHEN OTHERS THEN
+                return 0;
+        
+        END fun_budg_medcost_matoutexec;               
+    ]]></sql>
+    <sql id="fun_budg_matpur_matinexec" type="fun" desc=""><![CDATA[
+       CREATE OR REPLACE FUNCTION fun_budg_matpur_matinexec(prm_group_id  IN VARCHAR2, --集团
+                                              prm_hos_id    IN VARCHAR2, --医院
+                                              prm_copy_code    IN VARCHAR2, --账套
+                                              prm_budg_year IN VARCHAR2, --年度
+                                              prm_budg_month IN VARCHAR2, --月份
+                                              prm_dept_id IN VARCHAR2, --科室Id
+                                              prm_cont_l IN VARCHAR2, --控制层次
+                                              prm_cont_p IN VARCHAR2, --控制期间
+                                              prm_mat_type_id  IN VARCHAR2, --预算项 物资分类
+                                              prm_work_table in VARCHAR2, --业务表
+                                              prm_work_table_state in VARCHAR2, --业务表状态值
+                                              prm_re_link in VARCHAR2, --预算关联环节
+                                              prm_re_state in VARCHAR2, --预算关联环节业务表状态值
+                                              prm_work_select_id in varchar2, --去掉本次选择的表
+                                              prm_year_begin_date in varchar2, --年启始日期
+                                              prm_year_end_date in varchar2,   --年末日期
+                                              prm_month_begin_date in varchar2, --月启日期
+                                              prm_month_end_date in varchar2  --月末日期
+                                              ) RETURN number
+        IS
+            exec_money number ;
+            re_state varchar2(20);
+            re_money number ; 
+            re_money2 number ;
+            re_sql varchar2(4000);
+        BEGIN
+           
+            if prm_work_table ='BUDG_MAT_PUR' 
+            then
+        
+            select sum(mod.amount_money) into exec_money
+            from MAT_IN_MAIN mom
+           left join mat_in_detail mod
+                on mom.group_id=mod.group_id
+                and mom.hos_id=mod.hos_id
+                and mom.copy_code=mod.copy_code
+                and mom.in_id=mod.in_id
+            left join mat_inv_dict mi
+                on mod.group_id=mi.group_id
+                and mod.hos_id=mi.hos_id
+                and mod.copy_code=mi.copy_code
+                and mod.inv_id=mi.inv_id
+                and mi.is_stop=0
+            left join mat_type_dict  mt2
+               on mi.group_id =mt2.group_id
+               and mi.hos_id =mt2.hos_id
+               and mi.copy_code=mt2.copy_code
+               and mi.mat_type_id = mt2.mat_type_id
+               and mt2.is_stop =0
+            
+            left join
+               (
+               select mt.mat_type_code,mt.mat_type_id, bcd.cont_l,bcd.cont_p,bcd.cont_w
+            from  BUDG_C_DET bcd
+             left join mat_type_dict mt
+               on bcd.group_id = mt.group_id
+               and bcd.hos_id = mt.hos_id
+               and bcd.copy_code=mt.copy_code
+               and bcd.item_code = mt.mat_type_id
+               and mt.is_stop =0
+               where bcd.group_id =prm_group_id
+                 and bcd.hos_id =prm_hos_id
+                 and bcd.copy_code =prm_copy_code
+                 and bcd.budg_year =prm_budg_year
+                 and bcd.plan_code ='05'
+                 and mod_code ='04'
+                 and link_code ='MAT_IN'
+                 and bcd.cont_w is not null
+                 and bcd.cont_l is not null
+                 and bcd.cont_p is not null
+               ) budg_type_table on mt2.mat_type_code like budg_type_table.mat_type_code ||'%'
+             
+             where mom.group_id=prm_group_id
+             and mom.hos_id=prm_hos_id
+             and mom.copy_code=prm_copy_code 
+             and mom.bus_type_code in (2,12,27,29,47,48) 
+             and mom.state in (
+                 SELECT REGEXP_SUBSTR ( prm_work_table_state , '[^,]+', 1,rownum) state
+                        from dual connect by rownum <=LENGTH (prm_work_table_state) - LENGTH (regexp_replace(prm_work_table_state, ',', ''))+1
+             ) 
+             and mom.in_id not in (
+                 SELECT REGEXP_SUBSTR ( prm_work_select_id , '[^,]+', 1,rownum) in_id
+                        from dual connect by rownum <=LENGTH (prm_work_select_id) - LENGTH (regexp_replace(prm_work_select_id, ',', ''))+1
+             )
+             and (
+                 ( prm_cont_p ='03' and (( to_date(to_char(mom.in_date,'YYYY-MM-DD'),'YYYY-MM-DD') between to_date(prm_month_begin_date,'YYYY-MM-DD') and to_date(prm_month_end_date,'YYYY-MM-DD')) or ( to_date(to_char(mom.check_date,'YYYY-MM-DD'),'YYYY-MM-DD') between to_date(prm_month_begin_date,'YYYY-MM-DD') and to_date(prm_month_end_date,'YYYY-MM-DD') )  or (to_date(to_char(mom.confirm_date,'YYYY-MM-DD'),'YYYY-MM-DD')  between to_date(prm_month_begin_date,'YYYY-MM-DD')  and to_date(prm_month_end_date,'YYYY-MM-DD')  )))
+                   or
+                 ( prm_cont_p ='02' and (( to_date(to_char(mom.in_date,'YYYY-MM-DD'),'YYYY-MM-DD') between to_date(prm_year_begin_date,'YYYY-MM-DD') and to_date(prm_month_end_date,'YYYY-MM-DD')) or ( to_date(to_char(mom.check_date,'YYYY-MM-DD'),'YYYY-MM-DD')  between to_date(prm_year_begin_date,'YYYY-MM-DD')  and  to_date(prm_month_end_date,'YYYY-MM-DD')  ) or (to_date(to_char(mom.confirm_date,'YYYY-MM-DD'),'YYYY-MM-DD') between to_date(prm_year_begin_date,'YYYY-MM-DD')   and to_date(prm_month_end_date,'YYYY-MM-DD')  )))
+                  or
+                 ( prm_cont_p ='01' and (( to_date(to_char(mom.in_date,'YYYY-MM-DD'),'YYYY-MM-DD') between to_date(prm_year_begin_date,'YYYY-MM-DD')   and to_date(prm_year_end_date,'YYYY-MM-DD')) or ( to_date(to_char(mom.check_date,'YYYY-MM-DD'),'YYYY-MM-DD') between to_date(prm_year_begin_date,'YYYY-MM-DD')  and to_date(prm_year_end_date,'YYYY-MM-DD') ) or (to_date(to_char(mom.confirm_date,'YYYY-MM-DD'),'YYYY-MM-DD') between to_date(prm_year_begin_date,'YYYY-MM-DD')   and to_date(prm_year_end_date,'YYYY-MM-DD')   )))
+             )    
+            and (prm_dept_id =0 )
+            and (prm_mat_type_id =-1 or budg_type_table.mat_type_id = prm_mat_type_id)
+            
+            ;
+             end if;
+        
+             if instr(prm_re_link,'MAT_PUR')>0
+            then
+              select use_state into re_state from budg_c_main bcd 
+              where  bcd.group_id =prm_group_id
+                 and bcd.hos_id =prm_hos_id
+                 and bcd.copy_code =prm_copy_code
+                 and bcd.budg_year =prm_budg_year
+                 and bcd.plan_code ='05'
+                 and mod_code ='04'
+                 and link_code ='MAT_PUR';
+              
+                 re_sql := ' select fun_budg_matpur_matpurexec( ' || prm_group_id ||',' || prm_hos_id 
+                            ||','''|| prm_copy_code ||''' , '''|| prm_budg_year || ''','''|| prm_budg_month ||''' ,'
+                            || prm_dept_id || ',''' || prm_cont_l ||''','''|| prm_cont_p ||''','
+                            || prm_mat_type_id ||','''|| prm_work_table ||''','''|| re_state ||''','''','''',''0'','''
+                            || prm_year_begin_date ||''','''|| prm_year_end_date||''','''
+                            || prm_month_begin_date ||''','''|| prm_month_end_date||''' ) from dual ';   
+                                                                 
+               EXECUTE IMMEDIATE re_sql INTO re_money;
+            end if;
+            
+            if instr(prm_re_link,'MAT_ORDER')>0
+            then
+              select use_state into re_state from budg_c_main bcd 
+              where  bcd.group_id =prm_group_id
+                 and bcd.hos_id =prm_hos_id
+                 and bcd.copy_code =prm_copy_code
+                 and bcd.budg_year =prm_budg_year
+                 and bcd.plan_code ='05'
+                 and mod_code ='04'
+                 and link_code ='MAT_ORDER';
+                 
+                 re_sql := ' select fun_budg_matpur_matorderexec( ' || prm_group_id ||',' || prm_hos_id 
+                            ||','''|| prm_copy_code ||''' , '''|| prm_budg_year || ''','''|| prm_budg_month ||''' ,'
+                            || prm_dept_id || ',''' || prm_cont_l ||''','''|| prm_cont_p ||''','
+                            || prm_mat_type_id ||','''|| prm_work_table ||''','''|| re_state ||''','''','''',''0'','''
+                            || prm_year_begin_date ||''','''|| prm_year_end_date||''','''
+                            || prm_month_begin_date ||''','''|| prm_month_end_date||''' ) from dual ';   
+                                                                  
+               EXECUTE IMMEDIATE re_sql INTO re_money2;
+            end if;
+              
+            return nvl(exec_money,0)+ nvl(re_money,0)+nvl(re_money2,0) ;
+        
+        EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+                return 0;
+            WHEN OTHERS THEN
+                return 0;
+        
+        END fun_budg_matpur_matinexec;             
+    ]]></sql>
+    <sql id="fun_budg_matpur_matinplan" type="fun" desc=""><![CDATA[
+       CREATE OR REPLACE FUNCTION fun_budg_matpur_matinplan(prm_group_id  IN VARCHAR2, --集团
+                                              prm_hos_id    IN VARCHAR2, --医院
+                                              prm_copy_code    IN VARCHAR2, --账套
+                                              prm_budg_year IN VARCHAR2, --年度
+                                              prm_budg_month IN VARCHAR2, --月份
+                                              prm_dept_id IN VARCHAR2, --预算科室Id
+                                              prm_cont_l IN VARCHAR2, --控制层次
+                                              prm_cont_p IN VARCHAR2, --控制期间
+                                              prm_mat_type_id  IN VARCHAR2, --预算项 物资分类
+                                              prm_budg_table in VARCHAR2 --预算表
+                                              ) RETURN number
+        IS
+            item_money  number ;
+        BEGIN
+            if prm_budg_table ='BUDG_MAT_PUR' 
+            then
+            select sum(pur_budg) into item_money
+             from BUDG_MAT_PUR
+             where group_id =prm_group_id
+               and hos_id=prm_hos_id
+               and copy_code=prm_copy_code
+               and year=prm_budg_year
+               and( ( prm_cont_p ='03' and month= prm_budg_month )
+                  or (prm_cont_p ='02' and month <= prm_budg_month )
+                  or prm_cont_p ='01'
+                 )
+               and (prm_mat_type_id =-1 or mat_type_id =prm_mat_type_id )
+               and (prm_dept_id =0);
+            end if;
+            
+            if item_money is null then
+                return -1;
+            else
+                return item_money;
+            end if;
+        
+        EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+                return -1;
+            WHEN OTHERS THEN
+                return -1;
+        
+        END fun_budg_matpur_matinplan;
+               
+    ]]></sql>
+    <sql id="fun_budg_mat_matapplyexec" type="fun" desc=""><![CDATA[
+        CREATE OR REPLACE FUNCTION fun_budg_mat_matapplyexec(prm_group_id  IN VARCHAR2, --集团
+                                              prm_hos_id    IN VARCHAR2, --医院
+                                              prm_copy_code    IN VARCHAR2, --账套
+                                              prm_budg_year IN VARCHAR2, --年度
+                                              prm_budg_month IN VARCHAR2, --月份
+                                              prm_dept_id IN VARCHAR2, --科室Id
+                                              prm_cont_l IN VARCHAR2, --控制层次
+                                              prm_cont_p IN VARCHAR2, --控制期间
+                                              prm_mat_type_id  IN VARCHAR2, --预算项 物资分类
+                                              prm_work_table in VARCHAR2, --业务表
+                                              prm_work_table_state in VARCHAR2, --业务表状态值
+                                              prm_re_link in VARCHAR2, --预算关联环节
+                                              prm_re_state in VARCHAR2, --预算关联环节业务表状态值
+                                              prm_work_select_id in varchar2, --去掉本次选择的表
+                                              prm_year_begin_date in varchar2, --年启始日期
+                                              prm_year_end_date in varchar2,   --年末日期
+                                              prm_month_begin_date in varchar2, --月启日期
+                                              prm_month_end_date in varchar2  --月末日期
+                                              ) RETURN number
+        IS
+            exec_money number ;
+            re_state varchar2(20);
+            re_money number ;
+            re_sql varchar2(4000);
+        BEGIN
+           
+            if prm_work_table ='BUDG_MAT' 
+            then
+        
+            select sum(mod.app_amount*mi.plan_price) into exec_money
+            from MAT_APPLY_MAIN mom
+           left join mat_apply_detail mod
+                on mom.group_id=mod.group_id
+                and mom.hos_id=mod.hos_id
+                and mom.copy_code=mod.copy_code
+                and mom.apply_id=mod.apply_id
+            left join mat_inv_dict mi
+                on mod.group_id=mi.group_id
+                and mod.hos_id=mi.hos_id
+                and mod.copy_code=mi.copy_code
+                and mod.inv_id=mi.inv_id
+                and mi.is_stop=0
+            left join mat_type_dict  mt2
+               on mi.group_id =mt2.group_id
+               and mi.hos_id =mt2.hos_id
+               and mi.copy_code=mt2.copy_code
+               and mi.mat_type_id = mt2.mat_type_id
+               and mt2.is_stop =0
+            left join hos_dept_dict hdd
+                 on mom.group_id =hdd.group_id
+                 and mom.hos_id =hdd.hos_id
+                 and mom.dept_id = hdd.dept_id
+                 and hdd.is_stop = 0  
+            left join
+               (
+               select mt.mat_type_code,mt.mat_type_id
+            from  BUDG_C_DET bcd
+             left join mat_type_dict mt
+               on bcd.group_id = mt.group_id
+               and bcd.hos_id = mt.hos_id
+               and bcd.copy_code=mt.copy_code
+               and bcd.item_code = mt.mat_type_id
+               and mt.is_stop =0
+               where bcd.group_id =prm_group_id
+                 and bcd.hos_id =prm_hos_id
+                 and bcd.copy_code =prm_copy_code
+                 and bcd.budg_year =prm_budg_year
+                 and bcd.plan_code ='0103'
+                 and mod_code ='04'
+                 and link_code ='MAT_APPLY'
+                 and bcd.cont_w is not null
+                 and bcd.cont_l is not null
+                 and bcd.cont_p is not null
+               ) budg_type_table on mt2.mat_type_code like budg_type_table.mat_type_code ||'%'
+             left join (
+                select ada.dept_id, hd.dept_code from ACC_DEPT_ATTR ada
+                 left join hos_dept_dict hd on ada.group_id=hd.group_id
+                      and ada.hos_id =hd.hos_id
+                      and ada.dept_id = hd.dept_id
+                      and hd.is_stop =0
+                   where ada.group_id =prm_group_id
+                   and ada.hos_id=prm_hos_id
+                   and ada.is_budg =1
+             ) budg_dept_table on hdd.dept_code like budg_dept_table.dept_code||'%'
+        
+             where mom.group_id=prm_group_id
+             and mom.hos_id=prm_hos_id
+             and mom.copy_code=prm_copy_code
+             
+             and mom.state in (
+                 SELECT REGEXP_SUBSTR ( prm_work_table_state , '[^,]+', 1,rownum) state
+                        from dual connect by rownum <=LENGTH (prm_work_table_state) - LENGTH (regexp_replace(prm_work_table_state, ',', ''))+1
+             )
+             
+             and mom.apply_id not in (
+                 SELECT REGEXP_SUBSTR ( prm_work_select_id , '[^,]+', 1,rownum) apply_id
+                        from dual connect by rownum <=LENGTH (prm_work_select_id) - LENGTH (regexp_replace(prm_work_select_id, ',', ''))+1
+             )
+             
+             and (
+                 ( prm_cont_p ='03' and (( to_date(to_char(mom.app_date,'YYYY-MM-DD'),'YYYY-MM-DD')  between to_date(prm_month_begin_date,'YYYY-MM-DD') and to_date(prm_month_end_date,'YYYY-MM-DD')) or ( to_date(to_char(mom.check_date,'YYYY-MM-DD'),'YYYY-MM-DD')  between to_date(prm_month_begin_date,'YYYY-MM-DD')   and to_date(prm_month_end_date,'YYYY-MM-DD') )  or (to_date(to_char(mom.send_date,'YYYY-MM-DD'),'YYYY-MM-DD')  between to_date(prm_month_begin_date,'YYYY-MM-DD')  and to_date(prm_month_end_date,'YYYY-MM-DD')  )))
+                   or
+                 ( prm_cont_p ='02' and (( to_date(to_char(mom.app_date,'YYYY-MM-DD'),'YYYY-MM-DD') between to_date(prm_year_begin_date,'YYYY-MM-DD') and to_date(prm_month_end_date,'YYYY-MM-DD')) or   (to_date(to_char(mom.check_date,'YYYY-MM-DD'),'YYYY-MM-DD') between to_date(prm_year_begin_date,'YYYY-MM-DD')   and  to_date(prm_month_end_date,'YYYY-MM-DD')  ) or (to_date(to_char(mom.send_date,'YYYY-MM-DD'),'YYYY-MM-DD')  between to_date(prm_year_begin_date,'YYYY-MM-DD')   and to_date(prm_month_end_date,'YYYY-MM-DD')  )))
+                  or
+                 ( prm_cont_p ='01' and (( to_date(to_char(mom.app_date,'YYYY-MM-DD'),'YYYY-MM-DD') between to_date(prm_year_begin_date,'YYYY-MM-DD')   and to_date(prm_year_end_date,'YYYY-MM-DD')) or  (to_date(to_char(mom.check_date,'YYYY-MM-DD'),'YYYY-MM-DD') between to_date(prm_year_begin_date,'YYYY-MM-DD')  and to_date(prm_year_end_date,'YYYY-MM-DD') ) or (to_date(to_char(mom.send_date,'YYYY-MM-DD'),'YYYY-MM-DD')  between to_date(prm_year_begin_date,'YYYY-MM-DD')   and to_date(prm_year_end_date,'YYYY-MM-DD')   )))
+             )
+             
+            and (prm_dept_id =0 or budg_dept_table.dept_id =prm_dept_id )
+            and (prm_mat_type_id =-1
+                 or (prm_mat_type_id =-2 and budg_type_table.mat_type_id is not null)
+                 or budg_type_table.mat_type_id = prm_mat_type_id
+                )
+            ;
+             end if;
+            if prm_re_link = 'MAT_OUT' 
+            then
+              select use_state into re_state from budg_c_main bcd 
+              where  bcd.group_id =prm_group_id
+                 and bcd.hos_id =prm_hos_id
+                 and bcd.copy_code =prm_copy_code
+                 and bcd.budg_year =prm_budg_year
+                 and bcd.plan_code ='0103'
+                 and mod_code ='04'
+                 and link_code ='MAT_OUT';
+              
+                 re_sql := ' select fun_budg_mat_matoutexec( ' || prm_group_id ||',' || prm_hos_id 
+                            ||','''|| prm_copy_code ||''' , '''|| prm_budg_year || ''','''|| prm_budg_month ||''' ,'
+                            || prm_dept_id || ',''' || prm_cont_l ||''','''|| prm_cont_p ||''','
+                            || prm_mat_type_id ||','''|| prm_work_table ||''','''|| re_state ||''','''','''',''0'','''
+                            || prm_year_begin_date ||''','''|| prm_year_end_date||''','''
+                            || prm_month_begin_date ||''','''|| prm_month_end_date||''' ) from dual ';   
+                 dbms_output.put_line(nvl(re_sql,'adfaf'));                                                  
+               EXECUTE IMMEDIATE re_sql INTO re_money;
+            end if;
+             dbms_output.put_line(nvl(exec_money,0));
+              dbms_output.put_line(nvl(re_money,0));
+            return nvl(exec_money,0)+nvl(re_money,0);
+        EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+                return 0;
+            WHEN OTHERS THEN
+                return 0;
+        
+        END fun_budg_mat_matapplyexec;
+    ]]></sql>
+    <sql id="fun_budg_medcost_matapplyexec" type="fun" desc=""><![CDATA[
+        CREATE OR REPLACE FUNCTION fun_budg_medcost_matapplyexec(prm_group_id  IN VARCHAR2, --集团
+                                              prm_hos_id    IN VARCHAR2, --医院
+                                              prm_copy_code    IN VARCHAR2, --账套
+                                              prm_budg_year IN VARCHAR2, --年度
+                                              prm_budg_month IN VARCHAR2, --月份
+                                              prm_dept_id IN VARCHAR2, --科室Id
+                                              prm_cont_l IN VARCHAR2, --控制层次
+                                              prm_cont_p IN VARCHAR2, --控制期间
+                                              prm_mat_type_id  IN VARCHAR2, --预算项 物资分类 预算支出科目
+                                              prm_work_table in VARCHAR2, --业务表
+                                              prm_work_table_state in VARCHAR2, --业务表状态值
+                                              prm_re_link in VARCHAR2, --预算关联环节
+                                              prm_re_state in VARCHAR2, --预算关联环节业务表状态值
+                                              prm_work_select_id in varchar2, --去掉本次选择的表
+                                              prm_year_begin_date in varchar2, --年启始日期
+                                              prm_year_end_date in varchar2,   --年末日期
+                                              prm_month_begin_date in varchar2, --月启日期
+                                              prm_month_end_date in varchar2  --月末日期
+                                              ) RETURN number
+        IS
+            exec_money number ;
+            re_state varchar2(20);
+            re_money number ;
+             re_sql varchar2(4000);
+        BEGIN
+           
+            if prm_work_table ='BUDG_MED_COST' or prm_work_table ='BUDG_MED_COST_DY' or prm_work_table ='BUDG_MED_COST_HY' 
+            then
+            select sum(mod.app_amount * mi.plan_price) into exec_money
+            from MAT_APPLY_MAIN mom
+           left join mat_apply_detail mod
+                on mom.group_id=mod.group_id
+                and mom.hos_id=mod.hos_id
+                and mom.copy_code=mod.copy_code
+                and mom.apply_id=mod.apply_id
+            left join mat_inv_dict mi
+                on mod.group_id=mi.group_id
+                and mod.hos_id=mi.hos_id
+                and mod.copy_code=mi.copy_code
+                and mod.inv_id=mi.inv_id
+                and mi.is_stop =0
+            left join mat_type_dict  mt2
+               on mi.group_id =mt2.group_id
+               and mi.hos_id =mt2.hos_id
+               and mi.copy_code=mt2.copy_code
+               and mi.mat_type_id = mt2.mat_type_id
+               and mt2.is_stop =0
+            left join
+                     ( 
+                     select mtd.mat_type_code,cost_subj_code 
+                       from BUDG_MAT_TYPE_SUBJ bmts
+                       left join mat_type_dict mtd 
+                      on mtd.group_id= bmts.group_id
+                      and mtd.hos_id = bmts.hos_id
+                      and mtd.copy_code =bmts.copy_code
+                      and mtd.mat_type_id = bmts.mat_type_id
+                      and mtd.is_stop =0
+                      where bmts.group_id =prm_group_id
+                      and bmts.hos_id = prm_hos_id
+                      and bmts.copy_code= prm_copy_code
+                      and bmts.budg_year =prm_budg_year
+                    ) budg_subj on mt2.mat_type_code like budg_subj.mat_type_code ||'%'
+                    
+            left join hos_dept_dict hdd
+                 on mom.group_id =hdd.group_id
+                 and mom.hos_id =hdd.hos_id
+                 and mom.dept_id = hdd.dept_id
+                 and hdd.is_stop = 0
+                 
+            left join
+               (
+               select bcd.item_code cost_subj_code, bcd.cont_l,bcd.cont_p,bcd.cont_w
+            from  BUDG_C_DET bcd
+               where bcd.group_id =prm_group_id
+                 and bcd.hos_id =prm_hos_id
+                 and bcd.copy_code =prm_copy_code
+                 and bcd.budg_year =prm_budg_year
+                 and bcd.plan_code ='01'
+                 and bcd.mod_code ='04'
+                 and bcd.link_code ='MAT_APPLY'
+                 and (prm_mat_type_id = -2 or 
+                     (
+                     prm_mat_type_id !=-2 and bcd.cont_w in('02','03') and bcd.cont_l is not null and bcd.cont_p is not null
+                     )
+                    )
+               ) budg_type_table on budg_subj.cost_subj_code=budg_type_table.cost_subj_code
+             left join (
+                select ada.dept_id, hd.dept_code from ACC_DEPT_ATTR ada
+                 left join hos_dept_dict hd on ada.group_id=hd.group_id
+                      and ada.hos_id =hd.hos_id
+                      and ada.dept_id = hd.dept_id
+                      and hd.is_stop =0
+                   where ada.group_id =prm_group_id
+                   and ada.hos_id=prm_hos_id
+                   and ada.is_budg =1
+             ) budg_dept_table on hdd.dept_code like budg_dept_table.dept_code||'%'
+             left join (
+              select duty_dept_id, dept_id, subj_code
+              from BUDG_COST_DUTY_DEPT bcdd
+              where bcdd.group_id = prm_group_id
+                and bcdd.hos_id = prm_hos_id
+                and bcdd.copy_code = prm_copy_code
+                and bcdd.budg_year = prm_budg_year
+            ) duty_dept_table on budg_dept_table.dept_id = duty_dept_table.dept_id
+                and budg_type_table.cost_subj_code = duty_dept_table.subj_code
+                
+             where mom.group_id=prm_group_id
+             and mom.hos_id=prm_hos_id
+             and mom.copy_code=prm_copy_code
+             and mom.state in (
+                 SELECT REGEXP_SUBSTR ( prm_work_table_state , '[^,]+', 1,rownum) state
+                        from dual connect by rownum <=LENGTH (prm_work_table_state) - LENGTH (regexp_replace(prm_work_table_state, ',', ''))+1
+             )
+             
+             and mom.apply_id not in (
+                 SELECT REGEXP_SUBSTR ( prm_work_select_id , '[^,]+', 1,rownum) apply_id
+                        from dual connect by rownum <=LENGTH (prm_work_select_id) - LENGTH (regexp_replace(prm_work_select_id, ',', ''))+1
+             )
+             
+             and (
+                 ( prm_cont_p ='03' and (( to_date(to_char(mom.app_date,'YYYY-MM-DD'),'YYYY-MM-DD')  between to_date(prm_month_begin_date,'YYYY-MM-DD') and to_date(prm_month_end_date,'YYYY-MM-DD')) or (to_date(to_char(mom.check_date,'YYYY-MM-DD'),'YYYY-MM-DD')  between to_date(prm_month_begin_date,'YYYY-MM-DD')   and to_date(prm_month_end_date,'YYYY-MM-DD') )  or (to_date(to_char(mom.send_date,'YYYY-MM-DD'),'YYYY-MM-DD')  between to_date(prm_month_begin_date,'YYYY-MM-DD')  and to_date(prm_month_end_date,'YYYY-MM-DD')  )))
+                   or
+                 ( prm_cont_p ='02' and (( to_date(to_char(mom.app_date,'YYYY-MM-DD'),'YYYY-MM-DD') between to_date(prm_year_begin_date,'YYYY-MM-DD') and to_date(prm_month_end_date,'YYYY-MM-DD')) or (to_date(to_char(mom.check_date,'YYYY-MM-DD'),'YYYY-MM-DD') between to_date(prm_year_begin_date,'YYYY-MM-DD')   and  to_date(prm_month_end_date,'YYYY-MM-DD')  ) or (to_date(to_char(mom.send_date,'YYYY-MM-DD'),'YYYY-MM-DD') between to_date(prm_year_begin_date,'YYYY-MM-DD')   and to_date(prm_month_end_date,'YYYY-MM-DD')  )))
+                  or
+                 ( prm_cont_p ='01' and (( to_date(to_char(mom.app_date,'YYYY-MM-DD'),'YYYY-MM-DD') between to_date(prm_year_begin_date,'YYYY-MM-DD')   and to_date(prm_year_end_date,'YYYY-MM-DD')) or (to_date(to_char(mom.check_date,'YYYY-MM-DD'),'YYYY-MM-DD') between to_date(prm_year_begin_date,'YYYY-MM-DD')  and to_date(prm_year_end_date,'YYYY-MM-DD') ) or (to_date(to_char(mom.send_date,'YYYY-MM-DD'),'YYYY-MM-DD') between to_date(prm_year_begin_date,'YYYY-MM-DD')   and to_date(prm_year_end_date,'YYYY-MM-DD')   )))
+             )
+            and (prm_dept_id =0 or ((prm_cont_l!='02' and budg_dept_table.dept_id =prm_dept_id) 
+                                     or  (prm_cont_l ='02' and duty_dept_table.duty_dept_id =prm_dept_id)
+                                   )
+                 )
+            and (prm_mat_type_id =-1 or 
+                (prm_mat_type_id =-2 and budg_type_table.cost_subj_code is not null)
+                or budg_type_table.cost_subj_code = prm_mat_type_id      
+                )
+            ;
+             end if;
+             
+             if prm_re_link = 'MAT_OUT' 
+                    then
+                      select use_state into re_state from budg_c_main bcd 
+                      where  bcd.group_id =prm_group_id
+                         and bcd.hos_id =prm_hos_id
+                         and bcd.copy_code =prm_copy_code
+                         and bcd.budg_year =prm_budg_year
+                         and bcd.plan_code ='01'
+                         and mod_code ='04'
+                         and link_code ='MAT_OUT';
+                      
+                       re_sql := ' select fun_budg_medcost_matoutexec( ' || prm_group_id ||',' || prm_hos_id 
+                            ||','''|| prm_copy_code ||''' , '''|| prm_budg_year || ''','''|| prm_budg_month ||''' ,'
+                            || prm_dept_id || ',''' || prm_cont_l ||''','''|| prm_cont_p ||''','
+                            || prm_mat_type_id ||','''|| prm_work_table ||''','''|| re_state ||''','''','''',''0'','''
+                            || prm_year_begin_date ||''','''|| prm_year_end_date||''','''
+                            || prm_month_begin_date ||''','''|| prm_month_end_date||''' ) from dual ';                                          
+                        EXECUTE IMMEDIATE re_sql INTO re_money;
+               
+                    end if;
+                    
+        
+            return nvl(exec_money,0)+nvl(re_money,0);
+        
+        EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+                return 0;
+            WHEN OTHERS THEN
+                return 0;
+        
+        END fun_budg_medcost_matapplyexec;
+    ]]></sql>
+    <sql id="fun_budg_matpur_matpurexec" type="fun" desc=""><![CDATA[
+        CREATE OR REPLACE FUNCTION fun_budg_matpur_matpurexec(prm_group_id  IN VARCHAR2, --集团
+                                              prm_hos_id    IN VARCHAR2, --医院
+                                              prm_copy_code    IN VARCHAR2, --账套
+                                              prm_budg_year IN VARCHAR2, --年度
+                                              prm_budg_month IN VARCHAR2, --月份
+                                              prm_dept_id IN VARCHAR2, --科室Id
+                                              prm_cont_l IN VARCHAR2, --控制层次
+                                              prm_cont_p IN VARCHAR2, --控制期间
+                                              prm_mat_type_id  IN VARCHAR2, --预算项 物资分类
+                                              prm_work_table in VARCHAR2, --业务表
+                                              prm_work_table_state in VARCHAR2, --业务表状态值
+                                              prm_re_link in VARCHAR2, --预算关联环节
+                                              prm_re_state in VARCHAR2, --预算关联环节业务表状态值
+                                              prm_work_select_id in varchar2, --去掉本次选择的表
+                                              prm_year_begin_date in varchar2, --年启始日期
+                                              prm_year_end_date in varchar2,   --年末日期
+                                              prm_month_begin_date in varchar2, --月启日期
+                                              prm_month_end_date in varchar2  --月末日期
+                                              ) RETURN number
+        IS
+            exec_money number ;
+            re_state varchar2(20);
+            re_money number ; 
+            re_money2 number ;
+            re_sql varchar2(4000);
+        BEGIN
+           
+            if prm_work_table ='BUDG_MAT_PUR' 
+            then
+        
+            select sum(mod.amount * mod.price) into exec_money
+            from MAT_PUR_MAIN mom
+           left join mat_pur_detail mod
+                on mom.group_id=mod.group_id
+                and mom.hos_id=mod.hos_id
+                and mom.copy_code=mod.copy_code
+                and mom.pur_id=mod.pur_id
+            left join mat_inv_dict mi
+                on mod.group_id=mi.group_id
+                and mod.hos_id=mi.hos_id
+                and mod.copy_code=mi.copy_code
+                and mod.inv_id=mi.inv_id
+                and mi.is_stop=0
+            left join mat_type_dict  mt2
+               on mi.group_id =mt2.group_id
+               and mi.hos_id =mt2.hos_id
+               and mi.copy_code=mt2.copy_code
+               and mi.mat_type_id = mt2.mat_type_id
+               and mt2.is_stop =0
+            
+            left join
+               (
+               select mt.mat_type_code,mt.mat_type_id, bcd.cont_l,bcd.cont_p,bcd.cont_w
+            from  BUDG_C_DET bcd
+             left join mat_type_dict mt
+               on bcd.group_id = mt.group_id
+               and bcd.hos_id = mt.hos_id
+               and bcd.copy_code=mt.copy_code
+               and bcd.item_code = mt.mat_type_id
+               and mt.is_stop =0
+               where bcd.group_id =prm_group_id
+                 and bcd.hos_id =prm_hos_id
+                 and bcd.copy_code =prm_copy_code
+                 and bcd.budg_year =prm_budg_year
+                 and bcd.plan_code ='05'
+                 and mod_code ='04'
+                 and link_code ='MAT_PUR'
+                 and bcd.cont_w is not null
+                 and bcd.cont_l is not null
+                 and bcd.cont_p is not null
+               ) budg_type_table on mt2.mat_type_code like budg_type_table.mat_type_code ||'%'
+             
+             where mom.group_id=prm_group_id
+             and mom.hos_id=prm_hos_id
+             and mom.copy_code=prm_copy_code 
+             
+             and mom.state in (
+                 SELECT REGEXP_SUBSTR ( prm_work_table_state , '[^,]+', 1,rownum) state
+                        from dual connect by rownum <=LENGTH (prm_work_table_state) - LENGTH (regexp_replace(prm_work_table_state, ',', ''))+1
+             ) 
+             and mom.pur_id not in (
+                 SELECT REGEXP_SUBSTR ( prm_work_select_id , '[^,]+', 1,rownum) pur_id
+                        from dual connect by rownum <=LENGTH (prm_work_select_id) - LENGTH (regexp_replace(prm_work_select_id, ',', ''))+1
+             )
+             and (
+                 ( prm_cont_p ='03' and (( to_date(to_char(mom.make_date,'YYYY-MM-DD'),'YYYY-MM-DD')  between to_date(prm_month_begin_date,'YYYY-MM-DD') and to_date(prm_month_end_date,'YYYY-MM-DD')) or (to_date(to_char(mom.check_date,'YYYY-MM-DD'),'YYYY-MM-DD')  between to_date(prm_month_begin_date,'YYYY-MM-DD') and to_date(prm_month_end_date,'YYYY-MM-DD') )  ))
+                   or
+                 ( prm_cont_p ='02' and (( to_date(to_char(mom.make_date,'YYYY-MM-DD'),'YYYY-MM-DD') between to_date(prm_year_begin_date,'YYYY-MM-DD') and to_date(prm_month_end_date,'YYYY-MM-DD')) or   (to_date(to_char(mom.check_date,'YYYY-MM-DD'),'YYYY-MM-DD') between to_date(prm_year_begin_date,'YYYY-MM-DD')   and  to_date(prm_month_end_date,'YYYY-MM-DD')  ) ))
+                  or
+                 ( prm_cont_p ='01' and (( to_date(to_char(mom.make_date,'YYYY-MM-DD'),'YYYY-MM-DD') between to_date(prm_year_begin_date,'YYYY-MM-DD')   and to_date(prm_year_end_date,'YYYY-MM-DD')) or  (to_date(to_char(mom.check_date,'YYYY-MM-DD'),'YYYY-MM-DD') between to_date(prm_year_begin_date,'YYYY-MM-DD')  and to_date(prm_year_end_date,'YYYY-MM-DD') ) ))
+             )    
+            and (prm_dept_id =0 )
+            and (prm_mat_type_id =-1 or budg_type_table.mat_type_id = prm_mat_type_id)
+            
+            ;
+             end if;
+             
+             if instr(prm_re_link,'MAT_IN')>0
+            then
+              select use_state into re_state from budg_c_main bcd 
+              where  bcd.group_id =prm_group_id
+                 and bcd.hos_id =prm_hos_id
+                 and bcd.copy_code =prm_copy_code
+                 and bcd.budg_year =prm_budg_year
+                 and bcd.plan_code ='05'
+                 and mod_code ='04'
+                 and link_code ='MAT_IN';
+              
+                 re_sql := ' select fun_budg_matpur_matinexec( ' || prm_group_id ||',' || prm_hos_id 
+                            ||','''|| prm_copy_code ||''' , '''|| prm_budg_year || ''','''|| prm_budg_month ||''' ,'
+                            || prm_dept_id || ',''' || prm_cont_l ||''','''|| prm_cont_p ||''','
+                            || prm_mat_type_id ||','''|| prm_work_table ||''','''|| re_state ||''','''','''',''0'','''
+                            || prm_year_begin_date ||''','''|| prm_year_end_date||''','''
+                            || prm_month_begin_date ||''','''|| prm_month_end_date||''' ) from dual ';   
+                                                             
+               EXECUTE IMMEDIATE re_sql INTO re_money;
+            end if;
+            
+            if instr(prm_re_link,'MAT_ORDER')>0
+            then
+              select use_state into re_state from budg_c_main bcd 
+              where  bcd.group_id =prm_group_id
+                 and bcd.hos_id =prm_hos_id
+                 and bcd.copy_code =prm_copy_code
+                 and bcd.budg_year =prm_budg_year
+                 and bcd.plan_code ='05'
+                 and mod_code ='04'
+                 and link_code ='MAT_ORDER';
+                 
+                 re_sql := ' select fun_budg_matpur_matorderexec( ' || prm_group_id ||',' || prm_hos_id 
+                            ||','''|| prm_copy_code ||''' , '''|| prm_budg_year || ''','''|| prm_budg_month ||''' ,'
+                            || prm_dept_id || ',''' || prm_cont_l ||''','''|| prm_cont_p ||''','
+                            || prm_mat_type_id ||','''|| prm_work_table ||''','''|| re_state ||''','''','''',''0'','''
+                            || prm_year_begin_date ||''','''|| prm_year_end_date||''','''
+                            || prm_month_begin_date ||''','''|| prm_month_end_date||''' ) from dual ';   
+                                                                  
+               EXECUTE IMMEDIATE re_sql INTO re_money2;
+            end if;
+              
+            return nvl(exec_money,0)+ nvl(re_money,0)+nvl(re_money2,0) ;
+           
+        
+        EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+                return 0;
+            WHEN OTHERS THEN
+                return 0;
+        
+        END fun_budg_matpur_matpurexec;
+    ]]></sql>
+    <sql id="fun_budg_matpur_matorderexec" type="fun" desc=""><![CDATA[
+        CREATE OR REPLACE FUNCTION fun_budg_matpur_matorderexec(prm_group_id  IN VARCHAR2, --集团
+                                              prm_hos_id    IN VARCHAR2, --医院
+                                              prm_copy_code    IN VARCHAR2, --账套
+                                              prm_budg_year IN VARCHAR2, --年度
+                                              prm_budg_month IN VARCHAR2, --月份
+                                              prm_dept_id IN VARCHAR2, --科室Id
+                                              prm_cont_l IN VARCHAR2, --控制层次
+                                              prm_cont_p IN VARCHAR2, --控制期间
+                                              prm_mat_type_id  IN VARCHAR2, --预算项 物资分类
+                                              prm_work_table in VARCHAR2, --业务表
+                                              prm_work_table_state in VARCHAR2, --业务表状态值
+                                              prm_re_link in VARCHAR2, --预算关联环节
+                                              prm_re_state in VARCHAR2, --预算关联环节业务表状态值
+                                              prm_work_select_id in varchar2, --去掉本次选择的表
+                                              prm_year_begin_date in varchar2, --年启始日期
+                                              prm_year_end_date in varchar2,   --年末日期
+                                              prm_month_begin_date in varchar2, --月启日期
+                                              prm_month_end_date in varchar2  --月末日期
+                                              ) RETURN number
+        IS
+            exec_money number ;
+            re_state varchar2(20);
+            re_money number ; 
+            re_money2 number ;
+            re_sql varchar2(4000);
+        BEGIN
+           
+            if prm_work_table ='BUDG_MAT_PUR' 
+            then
+        
+            select sum(mod.amount * mod.price) into exec_money
+            from MAT_ORDER_MAIN mom
+           left join mat_order_detail mod
+                on mom.group_id=mod.group_id
+                and mom.hos_id=mod.hos_id
+                and mom.copy_code=mod.copy_code
+                and mom.order_id=mod.order_id
+            left join mat_inv_dict mi
+                on mod.group_id=mi.group_id
+                and mod.hos_id=mi.hos_id
+                and mod.copy_code=mi.copy_code
+                and mod.inv_id=mi.inv_id
+                and mi.is_stop=0
+            left join mat_type_dict  mt2
+               on mi.group_id =mt2.group_id
+               and mi.hos_id =mt2.hos_id
+               and mi.copy_code=mt2.copy_code
+               and mi.mat_type_id = mt2.mat_type_id
+               and mt2.is_stop =0          
+            left join
+               (
+               select mt.mat_type_code,mt.mat_type_id, bcd.cont_l,bcd.cont_p,bcd.cont_w
+            from  BUDG_C_DET bcd
+             left join mat_type_dict mt
+               on bcd.group_id = mt.group_id
+               and bcd.hos_id = mt.hos_id
+               and bcd.copy_code=mt.copy_code
+               and bcd.item_code = mt.mat_type_id
+               and mt.is_stop =0
+               where bcd.group_id =prm_group_id
+                 and bcd.hos_id =prm_hos_id
+                 and bcd.copy_code =prm_copy_code
+                 and bcd.budg_year =prm_budg_year
+                 and bcd.plan_code ='05'
+                 and mod_code ='04'
+                 and link_code ='MAT_ORDER'
+                 and bcd.cont_w is not null
+                 and bcd.cont_l is not null
+                 and bcd.cont_p is not null
+               ) budg_type_table on mt2.mat_type_code like budg_type_table.mat_type_code ||'%'
+             
+             where mom.group_id=prm_group_id
+             and mom.hos_id=prm_hos_id
+             and mom.copy_code=prm_copy_code 
+             
+             and mom.state in (
+                 SELECT REGEXP_SUBSTR ( prm_work_table_state , '[^,]+', 1,rownum) state
+                        from dual connect by rownum <=LENGTH (prm_work_table_state) - LENGTH (regexp_replace(prm_work_table_state, ',', ''))+1
+             ) 
+             and mom.order_id not in (
+                 SELECT REGEXP_SUBSTR ( prm_work_select_id , '[^,]+', 1,rownum) order_id
+                        from dual connect by rownum <=LENGTH (prm_work_select_id) - LENGTH (regexp_replace(prm_work_select_id, ',', ''))+1
+             )
+             and (
+                 ( prm_cont_p ='03' and (( to_date(to_char(mom.make_date,'YYYY-MM-DD'),'YYYY-MM-DD')  between to_date(prm_month_begin_date,'YYYY-MM-DD') and to_date(prm_month_end_date,'YYYY-MM-DD')) or ( to_date(to_char(mom.check_date,'YYYY-MM-DD'),'YYYY-MM-DD')  between to_date(prm_month_begin_date,'YYYY-MM-DD')   and to_date(prm_month_end_date,'YYYY-MM-DD') )  or ( to_date(to_char(mom.order_date,'YYYY-MM-DD'),'YYYY-MM-DD') between to_date(prm_month_begin_date,'YYYY-MM-DD')  and to_date(prm_month_end_date,'YYYY-MM-DD')  )))
+                   or
+                 ( prm_cont_p ='02' and (( to_date(to_char(mom.make_date,'YYYY-MM-DD'),'YYYY-MM-DD') between to_date(prm_year_begin_date,'YYYY-MM-DD') and to_date(prm_month_end_date,'YYYY-MM-DD')) or (  to_date(to_char(mom.check_date,'YYYY-MM-DD'),'YYYY-MM-DD') between to_date(prm_year_begin_date,'YYYY-MM-DD')   and  to_date(prm_month_end_date,'YYYY-MM-DD')  ) or (to_date(to_char(mom.order_date,'YYYY-MM-DD'),'YYYY-MM-DD') between to_date(prm_year_begin_date,'YYYY-MM-DD')   and to_date(prm_month_end_date,'YYYY-MM-DD')  )))
+                  or
+                 ( prm_cont_p ='01' and (( to_date(to_char(mom.make_date,'YYYY-MM-DD'),'YYYY-MM-DD') between to_date(prm_year_begin_date,'YYYY-MM-DD')   and to_date(prm_year_end_date,'YYYY-MM-DD')) or ( to_date(to_char(mom.check_date,'YYYY-MM-DD'),'YYYY-MM-DD') between to_date(prm_year_begin_date,'YYYY-MM-DD')  and to_date(prm_year_end_date,'YYYY-MM-DD') ) or     (to_date(to_char(mom.order_date,'YYYY-MM-DD'),'YYYY-MM-DD') between to_date(prm_year_begin_date,'YYYY-MM-DD')   and to_date(prm_year_end_date,'YYYY-MM-DD')   )))
+             )    
+            and (prm_dept_id =0 )
+            and (prm_mat_type_id =-1 or budg_type_table.mat_type_id = prm_mat_type_id)
+            
+            ;
+             end if;
+             
+             if instr(prm_re_link,'MAT_IN')>0
+            then
+              select use_state into re_state from budg_c_main bcd 
+              where  bcd.group_id =prm_group_id
+                 and bcd.hos_id =prm_hos_id
+                 and bcd.copy_code =prm_copy_code
+                 and bcd.budg_year =prm_budg_year
+                 and bcd.plan_code ='05'
+                 and mod_code ='04'
+                 and link_code ='MAT_IN';
+              
+                 re_sql := ' select fun_budg_matpur_matinexec( ' || prm_group_id ||',' || prm_hos_id 
+                            ||','''|| prm_copy_code ||''' , '''|| prm_budg_year || ''','''|| prm_budg_month ||''' ,'
+                            || prm_dept_id || ',''' || prm_cont_l ||''','''|| prm_cont_p ||''','
+                            || prm_mat_type_id ||','''|| prm_work_table ||''','''|| re_state ||''','''','''',''0'','''
+                            || prm_year_begin_date ||''','''|| prm_year_end_date||''','''
+                            || prm_month_begin_date ||''','''|| prm_month_end_date||''' ) from dual ';   
+                                               
+               EXECUTE IMMEDIATE re_sql INTO re_money;
+            end if;
+            
+            if instr(prm_re_link,'MAT_PUR')>0
+            then
+              select use_state into re_state from budg_c_main bcd 
+              where  bcd.group_id =prm_group_id
+                 and bcd.hos_id =prm_hos_id
+                 and bcd.copy_code =prm_copy_code
+                 and bcd.budg_year =prm_budg_year
+                 and bcd.plan_code ='05'
+                 and mod_code ='04'
+                 and link_code ='MAT_PUR';
+                 
+                 re_sql := ' select fun_budg_matpur_matpurexec( ' || prm_group_id ||',' || prm_hos_id 
+                            ||','''|| prm_copy_code ||''' , '''|| prm_budg_year || ''','''|| prm_budg_month ||''' ,'
+                            || prm_dept_id || ',''' || prm_cont_l ||''','''|| prm_cont_p ||''','
+                            || prm_mat_type_id ||','''|| prm_work_table ||''','''|| re_state ||''','''','''',''0'','''
+                            || prm_year_begin_date ||''','''|| prm_year_end_date||''','''
+                            || prm_month_begin_date ||''','''|| prm_month_end_date||''' ) from dual ';   
+                                                                  
+               EXECUTE IMMEDIATE re_sql INTO re_money2;
+            end if; 
+            return nvl(exec_money,0)+ nvl(re_money,0)+nvl(re_money2,0) ;
+           
+        
+        EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+                return 0;
+            WHEN OTHERS THEN
+                return 0;
+        
+        END fun_budg_matpur_matorderexec;
+        
+    ]]></sql>
+    <sql id="fun_budg_medcost_accvouchexec" type="fun" desc=""><![CDATA[
+    CREATE OR REPLACE FUNCTION fun_budg_medcost_accvouchexec(prm_group_id  IN VARCHAR2, --集团
+                                              prm_hos_id    IN VARCHAR2, --医院
+                                              prm_copy_code    IN VARCHAR2, --账套
+                                              prm_budg_year IN VARCHAR2, --年度
+                                              prm_budg_month IN VARCHAR2, --月份
+                                              prm_dept_id IN VARCHAR2, --科室Id
+                                              prm_cont_l IN VARCHAR2, --控制层次
+                                              prm_cont_p IN VARCHAR2, --控制期间
+                                              prm_mat_type_id  IN VARCHAR2, --预算项 物资分类 预算支出科目
+                                              prm_work_table in VARCHAR2, --业务表
+                                              prm_work_table_state in VARCHAR2, --业务表状态值
+                                              prm_re_link in VARCHAR2, --预算关联环节
+                                              prm_re_state in VARCHAR2, --预算关联环节业务表状态值
+                                              prm_work_select_id in varchar2, --去掉本次选择的表
+                                              prm_year_begin_date in varchar2, --年启始日期
+                                              prm_year_end_date in varchar2,   --年末日期
+                                              prm_month_begin_date in varchar2, --月启日期
+                                              prm_month_end_date in varchar2  --月末日期
+                                              ) RETURN number
+        IS
+            exec_money number ;
+            re_state varchar2(20);
+            re_money number ;
+            re_sql varchar2(4000);
+            month_begin_date date;
+            month_end_date date;
+            year_begin_date date;
+            year_end_date date;
+        BEGIN
+            month_begin_date:= to_date(prm_month_begin_date,'YYYY-MM-DD');
+            month_end_date := to_date(prm_month_end_date,'YYYY-MM-DD');
+            year_begin_date:= to_date(prm_year_begin_date,'YYYY-MM-DD');
+            year_end_date := to_date(prm_year_end_date,'YYYY-MM-DD');
+            
+            if prm_work_table ='BUDG_MED_COST' or prm_work_table ='BUDG_MED_COST_DY' or prm_work_table ='BUDG_MED_COST_HY' 
+            then
+            select sum(mod.debit) into exec_money
+            from acc_vouch mom
+            join acc_vouch_check mod
+                on mom.group_id=mod.group_id
+                and mom.hos_id=mod.hos_id
+                and mom.copy_code=mod.copy_code
+                and mom.acc_year =mod.acc_year
+                and mom.vouch_id=mod.vouch_id
+                and nvl(mod.DEBIT,0) !=0
+                and mod.check1_id is not null      
+            join acc_subj mi
+                on mod.group_id=mi.group_id
+                and mod.hos_id=mi.hos_id
+                and mod.copy_code=mi.copy_code
+                and mod.acc_year = mi.acc_year
+                and mod.subj_code=mi.subj_code
+                and mi.subj_type_code ='05'
+            join BUDG_ACC_SUBJ_SHIP bass 
+                on bass.group_id=prm_group_id
+                and  bass.hos_id=prm_hos_id
+                and  bass.copy_code=prm_copy_code
+                and  bass.budg_year=prm_budg_year
+                and  mod.subj_code= bass.ACC_SUBJ_CODE2     
+            join hos_dept_dict hdd
+                 on mom.group_id = hdd.group_id 
+                 and mom.hos_id =hdd.hos_id
+                 and mod.check1_id = hdd.dept_id
+                 and hdd.is_stop = 0               
+            left join
+               (
+              select bcd.item_code subj_code, bcd.cont_l,bcd.cont_p,bcd.cont_w
+               from  BUDG_C_DET bcd 
+                 where bcd.group_id =prm_group_id
+                   and bcd.hos_id =prm_hos_id
+                   and bcd.copy_code =prm_copy_code
+                   and bcd.budg_year = prm_budg_year
+                   and bcd.plan_code = '01'
+                   and bcd.link_code = 'ACC_VOUCH'
+                   and (prm_mat_type_id = -2 or 
+                     (
+                     prm_mat_type_id !=-2 and bcd.cont_w in('02','03') and bcd.cont_l is not null and bcd.cont_p is not null
+                     )
+                    )
+               ) budg_type_table on bass.subj_code=budg_type_table.subj_code
+             left join (
+                select ada.dept_id, hd.dept_code from ACC_DEPT_ATTR ada
+                 left join hos_dept_dict hd on ada.group_id=hd.group_id
+                      and ada.hos_id =hd.hos_id
+                      and ada.dept_id = hd.dept_id
+                      and hd.is_stop =0
+                   where ada.group_id =prm_group_id
+                   and ada.hos_id=prm_hos_id
+                   and ada.is_budg =1
+             ) budg_dept_table on hdd.dept_code like budg_dept_table.dept_code||'%'
+             left join (
+              select duty_dept_id, dept_id, subj_code
+              from BUDG_COST_DUTY_DEPT bcdd
+              where bcdd.group_id = prm_group_id
+                and bcdd.hos_id = prm_hos_id
+                and bcdd.copy_code = prm_copy_code
+                and bcdd.budg_year = prm_budg_year
+            ) duty_dept_table on budg_dept_table.dept_id = duty_dept_table.dept_id
+                and budg_type_table.subj_code = duty_dept_table.subj_code 
+             where mom.group_id=prm_group_id
+             and mom.hos_id=prm_hos_id
+             and mom.copy_code=prm_copy_code
+             and mom.state in (
+                 SELECT REGEXP_SUBSTR ( prm_work_table_state , '[^,]+', 1,rownum) state
+                        from dual connect by rownum <=LENGTH (prm_work_table_state) - LENGTH (regexp_replace(prm_work_table_state, ',', ''))+1
+             )
+             and mom.vouch_id not in (
+                 SELECT REGEXP_SUBSTR ( prm_work_select_id , '[^,]+', 1,rownum) vouch_id
+                        from dual connect by rownum <=LENGTH (prm_work_select_id) - LENGTH (regexp_replace(prm_work_select_id, ',', ''))+1
+             )
+           --  vouch_date,create_date,CASHE_DATE,AUDIT_DATE,ACC_DATE 
+             
+             and (
+                 ( prm_cont_p ='03' and (
+                                           (to_date(to_char(mom.vouch_date,'YYYY-MM-DD') ,'YYYY-MM-DD') between month_begin_date and month_end_date)                                       
+                                        or (to_date(to_char(mom.CASHE_DATE,'YYYY-MM-DD'),'YYYY-MM-DD') between month_begin_date and month_end_date)
+                                        or (to_date(to_char(mom.AUDIT_DATE,'YYYY-MM-DD'),'YYYY-MM-DD') between month_begin_date and month_end_date)
+                                        or (to_date(to_char(mom.ACC_DATE,'YYYY-MM-DD'),'YYYY-MM-DD') between month_begin_date and month_end_date)
+                                        )
+                 )
+                   or
+                 ( prm_cont_p ='02' and (
+                                           (to_date(to_char(mom.vouch_date,'YYYY-MM-DD') ,'YYYY-MM-DD') between year_begin_date and month_end_date)                               
+                                        or (to_date(to_char(mom.CASHE_DATE,'YYYY-MM-DD'),'YYYY-MM-DD') between year_begin_date and month_end_date)
+                                        or (to_date(to_char(mom.AUDIT_DATE,'YYYY-MM-DD'),'YYYY-MM-DD') between year_begin_date and month_end_date)
+                                        or (to_date(to_char(mom.ACC_DATE,'YYYY-MM-DD'),'YYYY-MM-DD') between year_begin_date and month_end_date)
+                                        )
+                 )
+                 or
+                 ( prm_cont_p ='01' and (
+                                           (to_date(to_char(mom.vouch_date,'YYYY-MM-DD') ,'YYYY-MM-DD') between year_begin_date and year_end_date)           
+                                        or (to_date(to_char(mom.CASHE_DATE,'YYYY-MM-DD'),'YYYY-MM-DD') between year_begin_date and year_end_date)
+                                        or (to_date(to_char(mom.AUDIT_DATE,'YYYY-MM-DD'),'YYYY-MM-DD') between year_begin_date and year_end_date)
+                                        or (to_date(to_char(mom.ACC_DATE,'YYYY-MM-DD'),'YYYY-MM-DD') between year_begin_date and year_end_date)
+                                        )
+                 ) 
+             )
+            
+            and (prm_dept_id =0 or ((prm_cont_l!='02' and budg_dept_table.dept_id =prm_dept_id) 
+                                     or  (prm_cont_l ='02' and duty_dept_table.duty_dept_id =prm_dept_id)
+                                   )
+                 )
+            and (prm_mat_type_id =-1 or 
+                (prm_mat_type_id =-2 and budg_type_table.subj_code is not null)
+                or budg_type_table.subj_code = prm_mat_type_id      
+                )
+            ;
+             end if;
+             
+        
+            return nvl(exec_money,0);
+        
+        EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+                return 0;
+            WHEN OTHERS THEN
+                return 0;
+        
+        END fun_budg_medcost_accvouchexec;
+    ]]></sql>
+     <sql id="fun_budgcont_budgassinplan" type="fun" desc=""><![CDATA[
+     CREATE OR REPLACE FUNCTION fun_budgcont_budgassinplan(prm_group_id  IN VARCHAR2, --集团
+                                              prm_hos_id    IN VARCHAR2, --医院
+                                              prm_copy_code    IN VARCHAR2, --账套
+                                              prm_budg_year IN VARCHAR2, --年度
+                                              prm_budg_month IN VARCHAR2, --月份
+
+                                              prm_cont_l IN VARCHAR2, --控制层次
+                                              prm_cont_p IN VARCHAR2, --控制期间
+                                              prm_ass_type_id  IN VARCHAR2 --资产分类ID
+
+                                              ) RETURN number
+        IS
+            item_money  number ;
+        BEGIN
+
+            select sum(PUR_BUDG) into item_money
+             from budg_asset_purchase
+             where group_id =prm_group_id
+               and hos_id=prm_hos_id
+               and copy_code=prm_copy_code
+               and budg_year=prm_budg_year
+               and( ( prm_cont_p ='03' and month= prm_budg_month )
+                  or (prm_cont_p ='02' and month <= prm_budg_month )
+                  or prm_cont_p ='01'
+                 )
+               and (prm_ass_type_id =-1 or ass_type_id =prm_ass_type_id );
+
+ if item_money is null then
+                return -1;
+            else
+                return item_money;
+            end if;
+
+        EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+                return -1;
+            WHEN OTHERS THEN
+                return -1;
+
+        END fun_budgcont_budgassinplan;
+     ]]></sql>
+       <sql id="fun_budgcont_budgassinoexec" type="fun" desc=""><![CDATA[
+          CREATE OR REPLACE FUNCTION fun_budgcont_budgassinoexec(prm_group_id  IN VARCHAR2, --集团
+                                                        prm_hos_id    IN VARCHAR2, --医院
+                                                        prm_copy_code    IN VARCHAR2, --账套
+                                                        prm_budg_year IN VARCHAR2, --年度
+                                                        prm_budg_month IN VARCHAR2, --月份
+                                                        prm_cont_l IN VARCHAR2, --控制层次
+                                                        prm_cont_p IN VARCHAR2, --控制期间
+                                                        prm_ass_type_id  IN VARCHAR2 ,--资产分类ID
+                                                        prm_work_table in VARCHAR2, --业务表
+                                                        prm_work_table_state in VARCHAR2, --业务表状态值
+                                                        prm_re_link in VARCHAR2, --预算关联环节
+                                                        prm_re_state in VARCHAR2, --预算关联环节业务表状态值
+                                                        prm_work_select_id in varchar2, --去掉本次选择的表
+                                                        prm_year_begin_date in varchar2, --年启始日期
+                                                        prm_year_end_date in varchar2,   --年末日期
+                                                        prm_month_begin_date in varchar2, --月启日期
+                                                        prm_month_end_date in varchar2,  --月末日期
+                                                        prm_ass_naturs  in varchar2 --资产性质
+                                                      
+                                                        ) RETURN number
+                  IS
+                      in_money number ;
+                      ba_money number ;
+                      exec_money number ;
+                      v_sql varchar(30000);
+                       d_sql varchar(30000);
+                  BEGIN 
+                      
+                   if  prm_ass_naturs= '01'
+                 then 
+                 select
+                                 nvl(sum(in_money),0） occur_value  into in_money
+                             from (
+           select typ.ass_type_id,aim.in_money in_money, budg_type_table.cont_l,budg_type_table.cont_p,budg_type_table.cont_w 
+           from ass_in_main_house  aim left join ass_in_detail_house adh  on aim.group_id = adh.group_id
+                                      and aim.hos_id = adh.hos_id
+                                      and aim.copy_code = adh.copy_code
+                                      and aim.ass_in_no = adh.ass_in_no
+                                     left join (select atd.ass_type_id, adi.ass_id
+                                                  from ASS_TYPE_DICT atd
+                                                  left join ass_dict adi
+                                                    on adi.group_id = atd.group_id
+                                                   and adi.hos_id = atd.hos_id
+                                                   and adi.copy_code = atd.copy_code
+                                                   and adi.ass_type_id = atd.ass_type_id
+                                                 where atd.group_id =prm_group_id
+                                                   and atd.hos_id =prm_hos_id
+                                                   and atd.copy_code = prm_copy_code
+                                                   and atd.ass_type_id in(
+                                                  select ad.ass_type_id
+                                                          from ass_dict ad
+                                                         where ad.ass_id in
+                                                               (select ass_id
+                                                                  from ass_in_detail_house adh
+                                         
+                                                                 where group_id=prm_group_id
+                       and hos_id=prm_hos_id
+                       and copy_code=prm_copy_code) )
+                                                ) typ
+                                       on adh.ass_id = typ.ass_id
+                                     left join (
+                                   select bcd.cont_l, bcd.cont_p, bcd.cont_w
+                                     from BUDG_C_DET bcd  where  bcd.group_id=prm_group_id and bcd.hos_id=prm_hos_id and bcd.copy_code=prm_copy_code and bcd.budg_year=prm_budg_year  and bcd.plan_code ='04'
+                                      and bcd.mod_code='05'
+                                      and bcd.link_code = 'ASS_IN'
+                                      and bcd.cont_w in ('02', '03')
+                                      and bcd.cont_l is not null
+                                      and bcd.cont_p is not null 
+                                      and bcd.item_code in(
+                                                  select ad.ass_type_id
+                                                          from ass_dict ad
+                                                         where ad.ass_id in
+                                                               (select ass_id
+                                                                  from ass_in_detail_HOUSE adh
+                                         
+                                                                 where group_id=prm_group_id
+                       and hos_id=prm_hos_id
+                       and copy_code=prm_copy_code) )
+                                      )budg_type_table on
+                                    1 = 1 where aim.group_id=prm_group_id and aim.hos_id=prm_hos_id and aim.copy_code=prm_copy_code 
+                                  and aim.state in (
+                         SELECT REGEXP_SUBSTR ( prm_work_table_state , '[^,]+', 1,rownum) state
+                                  from dual connect by rownum <=LENGTH (prm_work_table_state ) - LENGTH (regexp_replace(prm_work_table_state, ',', ''))+1 
+                      )
+                       and aim.ass_in_no not in (
+
+                           SELECT REGEXP_SUBSTR (prm_work_select_id, '[^,]+', 1,rownum) out_id
+                                  from dual connect by rownum <=LENGTH (prm_work_select_id) - LENGTH (regexp_replace(prm_work_select_id, ',',''))+1
+                       )
+                             and (
+                           ( prm_cont_p ='03' and ((aim.create_date between to_date(prm_month_begin_date,'YYYY-MM-DD') and to_date(prm_month_end_date,'YYYY-MM-DD')) or (aim.in_date between to_date(prm_month_begin_date,'YYYY-MM-DD')   and to_date(prm_month_end_date,'YYYY-MM-DD')     )))
+                             or
+                           ( prm_cont_p ='02' and ((aim.create_date between to_date(prm_year_begin_date,'YYYY-MM-DD') and to_date(prm_month_end_date,'YYYY-MM-DD')) or (aim.in_date between to_date(prm_year_begin_date,'YYYY-MM-DD')   and  to_date(prm_month_end_date,'YYYY-MM-DD')    )))
+                            or
+                           (prm_cont_p='01' and ((aim.create_date between to_date(prm_year_begin_date,'YYYY-MM-DD')   and to_date(prm_year_end_date,'YYYY-MM-DD')) or (aim.in_date between to_date(prm_year_begin_date,'YYYY-MM-DD')  and to_date(prm_year_end_date,'YYYY-MM-DD') )))
+                       )
+                       
+
+                 ) basic_data ;
+                   
+
+                 select nvl(sum(in_money),0） occur_value into ba_money
+                             from ( 
+                               
+                              select acg1.ass_id, aim.BACK_MONEY in_money ,  budg_type_table.cont_l,
+                              budg_type_table.cont_p,
+                              budg_type_table.cont_w from ass_back_house aim
+                    left join ass_back_DETAIL_house adh on aim.group_id=adh.group_id
+                    and aim.hos_id=adh.hos_id
+                    and aim.ASS_BACK_NO=adh.ASS_BACK_NO
+                    left join ass_card_house acg1 on adh.ass_card_no=acg1.ass_card_no
+             and  adh.group_id=acg1.group_id
+                    and adh.hos_id=acg1.hos_id
+                    and adh.copy_code=acg1.copy_code
+                    
+                    left join (
+                     select bcd.cont_l,bcd.cont_p,bcd.cont_w
+                         from  BUDG_C_det bcd 
+                           where bcd.group_id =prm_group_id
+                             and bcd.hos_id =prm_hos_id
+                             and bcd.copy_code =prm_copy_code
+                             and bcd.budg_year =prm_budg_year
+                             and bcd.plan_code = '04'
+                             and bcd.link_code ='ASS_IN'
+                             and bcd.cont_w in ('02')
+                             and bcd.cont_l is not null
+                             and bcd.cont_p is not null
+                                and bcd.item_code in(
+                                                  select ad.ass_type_id
+                                                          from ass_dict ad
+                                                         where ad.ass_id in
+                                                               (select ass_id
+                                                                  from ass_in_detail_HOUSE adh
+                                         
+                                                                 where group_id=prm_group_id
+                       and hos_id=prm_hos_id
+                       and copy_code=prm_copy_code
+                       and ASS_IN_NO=prm_work_select_id) )
+                    )budg_type_table on 1=1
+                    where aim.group_id =prm_group_id
+                             and aim.hos_id =prm_hos_id
+                             and acg1.ass_id in (select ass_id
+                                                                  from ass_in_detail_HOUSE adh
+                                         
+                                                                 where group_id=prm_group_id
+                       and hos_id=prm_hos_id
+                       and copy_code=prm_copy_code
+                       and ASS_IN_NO=prm_work_select_id)
+                             and (
+                           ( prm_cont_p ='03' and ((aim.create_date between to_date(prm_month_begin_date,'YYYY-MM-DD') and to_date(prm_month_end_date,'YYYY-MM-DD')) or (aim.BACK_DATE between to_date(prm_month_begin_date,'YYYY-MM-DD')   and to_date(prm_month_end_date,'YYYY-MM-DD')     )))
+                             or
+                            ( prm_cont_p ='02' and ((aim.create_date between to_date(prm_year_begin_date,'YYYY-MM-DD') and to_date(prm_month_end_date,'YYYY-MM-DD')) or (aim.BACK_DATE between to_date(prm_year_begin_date,'YYYY-MM-DD')   and  to_date(prm_month_end_date,'YYYY-MM-DD')    )))
+                            or
+                           (prm_cont_p='01' and ((aim.create_date between to_date(prm_year_begin_date,'YYYY-MM-DD')   and to_date(prm_year_end_date,'YYYY-MM-DD')) or (aim.BACK_DATE between to_date(prm_year_begin_date,'YYYY-MM-DD')  and to_date(prm_year_end_date,'YYYY-MM-DD') )))
+                       ) 
+                         group by acg1.ass_id, aim.BACK_MONEY ,budg_type_table.cont_l,
+                              budg_type_table.cont_p,
+                              budg_type_table.cont_w 
+                     );
+              else  if prm_ass_naturs= '02'
+                 then 
+                 select
+                                  nvl(sum(in_money),0） occur_value  into in_money
+                             from (
+           select typ.ass_type_id,aim.in_money in_money, budg_type_table.cont_l,budg_type_table.cont_p,budg_type_table.cont_w 
+           from ass_in_main_special  aim left join ass_in_detail_special adh  on aim.group_id = adh.group_id
+                                      and aim.hos_id = adh.hos_id
+                                      and aim.copy_code = adh.copy_code
+                                      and aim.ass_in_no = adh.ass_in_no
+                                     left join (select atd.ass_type_id, adi.ass_id
+                                                  from ASS_TYPE_DICT atd
+                                                  left join ass_dict adi
+                                                    on adi.group_id = atd.group_id
+                                                   and adi.hos_id = atd.hos_id
+                                                   and adi.copy_code = atd.copy_code
+                                                   and adi.ass_type_id = atd.ass_type_id
+                                                 where atd.group_id =prm_group_id
+                                                   and atd.hos_id =prm_hos_id
+                                                   and atd.copy_code = prm_copy_code
+                                                   and atd.ass_type_id in(
+                                                  select ad.ass_type_id
+                                                          from ass_dict ad
+                                                         where ad.ass_id in
+                                                               (select ass_id
+                                                                  from ass_in_detail_special adh
+                                         
+                                                                 where group_id=prm_group_id
+                       and hos_id=prm_hos_id
+                       and copy_code=prm_copy_code) )
+                                                ) typ
+                                       on adh.ass_id = typ.ass_id
+                                     left join (
+                                   select bcd.cont_l, bcd.cont_p, bcd.cont_w
+                                     from BUDG_C_DET bcd  where  bcd.group_id=prm_group_id and bcd.hos_id=prm_hos_id and bcd.copy_code=prm_copy_code and bcd.budg_year=prm_budg_year  and bcd.plan_code ='04'
+                                      and bcd.mod_code='05'
+                                      and bcd.link_code = 'ASS_IN'
+                                      and bcd.cont_w in ('02', '03')
+                                      and bcd.cont_l is not null
+                                      and bcd.cont_p is not null
+                                         and bcd.item_code in(
+                                                  select ad.ass_type_id
+                                                          from ass_dict ad
+                                                         where ad.ass_id in
+                                                               (select ass_id
+                                                                  from ass_in_detail_special adh
+                                         
+                                                                 where group_id=prm_group_id
+                       and hos_id=prm_hos_id
+                       and copy_code=prm_copy_code) ) )budg_type_table on
+                                    1 = 1 where aim.group_id=prm_group_id and aim.hos_id=prm_hos_id and aim.copy_code=prm_copy_code 
+                                  and aim.state in (
+                          SELECT REGEXP_SUBSTR ( prm_work_table_state , '[^,]+', 1,rownum) state
+                                  from dual connect by rownum <=LENGTH (prm_work_table_state ) - LENGTH (regexp_replace(prm_work_table_state, ',', ''))+1
+                      )
+                       and aim.ass_in_no not in (
+
+                           SELECT REGEXP_SUBSTR (prm_work_select_id, '[^,]+', 1,rownum) out_id
+                                  from dual connect by rownum <=LENGTH (prm_work_select_id) - LENGTH (regexp_replace(prm_work_select_id, ',',''))+1
+                       )
+                            and (
+                           ( prm_cont_p ='03' and ((aim.create_date between to_date(prm_month_begin_date,'YYYY-MM-DD') and to_date(prm_month_end_date,'YYYY-MM-DD')) or (aim.in_date between to_date(prm_month_begin_date,'YYYY-MM-DD')   and to_date(prm_month_end_date,'YYYY-MM-DD')     )))
+                             or
+                           ( prm_cont_p ='02' and ((aim.create_date between to_date(prm_year_begin_date,'YYYY-MM-DD') and to_date(prm_month_end_date,'YYYY-MM-DD')) or (aim.in_date between to_date(prm_year_begin_date,'YYYY-MM-DD')   and  to_date(prm_month_end_date,'YYYY-MM-DD')    )))
+                            or
+                           (prm_cont_p='01' and ((aim.create_date between to_date(prm_year_begin_date,'YYYY-MM-DD')   and to_date(prm_year_end_date,'YYYY-MM-DD')) or (aim.in_date between to_date(prm_year_begin_date,'YYYY-MM-DD')  and to_date(prm_year_end_date,'YYYY-MM-DD') )))
+                        )
+                    
+
+                 ) basic_data ;
+                   
+
+                 select  nvl(sum(in_money),0） occur_value into ba_money
+                             from ( 
+                               
+                              select acg1.ass_id, aim.BACK_MONEY in_money ,  budg_type_table.cont_l,
+                              budg_type_table.cont_p,
+                              budg_type_table.cont_w from ass_back_special aim
+                    left join ass_back_DETAIL_special adh on aim.group_id=adh.group_id
+                    and aim.hos_id=adh.hos_id
+                    and aim.ASS_BACK_NO=adh.ASS_BACK_NO
+                    left join ass_card_special acg1 on adh.ass_card_no=acg1.ass_card_no
+             and  adh.group_id=acg1.group_id
+                    and adh.hos_id=acg1.hos_id
+                    and adh.copy_code=acg1.copy_code
+                    
+                    left join (
+                     select bcd.cont_l,bcd.cont_p,bcd.cont_w
+                         from  BUDG_C_det bcd 
+                           where bcd.group_id =prm_group_id
+                             and bcd.hos_id =prm_hos_id
+                             and bcd.copy_code =prm_copy_code
+                             and bcd.budg_year =prm_budg_year
+                             and bcd.plan_code = '04'
+                             and bcd.link_code ='ASS_IN'
+                             and bcd.cont_w in ('02')
+                             and bcd.cont_l is not null
+                             and bcd.cont_p is not null
+                                and bcd.item_code in(
+                                                  select ad.ass_type_id
+                                                          from ass_dict ad
+                                                         where ad.ass_id in
+                                                               (select ass_id
+                                                                  from ass_in_detail_special adh
+                                         
+                                                                 where group_id=prm_group_id
+                       and hos_id=prm_hos_id
+                       and copy_code=prm_copy_code
+                       and ASS_IN_NO=prm_work_select_id
+                       ) )
+                    )budg_type_table on 1=1
+                    where aim.group_id =prm_group_id
+                             and aim.hos_id =prm_hos_id
+                             and acg1.ass_id in (select ass_id
+                                                                  from ass_in_detail_special adh
+                                         
+                                                                 where group_id=prm_group_id
+                       and hos_id=prm_hos_id
+                       and copy_code=prm_copy_code
+                       and ASS_IN_NO=prm_work_select_id)
+                              and (
+                           ( prm_cont_p ='03' and ((aim.create_date between to_date(prm_month_begin_date,'YYYY-MM-DD') and to_date(prm_month_end_date,'YYYY-MM-DD')) or (aim.BACK_DATE between to_date(prm_month_begin_date,'YYYY-MM-DD')   and to_date(prm_month_end_date,'YYYY-MM-DD')     )))
+                             or
+                           ( prm_cont_p ='02' and ((aim.create_date between to_date(prm_year_begin_date,'YYYY-MM-DD') and to_date(prm_month_end_date,'YYYY-MM-DD')) or (aim.BACK_DATE between to_date(prm_year_begin_date,'YYYY-MM-DD')   and  to_date(prm_month_end_date,'YYYY-MM-DD')    )))
+                            or
+                           (prm_cont_p='01' and ((aim.create_date between to_date(prm_year_begin_date,'YYYY-MM-DD')   and to_date(prm_year_end_date,'YYYY-MM-DD')) or (aim.BACK_DATE between to_date(prm_year_begin_date,'YYYY-MM-DD')  and to_date(prm_year_end_date,'YYYY-MM-DD') )))
+                      )
+                        group by acg1.ass_id, aim.BACK_MONEY ,budg_type_table.cont_l,
+                              budg_type_table.cont_p,
+                              budg_type_table.cont_w
+                      );
+                   
+                ELSIF  prm_ass_naturs= '03'
+                 then 
+                 select
+                                 nvl(sum(in_money),0） occur_value  into in_money
+                             from (
+           select typ.ass_type_id,aim.in_money in_money, budg_type_table.cont_l,budg_type_table.cont_p,budg_type_table.cont_w 
+           from ass_in_main_General  aim left join ass_in_detail_General adh  on aim.group_id = adh.group_id
+                                      and aim.hos_id = adh.hos_id
+                                      and aim.copy_code = adh.copy_code
+                                      and aim.ass_in_no = adh.ass_in_no
+                                     left join (select atd.ass_type_id, adi.ass_id
+                                                  from ASS_TYPE_DICT atd
+                                                  left join ass_dict adi
+                                                    on adi.group_id = atd.group_id
+                                                   and adi.hos_id = atd.hos_id
+                                                   and adi.copy_code = atd.copy_code
+                                                   and adi.ass_type_id = atd.ass_type_id
+                                                 where atd.group_id =prm_group_id
+                                                   and atd.hos_id =prm_hos_id
+                                                   and atd.copy_code = prm_copy_code
+                                                   and atd.ass_type_id in(
+                                                  select ad.ass_type_id
+                                                          from ass_dict ad
+                                                         where ad.ass_id in
+                                                               (select ass_id
+                                                                  from ass_in_detail_General adh
+                                         
+                                                                 where group_id=prm_group_id
+                       and hos_id=prm_hos_id
+                       and copy_code=prm_copy_code) )
+                                                ) typ
+                                       on adh.ass_id = typ.ass_id
+                                     left join (
+                                   select bcd.cont_l, bcd.cont_p, bcd.cont_w
+                                     from BUDG_C_DET bcd  where  bcd.group_id=prm_group_id and bcd.hos_id=prm_hos_id and bcd.copy_code=prm_copy_code and bcd.budg_year=prm_budg_year  and bcd.plan_code ='04'
+                                      and bcd.mod_code='05'
+                                      and bcd.link_code = 'ASS_IN'
+                                      and bcd.cont_w in ('02', '03')
+                                      and bcd.cont_l is not null
+                                      and bcd.cont_p is not null 
+                                         and bcd.item_code in(
+                                                  select ad.ass_type_id
+                                                          from ass_dict ad
+                                                         where ad.ass_id in
+                                                               (select ass_id
+                                                                  from ass_in_detail_General adh
+                                         
+                                                                 where group_id=prm_group_id
+                       and hos_id=prm_hos_id
+                       and copy_code=prm_copy_code) ))budg_type_table on
+                                    1 = 1 where aim.group_id=prm_group_id and aim.hos_id=prm_hos_id and aim.copy_code=prm_copy_code 
+                                  and aim.state in (
+                         SELECT REGEXP_SUBSTR ( prm_work_table_state , '[^,]+', 1,rownum) state
+                                  from dual connect by rownum <=LENGTH (prm_work_table_state ) - LENGTH (regexp_replace(prm_work_table_state, ',', ''))+1
+                      )
+                       and aim.ass_in_no not in (
+
+                           SELECT REGEXP_SUBSTR (prm_work_select_id, '[^,]+', 1,rownum) out_id
+                                  from dual connect by rownum <=LENGTH (prm_work_select_id) - LENGTH (regexp_replace(prm_work_select_id, ',',''))+1
+                       )
+                            and (
+                           ( prm_cont_p ='03' and ((aim.create_date between to_date(prm_month_begin_date,'YYYY-MM-DD') and to_date(prm_month_end_date,'YYYY-MM-DD')) or (aim.in_date between to_date(prm_month_begin_date,'YYYY-MM-DD')   and to_date(prm_month_end_date,'YYYY-MM-DD')     )))
+                             or
+                          ( prm_cont_p ='02' and ((aim.create_date between to_date(prm_year_begin_date,'YYYY-MM-DD') and to_date(prm_month_end_date,'YYYY-MM-DD')) or (aim.in_date between to_date(prm_year_begin_date,'YYYY-MM-DD')   and  to_date(prm_month_end_date,'YYYY-MM-DD')    )))
+                            or
+                           (prm_cont_p='01' and ((aim.create_date between to_date(prm_year_begin_date,'YYYY-MM-DD')   and to_date(prm_year_end_date,'YYYY-MM-DD')) or (aim.in_date between to_date(prm_year_begin_date,'YYYY-MM-DD')  and to_date(prm_year_end_date,'YYYY-MM-DD') )))
+                      )
+                      
+
+                 ) basic_data ;
+                   
+
+                 select nvl(sum(in_money),0） occur_value into ba_money
+                             from ( 
+                               
+                              select acg1.ass_id, aim.BACK_MONEY in_money ,  budg_type_table.cont_l,
+                              budg_type_table.cont_p,
+                              budg_type_table.cont_w from ass_back_General aim
+                    left join ass_back_DETAIL_General adh on aim.group_id=adh.group_id
+                    and aim.hos_id=adh.hos_id
+                    and aim.ASS_BACK_NO=adh.ASS_BACK_NO
+                    left join ass_card_General acg1 on adh.ass_card_no=acg1.ass_card_no
+             and  adh.group_id=acg1.group_id
+                    and adh.hos_id=acg1.hos_id
+                    and adh.copy_code=acg1.copy_code
+                      
+                    left join (
+                     select bcd.cont_l,bcd.cont_p,bcd.cont_w
+                         from  BUDG_C_det bcd 
+                           where bcd.group_id =prm_group_id
+                             and bcd.hos_id =prm_hos_id
+                             and bcd.copy_code =prm_copy_code
+                             and bcd.budg_year =prm_budg_year
+                             and bcd.plan_code = '04'
+                             and bcd.link_code ='ASS_IN'
+                             and bcd.cont_w in ('02')
+                             and bcd.cont_l is not null
+                             and bcd.cont_p is not null
+                                and bcd.item_code in(
+                                                  select ad.ass_type_id
+                                                          from ass_dict ad
+                                                         where ad.ass_id in
+                                                               (select ass_id
+                                                                  from ass_in_detail_General adh
+                                         
+                                                                 where group_id=prm_group_id
+                       and hos_id=prm_hos_id
+                       and copy_code=prm_copy_code) )
+                    )budg_type_table on 1=1
+                    where aim.group_id =prm_group_id
+                             and aim.hos_id =prm_hos_id
+                              and acg1.ass_id in (select ass_id
+                                                                  from ass_in_detail_General adh
+                                         
+                                                                 where group_id=prm_group_id
+                       and hos_id=prm_hos_id
+                       and copy_code=prm_copy_code
+                       and ASS_IN_NO=prm_work_select_id)
+                              and (
+                           ( prm_cont_p ='03' and ((aim.create_date between to_date(prm_month_begin_date,'YYYY-MM-DD') and to_date(prm_month_end_date,'YYYY-MM-DD')) or (aim.back_date between to_date(prm_month_begin_date,'YYYY-MM-DD')   and to_date(prm_month_end_date,'YYYY-MM-DD')     )))
+                             or
+                           ( prm_cont_p ='02' and ((aim.create_date between to_date(prm_year_begin_date,'YYYY-MM-DD') and to_date(prm_month_end_date,'YYYY-MM-DD')) or (aim.BACK_DATE between to_date(prm_year_begin_date,'YYYY-MM-DD')   and  to_date(prm_month_end_date,'YYYY-MM-DD')    )))
+                            or
+                           (prm_cont_p='01' and ((aim.create_date between to_date(prm_year_begin_date,'YYYY-MM-DD')   and to_date(prm_year_end_date,'YYYY-MM-DD')) or (aim.BACK_DATE between to_date(prm_year_begin_date,'YYYY-MM-DD')  and to_date(prm_year_end_date,'YYYY-MM-DD') )))
+                      )
+                        group by acg1.ass_id, aim.BACK_MONEY ,budg_type_table.cont_l,
+                              budg_type_table.cont_p,
+                              budg_type_table.cont_w
+                      );
+                   
+                 ELSIF  prm_ass_naturs= '04'
+                 then 
+                 select
+                                 nvl(sum(in_money),0） occur_value  into in_money
+                             from (
+           select typ.ass_type_id,aim.in_money in_money, budg_type_table.cont_l,budg_type_table.cont_p,budg_type_table.cont_w 
+           from ass_in_main_other  aim left join ass_in_detail_other adh  on aim.group_id = adh.group_id
+                                      and aim.hos_id = adh.hos_id
+                                      and aim.copy_code = adh.copy_code
+                                      and aim.ass_in_no = adh.ass_in_no
+                                     left join (select atd.ass_type_id, adi.ass_id
+                                                  from ASS_TYPE_DICT atd
+                                                  left join ass_dict adi
+                                                    on adi.group_id = atd.group_id
+                                                   and adi.hos_id = atd.hos_id
+                                                   and adi.copy_code = atd.copy_code
+                                                   and adi.ass_type_id = atd.ass_type_id
+                                                 where atd.group_id =prm_group_id
+                                                   and atd.hos_id =prm_hos_id
+                                                   and atd.copy_code = prm_copy_code
+                                                   and atd.ass_type_id in(
+                                                  select ad.ass_type_id
+                                                          from ass_dict ad
+                                                         where ad.ass_id in
+                                                               (select ass_id
+                                                                  from ass_in_detail_other adh
+                                         
+                                                                 where group_id=prm_group_id
+                       and hos_id=prm_hos_id
+                       and copy_code=prm_copy_code) )
+                                                ) typ
+                                       on adh.ass_id = typ.ass_id
+                                     left join (
+                                   select bcd.cont_l, bcd.cont_p, bcd.cont_w
+                                     from BUDG_C_DET bcd  where  bcd.group_id=prm_group_id and bcd.hos_id=prm_hos_id and bcd.copy_code=prm_copy_code and bcd.budg_year=prm_budg_year  and bcd.plan_code ='04'
+                                      and bcd.mod_code='05'
+                                      and bcd.link_code = 'ASS_IN'
+                                      and bcd.cont_w in ('02', '03')
+                                      and bcd.cont_l is not null
+                                      and bcd.cont_p is not null 
+                                         and bcd.item_code in(
+                                                  select ad.ass_type_id
+                                                          from ass_dict ad
+                                                         where ad.ass_id in
+                                                               (select ass_id
+                                                                  from ass_in_detail_other adh
+                                         
+                                                                 where group_id=prm_group_id
+                       and hos_id=prm_hos_id
+                       and copy_code=prm_copy_code) ))budg_type_table on
+                                    1 = 1 where aim.group_id=prm_group_id and aim.hos_id=prm_hos_id and aim.copy_code=prm_copy_code 
+                                  and aim.state in (
+                         SELECT REGEXP_SUBSTR ( prm_work_table_state , '[^,]+', 1,rownum) state
+                                  from dual connect by rownum <=LENGTH (prm_work_table_state ) - LENGTH (regexp_replace(prm_work_table_state, ',', ''))+1
+                      )
+                       and aim.ass_in_no not in (
+
+                           SELECT REGEXP_SUBSTR (prm_work_select_id, '[^,]+', 1,rownum) out_id
+                                  from dual connect by rownum <=LENGTH (prm_work_select_id) - LENGTH (regexp_replace(prm_work_select_id, ',',''))+1
+                       )
+                            and (
+                           ( prm_cont_p ='03' and ((aim.create_date between to_date(prm_month_begin_date,'YYYY-MM-DD') and to_date(prm_month_end_date,'YYYY-MM-DD')) or (aim.in_date between to_date(prm_month_begin_date,'YYYY-MM-DD')   and to_date(prm_month_end_date,'YYYY-MM-DD')     )))
+                             or
+                           ( prm_cont_p ='02' and ((aim.create_date between to_date(prm_year_begin_date,'YYYY-MM-DD') and to_date(prm_month_end_date,'YYYY-MM-DD')) or (aim.in_date between to_date(prm_year_begin_date,'YYYY-MM-DD')   and  to_date(prm_month_end_date,'YYYY-MM-DD')    )))
+                            or
+                           (prm_cont_p='01' and ((aim.create_date between to_date(prm_year_begin_date,'YYYY-MM-DD')   and to_date(prm_year_end_date,'YYYY-MM-DD')) or (aim.in_date between to_date(prm_year_begin_date,'YYYY-MM-DD')  and to_date(prm_year_end_date,'YYYY-MM-DD') )))
+                      )
+                      
+
+                 ) basic_data ;
+                   
+
+                 select  nvl(sum(in_money),0） occur_value into ba_money
+                             from ( 
+                               
+                              select acg1.ass_id, aim.BACK_MONEY in_money ,  budg_type_table.cont_l,
+                              budg_type_table.cont_p,
+                              budg_type_table.cont_w from ass_back_other aim
+                    left join ass_back_DETAIL_other adh on aim.group_id=adh.group_id
+                    and aim.hos_id=adh.hos_id
+                    and aim.ASS_BACK_NO=adh.ASS_BACK_NO
+                    left join ass_card_other acg1 on adh.ass_card_no=acg1.ass_card_no
+             and  adh.group_id=acg1.group_id
+                    and adh.hos_id=acg1.hos_id
+                    and adh.copy_code=acg1.copy_code
+                   
+                    left join (
+                     select bcd.cont_l,bcd.cont_p,bcd.cont_w
+                         from  BUDG_C_det bcd 
+                           where bcd.group_id =prm_group_id
+                             and bcd.hos_id =prm_hos_id
+                             and bcd.copy_code =prm_copy_code
+                             and bcd.budg_year =prm_budg_year
+                             and bcd.plan_code = '04'
+                             and bcd.link_code ='ASS_IN'
+                             and bcd.cont_w in ('02')
+                             and bcd.cont_l is not null
+                             and bcd.cont_p is not null
+                                and bcd.item_code in(
+                                                  select ad.ass_type_id
+                                                          from ass_dict ad
+                                                         where ad.ass_id in
+                                                               (select ass_id
+                                                                  from ass_in_detail_other adh
+                                         
+                                                                 where group_id=prm_group_id
+                       and hos_id=prm_hos_id
+                       and copy_code=prm_copy_code and ASS_IN_NO=prm_work_select_id) )
+                    )budg_type_table on 1=1
+                    where aim.group_id =prm_group_id
+                             and aim.hos_id =prm_hos_id
+                               and acg1.ass_id in (select ass_id
+                                                                  from ass_in_detail_other adh
+                                         
+                                                                 where group_id=prm_group_id
+                       and hos_id=prm_hos_id
+                       and copy_code=prm_copy_code
+                       and ASS_IN_NO=prm_work_select_id)
+                              and (
+                           ( prm_cont_p ='03' and ((aim.create_date between to_date(prm_month_begin_date,'YYYY-MM-DD') and to_date(prm_month_end_date,'YYYY-MM-DD')) or (aim.back_date between to_date(prm_month_begin_date,'YYYY-MM-DD')   and to_date(prm_month_end_date,'YYYY-MM-DD')     )))
+                             or
+                            ( prm_cont_p ='02' and ((aim.create_date between to_date(prm_year_begin_date,'YYYY-MM-DD') and to_date(prm_month_end_date,'YYYY-MM-DD')) or (aim.BACK_DATE between to_date(prm_year_begin_date,'YYYY-MM-DD')   and  to_date(prm_month_end_date,'YYYY-MM-DD')    )))
+                            or
+                           (prm_cont_p='01' and ((aim.create_date between to_date(prm_year_begin_date,'YYYY-MM-DD')   and to_date(prm_year_end_date,'YYYY-MM-DD')) or (aim.BACK_DATE between to_date(prm_year_begin_date,'YYYY-MM-DD')  and to_date(prm_year_end_date,'YYYY-MM-DD') )))
+                      )
+                        
+                        group by acg1.ass_id, aim.BACK_MONEY ,budg_type_table.cont_l,
+                              budg_type_table.cont_p,
+                              budg_type_table.cont_w
+                      );
+                     ELSIF  prm_ass_naturs= '05'
+                 then 
+                 select
+                                nvl(sum(in_money),0） occur_value  into in_money
+                             from (
+           select typ.ass_type_id,aim.in_money in_money, budg_type_table.cont_l,budg_type_table.cont_p,budg_type_table.cont_w 
+           from ass_in_main_Inassets  aim left join ass_in_detail_Inassets adh  on aim.group_id = adh.group_id
+                                      and aim.hos_id = adh.hos_id
+                                      and aim.copy_code = adh.copy_code
+                                      and aim.ass_in_no = adh.ass_in_no
+                                     left join (select atd.ass_type_id, adi.ass_id
+                                                  from ASS_TYPE_DICT atd
+                                                  left join ass_dict adi
+                                                    on adi.group_id = atd.group_id
+                                                   and adi.hos_id = atd.hos_id
+                                                   and adi.copy_code = atd.copy_code
+                                                   and adi.ass_type_id = atd.ass_type_id
+                                                 where atd.group_id =prm_group_id
+                                                   and atd.hos_id =prm_hos_id
+                                                   and atd.copy_code = prm_copy_code
+                                                   and atd.ass_type_id in(
+                                                  select ad.ass_type_id
+                                                          from ass_dict ad
+                                                         where ad.ass_id in
+                                                               (select ass_id
+                                                                  from ass_in_detail_Inassets adh
+                                         
+                                                                 where group_id=prm_group_id
+                       and hos_id=prm_hos_id
+                       and copy_code=prm_copy_code) )
+                                                ) typ
+                                       on adh.ass_id = typ.ass_id
+                                     left join (
+                                   select bcd.cont_l, bcd.cont_p, bcd.cont_w
+                                     from BUDG_C_DET bcd  where  bcd.group_id=prm_group_id and bcd.hos_id=prm_hos_id and bcd.copy_code=prm_copy_code and bcd.budg_year=prm_budg_year  and bcd.plan_code ='04'
+                                      and bcd.mod_code='05'
+                                      and bcd.link_code = 'ASS_IN'
+                                      and bcd.cont_w in ('02', '03')
+                                      and bcd.cont_l is not null
+                                      and bcd.cont_p is not null 
+                                         and bcd.item_code in(
+                                                  select ad.ass_type_id
+                                                          from ass_dict ad
+                                                         where ad.ass_id in
+                                                               (select ass_id
+                                                                  from ass_in_detail_Inassets adh
+                                         
+                                                                 where group_id=prm_group_id
+                       and hos_id=prm_hos_id
+                       and copy_code=prm_copy_code) ))budg_type_table on
+                                    1 = 1 where aim.group_id=prm_group_id and aim.hos_id=prm_hos_id and aim.copy_code=prm_copy_code 
+                                  and aim.state in (
+                         SELECT REGEXP_SUBSTR ( prm_work_table_state , '[^,]+', 1,rownum) state
+                                  from dual connect by rownum <=LENGTH (prm_work_table_state ) - LENGTH (regexp_replace(prm_work_table_state, ',', ''))+1
+                      )
+                       and aim.ass_in_no not in (
+
+                           SELECT REGEXP_SUBSTR (prm_work_select_id, '[^,]+', 1,rownum) out_id
+                                  from dual connect by rownum <=LENGTH (prm_work_select_id) - LENGTH (regexp_replace(prm_work_select_id, ',',''))+1
+                       )
+                            
+                            and (
+                           ( prm_cont_p ='03' and ((aim.create_date between to_date(prm_month_begin_date,'YYYY-MM-DD') and to_date(prm_month_end_date,'YYYY-MM-DD')) or (aim.in_date between to_date(prm_month_begin_date,'YYYY-MM-DD')   and to_date(prm_month_end_date,'YYYY-MM-DD')     )))
+                             or
+                          ( prm_cont_p ='02' and ((aim.create_date between to_date(prm_year_begin_date,'YYYY-MM-DD') and to_date(prm_month_end_date,'YYYY-MM-DD')) or (aim.in_date between to_date(prm_year_begin_date,'YYYY-MM-DD')   and  to_date(prm_month_end_date,'YYYY-MM-DD')    )))
+                            or
+                           (prm_cont_p='01' and ((aim.create_date between to_date(prm_year_begin_date,'YYYY-MM-DD')   and to_date(prm_year_end_date,'YYYY-MM-DD')) or (aim.in_date between to_date(prm_year_begin_date,'YYYY-MM-DD')  and to_date(prm_year_end_date,'YYYY-MM-DD') )))
+                      )
+                         
+
+                 ) basic_data ;
+                   
+
+                 select  nvl(sum(in_money),0） occur_value into ba_money
+                             from ( 
+                               
+                              select acg1.ass_id, aim.BACK_MONEY in_money ,  budg_type_table.cont_l,
+                              budg_type_table.cont_p,
+                              budg_type_table.cont_w from ass_back_Inassets aim
+                    left join ass_back_DETAIL_Inassets adh on aim.group_id=adh.group_id
+                    and aim.hos_id=adh.hos_id
+                    and aim.ASS_BACK_NO=adh.ASS_BACK_NO
+                    left join ass_card_Inassets acg1 on adh.ass_card_no=acg1.ass_card_no
+             and  adh.group_id=acg1.group_id
+                    and adh.hos_id=acg1.hos_id
+                    and adh.copy_code=acg1.copy_code
+                    
+                    left join (
+                     select bcd.cont_l,bcd.cont_p,bcd.cont_w
+                         from  BUDG_C_det bcd 
+                           where bcd.group_id =prm_group_id
+                             and bcd.hos_id =prm_hos_id
+                             and bcd.copy_code =prm_copy_code
+                             and bcd.budg_year =prm_budg_year
+                             and bcd.plan_code = '04'
+                             and bcd.link_code ='ASS_IN'
+                             and bcd.cont_w in ('02')
+                             and bcd.cont_l is not null
+                             and bcd.cont_p is not null
+                                and bcd.item_code in(
+                                                  select ad.ass_type_id
+                                                          from ass_dict ad
+                                                         where ad.ass_id in
+                                                               (select ass_id
+                                                                  from ass_in_detail_Inassets adh
+                                         
+                                                                 where group_id=prm_group_id
+                       and hos_id=prm_hos_id
+                       and copy_code=prm_copy_code
+                        and ASS_IN_NO=prm_work_select_id
+                       ) )
+                    )budg_type_table on 1=1
+                    where aim.group_id =prm_group_id
+                             and aim.hos_id =prm_hos_id
+                               and acg1.ass_id in (select ass_id
+                                                                  from ass_in_detail_Inassets adh
+                                         
+                                                                 where group_id=prm_group_id
+                       and hos_id=prm_hos_id
+                       and copy_code=prm_copy_code
+                       and ASS_IN_NO=prm_work_select_id)
+                              and (
+                           ( prm_cont_p ='03' and ((aim.create_date between to_date(prm_month_begin_date,'YYYY-MM-DD') and to_date(prm_month_end_date,'YYYY-MM-DD')) or (aim.back_date between to_date(prm_month_begin_date,'YYYY-MM-DD')   and to_date(prm_month_end_date,'YYYY-MM-DD')     )))
+                             or
+                            ( prm_cont_p ='02' and ((aim.create_date between to_date(prm_year_begin_date,'YYYY-MM-DD') and to_date(prm_month_end_date,'YYYY-MM-DD')) or (aim.BACK_DATE between to_date(prm_year_begin_date,'YYYY-MM-DD')   and  to_date(prm_month_end_date,'YYYY-MM-DD')    )))
+                            or
+                           (prm_cont_p='01' and ((aim.create_date between to_date(prm_year_begin_date,'YYYY-MM-DD')   and to_date(prm_year_end_date,'YYYY-MM-DD')) or (aim.BACK_DATE between to_date(prm_year_begin_date,'YYYY-MM-DD')  and to_date(prm_year_end_date,'YYYY-MM-DD') )))
+                      )
+                        group by acg1.ass_id, aim.BACK_MONEY ,budg_type_table.cont_l,
+                              budg_type_table.cont_p,
+                              budg_type_table.cont_w
+                      );
+                      else
+
+                 select
+                                 nvl(sum(in_money),0） occur_value  into in_money
+                             from (
+           select typ.ass_type_id,aim.in_money in_money, budg_type_table.cont_l,budg_type_table.cont_p,budg_type_table.cont_w 
+           from ass_in_main_LAND  aim left join ass_in_detail_LAND adh  on aim.group_id = adh.group_id
+                                      and aim.hos_id = adh.hos_id
+                                      and aim.copy_code = adh.copy_code
+                                      and aim.ass_in_no = adh.ass_in_no
+                                     left join (select atd.ass_type_id, adi.ass_id
+                                                  from ASS_TYPE_DICT atd
+                                                  left join ass_dict adi
+                                                    on adi.group_id = atd.group_id
+                                                   and adi.hos_id = atd.hos_id
+                                                   and adi.copy_code = atd.copy_code
+                                                   and adi.ass_type_id = atd.ass_type_id
+                                                 where atd.group_id =prm_group_id
+                                                   and atd.hos_id =prm_hos_id
+                                                   and atd.copy_code = prm_copy_code
+                                                   and atd.ass_type_id in(
+                                                  select ad.ass_type_id
+                                                          from ass_dict ad
+                                                         where ad.ass_id in
+                                                               (select ass_id
+                                                                  from ass_in_detail_LAND adh
+                                         
+                                                                 where group_id=prm_group_id
+                       and hos_id=prm_hos_id
+                       and copy_code=prm_copy_code) )
+                                                ) typ
+                                       on adh.ass_id = typ.ass_id
+                                     left join (
+                                   select bcd.cont_l, bcd.cont_p, bcd.cont_w
+                                     from BUDG_C_DET bcd  where  bcd.group_id=prm_group_id and bcd.hos_id=prm_hos_id and bcd.copy_code=prm_copy_code and bcd.budg_year=prm_budg_year  and bcd.plan_code ='04'
+                                      and bcd.mod_code='05'
+                                      and bcd.link_code = 'ASS_IN'
+                                      and bcd.cont_w in ('02', '03')
+                                      and bcd.cont_l is not null
+                                      and bcd.cont_p is not null
+                                         and bcd.item_code in(
+                                                  select ad.ass_type_id
+                                                          from ass_dict ad
+                                                         where ad.ass_id in
+                                                               (select ass_id
+                                                                  from ass_in_detail_land adh
+                                         
+                                                                 where group_id=prm_group_id
+                       and hos_id=prm_hos_id
+                       and copy_code=prm_copy_code) ) )budg_type_table on
+                                    1 = 1 where aim.group_id=prm_group_id and aim.hos_id=prm_hos_id and aim.copy_code=prm_copy_code 
+                                  and aim.state in (
+                          SELECT REGEXP_SUBSTR ( prm_work_table_state , '[^,]+', 1,rownum) state
+                                  from dual connect by rownum <=LENGTH (prm_work_table_state ) - LENGTH (regexp_replace(prm_work_table_state, ',', ''))+1
+                      )
+                       and aim.ass_in_no not in (
+
+                           SELECT REGEXP_SUBSTR (prm_work_select_id, '[^,]+', 1,rownum) out_id
+                                  from dual connect by rownum <=LENGTH (prm_work_select_id) - LENGTH (regexp_replace(prm_work_select_id, ',',''))+1
+                       )
+                              and (
+                           ( prm_cont_p ='03' and ((aim.create_date between to_date(prm_month_begin_date,'YYYY-MM-DD') and to_date(prm_month_end_date,'YYYY-MM-DD')) or (aim.in_date between to_date(prm_month_begin_date,'YYYY-MM-DD')   and to_date(prm_month_end_date,'YYYY-MM-DD')     )))
+                             or
+                           ( prm_cont_p ='02' and ((aim.create_date between to_date(prm_year_begin_date,'YYYY-MM-DD') and to_date(prm_month_end_date,'YYYY-MM-DD')) or (aim.in_date between to_date(prm_year_begin_date,'YYYY-MM-DD')   and  to_date(prm_month_end_date,'YYYY-MM-DD')    )))
+                            or
+                           (prm_cont_p='01' and ((aim.create_date between to_date(prm_year_begin_date,'YYYY-MM-DD')   and to_date(prm_year_end_date,'YYYY-MM-DD')) or (aim.in_date between to_date(prm_year_begin_date,'YYYY-MM-DD')  and to_date(prm_year_end_date,'YYYY-MM-DD') )))
+                       )
+                        
+
+                 ) basic_data ;
+                   
+
+                 select  nvl(sum(in_money),0） occur_value into ba_money
+                             from ( 
+                               
+                              select acg1.ass_id, aim.BACK_MONEY in_money ,  budg_type_table.cont_l,
+                              budg_type_table.cont_p,
+                              budg_type_table.cont_w from ass_back_LAND aim
+                    left join ass_back_DETAIL_LAND adh on aim.group_id=adh.group_id
+                    and aim.hos_id=adh.hos_id
+                    and aim.ASS_BACK_NO=adh.ASS_BACK_NO
+                    left join ass_card_LAND acg1 on adh.ass_card_no=acg1.ass_card_no
+             and  adh.group_id=acg1.group_id
+                    and adh.hos_id=acg1.hos_id
+                    and adh.copy_code=acg1.copy_code
+                  
+                    left join (
+                     select bcd.cont_l,bcd.cont_p,bcd.cont_w
+                         from  BUDG_C_det bcd 
+                           where bcd.group_id =prm_group_id
+                             and bcd.hos_id =prm_hos_id
+                             and bcd.copy_code =prm_copy_code
+                             and bcd.budg_year =prm_budg_year
+                             and bcd.plan_code = '04'
+                             and bcd.link_code ='ASS_IN'
+                             and bcd.cont_w in ('02')
+                             and bcd.cont_l is not null
+                             and bcd.cont_p is not null
+                                and bcd.item_code in(
+                                                  select ad.ass_type_id
+                                                          from ass_dict ad
+                                                         where ad.ass_id in
+                                                               (select ass_id
+                                                                  from ass_in_detail_LAND adh
+                                         
+                                                                 where group_id=prm_group_id
+                       and hos_id=prm_hos_id
+                       and copy_code=prm_copy_code  and ASS_IN_NO=prm_work_select_id) )
+                    )budg_type_table on 1=1
+                    where aim.group_id =prm_group_id
+                             and aim.hos_id =prm_hos_id
+                               and acg1.ass_id in (select ass_id
+                                                                  from ass_in_detail_LAND adh
+                                         
+                                                                 where group_id=prm_group_id
+                       and hos_id=prm_hos_id
+                       and copy_code=prm_copy_code
+                       and ASS_IN_NO=prm_work_select_id)
+                              and (
+                           ( prm_cont_p ='03' and ((aim.create_date between to_date(prm_month_begin_date,'YYYY-MM-DD') and to_date(prm_month_end_date,'YYYY-MM-DD')) or (aim.back_date between to_date(prm_month_begin_date,'YYYY-MM-DD')   and to_date(prm_month_end_date,'YYYY-MM-DD')     )))
+                             or
+                           ( prm_cont_p ='02' and ((aim.create_date between to_date(prm_year_begin_date,'YYYY-MM-DD') and to_date(prm_month_end_date,'YYYY-MM-DD')) or (aim.BACK_DATE between to_date(prm_year_begin_date,'YYYY-MM-DD')   and  to_date(prm_month_end_date,'YYYY-MM-DD')    )))
+                            or
+                           (prm_cont_p='01' and ((aim.create_date between to_date(prm_year_begin_date,'YYYY-MM-DD')   and to_date(prm_year_end_date,'YYYY-MM-DD')) or (aim.BACK_DATE between to_date(prm_year_begin_date,'YYYY-MM-DD')  and to_date(prm_year_end_date,'YYYY-MM-DD') )))
+                      )
+                        group by acg1.ass_id, aim.BACK_MONEY ,budg_type_table.cont_l,
+                              budg_type_table.cont_p,
+                              budg_type_table.cont_w
+                      );
+                     
+                   end if;
+                   
+                 exec_money :=in_money -ba_money ;
+
+                      if in_money -ba_money is null then
+                          return 0;
+                      else 
+                          return exec_money ;
+                      end if;
+              
+
+                  
+                  end if;
+                   exec_money :=in_money -ba_money ;
+
+                      if in_money -ba_money is null then
+                          return 0;
+                      else 
+                          return exec_money ;
+                      end if;
+                  end;
+
+
+       ]]></sql>
+</root>

@@ -1,0 +1,231 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.hr.dao.nursingtraining.HrAssessmentStatisticalMapper">
+	<resultMap type="java.util.Map" id="hrSelectMap">
+	<result property="id" column="id" />
+	<result property="text" column="text" />
+	<result property="name" column="name" />
+	<result property="label" column="label" />
+	</resultMap>
+	<resultMap type="java.util.Map" id="hrAssessmentStatisticalMap">
+	<result property="group_id" column="group_id"/>
+	<result property="hos_id" column="hos_id"/>
+	<result property="year" column="year"/>
+	<result property="emp_code" column="emp_code"/>
+	<result property="emp_id" column="emp_id"/>
+	<result property="emp_name" column="emp_name"/>
+	<result property="dept_no" column="dept_no"/>
+	<result property="dept_name" column="dept_name"/>
+	<result property="score" column="score"/>
+	<result property="title_code" column="title_code"/>
+	<result property="level_code" column="level_code"/>
+	<result property="book_report" column="book_report"/>
+	<result property="case_analy" column="case_analy"/>
+	<result property="special_case_analy" column="special_case_analy"/>
+	<result property="state" column="state"/>
+	<result property="state_name" column="state_name"/>
+	<result property="note" column="note"/>
+	</resultMap>
+	
+	<select id="query"  parameterType="java.util.Map"
+		resultMap="hrAssessmentStatisticalMap">
+
+	select
+	heev.year,he.emp_id emp_code,hed.dept_no,ht.title_code,ht.title_name,hd.duty_code,hd.duty_name,he.emp_id,he.emp_name,hed.dept_name,heev.score,
+	case when hes.eval_goal - heev.score  &gt;  0 then '不合格'
+	when heev.score - hes.eval_goal  &gt;   0 then '合格' else '' end as state_name
+	from HR_EMP_EVALUATE_NURSE heev
+	left join hos_emp he on he.emp_id =heev.emp_id and he.group_id
+	=heev.group_id and he.hos_id=heev.hos_id
+	left join hos_dept_dict hed on he.dept_no =hed.dept_no and he.group_id
+	=hed.group_id and he.hos_id=hed.hos_id
+	left join HR_EVAL_SET hes on heev.eval_code=hes.eval_code and hes.year=heev.year  and heev.group_id=hes.group_id and heev.hos_id=hes.hos_id
+	left join hr_hos_duty hhd on he.emp_id=hhd.emp_id and he.group_id=hhd.group_id and he.hos_id=hhd.hos_id
+	left join hos_duty hd on hhd.duty_code=hd.duty_code and hd.group_id=hhd.group_id and hd.hos_id=hhd.hos_id
+	left join hr_emp_technology_title het on he.emp_id =het.emp_id and he.group_id=het.group_id and he.hos_id=het.hos_id
+	left join hr_title ht on het.title_code=ht.title_code and het.group_id=he.group_id and het.hos_id=he.hos_id
+	<where>                     
+		<if test="group_id != null and group_id != ''">
+		AND heev.group_id = #{group_id,jdbcType=INTEGER}
+		</if>
+		<if test="hos_id != null and hos_id != ''">
+		AND heev.hos_id = #{hos_id,jdbcType=INTEGER}
+		</if>
+		<if test="year != null and year != ''">
+		AND heev.year = #{year,jdbcType=VARCHAR}
+		</if>
+		<if test="emp_id != null and emp_id != ''">
+		AND heev.emp_id = #{emp_id,jdbcType=INTEGER}
+		</if>
+		<if test="duty_code != null and duty_code != ''">
+		AND hd.duty_code = #{duty_code,jdbcType=VARCHAR}
+		</if>
+		<if test="title_code != null and title_code != ''">
+		AND ht.title_code = #{title_code,jdbcType=VARCHAR}
+		</if>
+		<if test="eval_code != null and eval_code != ''">
+		AND heev.eval_code = #{eval_code,jdbcType=VARCHAR}
+		</if>
+		<if test="dept_no != null and dept_no != ''">
+		AND hed.dept_no = #{dept_no,jdbcType=VARCHAR} 
+		</if>
+		<if test="emp_name != null and emp_name != ''">
+		AND he.emp_name like '%${emp_name}%'
+		</if>
+		<if test="emp_code != null and emp_code != ''">
+		AND he.emp_id like '%${emp_code}%'
+		</if>
+		</where>   
+	
+union all
+select '平均分' title_name ,case when trunc(avg(heev1.score), 2) is null then 0 else trunc(avg(heev1.score), 2) end emp_code,null dept_no,null title_code,null title_name,null duty_code,null duty_name,null emp_id,null emp_name,'合格率' dept_name,trunc((count(case  when  heev1.score - hes1.eval_goal   &gt;   0  then '合格' end)/ (case when count(heev1.score) = 0 then 1 else count(heev1.score) end) ),4)*100 , null state_name  from  HR_EMP_EVALUATE_NURSE heev1 
+left join hos_emp he1 on he1.emp_id =heev1.emp_id and he1.group_id =heev1.group_id and he1.hos_id=heev1.hos_id
+left join hos_dept_dict hed1  on he1.dept_no =hed1.dept_no and he1.group_id =hed1.group_id and he1.hos_id=hed1.hos_id
+left join HR_EVAL_SET hes1 on heev1.eval_code=hes1.eval_code and hes1.year=heev1.year and heev1.group_id=hes1.group_id and heev1.hos_id=hes1.hos_id
+left join hr_hos_duty hhd1 on he1.emp_id=hhd1.emp_id and
+		he1.group_id=hhd1.group_id and he1.hos_id=hhd1.hos_id
+		left join hos_duty hd1 on hhd1.duty_code=hd1.duty_code and
+		hd1.group_id=hhd1.group_id and hd1.hos_id=hhd1.hos_id
+    left join hr_emp_technology_title het1 on he1.emp_id =het1.emp_id and
+		he1.group_id=het1.group_id and he1.hos_id=het1.hos_id
+    left join hr_title ht1 on het1.title_code=ht1.title_code and
+		het1.group_id=he1.group_id and het1.hos_id=he1.hos_id
+<where>                     
+		<if test="group_id != null and group_id != ''">
+		AND heev1.group_id = #{group_id,jdbcType=INTEGER}
+		</if>
+		<if test="hos_id != null and hos_id != ''">
+		AND heev1.hos_id = #{hos_id,jdbcType=INTEGER}
+		</if>
+		<if test="year != null and year != ''">
+		AND heev1.year = #{year,jdbcType=VARCHAR}
+		</if>
+		<if test="emp_id != null and emp_id != ''">
+		AND heev1.emp_id = #{emp_id,jdbcType=INTEGER}
+		</if>
+		<if test="duty_code != null and duty_code != ''">
+		AND hd1.duty_code = #{duty_code,jdbcType=VARCHAR}
+		</if>
+		<if test="title_code != null and title_code != ''">
+		AND ht1.title_code = #{title_code,jdbcType=VARCHAR}
+		</if>
+		<if test="eval_code != null and eval_code != ''">
+		AND heev1.eval_code = #{eval_code,jdbcType=VARCHAR}
+		</if>
+		<if test="dept_no != null and dept_no != ''">
+		AND hed1.dept_no = #{dept_no,jdbcType=VARCHAR} 
+		</if>
+		<if test="emp_name != null and emp_name != ''">
+		AND he1.emp_name like '%${emp_name}%'
+		</if>
+		<if test="emp_code != null and emp_code != ''">
+		AND he1.emp_id like '%${emp_code}%'
+		</if>
+		</where>   
+		</select>
+	
+	
+	
+	
+	<select id="queryEvalCode"  parameterType="java.util.Map"
+		resultMap="hrSelectMap">
+		select hf2.field_col_code as id , hf2.field_col_code ||' '||hf2.field_col_name text from 
+ HR_FIIED_DATA hf2 where  hf2.field_tab_code = 'DIC_EVAL'
+		
+		</select>
+		<select id="queryAssessmentByPrint" resultType="java.util.Map" parameterType="java.util.Map">
+		select
+	heev.year,he.emp_id emp_code,hed.dept_no,ht.title_code,ht.title_name,hd.duty_code,hd.duty_name,he.emp_id,he.emp_name,hed.dept_name,heev.score,
+	case when hes.eval_goal - heev.score  &gt;  0 then '不合格'
+	when heev.score - hes.eval_goal  &gt;   0 then '合格' else '' end as state_name
+	from HR_EMP_EVALUATE_NURSE heev
+	left join hos_emp he on he.emp_id =heev.emp_id and he.group_id
+	=heev.group_id and he.hos_id=heev.hos_id
+	left join hos_dept_dict hed on he.dept_no =hed.dept_no and he.group_id
+	=hed.group_id and he.hos_id=hed.hos_id
+	left join HR_EVAL_SET hes on heev.eval_code=hes.eval_code and hes.year=heev.year  and heev.group_id=hes.group_id and heev.hos_id=hes.hos_id
+	left join hr_hos_duty hhd on he.emp_id=hhd.emp_id and he.group_id=hhd.group_id and he.hos_id=hhd.hos_id
+	left join hos_duty hd on hhd.duty_code=hd.duty_code and hd.group_id=hhd.group_id and hd.hos_id=hhd.hos_id
+	left join hr_emp_technology_title het on he.emp_id =het.emp_id and he.group_id=het.group_id and he.hos_id=het.hos_id
+	left join hr_title ht on het.title_code=ht.title_code and het.group_id=he.group_id and het.hos_id=he.hos_id
+	<where>                     
+		<if test="group_id != null and group_id != ''">
+		AND heev.group_id = #{group_id,jdbcType=INTEGER}
+		</if>
+		<if test="hos_id != null and hos_id != ''">
+		AND heev.hos_id = #{hos_id,jdbcType=INTEGER}
+		</if>
+		<if test="year != null and year != ''">
+		AND heev.year = #{year,jdbcType=VARCHAR}
+		</if>
+		<if test="emp_id != null and emp_id != ''">
+		AND heev.emp_id = #{emp_id,jdbcType=INTEGER}
+		</if>
+		<if test="duty_code != null and duty_code != ''">
+		AND hd.duty_code = #{duty_code,jdbcType=VARCHAR}
+		</if>
+		<if test="title_code != null and title_code != ''">
+		AND ht.title_code = #{title_code,jdbcType=VARCHAR}
+		</if>
+		<if test="eval_code != null and eval_code != ''">
+		AND heev.eval_code = #{eval_code,jdbcType=VARCHAR}
+		</if>
+		<if test="dept_no != null and dept_no != ''">
+		AND hed.dept_no = #{dept_no,jdbcType=VARCHAR} 
+		</if>
+		<if test="emp_name != null and emp_name != ''">
+		AND he.emp_name like '%${emp_name}%'
+		</if>
+		<if test="emp_code != null and emp_code != ''">
+		AND he.emp_code like '%${emp_code}%'
+		</if>
+		</where>   
+	
+union all
+select '平均分' title_name ,trunc(avg(heev1.score),2) emp_code,null dept_no,null title_code,null title_name,null duty_code,null duty_name,null emp_id,null emp_name,'合格率' dept_name,trunc((count(case  when  heev1.score - hes1.eval_goal   &gt;   0  then '合格' end)/ count(heev1.score)),4)*100 , null state_name  from  HR_EMP_EVALUATE_NURSE heev1 
+left join hos_emp he1 on he1.emp_id =heev1.emp_id and he1.group_id =heev1.group_id and he1.hos_id=heev1.hos_id
+left join hos_dept_dict hed1  on he1.dept_no =hed1.dept_no and he1.group_id =hed1.group_id and he1.hos_id=hed1.hos_id
+left join HR_EVAL_SET hes1 on heev1.eval_code=hes1.eval_code and hes1.year=heev1.year and heev1.group_id=hes1.group_id and heev1.hos_id=hes1.hos_id
+left join hr_hos_duty hhd1 on he1.emp_id=hhd1.emp_id and
+		he1.group_id=hhd1.group_id and he1.hos_id=hhd1.hos_id
+		left join hos_duty hd1 on hhd1.duty_code=hd1.duty_code and
+		hd1.group_id=hhd1.group_id and hd1.hos_id=hhd1.hos_id
+    left join hr_emp_technology_title het1 on he1.emp_id =het1.emp_id and
+		he1.group_id=het1.group_id and he1.hos_id=het1.hos_id
+    left join hr_title ht1 on het1.title_code=ht1.title_code and
+		het1.group_id=he1.group_id and het1.hos_id=he1.hos_id
+<where>                     
+		<if test="group_id != null and group_id != ''">
+		AND heev1.group_id = #{group_id,jdbcType=INTEGER}
+		</if>
+		<if test="hos_id != null and hos_id != ''">
+		AND heev1.hos_id = #{hos_id,jdbcType=INTEGER}
+		</if>
+		<if test="year != null and year != ''">
+		AND heev1.year = #{year,jdbcType=VARCHAR}
+		</if>
+		<if test="emp_id != null and emp_id != ''">
+		AND heev1.emp_id = #{emp_id,jdbcType=INTEGER}
+		</if>
+		<if test="duty_code != null and duty_code != ''">
+		AND hd1.duty_code = #{duty_code,jdbcType=VARCHAR}
+		</if>
+		<if test="title_code != null and title_code != ''">
+		AND ht1.title_code = #{title_code,jdbcType=VARCHAR}
+		</if>
+		<if test="eval_code != null and eval_code != ''">
+		AND heev1.eval_code = #{eval_code,jdbcType=VARCHAR}
+		</if>
+		<if test="dept_no != null and dept_no != ''">
+		AND hed1.dept_no = #{dept_no,jdbcType=VARCHAR} 
+		</if>
+		<if test="emp_name != null and emp_name != ''">
+		AND he1.emp_name like '%${emp_name}%'
+		</if>
+		<if test="emp_code != null and emp_code != ''">
+		AND he1.emp_code like '%${emp_code}%'
+		</if>
+		</where>   
+		
+		</select>
+</mapper>

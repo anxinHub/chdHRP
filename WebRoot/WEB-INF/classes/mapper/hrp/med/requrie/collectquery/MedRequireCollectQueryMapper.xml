@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.med.dao.requrie.collectquery.MedRequireCollectQueryMapper">
+
+	<resultMap id="medRequireMain" type="java.util.Map">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="req_id" column="req_id" />
+		<result property="req_code" column="req_code" />
+		
+		<result property="pur_id" column="pur_id" />
+		<result property="pur_code" column="pur_code" />
+		
+		<result property="req_code" column="req_code" />
+		<result property="brif" column="brif" />
+		<result property="dept_no" column="dept_no" />
+		<result property="dept_id" column="dept_id" />
+		
+		<result property="dept_name" column="dept_name" />
+		<result property="dept_names" column="dept_names" />
+		<result property="stock_no" column="stock_no" />
+		<result property="stock_id" column="stock_id" />
+		
+		<result property="store_name" column="store_name" />
+		<result property="store_code" column="store_code" />
+		<result property="maker" column="maker" />
+		<result property="make_date" column="make_date" />
+		<result property="rdate" column="rdate" />
+		<result property="checker" column="checker" />
+		<result property="check_date" column="check_date" />
+		<result property="state" column="state" />
+		<result property="req_type" column="req_type" />
+		<result property="is_collect" column="is_collect" />
+		<result property="is_submit" column="is_submit" />
+		<result property="is_return" column="is_return" />
+		<result property="return_reason" column="return_reason" />
+		<result property="other_inv" column="other_inv" />
+		<result property="is_dir" column="is_dir" />
+		
+		<result property="inv_id" column="inv_id" />
+		<result property="inv_no" column="inv_no" />
+		<result property="inv_code" column="inv_code" />
+		<result property="inv_name" column="inv_name" />
+		<result property="inv_model" column="inv_model" />
+		<result property="unit_name" column="unit_name" />
+		<result property="begin_amount" column="begin_amount" />
+		<result property="cur_amount" column="cur_amount" />
+		<result property="amount" column="amount" />
+		
+		<result property="plan_amount" column="plan_amount" />
+		<result property="plan_price" column="plan_price" />
+		
+		
+		<result property="differ" column="differ" />
+		<result property="price" column="price" />
+		<result property="money" column="money" />
+		
+		<result property="req_amount" column="req_amount" />
+		<result property="exec_amount" column="exec_amount" />
+		
+		<result property="last_extend" column="last_extend" />
+		<result property="last_plan" column="last_plan" />
+		<result property="this_plan" column="this_plan" />
+		
+		
+	</resultMap>
+	
+	<!-- 汇总需求计划查询 -->
+	<select id="queryCollectQ" parameterType="java.util.Map" resultMap="medRequireMain">
+		select distinct
+			mrm.group_id,
+			mrm.hos_id,
+			mrm.copy_code, 
+			mrm.req_id,
+		    nvl(pum.pur_id,'') pur_id,
+		    mrm.req_code,
+		    pum.pur_code,
+		    hsd.store_name,
+		    to_char(mrm.make_date,'yyyy-MM-dd') make_date,
+		    mrm.is_dir,
+		    su.user_name maker,
+		    mrm.state state,
+		    '查看明细' other_inv
+		from med_require_main mrm 
+		left join med_req_pur_rela b on mrm.req_id = b.req_id
+         	and mrm.group_id = b.group_id
+         	and mrm.hos_id = b.hos_id
+         	and mrm.copy_code = b.copy_code
+	    left join med_pur_main pum ON pum.pur_id = b.pur_id
+	    	and pum.copy_code = b.copy_code
+	    	and pum.hos_id = b.hos_id
+	    	and pum.group_id = b.group_id
+		left join hos_store_dict hsd on mrm.hos_id = hsd.hos_id 
+			and mrm.group_id = hsd.group_id 			
+		    and hsd.store_id = mrm.stock_id   
+		    <if test="show_history == 1">
+				and mrm.stock_no = hsd.store_no 
+			</if>
+			<if test="show_history == 0">
+				and hsd.is_stop = 0
+			</if>
+		left join sys_user su on su.user_id = mrm.maker 
+			and su.copy_code = mrm.copy_code 
+			and su.group_id = mrm.group_id 
+		    and su.hos_id = mrm.hos_id
+		<where>
+			<if test="hos_id != null and hos_id != ''">
+				mrm.hos_id = #{hos_id}	
+			</if> 
+			<if test="group_id != null and group_id != ''">
+				and mrm.group_id = #{group_id}	
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				and mrm.copy_code = #{copy_code}	
+			</if>
+			<if test="stock_no != null and stock_no != ''">
+				and mrm.stock_no = #{stock_no}	
+			</if>
+			<if test="stock_id != null and stock_id != ''">
+				and mrm.stock_id = #{stock_id}	
+			</if>
+			<if test="store_code != null and store_code != ''">
+				and hsd.store_code = #{store_code}	
+			</if>
+			<if test="req_code != null and req_code != ''">
+				and mrm.req_code like '${req_code}%'
+			</if>
+		      and mrm.is_collect = 1
+		      and mrm.state >= 2
+		      and substr(to_char(mrm.make_date,'yyyyMMdd'),0,6) between #{accYearB}||''||#{accMonthB} and #{accYearE}||''||#{accMonthE}
+		</where>
+		order by mrm.req_id	 desc
+	</select>
+	
+	<!-- 汇总查询   汇总单号查询明细  -->
+	<select id="queryCollectStore" parameterType="java.util.Map" resultMap="medRequireMain">
+		select mrm.req_code,
+		       hsd.store_name,
+		       mid.inv_code,
+		       mid.inv_name,
+		       mid.inv_model,
+		       hu.unit_name,
+		       nvl(aa.req_amount,0) amount,
+		       mid.plan_price price,
+		       nvl(aa.req_amount,0)*nvl(mid.plan_price,0) money
+		from med_require_main mrm 
+		left join hos_store_dict hsd on mrm.hos_id = hsd.hos_id and mrm.group_id = hsd.group_id and mrm.stock_no = hsd.store_no 
+		     and hsd.store_id = mrm.stock_id and hsd.is_stop = 0
+		left join (
+		     select group_id,hos_id,copy_code,total_id,inv_id,sum(nvl(req_amount,0)) req_amount
+		     from med_require_rela
+		     where group_id = #{group_id} 
+		     	and hos_id = #{hos_id} 
+		     	and copy_code = #{copy_code}  
+		     	and total_id = #{req_id}
+		     group by group_id,hos_id,copy_code,total_id,inv_id
+		) aa on aa.group_id = mrm.group_id and aa.hos_id = mrm.hos_id and aa.copy_code = mrm.copy_code and mrm.req_id = aa.total_id
+		left join med_inv_dict mid on mid.inv_id = aa.inv_id and mid.copy_code = aa.copy_code and mid.hos_id = aa.hos_id
+		     and mid.group_id = aa.group_id  and mid.is_stop = 0
+		left join hos_unit hu on hu.group_id = mid.group_id and hu.hos_id = mid.hos_id and hu.unit_code = mid.unit_code
+		     and hu.is_stop = 0
+		where mrm.hos_id = #{hos_id}
+		      and mrm.group_id = #{group_id}
+		      and mrm.copy_code = #{copy_code}
+		      and mrm.req_id = #{req_id}
+	</select>
+	
+	<!--汇总查询 明细查询  -->
+	<select id="queryCollectDept" parameterType="java.util.Map" resultMap="medRequireMain">
+		select  ma.req_code,
+		        hdd.dept_name,
+		        mid.inv_code,
+		        mid.inv_name,
+		        mid.inv_model,
+		        hu.unit_name,
+		        nvl(mrd.amount,0) amount,
+		        nvl(mrd.price,0) price,
+		        nvl(mrd.price,0) * nvl(mrd.amount,0) money
+		from med_require_main ma 
+		join (
+		  select mrr.req_id,
+		  	mrr.copy_code ,
+		  	mrr.group_id ,
+		  	mrr.hos_id ,
+		  	mrr.inv_id
+		  from med_require_rela mrr
+		  left join med_require_main mrm on mrm.req_id = mrr.total_id 
+		  	   and mrr.group_id = mrm.group_id 
+		  	   and mrr.hos_id = mrm.hos_id 
+		       and mrm.copy_code = mrr.copy_code
+		  where mrr.copy_code = #{copy_code}
+		        and mrr.group_id = #{group_id}
+		        and mrr.hos_id = #{hos_id}
+		        and mrr.total_id = #{req_id}
+		) mb on ma.req_id = mb.req_id 
+			and ma.copy_code = mb.copy_code 
+			and ma.group_id = mb.group_id 
+			and ma.hos_id = mb.hos_id
+		left join hos_dept_dict hdd on hdd.dept_no = ma.dept_no 
+			and hdd.dept_id = ma.dept_id 
+			and hdd.group_id  = ma.group_id
+		    and hdd.hos_id = ma.hos_id 
+		    and hdd.is_stop = 0
+		left join med_require_detail mrd on mrd.copy_code = ma.copy_code 
+			and mrd.group_id = ma.group_id 
+			and mrd.hos_id = ma.hos_id
+		    and mrd.req_id = ma.req_id
+		    and mrd.inv_id = mb.inv_id
+		left join med_inv_dict mid on mid.inv_no = mrd.inv_no 
+			and mid.inv_id = mrd.inv_id 
+			and mid.copy_code = mrd.copy_code 
+		    and mid.hos_id = mrd.hos_id 
+		    and mid.group_id = mrd.group_id 
+		    and mid.is_stop = 0
+		left join hos_unit hu on hu.unit_code = mid.unit_code 
+			and hu.group_id = mid.group_id 
+			and hu.hos_id = mid.hos_id
+		    and hu.is_stop = 0
+		where ma.is_collect = 0
+	</select>
+	
+	
+</mapper>
+

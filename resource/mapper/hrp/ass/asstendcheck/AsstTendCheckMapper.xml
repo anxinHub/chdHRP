@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.ass.dao.asstendcheck.AssTendCheckMapper">
+	
+	<resultMap id="assTendCheckMap" type="java.util.Map">
+	<result property="group_id" column="group_id"/>
+	<result property="hos_id" column="hos_id"/>
+	<result property="copy_code" column="copy_code"/>
+	<result property="bid_id" column="bid_id"/>
+	<result property="bid_code" column="bid_code"/>
+	<result property="bid_calibratedate" column="bid_calibratedate"/>
+	<result property="bid_tenderaddress" column="bid_tenderaddress"/>
+	<result property="bid_tenderee" column="bid_tenderee"/>
+	<result property="bid_value" column="bid_value"/>
+	<result property="bid_makertime" column="bid_makertime"/>
+	<result property="bid_method" column="bid_method"/>
+	<result property="bid_notice" column="bid_notice"/>
+	<result property="bid_noticedate" column="bid_noticedate"/>
+	<result property="bid_phone" column="bid_phone"/>
+	<result property="bid_ylwcode" column="bid_ylwcode"/>
+	<result property="file_path" column="file_path"/>
+	<result property="bid_state" column="bid_state"/>
+	<result property="ven_id" column="ven_id"/>
+	<result property="ven_code" column="ven_code"/>
+	<result property="ven_name" column="ven_name"/>
+	<result property="bid_winflag" column="bid_winflag"/>
+	</resultMap>
+	
+	
+	
+	
+	
+	<delete id="delete" parameterType="java.util.Map">
+		DELETE FROM ASS_TEND_MAIN 
+		WHERE group_id = #{group_id,jdbcType=INTEGER}   
+			and hos_id = #{hos_id,jdbcType=INTEGER}   
+			and copy_code = #{copy_code,jdbcType=VARCHAR}   
+			and bid_id = #{bid_id,jdbcType=INTEGER}
+			<if test=" bid_code != null and bid_code !=''">
+			and bid_code = #{bid_code,jdbcType=VARCHAR} 
+			</if>   
+	</delete>
+	
+	<delete id="deleteBatch" parameterType="java.util.List">
+		DELETE FROM MAT_CERT_SUP 
+		<where>
+			<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+				group_id = #{item.group_id,jdbcType=INTEGER}
+				and hos_id = #{item.hos_id,jdbcType=INTEGER}
+				and copy_code = #{item.copy_code,jdbcType=VARCHAR}
+				and bid_id = #{item.bid_id,jdbcType=INTEGER}
+				<if test=" item.bid_code != null and item.bid_code != '' ">
+					and bid_code = #{item.bid_code,jdbcType=VARCHAR}
+				</if>
+			</foreach>
+		</where>
+	</delete>
+	
+	<select id="queryAssTendCheck" parameterType="java.util.Map" resultMap="assTendCheckMap" >
+	
+		SELECT 
+			atm.group_id,
+			atm.hos_id,
+			atm.copy_code,
+			atm.bid_id,
+			atm.bid_code,
+			atm.bid_makertime,
+			atm.bid_calibratedate,
+			atm.bid_tenderaddress,
+			atm.bid_tenderee,
+			atm.bid_value,
+			atm.bid_method,
+			atm.bid_notice,
+			atm.bid_noticedate,
+			atm.bid_phone,
+			atm.bid_ylwcode,
+			atm.bid_state,
+			atf.file_path,
+			case nvl(atm.ven_id,-1) when -1 then null else atm.ven_id || '@' || hsd.sup_no end ven_id ,
+			hsd.sup_code ven_code,
+			hsd.sup_name ven_name ,
+			bid_winflag
+		FROM  ASS_TEND_MAIN atm
+		left join ASS_TEND_FILE atf
+			ON
+				atm.group_id = atf.group_id
+				and atm.hos_id = atf.hos_id
+				and atm.copy_code = atf.copy_code
+				and atm.bid_id = atf.bid_id
+				and atf.file_type = '02'
+		left join HOS_SUP_DICT hsd
+			on	
+				atm.group_id = hsd.group_id
+				and atm.hos_id = hsd.hos_id
+				and atm.ven_id = hsd.sup_id
+				and hsd.is_stop = 0
+		<where> 
+			atm.group_id = #{group_id,jdbcType=INTEGER}
+			AND atm.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND atm.copy_code = #{copy_code,jdbcType=VARCHAR}
+			<if test="bid_code != null and bid_code != ''">
+				AND atm.bid_code = #{bid_code,jdbcType=INTEGER}
+			</if>
+			<if test="bid_makertime != null and bid_makertime != ''">
+				AND atm.bid_makertime = to_date(#{bid_makertime},'yyyy-mm-dd')
+			</if>
+			<if test="bid_method != null and bid_method != ''">
+				AND atm.bid_method = #{bid_method,jdbcType=VARCHAR}
+			</if>
+			<if test="ven_id != null and ven_id != ''">
+				AND atm.ven_id = #{ven_id,jdbcType=INTEGER}
+			</if>
+			<if test="bid_ylwcode != null and bid_ylwcode != ''">
+				AND atm.bid_ylwcode = #{bid_ylwcode,jdbcType=VARCHAR}
+			</if>
+			<if test="bid_state != null and bid_state != ''">
+				AND atm.bid_state = #{bid_state,jdbcType=VARCHAR}
+			</if>
+		</where>   
+	</select>
+	
+	<!-- 提交/取消提交/审核/消审  -->
+	<update id="updateAssTendCheckState" parameterType="java.util.List">
+		<foreach collection="list" item="item" index="index" open="begin" close=";end;" separator=";" >
+			UPDATE ASS_TEND_MAIN set
+				bid_state = #{item.bid_state,jdbcType=VARCHAR},
+				bid_checkdate = to_date(#{item.bid_checkdate,jdbcType=DATE},'yyyy-MM-dd')
+			where                    
+				group_id = #{item.group_id,jdbcType=INTEGER}
+				AND hos_id = #{item.hos_id,jdbcType=INTEGER}
+				AND copy_code = #{item.copy_code,jdbcType=VARCHAR}
+				AND bid_id = #{item.bid_id,jdbcType=INTEGER}
+		</foreach>
+	</update>
+	
+	<!-- 保存/删除 修改 中标信息 -->
+	<update id="updateAssTendCheckInfo" parameterType="java.util.List">
+		<foreach collection="list" item="item" index="index" open="begin" close=";end;" separator=";" >
+			UPDATE ASS_TEND_MAIN set
+				ven_id = #{item.ven_id,jdbcType=INTEGER},
+				ven_no = #{item.ven_no,jdbcType=INTEGER},
+				bid_calibratedate = #{item.bid_calibratedate,jdbcType=DATE},
+				bid_winflag = #{item.bid_winflag,jdbcType=VARCHAR}
+			where                    
+				group_id = #{item.group_id,jdbcType=INTEGER}
+				AND hos_id = #{item.hos_id,jdbcType=INTEGER}
+				AND copy_code = #{item.copy_code,jdbcType=VARCHAR}
+				AND bid_id = #{item.bid_id,jdbcType=INTEGER}
+		</foreach>
+	</update>
+	
+</mapper>
+

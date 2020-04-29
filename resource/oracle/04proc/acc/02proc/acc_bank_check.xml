@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+
+<sql id="T_ACC_BANK_CHECK" type="sql" desc="出纳-银行对账-银行对账单临时表"><![CDATA[
+	declare num number(4);
+	  begin
+	   select count(1) into num from USER_tables where TABLE_NAME = 'T_ACC_BANK_CHECK'; 
+	   if num>0 then
+	       execute immediate 'drop table T_ACC_BANK_CHECK cascade constraints';
+	   end if;
+	    
+	  execute immediate '
+	  create global temporary table T_ACC_BANK_CHECK 
+	  (
+	    XH NUMERIC(18,0) NOT NULL,  
+	    ROW_ID NUMERIC(18,0) NOT NULL, 
+	    BANK_ID NUMERIC(18,0) NOT NULL,  
+	    ACC_YEAR  VARCHAR2(4) NULL,
+	    SUBJ_CODE VARCHAR2(100) NULL,
+	    OCCUR_DATE DATE NULL, 
+	    SUMMARY VARCHAR2(200) NULL,
+	    PAY_CODE VARCHAR2(100) NULL,
+	    PAY_NAME VARCHAR2(100) NULL,
+	    CHECK_NO VARCHAR2(100) NULL,
+	    DEBIT NUMERIC(19,2) NULL,
+	    CREDIT NUMERIC(19,2) NULL,
+	    BAL NUMERIC(19,2) NULL,
+	    IS_CHECK VARCHAR2(20) NULL
+	  )on COMMIT delete ROWS
+	  ';
+	    
+	  execute immediate 'comment on table T_ACC_BANK_CHECK is ''银行对账单临时表''';
+	  execute immediate 'comment on column T_ACC_BANK_CHECK.XH is ''类型''';
+	  execute immediate 'comment on column T_ACC_BANK_CHECK.ROW_ID is ''序号''';
+	  execute immediate 'comment on column T_ACC_BANK_CHECK.BANK_ID is ''业务ID''';
+	  execute immediate 'comment on column T_ACC_BANK_CHECK.ACC_YEAR is ''年度''';
+	  execute immediate 'comment on column T_ACC_BANK_CHECK.SUBJ_CODE is ''科目编码''';
+	  execute immediate 'comment on column T_ACC_BANK_CHECK.OCCUR_DATE is ''业务日期''';
+	  execute immediate 'comment on column T_ACC_BANK_CHECK.SUMMARY is ''摘要''';
+	  execute immediate 'comment on column T_ACC_BANK_CHECK.PAY_CODE is ''结算方式编码''';
+	  execute immediate 'comment on column T_ACC_BANK_CHECK.PAY_NAME is ''结算方式''';
+	  execute immediate 'comment on column T_ACC_BANK_CHECK.DEBIT is ''借方''';
+	  execute immediate 'comment on column T_ACC_BANK_CHECK.CREDIT is ''贷方''';
+	  execute immediate 'comment on column T_ACC_BANK_CHECK.BAL is ''余额''';
+	  execute immediate 'comment on column T_ACC_BANK_CHECK.IS_CHECK is ''是否对账''';
+	    
+	end;
+]]></sql>
+
+
+<sql id="PROC_ACC_BANK_CHECK_QUERY" type="proc" desc="出纳-银行对账-银行对账单查询"><![CDATA[
+	CREATE OR REPLACE PROCEDURE PROC_ACC_BANK_CHECK_QUERY
+	/*银行对账单查询*/
+	(
+	  p_group_id         number,
+	  p_hos_id           number,
+	  p_copy_code        varchar2,
+	  p_acc_year         varchar2,
+	  p_subj_code        varchar2,
+	  p_begin_date       varchar2,
+	  p_end_date         varchar2,
+	  p_is_check         varchar2,
+	  p_pagesize         INTEGER,--每页显示数量
+	  p_page             INTEGER,--当前显示页
+	  p_tcount      OUT  INTEGER,
+	  p_result_data OUT  ACC_BOOKS.recursor
+	)
+	IS
+	  ddl_sql varchar2(4000);
+	BEGIN
+	  --插入期初余额
+	  insert into t_acc_bank_check(
+	    xh, row_id, acc_year, subj_code, occur_date, bank_id, summary,
+	    pay_code, pay_name, check_no, debit, credit, is_check, bal
+	  )
+	  select 1, 1, '', a.subj_code, '', 0, '期初余额', '', '',
+	    '', 0, 0, '', nvl(a.bal, 0) + nvl(b.bal, 0)
+	  from(
+	    select subj_code, nvl(bal,0) as bal
+	    from acc_bank_check
+	    where group_id = p_group_id
+	      and hos_id = p_hos_id
+	      and copy_code = p_copy_code
+	      and acc_year = p_acc_year
+	      and subj_code = p_subj_code
+	      and is_init = 1
+	      and bal <> 0
+	  )a
+	  full join(
+	    select subj_code, sum(nvl(credit, 0) - nvl(debit, 0)) as bal
+	    from acc_bank_check
+	    where group_id = p_group_id
+	      and hos_id = p_hos_id
+	      and copy_code = p_copy_code
+	      and acc_year = p_acc_year
+	      and subj_code = p_subj_code
+	      and is_init = 0
+	      and occur_date < to_date(p_begin_date, 'yyyy/MM/dd')
+	    group by subj_code
+	  )b
+	  on 1 = 1;
+	
+	  --插入业务数据
+	  insert into t_acc_bank_check(
+	    xh, row_id, acc_year, subj_code, occur_date, bank_id, summary,
+	    pay_code, pay_name, check_no, debit, credit, is_check, bal
+	  )
+	  select 2, rownum, acc_year, subj_code, occur_date, bank_id, summary, 
+	    pay_code, pay_name, check_no, debit, credit, is_check, 0
+	  from(
+	    select abc.acc_year, abc.subj_code, abc.occur_date,
+	      abc.bank_id, abc.summary, apt.pay_code, apt.pay_name,
+	      abc.check_no, nvl(abc.debit, 0) debit, nvl(abc.credit, 0) credit,
+	      case when abc.is_check = 1 then '是' else '否' end is_check 
+	    from acc_bank_check abc
+	    left join acc_pay_type apt
+	      on abc.group_id = apt.group_id
+	      and abc.hos_id = apt.hos_id
+	      and abc.copy_code = apt.copy_code
+	      and abc.pay_type_code = apt.pay_code
+	    where abc.group_id = p_group_id
+	      and abc.hos_id = p_hos_id
+	      and abc.copy_code = p_copy_code
+	      and abc.acc_year = p_acc_year
+	      and abc.subj_code = p_subj_code
+	      and abc.is_init = 0
+	      and abc.occur_date between to_date(p_begin_date, 'yyyy/MM/dd') and to_date(p_end_date, 'yyyy/MM/dd')
+	      and (
+	        p_is_check = 1
+	        or (p_is_check = 2 and abc.is_check = 1)
+	        or (p_is_check = 3 and nvl(abc.is_check, 0) = 0)
+	      )
+	    order by abc.occur_date, abc.bank_id
+	  ) tmp;
+	
+	  --插入合计数
+	  insert into t_acc_bank_check(
+	    xh, row_id, acc_year, subj_code, occur_date, bank_id, summary,
+	    pay_code, pay_name, check_no, debit, credit, is_check, bal
+	  )
+	  select 3, 1, '', subj_code, '', 0, '合计', '', '',
+	    '', sum(debit), sum(credit), '', 0
+	  from t_acc_bank_check
+	  where xh = 2
+	  group by subj_code;
+	
+	  --计算余额
+	  declare
+	    --定义游标
+	    cursor c_job
+	    is
+	      select xh, row_id, subj_code, debit, credit, bal
+	      from t_acc_bank_check
+	      order by subj_code, xh, row_id;
+	     --定义一个游标变量
+	    c_row c_job%rowtype;
+	    v_bal numeric(18, 2);
+	  begin
+	    v_bal := 0;
+	    for c_row in c_job loop
+	      if c_row.xh = 1 then
+	        --如果xh为1 则初始化v_bal
+	        v_bal := c_row.bal;
+	      elsif c_row.xh = 3 then
+	        --如果xh为3 则直接更新余额
+	        update t_acc_bank_check
+	        set bal = v_bal
+	        where subj_code = c_row.subj_code
+	          and xh = c_row.xh
+	          and row_id = c_row.row_id;
+	        --重置累计数
+	        v_bal := 0;
+	      else
+	        --其他则计算累计数后更新余额
+	        v_bal := v_bal + c_row.credit - c_row.debit;
+	        --更新余额
+	        update t_acc_bank_check
+	        set bal = v_bal
+	        where subj_code = c_row.subj_code
+	          and xh = c_row.xh
+	          and row_id = c_row.row_id;
+	      end if;
+	
+	    end loop;
+	  end;
+	
+	  /*返回结果集游标*/
+	  ddl_sql:='
+	    select * from (
+	      select rownum rn, ab.* from t_acc_bank_check ab
+	    )
+	  ';
+	
+	  if p_pagesize>0 then
+	    ddl_sql:=ddl_sql||' where rn >'||(p_page-1)*p_pagesize||' and rn<='||p_page*p_pagesize;
+	  end if;
+	
+	  open p_result_data for ddl_sql;
+	
+	  p_tcount:=0;
+	  EXECUTE IMMEDIATE 'select count(*) from t_acc_bank_check' INTO p_tcount;
+	END PROC_ACC_BANK_CHECK_QUERY;
+]]>
+</sql>
+
+</root>

@@ -1,0 +1,103 @@
+﻿{
+  "title": "图表切片器用例",
+  "segments": [
+    [
+      { "description": "对于复杂的场景，你可以向下面这样定制<b>GeneralSlicerData</b>：" },
+      { "description": "(1) 从GeneralSlicerData派生定义切片器数据类型。" },
+      {
+        "code": [
+          "function ChartSlicerData(datas, columnNames) {",
+          "    GC.Spread.Slicers.GeneralSlicerData.call(this, datas, columnNames);",
+          "    this.listeners = [];",
+          "}",
+          "ChartSlicerData.prototype = GC.Spread.Slicers.GeneralSlicerData.prototype;",
+          "ChartSlicerData.prototype.constructor = ChartSlicerData;"
+        ]
+      },
+      { "description": "(2) 重写 <b>attachListener</b> 和 <b>dettachListener</b> 方法。" },
+      {
+        "code": [
+          "ChartSlicerData.prototype.attachListener = function (listener) {",
+          "    this.listeners.push(listener);",
+          "};",
+          "ChartSlicerData.prototype.dettachListener = function (listener) {",
+          "    for (var i = 0; i < this.listeners.length; i++) {",
+          "        if (this.listeners[i] === listener) {",
+          "            this.listeners.splice(i);",
+          "            break;",
+          "        }",
+          "    }",
+          "};"
+        ]
+      },
+      { "description": "(3) 重写 <b>onFiltered</b> 方法实现自己的的筛选逻辑。" },
+      {
+        "code": [
+          "ChartSlicerData.prototype.onFiltered = function () {",
+          "    for (var i = 0; i < this.listeners.length; i++) {",
+          "        this.listeners[i].onFiltered({ dataIndexes: this.getFilteredRowIndexes() });",
+          "        // invoke refreshLish to refresh chart UI",
+          "        this.listeners[i].refreshList();",
+          "    }",
+          "};"
+        ]
+      },
+      { "description": "(4) 创建自己的切片器。" },
+      {
+        "code": [
+          "function ChartSlicer(container, columnName, slicerData, title, legend) {",
+          "    this.data = slicerData;",
+          "    this.container = container;",
+          "    // Some code omitted here, you can see it on the right.",
+          "    ...",
+          "    this.slicerData.attachListener(this);",
+          "    // incoke onDataLoaded function to build UI",
+          "    this.onDataLoaded();",
+          "}",
+          "ChartSlicer.prototype.constructor = ChartSlicer;"
+        ]
+      },
+      { "description": "(5) 创建自己的 <b>onDataLoaded</b> 方法。" },
+      {
+        "code": [
+          "ChartSlicer.prototype.onDataLoaded = function () {",
+          "    var self = this;",
+	        "    ...",
+          "    $(this.container).append($chartDiv);",
+          "    $(this.container).append($footerDiv);",
+	        "    ...",
+          "    var indexes = [];",
+          "    ...",
+          "    // invoke slicerData's doFilter function",
+          "    self.slicerData.doFilter(self.columnName, { exclusiveRowIndexes: indexes });",
+	        "    ...",
+          "};"
+        ]
+      },
+      { "description": "(6) 创建自己的 <b>onFiltered</b> 方法。" },
+      {
+        "code": [
+          "ChartSlicer.prototype.onFiltered = function (data) {",
+          "    ...",
+          "    var filteredRowIndexs = data.dataIndexes;",
+          "    for (var r = 0, len = sheet.getRowCount() ; r < len; r++) {",
+          "        sheet.setRowVisible(r, false);",
+          "    }",
+          "    for (var i = 0, len = filteredRowIndexs.length; i < len; i++) {",
+          "        sheet.setRowVisible(filteredRowIndexs[i], true);",
+          "    }",
+          "    ...",
+          "};"
+        ]
+      },
+      { "description": "(7) 创建自己的切片器数据并附加到你的切片器上。" },
+      {
+        "code": [
+          "var slicerData = new ChartSlicerData(ret.arrayDatas, ret.columnNames);",
+          "var yearsOnListChart = new ChartSlicer($('#yearsOnList')[0], 'years on list', slicerData, 'Years on the List', 'Number of companies');",
+          "var workersChart = new ChartSlicer($('#workers')[0], 'workers', slicerData, 'Workers', 'Number of companies');"
+        ]
+      }     
+    ]
+  ]
+}

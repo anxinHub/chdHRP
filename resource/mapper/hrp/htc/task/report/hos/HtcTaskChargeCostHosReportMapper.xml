@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.htc.dao.task.report.hos.HtcTaskChargeCostHosReportMapper">
+
+	<resultMap id="map" type="java.util.Map">
+        <result property="group_id" column="group_id"/>
+        <result property="hos_id" column="hos_id"/>
+        <result property="copy_code" column="copy_code"/>
+        <result property="acc_year" column="acc_year"/>
+        <result property="plan_code" column="plan_code"/>
+        <result property="plan_name" column="plan_name"/>
+        <result property="proj_dept_id" column="proj_dept_id"/>
+        <result property="proj_dept_code" column="proj_dept_code"/>
+        <result property="proj_dept_name" column="proj_dept_name"/>
+        <result property="charge_item_code" column="charge_item_code"/>
+        <result property="charge_item_name" column="charge_item_name"/>
+        <result property="price" column="price"/>
+        <result property="cost_eve" column="cost_eve"/>
+        <result property="people_cost_eve" column="people_cost_eve"/>
+        <result property="mate_cost_eve" column="mate_cost_eve"/>
+        <result property="asset_cost_eve" column="asset_cost_eve"/>
+        <result property="bbd" column="bbd"/>
+        
+	</resultMap>
+	
+   
+	<select id="queryHtcTaskChargeCostHosReport" parameterType="java.util.Map" resultMap="map" >
+				                with charge_item as (
+									select 
+									 hdcr.group_id,
+									 hdcr.hos_id,
+									 hdcr.copy_code,
+									 hdcr.acc_year,
+									 hdcr.plan_code,
+									 hps.plan_name,
+									 hdcr.charge_item_id,
+									 ccia.charge_item_code,
+									 ccia.charge_item_name,
+									 ccia.price
+									from htc_dept_charge_rela hdcr
+									left join htc_plan_set hps
+									on hdcr.group_id = hps.group_id
+									and hdcr.hos_id = hps.hos_id
+									and hdcr.copy_code = hps.copy_code
+									and hdcr.acc_year = hps.acc_year
+									and hdcr.plan_code = hps.plan_code
+									left join cost_charge_item_arrt ccia
+									on ccia.group_id = hdcr.group_id
+									and ccia.hos_id = hdcr.hos_id
+									and ccia.copy_code = hdcr.copy_code
+									and ccia.charge_item_id = hdcr.charge_item_id
+									group by hdcr.group_id,
+													 hdcr.hos_id,
+													 hdcr.copy_code,
+													 hdcr.acc_year,
+													 hdcr.plan_code,
+													 hps.plan_name,
+													 hdcr.charge_item_id,
+													 ccia.charge_item_code,
+													 ccia.charge_item_name,
+													 ccia.price
+						), people_cost as (
+						  		select 
+									 hcdph.group_id,
+									 hcdph.hos_id,
+									 hcdph.copy_code,
+									 hcdph.acc_year,
+									 hcdph.plan_code,
+									 hcdph.charge_item_id,
+									 sum(hcdph.cost_eve) cost_eve
+									from htc_charge_direct_people_hos hcdph
+									group by hcdph.group_id,
+													 hcdph.hos_id,
+													 hcdph.copy_code,
+													 hcdph.acc_year,
+													 hcdph.plan_code,
+													 hcdph.charge_item_id
+						), mate_cost as (
+						      select 
+									 hcdmh.group_id,
+									 hcdmh.hos_id,
+									 hcdmh.copy_code,
+									 hcdmh.acc_year,
+									 hcdmh.plan_code,
+									 hcdmh.charge_item_id,
+									 sum(hcdmh.cost_eve)cost_eve
+									from htc_charge_direct_mate_hos hcdmh
+									group by hcdmh.group_id,
+													 hcdmh.hos_id,
+													 hcdmh.copy_code,
+													 hcdmh.acc_year,
+													 hcdmh.plan_code,
+													 hcdmh.charge_item_id
+						 ), asset_cost as (
+						  select 
+							    group_id,
+									hos_id,
+									copy_code,
+									acc_year,
+									plan_code,
+									charge_item_id,
+									sum(cost_eve) cost_eve
+							 from (
+							select 
+								hcdfh.group_id,
+								hcdfh.hos_id,
+								hcdfh.copy_code,
+								hcdfh.acc_year,
+								hcdfh.plan_code,
+								hcdfh.charge_item_id,
+								hcdfh.cost_eve
+							from htc_charge_direct_fasset_hos hcdfh
+							union all
+							select 
+								hcdih.group_id,
+								hcdih.hos_id,
+								hcdih.copy_code,
+								hcdih.acc_year,
+								hcdih.plan_code,
+								hcdih.charge_item_id,
+								hcdih.cost_eve
+							from htc_charge_direct_iasset_hos hcdih
+						 )t
+						  group by group_id,
+											hos_id,
+											copy_code,
+											acc_year,
+											plan_code,
+											charge_item_id
+						 )select 
+						       t1.group_id,
+									 t1.hos_id,
+									 t1.copy_code,
+									 t1.acc_year,
+									 t1.plan_code,
+									 t1.plan_name,
+									 t1.charge_item_id,
+									 t1.charge_item_code,
+									 t1.charge_item_name,
+									 t1.price,
+									 t2.cost_eve + t3.cost_eve +  t4.cost_eve cost_eve,
+									 t2.cost_eve people_cost_eve,
+									 t3.cost_eve mate_cost_eve,
+									 t4.cost_eve asset_cost_eve,
+									 t1.price - t2.cost_eve - t3.cost_eve -  t4.cost_eve bbd
+						  from charge_item t1
+						  left join people_cost t2
+							on t1.group_id = t2.group_id
+							and t1.hos_id = t2.hos_id
+							and t1.copy_code = t2.copy_code
+							and t1.acc_year = t2.acc_year
+							and t1.plan_code = t2.plan_code
+							and t1.charge_item_id = t2.charge_item_id
+							left join mate_cost t3
+							on t1.group_id = t3.group_id
+							and t1.hos_id = t3.hos_id
+							and t1.copy_code = t3.copy_code
+							and t1.acc_year = t3.acc_year
+							and t1.plan_code = t3.plan_code
+							and t1.charge_item_id = t3.charge_item_id
+							left join asset_cost t4
+							on t1.group_id = t4.group_id
+							and t1.hos_id = t4.hos_id
+							and t1.copy_code = t4.copy_code
+							and t1.acc_year = t4.acc_year
+							and t1.plan_code = t4.plan_code
+							and t1.charge_item_id = t4.charge_item_id
+					<where> t1.group_id = #{group_id}
+							and t1.hos_id = #{hos_id}
+							and t1.copy_code = #{copy_code}
+							and t1.acc_year = #{acc_year}
+							  <if test="plan_code != null and plan_code != ''">
+					                and t1.plan_code = #{plan_code}
+					           </if>
+					            <if test="charge_item_id != null and charge_item_id != ''">
+					                and t1.charge_item_id = #{charge_item_id}
+					           </if>
+							</where>
+					      order by  t1.group_id,
+									 t1.hos_id,
+									 t1.copy_code,
+									 t1.acc_year,
+									 t1.plan_code,
+									 t1.charge_item_code
+    </select>
+	
+</mapper>
+

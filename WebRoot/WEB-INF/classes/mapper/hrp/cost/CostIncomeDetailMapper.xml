@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.cost.dao.CostIncomeDetailMapper">
+	<resultMap id="costIncomeDetail" type="com.chd.hrp.cost.entity.CostIncomeDetail">
+        <result property="income_detail_id" column="income_detail_id"/>
+        <result property="acc_year" column="acc_year"/>
+        <result property="acc_month" column="acc_month"/>
+         <result property="year_month" column="year_month"/>
+        <result property="appl_dept_code" column="appl_dept_code"/>
+        <result property="appl_dept_name" column="appl_dept_name"/>
+        <result property="exec_dept_code" column="exec_dept_code"/>
+        <result property="exec_dept_name" column="exec_dept_name"/>
+        <result property="charge_kind_code" column="charge_kind_code"/>
+        <result property="charge_kind_name" column="charge_kind_name"/>
+        <result property="charge_item_code" column="charge_item_code"/>
+        <result property="charge_item_name" column="charge_item_name"/>
+        <result property="price" column="price"/>
+        <result property="num" column="num"/>
+        <result property="money" column="money"/>
+        <result property="busi_data_source_code" column="busi_data_source_code"/>
+        <result property="busi_data_source_name" column="busi_data_source_name"/>
+        <result property="create_user" column="create_user"/>
+        <result property="create_date" column="create_date"/>
+	</resultMap>
+	
+    <insert id="addCostIncomeDetail" useGeneratedKeys="true" >
+               insert into cost_income_detail
+						  (income_detail_id,
+						   acc_year,
+						   acc_month,
+						   appl_dept_code,
+						   appl_dept_name,
+						   exec_dept_code,
+						   exec_dept_name,
+						   charge_kind_code,
+						   charge_kind_name,
+						   charge_item_code,
+						   charge_item_name,
+						   price,
+						   num,
+						   money,
+						   busi_data_source_code,
+						   create_user,
+						   create_date)
+						values
+						  (cost_income_detail_seq.nextval,
+						   #{acc_year},
+						   #{acc_month},
+						   #{appl_dept_code},
+						   #{appl_dept_name},
+						   #{exec_dept_code},
+						   #{exec_dept_name},
+						   #{charge_kind_code},
+						   #{charge_kind_name},
+						   #{charge_item_code},
+						   #{charge_item_name},
+						   #{price},
+						   #{num},
+						   #{money},
+						   #{busi_data_source_code},
+						   #{create_user},
+						   #{create_date})
+    </insert>
+	<insert id="addBatchCostIncomeDetail" parameterType="java.util.List" >
+    
+         insert into cost_income_detail
+						  (income_detail_id,
+						   acc_year,
+						   acc_month,
+						   appl_dept_code,
+						   appl_dept_name,
+						   exec_dept_code,
+						   exec_dept_name,
+						   charge_kind_code,
+						   charge_kind_name,
+						   charge_item_code,
+						   charge_item_name,
+						   price,
+						   num,
+						   money,
+						   busi_data_source_code,
+						   create_user,
+						   create_date)
+	    select cost_income_detail_seq.nextval, t.*  from(
+		 <foreach collection="list" item="item" index="index" separator=" union all " >
+	           select 		
+					#{item.acc_year},
+				    #{item.acc_month},
+				    #{item.appl_dept_code},
+				    #{item.appl_dept_name},
+					#{item.exec_dept_code},
+					#{item.exec_dept_name},
+					#{item.charge_kind_code},
+					#{item.charge_kind_name},
+					#{item.charge_item_code},
+					#{item.charge_item_name},
+					#{item.price},
+					#{item.num},
+					#{item.money},
+					#{item.busi_data_source_code},
+					#{item.create_user},
+					#{item.create_date}			 
+				from dual 
+		</foreach>
+		) t
+    </insert>
+
+	
+    <delete id="deleteBatchCostIncomeDetail" parameterType="java.util.List">
+            delete from cost_income_detail  where
+		<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+		    income_detail_id = #{item.income_detail_id}
+		</foreach>
+    </delete>
+    
+   
+	<select id="queryCostIncomeDetail" parameterType="java.util.Map" resultMap="costIncomeDetail" >
+         			with temp as(
+			select income_detail_id,
+						 acc_year,
+						 acc_month,
+						 appl_dept_code,
+						 appl_dept_name,
+						 exec_dept_code,
+						 exec_dept_name,
+						 charge_kind_code,
+						 charge_kind_name,
+						 charge_item_code,
+						 charge_item_name,
+						 price,
+						 num,
+						 money,
+						 cid.busi_data_source_code,
+						 cbsd.busi_data_source_name,
+						 create_user,
+						 create_date 
+				from cost_income_detail cid
+				left join cost_busi_sourec_dict cbsd 
+				on cid.busi_data_source_code = cbsd.busi_data_source_code
+				and cbsd.busi_data_source_type = 1
+				where cid.acc_year || cid.acc_month between #{begin_year_month} and #{end_year_month}
+				<if test="busi_data_source_code != null and busi_data_source_code != ''">
+					and cim.busi_data_source_code = #{busi_data_source_code,jdbcType=VARCHAR}
+				</if>
+			)select 
+			       income_detail_id,
+						 acc_year||acc_month year_month,
+						 appl_dept_code,
+						 appl_dept_name,
+						 exec_dept_code,
+						 exec_dept_name,
+						 charge_kind_code,
+						 charge_kind_name,
+						 charge_item_code,
+						 charge_item_name,
+						 price,
+						 num,
+						 money,
+						 busi_data_source_code,
+						 busi_data_source_name,
+						 create_user,
+						 create_date
+			 from temp
+			 union all
+			 select 
+			             null,
+						 '合计',
+						 null,
+						 null,
+						 null,
+						 null,
+						 null,
+						 null,
+						 null,
+						 null,
+						 null,
+						 sum(num),
+						 sum(money),
+						 null,
+						 null,
+						 null,
+						 null
+				from temp
+         
+    </select>
+	
+	<insert id="addCostIncomeDetailByHis">
+		BEGIN 
+			<!-- 删除当月数据重新插入 -->
+			delete from cost_income_detail 
+			where  acc_year = #{acc_year}
+		    and acc_month = #{acc_month};
+				
+			<!-- 插入收入数据 -->
+			insert into cost_income_detail
+						  (income_detail_id,
+						   acc_year,
+						   acc_month,
+						   appl_dept_code,
+						   appl_dept_name,
+						   exec_dept_code,
+						   exec_dept_name,
+						   charge_kind_code,
+						   charge_kind_name,
+						   charge_item_code,
+						   charge_item_name,
+						   price,
+						   num,
+						   money,
+						   busi_data_source_code,
+						   create_user,
+						   create_date)
+		     
+			SELECT income_detail_id,
+				   acc_year,
+				   acc_month,
+				   appl_dept_code,
+				   appl_dept_name,
+				   exec_dept_code,
+				   exec_dept_name,
+				   charge_kind_code,
+				   charge_kind_name,
+				   charge_item_code,
+				   charge_item_name,
+				   price,
+				   num,
+				   money,
+				   busi_data_source_code,
+				   #{user_id}, 
+				   sysdate
+			from 
+			where a.acc_year = #{acc_year}
+			and a.acc_month = #{acc_month};
+		end;
+	</insert>
+	
+</mapper>
+

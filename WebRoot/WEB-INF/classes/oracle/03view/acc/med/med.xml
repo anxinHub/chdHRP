@@ -1,0 +1,677 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+
+  <sql id="V_MED_IN_MAIN" type="view" desc="药品入库主表"><![CDATA[
+	CREATE OR REPLACE VIEW V_MED_IN_MAIN AS
+ 	SELECT
+        PRE.GROUP_ID,   --集团ID
+        PRE.HOS_ID,     --单位ID
+        PRE.COPY_CODE,  --账套编码    
+        PRE.in_no BUSINESS_ID,--联合主键
+        PRE.in_no BUSINESS_NO,--单据号
+        pre.bus_type_code,--业务类型
+        PRE.IN_DATE BUSI_DATE, --入库日期
+        AMVHR.Hrp_Ven_Id SUP_ID, --供应商ID
+        HSD.SUP_NO, --供应商变更号 
+        HSD.SUP_CODE, --供应商编码
+        PRE.Ven_Code||' '||ven.ven_name HIS_SUP_NAME, --his供应商名称
+        HSD.SUP_CODE||' '||HSD.SUP_NAME HRP_SUP_NAME, --hrp供应商名称
+        hst.store_id STORE_ID_K,--药库ID
+        hst.store_no STORE_NO_K, --药库变更号      
+        HST.STORE_CODE STORE_CODE_K, --药库编码        
+        PRE.store_code_k||' '||hs.store_name HIS_STORE_NAME,--his药库名称
+        HST.Store_Code||' '||HST.STORE_NAME HRP_STORE_NAME, --hrp药库名称        
+        PRE.MED_TYPE_CODE SUB_TYPE_ID, --药品类别编码
+        PRE.MED_TYPE_CODE||' '||type.MED_TYPE_NAME MED_TYPE_NAME, --药品类别名称
+        case bill_state when 1 then '是' else '否' end bill_text,--是否挂账
+        bill_state bill_state,--挂账状态
+        PRE.IN_PRICE AMOUNT_MONEY, --药品进价
+        PRE.RETAIL_PRICE RETAIL_PRICE, --药品零售价
+        PRE.PROFIT_PRICE PROFIT_PRICE --药品差价(利润)
+     FROM ACC_MED_IN PRE
+     left join acc_med_store_his hs 
+     on pre.group_id=hs.group_id and pre.hos_id=hs.hos_id and pre.copy_code=hs.copy_code and pre.store_code_k=hs.store_code
+     left join ACC_MED_TYPE_HIS type   
+     on PRE.GROUP_ID=type.GROUP_ID and PRE.HOS_ID=type.HOS_ID and PRE.COPY_CODE=type.COPY_CODE and PRE.MED_TYPE_CODE=type.MED_TYPE_CODE
+     left join acc_med_ven_his ven 
+     on pre.group_id=ven.group_id and pre.hos_id=ven.hos_id and pre.copy_code=ven.copy_code and pre.ven_code=ven.ven_code
+       
+     left join ACC_MED_STORE_HIS_REF sf 
+     on pre.group_id=sf.group_id and pre.hos_id=sf.hos_id and pre.copy_code=sf.copy_code and sf.his_store_code=pre.store_code_k     
+     LEFT JOIN HOS_STORE_DICT HST 
+     on hst.group_id=sf.group_id and hst.hos_id=sf.hos_id and hst.store_id=sf.hrp_store_id and hst.is_stop=0
+         
+     LEFT JOIN ACC_MED_VEN_HIS_REF AMVHR
+     ON PRE.GROUP_ID = AMVHR.GROUP_ID  AND PRE.HOS_ID = AMVHR.HOS_ID  AND PRE.VEN_CODE = AMVHR.HIS_VEN_CODE
+     LEFT JOIN HOS_SUP_DICT HSD 
+       ON AMVHR.GROUP_ID = HSD.GROUP_ID 
+       AND AMVHR.HOS_ID = HSD.HOS_ID 
+       AND AMVHR.HRP_VEN_ID = HSD.SUP_ID
+       and HSD.Is_Stop=0
+     --group by PRE.GROUP_ID,PRE.HOS_ID,PRE.COPY_CODE,PRE.in_no,PRE.IN_DATE,hst.store_id,hst.store_no,PRE.store_code_k,HST.STORE_NAME,
+     --PRE.MED_TYPE_CODE,HST.STORE_NAME,PRE.MED_TYPE_CODE,type.MED_TYPE_NAME
+   	]]></sql>
+   	
+   	<sql id="V_MED_IN_DETAIL" type="view" desc="药品入库明细表"><![CDATA[
+	  CREATE OR REPLACE VIEW V_MED_IN_DETAIL AS
+		SELECT
+          PRE.GROUP_ID,   --集团ID
+          PRE.HOS_ID,     --单位ID
+          PRE.COPY_CODE,  --账套编码
+          pre.in_no BUSINESS_ID,--联合主键
+          pre.in_no BUSINESS_NO,--单据号
+          PRE.IN_DATE BUSI_DATE, --入库日期
+          hst.store_id STORE_ID_K,--药库ID
+          hst.store_no STORE_NO_K, --药库变更号
+          PRE.store_code_k STORE_CODE_K, --药库编码
+          --HST.STORE_CODE STORE_CODE_K, --药库编码
+          --HST.STORE_NAME STORE_NAME_K, --药库名称
+          HST.Store_Code||' '||HST.STORE_NAME HRP_STORE_NAME, --hrp药库名称
+          hss.STORE_NAME HIS_STORE_NAME, --HIS药库名称
+          PRE.MED_TYPE_CODE SUB_TYPE_ID, --药品类别编码
+          type.MED_TYPE_NAME, --药品类别名称
+          hsd.sup_id,--供应商ID
+          hsd.sup_no,--供应商变更号
+          HSD.sup_code,--供应商编码         
+          HSD.sup_code||' '||HSD.sup_name hrp_sup_name,--HRP供应商
+          pre.ven_code his_sup_code,--his供应商编码         
+          pre.ven_code||' '||hsv.ven_name his_sup_name,--HIS供应商
+          PRE.pay_no,--付款单号
+          pre.bill_date,--发票日期
+          pre.bill_no,--发票号
+          pre.bill_money,--发票金额
+          PRE.IN_PRICE AMOUNT_MONEY, --药品进价
+          PRE.RETAIL_PRICE RETAIL_PRICE, --药品零售价
+          PRE.PROFIT_PRICE PROFIT_PRICE --药品差价(利润)
+       FROM ACC_MED_IN_DETAIL PRE
+      
+       left join ACC_MED_TYPE_HIS type
+       on PRE.GROUP_ID=type.GROUP_ID and PRE.HOS_ID=type.HOS_ID and PRE.COPY_CODE=type.COPY_CODE and PRE.MED_TYPE_CODE=type.MED_TYPE_CODE
+
+       left join acc_med_store_his hss on PRE.GROUP_ID=hss.GROUP_ID and PRE.HOS_ID=hss.HOS_ID and PRE.COPY_CODE=hss.COPY_CODE and pre.store_code_k=hss.store_code and hss.store_flag=1
+
+       left join acc_med_ven_his hsv on PRE.GROUP_ID=hsv.GROUP_ID and PRE.HOS_ID=hsv.HOS_ID and PRE.COPY_CODE=hsv.COPY_CODE and pre.ven_code=hsv.ven_code
+
+       left join ACC_MED_STORE_HIS_REF sf on pre.group_id=sf.group_id and pre.hos_id=sf.hos_id and pre.copy_code=sf.copy_code
+       and sf.his_store_flag=1 and sf.his_store_code=pre.store_code_k
+       LEFT JOIN HOS_STORE_DICT HST on hst.group_id=sf.group_id and hst.hos_id=sf.hos_id and hst.store_id=sf.hrp_store_id and hst.is_stop=0
+
+       left join ACC_MED_VEN_HIS_REF vf on pre.group_id=vf.group_id and pre.hos_id=vf.hos_id and pre.copy_code=vf.copy_code
+       and pre.ven_code=vf.his_ven_code
+       LEFT JOIN HOS_SUP_DICT HSD on hsd.group_id=vf.group_id and hsd.hos_id=vf.hos_id and hsd.sup_id=vf.hrp_ven_id and hsd.is_stop=0
+      
+   	]]></sql>
+   	
+   	
+   	<sql id="V_MED_BACK_MAIN" type="view" desc="药品退货主表"><![CDATA[
+	CREATE OR REPLACE VIEW V_MED_BACK_MAIN AS
+ 	SELECT
+        PRE.GROUP_ID,   --集团ID
+        PRE.HOS_ID,     --单位ID
+        PRE.COPY_CODE,  --账套编码    
+        pre.back_no BUSINESS_ID,--联合主键
+        pre.back_no BUSINESS_NO,--单据号
+        PRE.BACK_DATE BUSI_DATE, --入库日期
+        AMVHR.Hrp_Ven_Id SUP_ID, --供应商ID
+        HSD.SUP_NO, --供应商变更号 
+        HSD.SUP_CODE, --供应商编码
+        PRE.Ven_Code||' '||ven.ven_name HIS_SUP_NAME, --his供应商名称
+        HSD.SUP_CODE||' '||HSD.SUP_NAME HRP_SUP_NAME, --hrp供应商名称
+        hst.store_id STORE_ID_K,--药库ID
+        hst.store_no STORE_NO_K, --药库变更号       
+        HST.STORE_CODE STORE_CODE_K, --药库编码
+        PRE.store_code_k||' '||hs.store_name HIS_STORE_NAME,--his药库名称
+        HST.Store_Code||' '||HST.STORE_NAME HRP_STORE_NAME, --hrp药库名称
+        PRE.MED_TYPE_CODE SUB_TYPE_ID, --药品类别编码
+        PRE.MED_TYPE_CODE||' '||type.MED_TYPE_NAME MED_TYPE_NAME, --药品类别名称
+        case bill_state when 1 then '是' else '否' end bill_text,--是否挂账
+        pre.bill_state bill_state,--发票状态
+        PRE.IN_PRICE AMOUNT_MONEY, --药品进价
+        PRE.RETAIL_PRICE RETAIL_PRICE, --药品零售价
+        PRE.PROFIT_PRICE PROFIT_PRICE --药品差价(利润)
+     FROM ACC_MED_BACK PRE
+     left join acc_med_store_his hs 
+     on pre.group_id=hs.group_id and pre.hos_id=hs.hos_id and pre.copy_code=hs.copy_code and pre.store_code_k=hs.store_code
+     left join ACC_MED_TYPE_HIS type
+     on PRE.GROUP_ID=type.GROUP_ID and PRE.HOS_ID=type.HOS_ID and PRE.COPY_CODE=type.COPY_CODE and PRE.MED_TYPE_CODE=type.MED_TYPE_CODE
+     left join acc_med_ven_his ven 
+     on pre.group_id=ven.group_id and pre.hos_id=ven.hos_id and pre.copy_code=ven.copy_code and pre.ven_code=ven.ven_code
+    
+     
+     left join ACC_MED_STORE_HIS_REF sf 
+     on pre.group_id=sf.group_id and pre.hos_id=sf.hos_id and pre.copy_code=sf.copy_code and sf.his_store_code=pre.store_code_k     
+     LEFT JOIN HOS_STORE_DICT HST 
+     on hst.group_id=sf.group_id and hst.hos_id=sf.hos_id and hst.store_id=sf.hrp_store_id and hst.is_stop=0
+     
+     LEFT JOIN ACC_MED_VEN_HIS_REF AMVHR
+     ON PRE.GROUP_ID = AMVHR.GROUP_ID  AND PRE.HOS_ID = AMVHR.HOS_ID  AND PRE.VEN_CODE = AMVHR.HIS_VEN_CODE     
+     LEFT JOIN HOS_SUP_DICT HSD 
+       ON AMVHR.GROUP_ID = HSD.GROUP_ID 
+       AND AMVHR.HOS_ID = HSD.HOS_ID 
+       AND AMVHR.HRP_VEN_ID = HSD.SUP_ID
+       and HSD.Is_Stop=0
+     --group by PRE.GROUP_ID,PRE.HOS_ID,PRE.COPY_CODE,PRE.BACK_DATE,hst.store_id,hst.store_no,HST.STORE_CODE,HST.STORE_NAME,
+     --PRE.MED_TYPE_CODE,HST.STORE_NAME,PRE.MED_TYPE_CODE,type.MED_TYPE_NAME
+   	]]></sql>
+   	
+   	
+   	<sql id="V_MED_BACK_DETAIL" type="view" desc="药品退货明细表"><![CDATA[
+	 CREATE OR REPLACE VIEW V_MED_BACK_DETAIL AS
+		SELECT
+          PRE.GROUP_ID,   --集团ID
+          PRE.HOS_ID,     --单位ID
+          PRE.COPY_CODE,  --账套编码
+          pre.back_no BUSINESS_ID,--联合主键
+          pre.back_no BUSINESS_NO,--单据号
+          PRE.BACK_DATE BUSI_DATE, --入库日期
+          hst.store_id STORE_ID_K,--药库ID
+          hst.store_no STORE_NO_K, --药库变更号
+          pre.store_code_k,--药库编码
+          --HST.STORE_CODE STORE_CODE_K, --药库编码
+          --HST.STORE_NAME STORE_NAME_K, --药库名称
+          HST.Store_Code||' '||HST.STORE_NAME HRP_STORE_NAME, --hrp药库名称
+          HSs.STORE_NAME HIS_STORE_NAME, --HIS药库名称
+          PRE.MED_TYPE_CODE SUB_TYPE_ID, --药品类别编码
+          type.MED_TYPE_NAME, --药品类别名称
+          hsd.sup_id,--供应商ID
+          hsd.sup_no,--供应商变更号
+          HSD.sup_code,--供应商编码
+          HSD.sup_code||' '||HSD.sup_name hrp_sup_name,--供应商名称
+          pre.ven_code his_sup_code,--his供应商编码
+          pre.ven_code||' '||hsv.ven_name his_sup_name,--his供应商名称
+          PRE.pay_no,--付款单号
+          PRE.bill_date,--发票日期
+          PRE.bill_no,--发票号
+          PRE.Bill_Money,--发票金额
+          PRE.IN_PRICE AMOUNT_MONEY, --药品进价
+          PRE.RETAIL_PRICE RETAIL_PRICE, --药品零售价
+          PRE.PROFIT_PRICE PROFIT_PRICE --药品差价(利润)
+       FROM ACC_MED_BACK_DETAIL PRE      
+       left join ACC_MED_TYPE_HIS type
+       on PRE.GROUP_ID=type.GROUP_ID and PRE.HOS_ID=type.HOS_ID and PRE.COPY_CODE=type.COPY_CODE and PRE.MED_TYPE_CODE=type.MED_TYPE_CODE
+
+       left join acc_med_store_his hss on PRE.GROUP_ID=hss.GROUP_ID and PRE.HOS_ID=hss.HOS_ID and PRE.COPY_CODE=hss.COPY_CODE and pre.store_code_k=hss.store_code and hss.store_flag=1
+
+       left join acc_med_ven_his hsv on PRE.GROUP_ID=hsv.GROUP_ID and PRE.HOS_ID=hsv.HOS_ID and PRE.COPY_CODE=hsv.COPY_CODE and pre.ven_code=hsv.ven_code
+
+       left join ACC_MED_STORE_HIS_REF sf on pre.group_id=sf.group_id and pre.hos_id=sf.hos_id and pre.copy_code=sf.copy_code
+       and sf.his_store_flag=1 and sf.his_store_code=pre.store_code_k
+       LEFT JOIN HOS_STORE_DICT HST on hst.group_id=sf.group_id and hst.hos_id=sf.hos_id and hst.store_id=sf.hrp_store_id and hst.is_stop=0
+
+       left join ACC_MED_VEN_HIS_REF vf on pre.group_id=vf.group_id and pre.hos_id=vf.hos_id and pre.copy_code=vf.copy_code
+       and pre.ven_code=vf.his_ven_code
+       LEFT JOIN HOS_SUP_DICT HSD on hsd.group_id=vf.group_id and hsd.hos_id=vf.hos_id and hsd.sup_id=vf.hrp_ven_id and hsd.is_stop=0
+
+   	]]></sql>
+   	
+   <sql id="V_MED_K_OUT_MAIN" type="view" desc="药库出库"><![CDATA[
+	CREATE OR REPLACE VIEW V_MED_K_OUT_MAIN AS
+	SELECT
+        ACO.GROUP_ID,   --集团ID
+        ACO.HOS_ID,     --单位ID
+        ACO.COPY_CODE,  --账套编码    
+        to_char(ACO.OUT_DATE,'yyyyMMdd')||'-'||HST.STORE_CODE BUSINESS_ID,--联合主键
+        to_char(ACO.OUT_DATE,'yyyyMMdd')||'-'||HST.STORE_CODE BUSINESS_NO,--单据号
+        ACO.OUT_DATE BUSI_DATE, --出库日期
+        
+        HST.STORE_ID STORE_ID_K,--药库ID
+        HST.STORE_NO STORE_NO_K, --药库变更号       
+        HST.STORE_CODE STORE_CODE_K, --药库编码
+        ACO.STORE_CODE_K||' '||HST.STORE_NAME STORE_NAME_K, --药库名称
+   
+        HSTF.STORE_ID STORE_ID_F,--药房ID
+        HSTF.STORE_NO STORE_NO_F, --药房变更号      
+        HSTF.STORE_CODE STORE_CODE_F, --药房编码
+        ACO.STORE_CODE_F||' '||HSTF.STORE_NAME STORE_NAME_F, --药房名称
+        
+        dep.DEPT_ID,
+        dep.DEPT_NO,
+        aco.his_dept his_dept,--his科室
+        aco.dept_code||' '||dep.dept_name DEPT_NAME,--hrp科室        
+        ACO.MED_TYPE_CODE SUB_TYPE_ID, --药品类别编码
+        ACO.MED_TYPE_CODE||' '||AMTH.MED_TYPE_NAME MED_TYPE_NAME, --药品类别名称
+        SUM(ACO.IN_PRICE) AMOUNT_MONEY, --药品进价
+        SUM(ACO.RETAIL_PRICE) RETAIL_PRICE --药品零售价
+     FROM ACC_MED_OUT ACO
+     --类别
+     LEFT JOIN ACC_MED_TYPE_HIS AMTH
+     ON ACO.GROUP_ID=AMTH.GROUP_ID AND ACO.HOS_ID=AMTH.HOS_ID AND ACO.COPY_CODE=AMTH.COPY_CODE AND ACO.MED_TYPE_CODE=AMTH.MED_TYPE_CODE
+     --药库
+     LEFT JOIN ACC_MED_STORE_HIS_REF SF ON ACO.GROUP_ID=SF.GROUP_ID AND ACO.HOS_ID=SF.HOS_ID AND ACO.COPY_CODE=SF.COPY_CODE 
+     AND SF.HIS_STORE_FLAG=1 AND SF.HIS_STORE_CODE=ACO.STORE_CODE_K     
+     LEFT JOIN HOS_STORE_DICT HST ON HST.GROUP_ID=SF.GROUP_ID AND HST.HOS_ID=SF.HOS_ID AND HST.STORE_ID=SF.HRP_STORE_ID AND HST.IS_STOP=0
+     --药房
+     LEFT JOIN ACC_MED_STORE_HIS_REF SFF ON ACO.GROUP_ID=SFF.GROUP_ID AND ACO.HOS_ID=SFF.HOS_ID AND ACO.COPY_CODE=SFF.COPY_CODE 
+     AND SFF.HIS_STORE_FLAG=2 AND SFF.HIS_STORE_CODE=ACO.STORE_CODE_F     
+     LEFT JOIN HOS_STORE_DICT HSTF ON HSTF.GROUP_ID=SFF.GROUP_ID AND HSTF.HOS_ID=SFF.HOS_ID AND HSTF.STORE_ID=SFF.HRP_STORE_ID AND HSTF.IS_STOP=0
+     
+     left join hos_dept_dict dep on ACO.GROUP_ID=dep.GROUP_ID AND ACO.HOS_ID=dep.HOS_ID and ACO.Dept_Code=dep.dept_code and dep.is_stop=0
+     
+    -- where SF.His_Store_Flag=1                   
+     GROUP BY ACO.GROUP_ID,ACO.HOS_ID,ACO.COPY_CODE,ACO.OUT_DATE,
+     HST.STORE_ID,HST.STORE_NO,ACO.Store_Code_k,HST.STORE_NAME,
+     HSTF.STORE_ID,HSTF.STORE_NO,ACO.Store_Code_f,HSTF.STORE_NAME,
+     ACO.MED_TYPE_CODE,HST.STORE_NAME,ACO.MED_TYPE_CODE,AMTH.MED_TYPE_NAME,
+     dep.DEPT_ID,dep.DEPT_NO,dep.dept_name,aco.dept_code,HST.STORE_CODE,aco.his_dept,HSTF.STORE_CODE
+	 order by ACO.STORE_CODE_K,ACO.STORE_CODE_F
+   	]]></sql>
+   	
+   	<sql id="V_MED_F_BACK_MAIN" type="view" desc="药房退库"><![CDATA[
+	CREATE OR REPLACE VIEW V_MED_F_BACK_MAIN AS
+ 	SELECT
+        ACO.GROUP_ID,   --集团ID
+        ACO.HOS_ID,     --单位ID
+        ACO.COPY_CODE,  --账套编码    
+        to_char(ACO.BACK_DATE,'yyyyMMdd')||'-'||HST.STORE_CODE BUSINESS_ID,--联合主键
+        to_char(ACO.BACK_DATE,'yyyyMMdd')||'-'||HST.STORE_CODE BUSINESS_NO,--单据号
+        
+        HSTF.STORE_ID STORE_ID_F,--药房ID
+        HSTF.STORE_NO STORE_NO_F, --药房变更号
+        HSTF.STORE_CODE STORE_CODE_F, --药房编码
+        ACO.STORE_CODE_F||' '||HSTF.STORE_NAME STORE_NAME_F, --药房名称
+        
+        ACO.BACK_DATE BUSI_DATE, --出库日期
+        HST.STORE_ID STORE_ID_K,--药库ID
+        HST.STORE_NO STORE_NO_K, --药库变更号
+        HST.STORE_CODE STORE_CODE_K, --药库编码
+        ACO.STORE_CODE_K||' '||HST.STORE_NAME STORE_NAME_K, --药库名称
+        
+        dep.DEPT_ID,
+        dep.DEPT_NO,
+        aco.his_dept,--HIS科室
+        aco.dept_code||' '||dep.dept_name DEPT_NAME,--hrp科室        
+        ACO.MED_TYPE_CODE SUB_TYPE_ID, --药品类别编码
+        ACO.MED_TYPE_CODE||' '||AMTH.MED_TYPE_NAME MED_TYPE_NAME, --药品类别名称
+        SUM(ACO.IN_PRICE) AMOUNT_MONEY, --药品进价
+        SUM(ACO.RETAIL_PRICE) RETAIL_PRICE --药品零售价
+     FROM ACC_MED_F_BACK ACO
+     --类别
+     LEFT JOIN ACC_MED_TYPE_HIS AMTH
+     ON ACO.GROUP_ID=AMTH.GROUP_ID AND ACO.HOS_ID=AMTH.HOS_ID AND ACO.COPY_CODE=AMTH.COPY_CODE AND ACO.MED_TYPE_CODE=AMTH.MED_TYPE_CODE
+     --药房
+     LEFT JOIN ACC_MED_STORE_HIS_REF SFF ON ACO.GROUP_ID=SFF.GROUP_ID AND ACO.HOS_ID=SFF.HOS_ID AND ACO.COPY_CODE=SFF.COPY_CODE 
+     AND SFF.HIS_STORE_FLAG=2 AND SFF.HIS_STORE_CODE=ACO.STORE_CODE_F     
+     LEFT JOIN HOS_STORE_DICT HSTF ON HSTF.GROUP_ID=SFF.GROUP_ID AND HSTF.HOS_ID=SFF.HOS_ID AND HSTF.STORE_ID=SFF.HRP_STORE_ID AND HSTF.IS_STOP=0
+      --药库
+     LEFT JOIN ACC_MED_STORE_HIS_REF SF ON ACO.GROUP_ID=SF.GROUP_ID AND ACO.HOS_ID=SF.HOS_ID AND ACO.COPY_CODE=SF.COPY_CODE 
+     AND SF.HIS_STORE_FLAG=1 AND SF.HIS_STORE_CODE=ACO.STORE_CODE_K     
+     LEFT JOIN HOS_STORE_DICT HST ON HST.GROUP_ID=SF.GROUP_ID AND HST.HOS_ID=SF.HOS_ID AND HST.STORE_ID=SF.HRP_STORE_ID AND HST.IS_STOP=0
+     
+     left join hos_dept_dict dep on ACO.GROUP_ID=dep.GROUP_ID AND ACO.HOS_ID=dep.HOS_ID and ACO.Dept_Code=dep.dept_code and dep.is_stop=0
+     
+     GROUP BY ACO.GROUP_ID,ACO.HOS_ID,ACO.COPY_CODE,ACO.BACK_DATE,
+     HSTF.STORE_ID,HSTF.STORE_NO,HSTF.STORE_NAME,HSTF.STORE_CODE,
+     HST.STORE_ID,HST.STORE_NO,HST.STORE_NAME,HST.STORE_CODE,
+     ACO.MED_TYPE_CODE,HST.STORE_NAME,ACO.MED_TYPE_CODE,AMTH.MED_TYPE_NAME,
+     dep.DEPT_ID,dep.DEPT_NO,dep.dept_name,aco.dept_code,aco.his_dept,ACO.STORE_CODE_F,ACO.STORE_CODE_K
+	 order by ACO.STORE_CODE_F,ACO.STORE_CODE_K
+   	]]></sql>
+   	
+   	<sql id="V_MED_F_OUT_MAIN" type="view" desc="药房出库"><![CDATA[
+	CREATE OR REPLACE VIEW V_MED_F_OUT_MAIN AS
+ 	SELECT
+        ACO.GROUP_ID,   --集团ID
+        ACO.HOS_ID,     --单位ID
+        ACO.COPY_CODE,  --账套编码    
+        to_char(ACO.OUT_DATE,'yyyyMMdd')||'-'||HSTF.STORE_CODE BUSINESS_ID,--联合主键
+        to_char(ACO.OUT_DATE,'yyyyMMdd')||'-'||HSTF.STORE_CODE BUSINESS_NO,--单据号
+        ACO.OUT_DATE BUSI_DATE, --出库日期
+        HSTF.STORE_ID STORE_ID_F,--药房ID
+        HSTF.STORE_NO STORE_NO_F, --药房变更号
+        HSTF.STORE_CODE STORE_CODE_F, --药房编码
+        ACO.STORE_CODE_F||' '||HSTF.STORE_NAME STORE_NAME_F, --药房名称
+        HDD.DEPT_ID ,--科室ID
+        HDD.DEPT_NO,--科室变更ID
+        ACO.HIS_DEPT,--HIS科室
+        ACO.DEPT_CODE||' '||HDD.DEPT_NAME DEPT_NAME,--HRP科室名称
+        ATTR.OUT_CODE,--支出性质
+        ACO.MED_TYPE_CODE SUB_TYPE_ID, --药品类别编码
+        ACO.MED_TYPE_CODE||' '||AMTH.MED_TYPE_NAME MED_TYPE_NAME, --药品类别名称
+        ACO.DOC_TYPE,
+        SUM(ACO.IN_PRICE) AMOUNT_MONEY, --药品进价
+        SUM(ACO.RETAIL_PRICE) RETAIL_PRICE --药品零售价
+    FROM ACC_MED_F_OUT ACO
+     --类别
+     LEFT JOIN ACC_MED_TYPE_HIS AMTH
+     ON ACO.GROUP_ID=AMTH.GROUP_ID AND ACO.HOS_ID=AMTH.HOS_ID AND ACO.COPY_CODE=AMTH.COPY_CODE AND ACO.MED_TYPE_CODE=AMTH.MED_TYPE_CODE
+     --药房
+     LEFT JOIN ACC_MED_STORE_HIS_REF SFF ON ACO.GROUP_ID=SFF.GROUP_ID AND ACO.HOS_ID=SFF.HOS_ID AND ACO.COPY_CODE=SFF.COPY_CODE 
+     AND SFF.HIS_STORE_CODE=ACO.STORE_CODE_F     
+     LEFT JOIN HOS_STORE_DICT HSTF ON HSTF.GROUP_ID=SFF.GROUP_ID AND HSTF.HOS_ID=SFF.HOS_ID AND HSTF.STORE_ID=SFF.HRP_STORE_ID AND HSTF.IS_STOP=0
+     --科室
+     --LEFT JOIN HIP_DEPT_REF_COST HDR ON HDR.GROUP_ID=ACO.GROUP_ID AND HDR.HOS_ID=ACO.HOS_ID 
+     --AND HDR.HIP_DEPT_CODE=ACO.DEPT_CODE AND HDR.DOC_TYPE=ACO.DOC_TYPE AND upper(HDR.DS_CODE)='HIS'
+     LEFT JOIN HOS_DEPT_DICT HDD ON  ACO.GROUP_ID=HDD.GROUP_ID AND ACO.HOS_ID=HDD.HOS_ID AND ACO.DEPT_CODE=HDD.DEPT_CODE AND HDD.IS_STOP=0 AND HDD.IS_LAST=1
+     LEFT JOIN ACC_DEPT_ATTR ATTR ON HDD.DEPT_ID=ATTR.DEPT_ID AND HDD.GROUP_ID=ATTR.GROUP_ID AND HDD.HOS_ID=ATTR.HOS_ID
+     where SFF.HIS_STORE_FLAG=2
+     GROUP BY ACO.GROUP_ID,ACO.HOS_ID,ACO.COPY_CODE,ACO.OUT_DATE,
+     HSTF.STORE_ID,HSTF.STORE_NO,HSTF.STORE_CODE,HSTF.STORE_NAME,
+     HDD.DEPT_ID,HDD.DEPT_NO,HDD.DEPT_NAME,ATTR.OUT_CODE,ACO.DEPT_CODE,
+     ACO.MED_TYPE_CODE,ACO.MED_TYPE_CODE,AMTH.MED_TYPE_NAME,ACO.DOC_TYPE,ACO.STORE_CODE_F,ACO.HIS_DEPT
+	 order by ACO.STORE_CODE_F,ACO.MED_TYPE_CODE
+   	]]></sql>
+   	
+   	<sql id="V_MED_D_BACK_MAIN" type="view" desc="科室退库"><![CDATA[
+	CREATE OR REPLACE VIEW V_MED_D_BACK_MAIN AS
+ 	SELECT
+        ACO.GROUP_ID,   --集团ID
+        ACO.HOS_ID,     --单位ID
+        ACO.COPY_CODE,  --账套编码    
+        to_char(ACO.BACK_DATE,'yyyyMMdd')||'-'||HSTF.STORE_CODE BUSINESS_ID,--联合主键
+        to_char(ACO.BACK_DATE,'yyyyMMdd')||'-'||HSTF.STORE_CODE BUSINESS_NO,--单据号
+        ACO.BACK_DATE BUSI_DATE, --出库日期
+        HSTF.STORE_ID STORE_ID_F,--药房ID
+        HSTF.STORE_NO STORE_NO_F, --药房变更号
+        HSTF.STORE_CODE STORE_CODE_F, --药房编码
+        ACO.STORE_CODE_F||' '||HSTF.STORE_NAME STORE_NAME_F, --药房名称
+        HDD.DEPT_ID ,--科室ID
+        HDD.DEPT_NO,--科室变更ID 
+        ACO.HIS_DEPT, --HIS科室名称
+        ACO.DEPT_CODE||' '||HDD.DEPT_NAME DEPT_NAME,--HRP科室名称
+        ATTR.OUT_CODE,--支出性质
+        ACO.MED_TYPE_CODE SUB_TYPE_ID, --药品类别编码
+        ACO.MED_TYPE_CODE||' '||AMTH.MED_TYPE_NAME MED_TYPE_NAME, --药品类别名称
+        ACO.DOC_TYPE,
+        SUM(ACO.IN_PRICE) AMOUNT_MONEY, --药品进价
+        SUM(ACO.RETAIL_PRICE) RETAIL_PRICE --药品零售价
+    FROM ACC_MED_D_BACK ACO
+     --类别
+     LEFT JOIN ACC_MED_TYPE_HIS AMTH
+     ON ACO.GROUP_ID=AMTH.GROUP_ID AND ACO.HOS_ID=AMTH.HOS_ID AND ACO.COPY_CODE=AMTH.COPY_CODE AND ACO.MED_TYPE_CODE=AMTH.MED_TYPE_CODE
+     --药房
+     LEFT JOIN ACC_MED_STORE_HIS_REF SFF ON ACO.GROUP_ID=SFF.GROUP_ID AND ACO.HOS_ID=SFF.HOS_ID AND ACO.COPY_CODE=SFF.COPY_CODE 
+     AND SFF.HIS_STORE_FLAG=2 AND SFF.HIS_STORE_CODE=ACO.STORE_CODE_F     
+     LEFT JOIN HOS_STORE_DICT HSTF ON HSTF.GROUP_ID=SFF.GROUP_ID AND HSTF.HOS_ID=SFF.HOS_ID AND HSTF.STORE_ID=SFF.HRP_STORE_ID AND HSTF.IS_STOP=0
+     --科室
+     --LEFT JOIN HIP_DEPT_REF_COST HDR ON HDR.GROUP_ID=ACO.GROUP_ID 
+     --AND HDR.HOS_ID=ACO.HOS_ID AND HDR.HIP_DEPT_CODE=ACO.DEPT_CODE AND HDR.DOC_TYPE=ACO.DOC_TYPE AND upper(HDR.DS_CODE)='HIS'
+     LEFT JOIN HOS_DEPT_DICT HDD ON  ACO.GROUP_ID=HDD.GROUP_ID AND ACO.HOS_ID=HDD.HOS_ID AND ACO.DEPT_CODE=HDD.DEPT_CODE  AND HDD.IS_STOP=0 AND HDD.IS_LAST=1
+     LEFT JOIN ACC_DEPT_ATTR ATTR ON HDD.DEPT_ID=ATTR.DEPT_ID AND HDD.GROUP_ID=ATTR.GROUP_ID AND HDD.HOS_ID=ATTR.HOS_ID
+     
+     GROUP BY ACO.GROUP_ID,ACO.HOS_ID,ACO.COPY_CODE,ACO.BACK_DATE,
+     HSTF.STORE_ID,HSTF.STORE_NO,HSTF.STORE_CODE,HSTF.STORE_NAME,
+     HDD.DEPT_ID,HDD.DEPT_NO,HDD.DEPT_NAME,ATTR.OUT_CODE,
+     ACO.MED_TYPE_CODE,ACO.MED_TYPE_CODE,AMTH.MED_TYPE_NAME,ACO.DOC_TYPE,ACO.HIS_DEPT,ACO.DEPT_CODE,ACO.STORE_CODE_F
+   	]]></sql>
+   	
+   	<sql id="V_MED_CHECKY_MAIN" type="view" desc="药库药房盘盈"><![CDATA[
+	CREATE OR REPLACE VIEW V_MED_CHECKY_MAIN AS
+ 	SELECT
+        ACO.GROUP_ID,   --集团ID
+        ACO.HOS_ID,     --单位ID
+        ACO.COPY_CODE,  --账套编码    
+        ACO.YEAR_MONTH||'-'||HSTF.STORE_CODE BUSINESS_ID,--联合主键
+        ACO.YEAR_MONTH||'-'||HSTF.STORE_CODE BUSINESS_NO,--单据号
+        ACO.YEAR_MONTH BUSI_DATE, --盘点年月
+        HSTF.STORE_ID STORE_ID,--药库/药房ID
+        HSTF.STORE_NO STORE_NO, --药库/药房变更号
+        HSTF.STORE_CODE STORE_CODE, --药库/药房编码
+        HSTF.STORE_NAME STORE_NAME, --药库/药房名称
+        ACO.MED_TYPE_CODE SUB_TYPE_ID, --药品类别编码
+        AMTH.MED_TYPE_NAME, --药品类别名称
+        SUM(ACO.IN_PRICE) AMOUNT_MONEY --药品进价
+    FROM ACC_MED_CHECKY ACO
+     --类别
+     LEFT JOIN ACC_MED_TYPE_HIS AMTH
+     ON ACO.GROUP_ID=AMTH.GROUP_ID AND ACO.HOS_ID=AMTH.HOS_ID AND ACO.COPY_CODE=AMTH.COPY_CODE AND ACO.MED_TYPE_CODE=AMTH.MED_TYPE_CODE
+     --药房
+     LEFT JOIN ACC_MED_STORE_HIS_REF SFF ON ACO.GROUP_ID=SFF.GROUP_ID AND ACO.HOS_ID=SFF.HOS_ID AND ACO.COPY_CODE=SFF.COPY_CODE 
+     AND SFF.HIS_STORE_CODE=ACO.STORE_CODE     
+     LEFT JOIN HOS_STORE_DICT HSTF ON HSTF.GROUP_ID=SFF.GROUP_ID AND HSTF.HOS_ID=SFF.HOS_ID AND HSTF.STORE_ID=SFF.HRP_STORE_ID AND HSTF.IS_STOP=0
+     
+     GROUP BY ACO.GROUP_ID,ACO.HOS_ID,ACO.COPY_CODE,ACO.YEAR_MONTH,
+     HSTF.STORE_ID,HSTF.STORE_NO,HSTF.STORE_CODE,HSTF.STORE_NAME,
+     ACO.MED_TYPE_CODE,ACO.MED_TYPE_CODE,AMTH.MED_TYPE_NAME
+   	]]></sql>
+   	
+   	<sql id="V_MED_CHECKK_MAIN" type="view" desc="药库药房盘亏"><![CDATA[
+	CREATE OR REPLACE VIEW V_MED_CHECKK_MAIN AS
+ 	SELECT
+        ACO.GROUP_ID,   --集团ID
+        ACO.HOS_ID,     --单位ID
+        ACO.COPY_CODE,  --账套编码    
+        ACO.YEAR_MONTH||'-'||HSTF.STORE_CODE BUSINESS_ID,--联合主键
+        ACO.YEAR_MONTH||'-'||HSTF.STORE_CODE BUSINESS_NO,--单据号
+        ACO.YEAR_MONTH BUSI_DATE, --盘点年月
+        HSTF.STORE_ID STORE_ID,--药库/药房ID
+        HSTF.STORE_NO STORE_NO, --药库/药房变更号
+        HSTF.STORE_CODE STORE_CODE, --药库/药房编码
+        HSTF.STORE_NAME STORE_NAME, --药库/药房名称
+        ACO.MED_TYPE_CODE SUB_TYPE_ID, --药品类别编码
+        AMTH.MED_TYPE_NAME, --药品类别名称
+        SUM(ACO.IN_PRICE) AMOUNT_MONEY --药品进价
+    FROM ACC_MED_CHECKK ACO
+     --类别
+     LEFT JOIN ACC_MED_TYPE_HIS AMTH
+     ON ACO.GROUP_ID=AMTH.GROUP_ID AND ACO.HOS_ID=AMTH.HOS_ID AND ACO.COPY_CODE=AMTH.COPY_CODE AND ACO.MED_TYPE_CODE=AMTH.MED_TYPE_CODE
+     --药房
+     LEFT JOIN ACC_MED_STORE_HIS_REF SFF ON ACO.GROUP_ID=SFF.GROUP_ID AND ACO.HOS_ID=SFF.HOS_ID AND ACO.COPY_CODE=SFF.COPY_CODE 
+     AND SFF.HIS_STORE_CODE=ACO.STORE_CODE     
+     LEFT JOIN HOS_STORE_DICT HSTF ON HSTF.GROUP_ID=SFF.GROUP_ID AND HSTF.HOS_ID=SFF.HOS_ID AND HSTF.STORE_ID=SFF.HRP_STORE_ID AND HSTF.IS_STOP=0
+     
+     GROUP BY ACO.GROUP_ID,ACO.HOS_ID,ACO.COPY_CODE,ACO.YEAR_MONTH,
+     HSTF.STORE_ID,HSTF.STORE_NO,HSTF.STORE_CODE,HSTF.STORE_NAME,
+     ACO.MED_TYPE_CODE,ACO.MED_TYPE_CODE,AMTH.MED_TYPE_NAME
+   	]]></sql>
+   	
+   	<sql id="V_MED_PAY_MAIN" type="view" desc="供应商付款"><![CDATA[
+	CREATE OR REPLACE VIEW V_MED_PAY_MAIN AS
+ 	SELECT
+        ACO.GROUP_ID,   --集团ID
+        ACO.HOS_ID,     --单位ID
+        ACO.COPY_CODE,  --账套编码    
+        '' BUSINESS_ID, --联合主键
+        PAY_BILL_NO BUSINESS_NO,--单据号
+        ACO.PAY_DATE BUSI_DATE, --付款日期
+        HSD.SUP_ID,    --供应商ID
+        HSD.SUP_NO, --供应商变更ID  
+        HSD.SUP_CODE,--供应商编码
+        HSD.SUP_NAME,--供应商名称
+        HRP.PAY_CODE SUB_TYPE_ID, --付款方式编码
+        HRP.PAY_NAME PAY_TYPE_NAME, --付款方式名称
+        ACO.PAY_CODE,--付款人编码
+        ACO.PAY_NAME,--付款人名称
+        SUM(ACO.PAY_MONEY) AMOUNT_MONEY --付款金额
+    FROM ACC_MED_PAY ACO
+     --付款方式
+     LEFT JOIN  HIP_PAY_TYPE_REF HDR ON HDR.GROUP_ID=ACO.GROUP_ID AND HDR.HOS_ID=ACO.HOS_ID AND HDR.COPY_CODE=ACO.COPY_CODE AND HDR.HIP_PAY_TYPE_CODE=ACO.PAY_TYPE_CODE
+     LEFT JOIN ACC_PAY_TYPE HRP ON HDR.HRP_PAY_TYPE_CODE = HRP.PAY_CODE AND HDR.GROUP_ID = HRP.GROUP_ID AND HDR.HOS_ID = HRP.HOS_ID AND HDR.COPY_CODE = HRP.COPY_CODE 
+     --供应商
+     LEFT JOIN HIP_SUP_REF HSR ON HSR.GROUP_ID=ACO.GROUP_ID AND HSR.HOS_ID=ACO.HOS_ID AND HSR.HIP_SUP_CODE=ACO.VEN_CODE
+     LEFT JOIN HOS_SUP_DICT HSD ON HSR.HRP_SUP_CODE = HSD.SUP_CODE AND HSR.GROUP_ID = HSD.GROUP_ID AND HSR.HOS_ID = HSD.HOS_ID AND HSD.IS_STOP=0
+     
+     GROUP BY  ACO.GROUP_ID,ACO.HOS_ID,ACO.COPY_CODE, PAY_BILL_NO,ACO.PAY_DATE,
+     HSD.SUP_ID,HSD.SUP_NO,HSD.SUP_CODE,HSD.SUP_NAME,HRP.PAY_CODE, HRP.PAY_NAME,ACO.PAY_CODE,ACO.PAY_NAME
+   	]]></sql>
+   	
+   	<sql id="V_MED_KD_OUT" type="view" desc="药库调拨出库"><![CDATA[
+	CREATE OR REPLACE VIEW V_MED_KD_OUT AS
+ 	SELECT
+        ACO.GROUP_ID,   --集团ID
+        ACO.HOS_ID,     --单位ID
+        ACO.COPY_CODE,  --账套编码    
+        to_char(ACO.OUT_DATE,'yyyyMMdd')||'-'||HST.STORE_CODE BUSINESS_ID,--联合主键
+        to_char(ACO.OUT_DATE,'yyyyMMdd')||'-'||HST.STORE_CODE BUSINESS_NO,--单据号
+        ACO.OUT_DATE BUSI_DATE, --出库日期
+        HST.STORE_ID STORE_ID_K,--药库ID
+        HST.STORE_NO STORE_NO_K, --药库变更号
+        ACO.STORE_CODE_K||' '||HST.STORE_NAME STORE_NAME_K, --药库名称
+        HDD.DEPT_ID ,--科室ID
+        HDD.DEPT_NO,--科室变更ID
+        ACO.HIS_DEPT,--his科室名称
+        ACO.DEPT_CODE||' '||HDD.DEPT_NAME DEPT_NAME,--hrp科室名称
+        ATTR.OUT_CODE,--支出性质
+        ACO.MED_TYPE_CODE SUB_TYPE_ID, --药品类别编码
+        ACO.MED_TYPE_CODE||' '||AMTH.MED_TYPE_NAME MED_TYPE_NAME, --药品类别名称
+        SUM(ACO.IN_PRICE) AMOUNT_MONEY, --药品进价
+        SUM(ACO.RETAIL_PRICE) RETAIL_PRICE --药品零售价
+    FROM ACC_MED_KD_OUT ACO
+     --类别
+     LEFT JOIN ACC_MED_TYPE_HIS AMTH
+     ON ACO.GROUP_ID=AMTH.GROUP_ID AND ACO.HOS_ID=AMTH.HOS_ID AND ACO.COPY_CODE=AMTH.COPY_CODE AND ACO.MED_TYPE_CODE=AMTH.MED_TYPE_CODE
+     --药库
+     LEFT JOIN ACC_MED_STORE_HIS_REF SF ON ACO.GROUP_ID=SF.GROUP_ID AND ACO.HOS_ID=SF.HOS_ID AND ACO.COPY_CODE=SF.COPY_CODE 
+     AND SF.HIS_STORE_FLAG=1 AND SF.HIS_STORE_CODE=ACO.STORE_CODE_K     
+     LEFT JOIN HOS_STORE_DICT HST ON HST.GROUP_ID=SF.GROUP_ID AND HST.HOS_ID=SF.HOS_ID AND HST.STORE_ID=SF.HRP_STORE_ID AND HST.IS_STOP=0
+     --科室
+     --LEFT JOIN HIP_DEPT_REF_COST HDR ON HDR.GROUP_ID=ACO.GROUP_ID AND HDR.HOS_ID=ACO.HOS_ID 
+    -- AND HDR.HIP_DEPT_CODE=ACO.DEPT_CODE AND HDR.DOC_TYPE=ACO.DOC_TYPE AND upper(HDR.DS_CODE)='HIS'
+     LEFT JOIN HOS_DEPT_DICT HDD ON  ACO.GROUP_ID=HDD.GROUP_ID AND ACO.HOS_ID=HDD.HOS_ID AND ACO.DEPT_CODE=HDD.DEPT_CODE  AND HDD.IS_STOP=0 AND HDD.IS_LAST=1
+     LEFT JOIN ACC_DEPT_ATTR ATTR ON HDD.DEPT_ID=ATTR.DEPT_ID AND HDD.GROUP_ID=ATTR.GROUP_ID AND HDD.HOS_ID=ATTR.HOS_ID
+     GROUP BY ACO.GROUP_ID,ACO.HOS_ID,ACO.COPY_CODE,ACO.OUT_DATE,    
+     HDD.DEPT_ID,HDD.DEPT_NO,HDD.DEPT_NAME,ATTR.OUT_CODE,
+     ACO.MED_TYPE_CODE,ACO.MED_TYPE_CODE,AMTH.MED_TYPE_NAME,ACO.DEPT_CODE,
+     HST.STORE_ID,HST.STORE_NO,ACO.STORE_CODE_K,HST.STORE_CODE,HST.STORE_NAME,ACO.HIS_DEPT
+   	]]></sql>
+   	
+   	
+   	<sql id="V_ACC_MED_F_TR" type="view" desc="药房调拨"><![CDATA[
+	CREATE OR REPLACE VIEW V_ACC_MED_F_TR AS
+	SELECT
+        ACO.GROUP_ID,   --集团ID
+        ACO.HOS_ID,     --单位ID
+        ACO.COPY_CODE,  --账套编码    
+        to_char(ACO.OUT_DATE,'yyyyMMdd')||'-'||HST.STORE_CODE BUSINESS_ID,--联合主键
+        to_char(ACO.OUT_DATE,'yyyyMMdd')||'-'||HST.STORE_CODE BUSINESS_NO,--单据号
+        ACO.OUT_DATE BUSI_DATE, --出库日期
+        
+        HST.STORE_ID STORE_ID_F,--调出药房ID
+        HST.STORE_NO STORE_NO_F, --调出药房变更号       
+        ACO.STORE_CODE_F||' '||HST.STORE_NAME STORE_NAME_F, --调出药房名称
+        dep.DEPT_ID DEPT_ID_F,--调出科室ID
+        dep.DEPT_NO DEPT_NO_F,--调出科室变更号
+        aco.dept_code_f||' '||dep.dept_name DEPT_NAME_F,--调出科室名称
+        aco.HIS_DEPT_F,--HIS调出科室
+        
+        HSTF.STORE_ID STORE_ID_T,--调入药房ID
+        HSTF.STORE_NO STORE_NO_T, --调入药房变更号     
+        ACO.STORE_CODE_T||' '||HSTF.STORE_NAME STORE_NAME_T, --调入药房名称
+        depf.DEPT_ID DEPT_ID_T,--调入科室ID
+        depf.DEPT_NO DEPT_NO_T,--调入科室变更号
+        aco.dept_code_t||' '||depf.dept_name DEPT_NAME_T,--调入科室名称
+        aco.HIS_DEPT_T,--HIS调入科室
+        
+        ACO.MED_TYPE_CODE SUB_TYPE_ID, --药品类别编码
+        ACO.MED_TYPE_CODE||' '||AMTH.MED_TYPE_NAME MED_TYPE_NAME, --药品类别名称
+        SUM(ACO.IN_PRICE) AMOUNT_MONEY, --药品进价
+        SUM(ACO.RETAIL_PRICE) RETAIL_PRICE --药品零售价
+     FROM ACC_MED_F_TR ACO
+     --类别
+     LEFT JOIN ACC_MED_TYPE_HIS AMTH
+     ON ACO.GROUP_ID=AMTH.GROUP_ID AND ACO.HOS_ID=AMTH.HOS_ID AND ACO.COPY_CODE=AMTH.COPY_CODE AND ACO.MED_TYPE_CODE=AMTH.MED_TYPE_CODE
+     --调出药房
+     LEFT JOIN ACC_MED_STORE_HIS_REF SF ON ACO.GROUP_ID=SF.GROUP_ID AND ACO.HOS_ID=SF.HOS_ID AND ACO.COPY_CODE=SF.COPY_CODE 
+     AND SF.HIS_STORE_FLAG=2 AND SF.HIS_STORE_CODE=ACO.STORE_CODE_F     
+     LEFT JOIN HOS_STORE_DICT HST ON HST.GROUP_ID=SF.GROUP_ID AND HST.HOS_ID=SF.HOS_ID AND HST.STORE_ID=SF.HRP_STORE_ID AND HST.IS_STOP=0
+     --调出科室
+     left join hos_dept_dict dep on ACO.GROUP_ID=dep.GROUP_ID AND ACO.HOS_ID=dep.HOS_ID and ACO.DEPT_CODE_F=dep.dept_code and dep.is_stop=0
+     
+     --调入药房
+     LEFT JOIN ACC_MED_STORE_HIS_REF SFF ON ACO.GROUP_ID=SFF.GROUP_ID AND ACO.HOS_ID=SFF.HOS_ID AND ACO.COPY_CODE=SFF.COPY_CODE 
+     AND SFF.HIS_STORE_FLAG=2 AND SFF.HIS_STORE_CODE=ACO.STORE_CODE_T     
+     LEFT JOIN HOS_STORE_DICT HSTF ON HSTF.GROUP_ID=SFF.GROUP_ID AND HSTF.HOS_ID=SFF.HOS_ID AND HSTF.STORE_ID=SFF.HRP_STORE_ID AND HSTF.IS_STOP=0
+     --调入科室
+     left join hos_dept_dict depf on ACO.GROUP_ID=depf.GROUP_ID AND ACO.HOS_ID=depf.HOS_ID and ACO.DEPT_CODE_T=depf.dept_code and depf.is_stop=0
+                           
+     GROUP BY ACO.GROUP_ID,ACO.HOS_ID,ACO.COPY_CODE,ACO.OUT_DATE,
+     HST.STORE_ID,HST.STORE_NO,ACO.Store_Code_f,HST.STORE_NAME,
+     HSTF.STORE_ID,HSTF.STORE_NO,ACO.Store_Code_t,HSTF.STORE_NAME,
+     ACO.MED_TYPE_CODE,HST.STORE_NAME,ACO.MED_TYPE_CODE,AMTH.MED_TYPE_NAME,
+     dep.DEPT_ID,dep.DEPT_NO,dep.dept_name,aco.dept_code_f,HST.STORE_CODE,
+     aco.dept_code_t,depf.DEPT_ID,depf.DEPT_NO,depf.dept_name,aco.HIS_DEPT_F,aco.HIS_DEPT_T
+     order by ACO.STORE_CODE_F,ACO.STORE_CODE_T
+
+   	]]></sql>
+   	
+   	
+   	<sql id="V_MED_BILL_MAIN" type="view" desc="供应商发票主表"><![CDATA[
+   	
+   	CREATE OR REPLACE VIEW V_MED_BILL_MAIN AS
+     SELECT
+          ACO.GROUP_ID,   --集团ID
+          ACO.HOS_ID,     --单位ID
+          ACO.COPY_CODE,  --账套编码    
+          ACO.BUSI_NO BUSINESS_ID, --联合主键      
+          ACO.BUSI_NO BUSINESS_NO,--单据号    
+          ACO.BUSI_DATE,--单据日期  
+          ACO.BILL_TYPE BILL_TYPE,--业务类型1入库2退货
+          case ACO.BILL_TYPE when 2 then '退货' else '入库' end BILL_TEXT,--业务类型1入库2退货
+          HSD.SUP_ID,    --供应商ID
+          HSD.SUP_NO, --供应商变更ID  
+          HSD.SUP_CODE,--供应商编码
+          ACO.VEN_CODE||' '||ven.ven_name HIS_SUP_NAME, --his供应商名称
+          HSD.SUP_CODE||' '||HSD.SUP_NAME HRP_SUP_NAME, --hrp供应商名称
+          hst.store_id STORE_ID_K,--药库ID
+          hst.store_no STORE_NO_K, --药库变更号      
+          HST.STORE_CODE STORE_CODE_K, --药库编码
+          ACO.store_code_k||' '||hs.store_name HIS_STORE_NAME,--his药库名称
+          HST.Store_Code||' '||HST.STORE_NAME HRP_STORE_NAME, --hrp药库名称
+          ACO.MED_TYPE_CODE SUB_TYPE_ID, --药品类别编码
+          ACO.MED_TYPE_CODE||' '||type.MED_TYPE_NAME MED_TYPE_NAME, --药品类别名称
+          ACO.BILL_MONEY AMOUNT_MONEY --发票金额
+      FROM ACC_MED_BILL ACO
+       left join acc_med_store_his hs 
+       on ACO.group_id=hs.group_id and ACO.hos_id=hs.hos_id and ACO.copy_code=hs.copy_code and ACO.store_code_k=hs.store_code
+       left join ACC_MED_TYPE_HIS type   
+       on ACO.GROUP_ID=type.GROUP_ID and ACO.HOS_ID=type.HOS_ID and ACO.COPY_CODE=type.COPY_CODE and ACO.MED_TYPE_CODE=type.MED_TYPE_CODE
+       --供应商
+       LEFT JOIN ACC_MED_VEN_HIS_REF HSR ON HSR.GROUP_ID=ACO.GROUP_ID AND HSR.HOS_ID=ACO.HOS_ID AND HSR.HIS_VEN_CODE=ACO.VEN_CODE
+       LEFT JOIN HOS_SUP_DICT HSD ON HSR.GROUP_ID = HSD.GROUP_ID AND HSR.HOS_ID = HSD.HOS_ID and HSR.Hrp_Ven_Id = HSD.SUP_ID AND HSD.IS_STOP=0
+       left join acc_med_ven_his ven 
+       on ACO.group_id=ven.group_id and ACO.hos_id=ven.hos_id and ACO.copy_code=ven.copy_code and ACO.ven_code=ven.ven_code
+       --库房
+       left join ACC_MED_STORE_HIS_REF sf 
+       on ACO.group_id=sf.group_id and ACO.hos_id=sf.hos_id and ACO.copy_code=sf.copy_code and sf.his_store_code=ACO.store_code_k     
+       LEFT JOIN HOS_STORE_DICT HST 
+       on hst.group_id=sf.group_id and hst.hos_id=sf.hos_id and hst.store_id=sf.hrp_store_id and hst.is_stop=0
+   		
+   		
+     ]]></sql>
+   	
+   	
+   	<sql id="V_MED_BILL_DETAIL" type="view" desc="供应商发票明细表"><![CDATA[
+	CREATE OR REPLACE VIEW V_MED_BILL_DETAIL AS
+     SELECT
+          ACO.GROUP_ID,   --集团ID
+          ACO.HOS_ID,     --单位ID
+          ACO.COPY_CODE,  --账套编码    
+          ACO.BUSI_NO BUSINESS_ID, --联合主键      
+          ACO.BUSI_NO BUSINESS_NO,--单据号    
+          ACO.BUSI_DATE,--单据日期           
+          ACO.BILL_NO,--发票号               
+          ACO.BILL_DATE BILL_DATE, --发票日期
+          ACO.BILL_TYPE BILL_TYPE,--业务类型1入库2退货
+          case ACO.BILL_TYPE when 2 then '退货' else '入库' end BILL_TEXT,--业务类型1入库2退货
+          HSD.SUP_ID,    --供应商ID
+          HSD.SUP_NO, --供应商变更ID  
+          HSD.SUP_CODE,--供应商编码
+          ACO.VEN_CODE||' '||ven.ven_name HIS_SUP_NAME, --his供应商名称
+          HSD.SUP_CODE||' '||HSD.SUP_NAME HRP_SUP_NAME, --hrp供应商名称
+          hst.store_id STORE_ID_K,--药库ID
+          hst.store_no STORE_NO_K, --药库变更号      
+          HST.STORE_CODE STORE_CODE_K, --药库编码
+          ACO.store_code_k||' '||hs.store_name HIS_STORE_NAME,--his药库名称
+          HST.Store_Code||' '||HST.STORE_NAME HRP_STORE_NAME, --hrp药库名称
+          ACO.MED_TYPE_CODE SUB_TYPE_ID, --药品类别编码
+          ACO.MED_TYPE_CODE||' '||type.MED_TYPE_NAME MED_TYPE_NAME, --药品类别名称
+          ACO.BILL_MONEY AMOUNT_MONEY --发票金额
+      FROM ACC_MED_BILL_DETAIL ACO
+      left join acc_med_store_his hs 
+       on ACO.group_id=hs.group_id and ACO.hos_id=hs.hos_id and ACO.copy_code=hs.copy_code and ACO.store_code_k=hs.store_code
+       left join ACC_MED_TYPE_HIS type   
+       on ACO.GROUP_ID=type.GROUP_ID and ACO.HOS_ID=type.HOS_ID and ACO.COPY_CODE=type.COPY_CODE and ACO.MED_TYPE_CODE=type.MED_TYPE_CODE
+       --供应商
+       LEFT JOIN ACC_MED_VEN_HIS_REF HSR ON HSR.GROUP_ID=ACO.GROUP_ID AND HSR.HOS_ID=ACO.HOS_ID AND HSR.HIS_VEN_CODE=ACO.VEN_CODE
+       LEFT JOIN HOS_SUP_DICT HSD ON HSR.GROUP_ID = HSD.GROUP_ID AND HSR.HOS_ID = HSD.HOS_ID and HSR.Hrp_Ven_Id = HSD.SUP_ID AND HSD.IS_STOP=0
+       left join acc_med_ven_his ven 
+       on ACO.group_id=ven.group_id and ACO.hos_id=ven.hos_id and ACO.copy_code=ven.copy_code and ACO.ven_code=ven.ven_code
+       --库房
+       left join ACC_MED_STORE_HIS_REF sf 
+       on ACO.group_id=sf.group_id and ACO.hos_id=sf.hos_id and ACO.copy_code=sf.copy_code and sf.his_store_code=ACO.store_code_k     
+       LEFT JOIN HOS_STORE_DICT HST 
+       on hst.group_id=sf.group_id and hst.hos_id=sf.hos_id and hst.store_id=sf.hrp_store_id and hst.is_stop=0
+      
+   	]]></sql>
+   	
+</root>
+

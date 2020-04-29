@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.mat.dao.dura.query.MatDuraQueryStoreStockMapper">
+	<select id="queryMatDuraQueryStoreStock" parameterType="java.util.Map"  resultType="java.util.Map">
+        select store_code, store_name, inv_code, inv_name, inv_model, unit_name, 
+          price, sum(begin_amount) begin_amount,sum(begin_money) begin_money,
+          sum(in_amount) in_amount,sum(in_money) in_money,
+          sum(out_amount) out_amount,sum(out_money) out_money,
+          sum(end_amount) end_amount,sum(end_money) end_money
+        from 
+        (
+		SELECT hsd.store_code, hsd.store_name, mid.inv_code, mid.inv_name, mid.inv_model, hu.unit_name, 
+			<!-- mdsb.bar_code,  -->mdss.price, mdss.begin_amount, mdss.begin_money, mdss.in_amount, mdss.in_money, 
+			mdss.out_amount, mdss.out_money, mdss.end_amount, mdss.end_money
+		FROM mat_dura_store_surplus mdss 
+		<!-- LEFT JOIN mat_dura_store_bar mdsb 
+			ON mdss.group_id = mdsb.group_id 
+			AND mdss.hos_id = mdsb.hos_id 
+			AND mdss.copy_code = mdsb.copy_code 
+			AND mdss.store_id = mdsb.store_id 
+			AND mdss.inv_id = mdsb.inv_id 
+			AND mdss.price = mdsb.price  -->
+		LEFT JOIN hos_store_dict hsd
+			ON mdss.group_id = hsd.group_id 
+			AND mdss.hos_id = hsd.hos_id 
+			AND mdss.store_id = hsd.store_id 
+			AND hsd.is_stop = 0 
+		LEFT JOIN mat_inv_dict mid 
+			ON mdss.group_id = mid.group_id 
+			AND mdss.hos_id = mid.hos_id 
+			AND mdss.copy_code = mid.copy_code 
+			AND mdss.inv_id = mid.inv_id 
+			AND mid.is_stop = 0
+		LEFT JOIN hos_unit hu 
+			ON mid.group_id = hu.group_id 
+			AND mid.hos_id = hu.hos_id 
+			AND mid.unit_code = hu.unit_code 
+		LEFT JOIN hos_fac_dict hfd 
+			ON mid.group_id = hfd.group_id 
+			AND mid.hos_id = hfd.hos_id 
+			AND mid.fac_id = hfd.fac_id 
+			AND mid.fac_no = hfd.fac_no 
+		where mdss.group_id = #{group_id,jdbcType=INTEGER} 
+			AND mdss.hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND mdss.copy_code = #{copy_code,jdbcType=VARCHAR} 
+			AND mdss.year = #{year,jdbcType=VARCHAR} 
+			AND mdss.month = #{month,jdbcType=VARCHAR} 
+			<if test="store_id != null and store_id != ''">
+				AND mdss.store_id = #{store_id,jdbcType=INTEGER} 
+			</if>
+			<if test="store_id == null or store_id == ''">
+				AND exists( 
+					SELECT 1 from v_user_data_perm 
+					WHERE group_id = #{group_id,jdbcType=INTEGER} 
+						AND hos_id = #{hos_id,jdbcType=INTEGER} 
+						AND table_code = 'HOS_STORE_DICT' 
+						AND user_id = #{user_id,jdbcType=INTEGER} 
+						AND is_read = 1 and is_write = 1 
+						AND perm_code = mdss.store_id 
+				)
+			</if>
+			<if test="inv_code != null and inv_code != ''">
+				AND (
+					mid.inv_code like '%' || #{inv_code,jdbcType=VARCHAR} || '%'
+					OR
+					mid.inv_name like '%' || #{inv_code,jdbcType=VARCHAR} || '%'
+					OR
+					mid.spell_code like '%' || #{inv_code,jdbcType=VARCHAR} || '%'
+					OR
+					mid.wbx_code like '%' || #{inv_code,jdbcType=VARCHAR} || '%'
+					OR
+					mid.inv_model like '%' || #{inv_code,jdbcType=VARCHAR} || '%'
+					OR
+					mid.alias like '%' || #{inv_code,jdbcType=VARCHAR} || '%'
+					OR
+					mid.alias_spell like '%' || #{inv_code,jdbcType=VARCHAR} || '%'
+				)
+			</if>
+            <if test="mat_type_id != null and mat_type_id != ''">
+                and mid.mat_type_id in (
+                    select mtd.mat_type_id from mat_type_dict mtd
+                        join (
+                            select mat_type_code from mat_type_dict 
+                            where mat_type_id =#{mat_type_id,jdbcType=INTEGER} 
+                            and group_id = #{group_id,jdbcType=INTEGER} 
+                            AND hos_id = #{hos_id,jdbcType=INTEGER} 
+                            and copy_code = #{copy_code,jdbcType=VARCHAR} 
+                        ) code_data on mtd.mat_type_code like code_data.mat_type_code||'%'
+                        where mtd.group_id = #{group_id,jdbcType=INTEGER} 
+                        AND mtd.hos_id = #{hos_id,jdbcType=INTEGER} 
+                        and mtd.copy_code = #{copy_code,jdbcType=VARCHAR}  
+                        and mtd.is_last=1            
+                )
+            
+            </if>
+         ) basic_data
+         group by store_code, store_name, inv_code, inv_name, inv_model, unit_name, price
+         
+	</select>
+	
+	<select id="queryMatDuraQueryScrapDetail" parameterType="java.util.Map"  resultType="java.util.Map">
+			select mdd.make_date,mdd.scrap_id, mdd.scrap_no,hdd.dept_id,hdd.dept_code,hdd.dept_name,
+			mid.inv_code,mid.inv_name,mdds.price,mdds.amount,sum(mdds.price * mdds.amount)as money,mdd.state
+
+
+ from mat_dura_dept_scrap mdd
+ 
+ left join mat_dura_dept_scrap_d mdds on
+ mdd.group_id=mdds.group_id
+ and mdd.hos_id=mdds.hos_id
+ and mdd.copy_code=mdds.copy_code
+ and mdd.scrap_id=mdds.scrap_id
+ 
+ left join mat_inv_dict mid on
+ mdd.group_id=mid.group_id
+ and mdd.hos_id=mid.hos_id
+ and mdd.copy_code=mid.copy_code
+ and mdds.inv_id=mid.inv_id
+ and mdds.inv_no=mid.inv_no
+ left join hos_dept_dict hdd on
+ mdd.group_id=hdd.group_id
+ and mdd.hos_id=hdd.hos_id
+ and mdd.dept_id=hdd.dept_id
+ and mdd.dept_no=hdd.dept_no
+<where>
+ 	mdd.group_id = #{group_id,jdbcType=INTEGER}
+				AND mdd.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND mdd.copy_code = #{copy_code,jdbcType=VARCHAR}
+				<if test="dept_id !=null and dept_id != ''">                                                                                                         
+					 and hdd.dept_id=#{dept_id}		
+				</if>
+			<!-- 	<if test="inv_code !=null and inv_code != ''">                                                                                                         
+					 and mid.inv_code=#{inv_code}		
+				</if>
+				
+				<if test="inv_code !=null and inv_name != ''">                                                                                                         
+					 and mid.inv_name=#{inv_name}		
+				</if>
+				 -->
+				<if test="inv_code != null and inv_code != ''">
+				AND (
+				      mid.inv_code like '%${inv_code}%'
+				   or mid.inv_name like '%${inv_code}%')
+			</if>
+				<if test="state != null and  state != ''">
+				and	mdd.state= #{state}
+				</if>
+				
+ group by mdd.make_date,mdd.scrap_id, mdd.scrap_no,hdd.dept_id,hdd.dept_code,hdd.dept_name,mid.inv_code,mid.inv_name,mdds.price,mdds.amount,mdd.state
+ 
+
+ 
+
+</where>
+
+ 
+	</select>
+	
+	
+	
+	<select id="queryMatDuraQueryScrapDetailStore" parameterType="java.util.Map"  resultType="java.util.Map">
+	select mdd.make_date, mdd.scrap_no, hsd.store_id, hsd.store_code , hsd.store_name
+		, mid.inv_code, mid.inv_name, mdds.price, mdds.amount,mdd.state
+		, sum(mdds.price * mdds.amount) as pay_money
+	from MAT_DURA_STORE_SCRAP mdd
+
+	left join mAT_DURA_STORE_SCRAP_D mdds on mdd.group_id = mdds.group_id
+	and mdd.hos_id = mdds.hos_id
+	and mdd.copy_code = mdds.copy_code
+	and mdd.scrap_id = mdds.scrap_id 
+
+	left join mat_inv_dict mid on mdd.group_id = mid.group_id
+	and mdd.hos_id = mid.hos_id
+	and mdd.copy_code = mid.copy_code
+	and mdds.inv_id = mid.inv_id
+	and mdds.inv_no = mid.inv_no 
+	
+    left join hos_store_dict hsd on mdd.group_id = hsd.group_id
+  and mdd.hos_id = hsd.hos_id
+  and mdd.store_id = hsd.store_id
+  and mdd.store_no = hsd.store_no 
+<where>
+ 	mdd.group_id = #{group_id,jdbcType=INTEGER}
+				AND mdd.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND mdd.copy_code = #{copy_code,jdbcType=VARCHAR}
+	<if test="store_code !=null and  store_code != ''">
+		 and hsd.store_code=#{store_code,jdbcType=VARCHAR}		
+	</if>
+	<if test="inv_code != null and inv_code != ''">
+		and (mid.inv_code like '%' || #{inv_code} || '%'
+		and   mid.inv_name like '%' || #{inv_code} || '%')
+	</if>
+	<if test="state !=null and state != ''">
+		and	mdd.state= #{state,jdbcType=INTEGER}
+	</if>
+
+  group by mdd.make_date, mdd.scrap_no, hsd.store_id, hsd.store_code,
+   hsd.store_name, mid.inv_code, mid.inv_name, mdds.price, mdds.amount,mdd.state
+
+ 
+
+</where>
+
+ 
+	</select>
+</mapper>
+

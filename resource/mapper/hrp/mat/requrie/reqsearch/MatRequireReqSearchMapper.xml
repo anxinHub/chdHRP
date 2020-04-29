@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.mat.dao.requrie.reqsearch.MatRequireReqSearchMapper">
+	<select id="queryMatDeptStatQToDept" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT g.dept_code "dept_code", g.dept_name "dept_name", c.inv_code "inv_code", 
+			d.mat_type_code "mat_type_code", d.mat_type_name "mat_type_name", 
+			c.inv_name "inv_name", c.inv_model "inv_model", i.unit_name "unit_name", 
+			f.sup_name "sup_name", e.fac_name "fac_name", sum(a.amount) "amount", 
+			a.price "price", sum(a.amount * a.price) "amount_money"
+		FROM mat_require_detail a 
+		LEFT JOIN mat_require_main b 
+			ON a.group_id = b.group_id 
+			AND a.hos_id = b.hos_id 
+			AND a.copy_code = b.copy_code 
+			AND a.req_id = b.req_id 
+		LEFT JOIN mat_inv_dict c 
+			ON a.group_id = c.group_id 
+			AND a.hos_id = c.hos_id 
+			AND a.copy_code = c.copy_code 
+			AND a.inv_id = c.inv_id
+			<if test="show_history != null and show_history == 1">
+			AND a.inv_no = c.inv_no
+			</if>
+			<if test="show_history == null or show_history == '' or show_history == 0">
+			AND c.is_stop = 0
+			</if>
+		LEFT JOIN mat_type_dict d 
+			ON c.group_id = d.group_id 
+			AND c.hos_id = d.hos_id 
+			AND c.copy_code = d.copy_code 
+			AND c.mat_type_id = d.mat_type_id 
+			<if test="show_history != null and show_history == 1">
+			AND c.mat_type_no = d.mat_type_no 
+			</if>
+			<if test="show_history == null or show_history == '' or show_history == 0">
+			AND d.is_stop = 0
+			</if>
+		LEFT JOIN hos_fac_dict e 
+			ON c.group_id = e.group_id 
+			AND c.hos_id = e.hos_id 
+			AND c.fac_id = e.fac_id 
+			<if test="show_history != null and show_history == 1">
+			AND c.fac_no = e.fac_no 
+			</if>
+			<if test="show_history == null or show_history == '' or show_history == 0">
+			AND e.is_stop = 0
+			</if>
+		LEFT JOIN hos_sup_dict f 
+			ON a.group_id = f.group_id 
+			AND a.hos_id = f.hos_id 
+			AND a.sup_id = f.sup_id 
+			<if test="show_history != null and show_history == 1">
+			AND a.sup_no = f.sup_no 
+			</if>
+			<if test="show_history == null or show_history == '' or show_history == 0">
+			AND f.is_stop = 0
+			</if>
+		LEFT JOIN hos_dept_dict g 
+			ON b.group_id = g.group_id 
+			AND b.hos_id = g.hos_id 
+			AND b.dept_id = g.dept_id 
+			<if test="show_history != null and show_history == 1">
+			AND b.dept_no = g.dept_no
+			</if>
+			<if test="show_history == null or show_history == '' or show_history == 0">
+			AND g.is_stop = 0
+			</if>
+		LEFT JOIN hos_store_dict h 
+			ON b.group_id = h.group_id 
+			AND b.hos_id = h.hos_id 
+			AND b.stock_id = h.store_id 
+			<if test="show_history != null and show_history == 1">
+			AND b.stock_no = h.store_no 
+			</if>
+			<if test="show_history == null or show_history == '' or show_history == 0">
+			AND h.is_stop = 0
+			</if>
+		LEFT JOIN hos_unit i 
+			ON c.group_id = i.group_id 
+			AND c.hos_id = i.hos_id 
+			AND c.unit_code = i.unit_code
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER} 
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND a.copy_code = #{copy_code,jdbcType=INTEGER} 
+			and b.state &gt; 0
+			<if test="begin_date != null and begin_date != ''">
+				AND b.make_date &gt;= #{begin_date,jdbcType=DATE}
+			</if>
+			<if test="end_date != null and begin_date != ''">
+				AND b.make_date &lt;= #{end_date,jdbcType=DATE}
+			</if>
+			<if test="store_id != null and store_id != ''">
+				AND b.stock_id = #{store_id,jdbcType=INTEGER}
+			</if>
+			<if test="store_id == null or store_id == ''">
+				AND exists(
+					SELECT 1 FROM v_user_data_perm
+					WHERE group_id = #{group_id,jdbcType=INTEGER}
+						AND hos_id = #{hos_id,jdbcType=INTEGER}
+						AND user_id = #{user_id,jdbcType=INTEGER}
+						AND table_code = 'HOS_STORE_DICT'
+						AND is_read = 1
+						AND b.stock_id = perm_code
+				)
+			</if>
+			<if test="dept_id != null and dept_id != ''">
+				AND b.dept_id = #{dept_id,jdbcType=INTEGER}
+			</if>
+			<if test="inv_code != null and inv_code != ''">
+				AND (
+					c.inv_code like '${inv_code}%'
+					or c.inv_name like '${inv_code}%'
+					or c.spell_code like '${inv_code}%'
+					or c.wbx_code like '${inv_code}%'
+				)
+			</if>
+		GROUP BY g.dept_code, g.dept_name, c.inv_code, c.inv_name, d.mat_type_code, 
+			d.mat_type_name, c.inv_model, i.unit_name, f.sup_name, e.fac_name, a.price
+		ORDER BY g.dept_code, c.inv_code
+	</select>
+</mapper>
+

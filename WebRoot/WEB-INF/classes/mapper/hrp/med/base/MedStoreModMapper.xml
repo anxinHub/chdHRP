@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.med.dao.base.MedStoreModMapper">
+	
+	<resultMap id="medStoreMod" type="java.util.Map">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="store_id" column="store_id"/>
+		<result property="start_year" column="start_year"/>
+		<result property="start_month" column="start_month"/>
+		<result property="user_id" column="user_id"/>
+		<result property="opt_date" column="opt_date"/>
+		<result property="store_code" column="store_code"/>
+		<result property="store_name" column="store_name"/>
+		<result property="user_name" column="user_name"/>
+		 
+	</resultMap>
+	
+	  
+	<select id="queryStoreMod" parameterType="java.util.Map" resultMap="medStoreMod" >
+	
+		 <!--  select  a.store_code,a.store_name,a.store_id,b.start_year,b.start_month,b.user_id,b.opt_date  from hos_store  a  
+				left join MED_STORE_START b on a.store_id = b.store_id
+			where a.group_id =#{group_id,jdbcType=INTEGER}
+		      and a.hos_id =#{hos_id,jdbcType=INTEGER}
+		      and a.is_med = 1 -->
+		      
+		      select H.GROUP_ID,H.HOS_ID,H.COPY_CODE,p.STORE_ID,s.start_year,s.start_month,1,
+		      		m.create_date,p.store_code,p.store_name,s.user_id,s.opt_date,su.user_name
+				from hos_copy h 
+				inner  join sys_mod_start m on H.GROUP_ID=m.group_id 
+											and H.HOS_ID=m.hos_id 
+											and H.COPY_CODE=m.copy_code 
+											and m.mod_code='04' 
+											and m.start_year is not null
+				inner join hos_store p on H.GROUP_ID=p.group_id 
+										and H.HOS_ID=p.hos_id   
+										and p.is_med=1 
+				left join  MED_STORE_START s on  H.GROUP_ID=s.group_id 
+												and H.HOS_ID=s.hos_id 
+												and H.COPY_CODE=s.copy_code
+												and s.store_id=p.store_id
+                 left join sys_user su on s.group_id = su.group_id 
+                 and s.hos_id = su.hos_id 
+                 and s.copy_code = su.copy_code 
+                 and  s.user_id = su.user_id
+               where h.group_id =#{group_id}
+              and h.hos_id = #{hos_id}
+              and h.copy_code = #{copy_code} 
+                 order by p.store_code
+ 
+	</select>
+    
+	 <insert id="addStoreModStart" useGeneratedKeys="true">
+		INSERT INTO MED_STORE_START (
+			group_id, hos_id, copy_code,store_id,start_year,start_month,user_id,opt_date
+		)  VALUES (
+			   #{group_id},
+				#{hos_id},
+				#{copy_code},
+				#{store_id},
+				#{start_year},
+				#{start_month},
+				#{user_id},
+				#{opt_date}
+			 
+        )
+	</insert>
+	
+	<!-- 用于判断期初入库的入库日期不能大于仓库启用日期 -->
+	<select id="existsStoreMod" resultType="java.util.Map" parameterType="java.util.Map">
+		<!-- select count(0) from med_store_start  a
+		    left join med_in_main b on a.store_id = b.store_id
+		    
+		    where a.group_id =   #{group_id} 
+		      and a.hos_id =  #{hos_id} 
+		      and a.copy_code =  #{copy_code} 
+		      and to_char(b.in_date,'yyyyMM') &lt; a.start_year||a.start_month
+		      and a.store_id  = #{store_id} -->
+		      
+		        select  a.start_year || a.start_month as year_month
+					from med_store_start a
+			 where a.group_id =   #{group_id} 
+		      and a.hos_id =  #{hos_id} 
+		      and a.copy_code =  #{copy_code} 
+		      and a.store_id  = #{store_id} 
+	</select>
+	
+ 
+</mapper>

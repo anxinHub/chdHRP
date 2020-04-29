@@ -1,0 +1,447 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.mat.dao.matpayquery.MatAccountReportInvArrBillUnArrMapper">
+	<resultMap id="matAccountReportInvArrBillUnArrMap" type="java.util.Map">
+	    <result property="in_id" column="in_id"/>
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="store_name" column="store_name"/>
+		<result property="in_no" column="in_no"/>
+		<result property="in_date" column="in_date"/>
+		<result property="mat_type_name" column="mat_type_name"/>
+		<result property="sup_name" column="sup_name"/>
+		<result property="emp_name" column="emp_name"/>
+		<result property="amount_money" column="amount_money"/>
+		<result property="bill_money" column="bill_money"/>
+		<result property="notpaymoney" column="notpaymoney"/>
+	</resultMap>
+	 
+	<select id="queryMatAccountReportInvArrBillUnArr" resultMap="matAccountReportInvArrBillUnArrMap">
+		with temp as (
+			select 
+			   temp.in_id,
+		       temp.group_id,
+		       temp.hos_id,
+		       temp.copy_code,
+		       temp.store_name,
+		       temp.in_no,
+		       temp.in_date,
+		       temp.mat_type_name,
+		       temp.sup_name,
+		       temp.emp_name,
+		       temp.amount_money,
+		       temp2.bill_money,
+		       nvl(temp.amount_money,0)-nvl(temp2.bill_money,0) as notpaymoney
+			from 
+			(
+			    <!-- 应付金额 -->
+			    select
+			       mim.group_id,
+			       mim.hos_id,
+			       mim.copy_code,
+			       hsd.store_name,
+			       mim.in_id,
+			       mim.in_no,
+			       mim.in_date,
+			       midd.mat_type_id,
+			       mtd.mat_type_name,
+			       hsdd.sup_name,
+			       hed.emp_name,
+			       sum(nvl(mid.amount_money,0)) as amount_money
+			    from mat_in_main mim
+			    left join mat_in_detail mid
+			    on
+			         mim.group_id = #{group_id}
+			         and mim.hos_id = #{hos_id}
+			         and mim.copy_code = #{copy_code}
+			         and mim.in_id = mid.in_id
+			         and mim.in_no = mid.in_no
+			    left join mat_bus_type mbt
+			    on
+			         mim.bus_type_code = mbt.bus_type_code
+			    left join hos_store_dict hsd
+			    on
+			         mim.group_id = #{group_id}
+			         and mim.hos_id = #{hos_id}
+			         and mim.store_id = hsd.store_id
+			         and mim.store_no = hsd.store_no
+			     <if test="set_id != null and set_id != '' ">
+				     
+			    left join mat_store_detail msd on mim.group_id=msd.group_id
+			            and mim.hos_id=msd.hos_id
+			            and hsd.store_id=msd.store_id
+			            
+			     </if>       
+			    left join mat_inv_dict midd
+			    on
+			         mid.group_id = #{group_id}
+			         and mid.hos_id = #{hos_id}
+			         and mid.copy_code = #{copy_code}
+			         and mid.inv_id = midd.inv_id
+			         and mid.inv_no = midd.inv_no
+			    left join mat_type_dict mtd
+			    on   midd.group_id=mtd.group_id and midd.hos_id=mtd.hos_id and 
+			         midd.mat_type_id = mtd.mat_type_id
+			         and midd.mat_type_no = mtd.mat_type_no
+			    left join hos_sup_dict hsdd
+			    on 
+			         mim.group_id = #{group_id}
+			         and mim.hos_id = #{hos_id}
+			         and mim.sup_id = hsdd.sup_id
+			         and mim.sup_no = hsdd.sup_no
+			    left join hos_sup hs
+			    on
+			         hsdd.sup_id = hs.sup_id 
+			         and hsdd.sup_code = hs.sup_code
+			    left join hos_sup_type hst
+			    on
+			         hs.type_code = hst.type_code
+			         and hst.is_stop = 0 
+			    left join hos_emp_dict hed
+			    on
+			         mim.group_id = #{group_id}
+			         and mim.hos_id = #{hos_id}
+			         and mim.stocker = hed.emp_id
+			         and hed.is_stop = 0
+			     
+			    where
+			         mim.group_id = #{group_id}
+			         and mim.hos_id = #{hos_id}
+			         and mim.copy_code = #{copy_code}
+			         and mbt.bus_type_code in (2,12)
+			         and to_char(mim.in_date,'yyyy-MM-dd') between #{begin_date} and #{end_date}
+			         <if test="store_id != null and store_id != '' ">
+				         and hsd.store_id = #{store_id}<!--in  (
+						  		select store_id from mat_store_detail
+								where group_id = #{group_id}
+								and hos_id = #{hos_id}
+								and set_id = #{store_id}
+						  	) -->
+			         </if>
+			         <if test="set_id != null and set_id != '' ">
+				         and msd.set_id = #{set_id}
+			         </if>
+			         
+			         <if test="sup_type_code != null and sup_type_code != '' ">
+				         and hst.type_code = #{sup_type_code}
+			         </if>
+			         
+			         <if test="sup_id != null and sup_id != '' ">
+				         and mim.sup_id = #{sup_id}
+			         </if>
+			         
+			         <if test="dept_id != null and dept_id != '' ">
+				         and mim.app_dept = #{dept_id}
+			         </if>
+			         
+			         <if test="stocker != null and stocker != '' ">
+				         and mim.stocker = #{stocker}
+			         </if>
+			group by mim.group_id,mim.hos_id,mim.copy_code,hsd.store_name,mim.in_id,mim.in_no,midd.mat_type_id,
+			         mim.in_date,mtd.mat_type_name,hsdd.sup_name,hed.emp_name
+			) temp left join(
+			
+			    <!-- 已开票金额 -->
+			    select
+			         mim.in_id,
+			         mim.in_no,
+			         mtd.mat_type_id,
+			         sum(nvl(mid.amount_money,0)) as bill_money
+			    from mat_in_main mim
+			    left join mat_in_detail mid
+			    on
+			         mim.group_id = #{group_id}
+			         and mim.hos_id = #{hos_id}
+			         and mim.copy_code = #{copy_code}
+			         and mim.in_id = mid.in_id
+			         and mim.in_no = mid.in_no
+			    left join mat_bus_type mbt
+			    on
+			         mim.bus_type_code = mbt.bus_type_code 
+			    left join mat_inv_dict midd
+			    on
+			         mid.group_id = #{group_id}
+			         and mid.hos_id = #{hos_id}
+			         and mid.copy_code = #{copy_code}
+			         and mid.inv_id = midd.inv_id
+			         and mid.inv_no = midd.inv_no
+			    left join mat_type_dict mtd
+			    on
+			         midd.mat_type_id = mtd.mat_type_id
+			         and midd.mat_type_no = mtd.mat_type_no
+			    left join hos_sup_dict hsdd
+			    on
+			          mim.group_id = #{group_id}
+			          and mim.hos_id = #{hos_id}
+			          and mim.sup_id = hsdd.sup_id
+			          and mim.sup_no = hsdd.sup_no
+			    left join hos_sup hs
+			    on
+			         hsdd.sup_id = hs.sup_id
+			         and hsdd.sup_code = hs.sup_code
+			    left join hos_sup_type hst
+			    on
+			         hs.type_code = hst.type_code
+			         and hst.is_stop = 0 
+			    where
+			         mim.group_id = #{group_id}
+			         and mim.hos_id = #{hos_id}
+			         and mim.copy_code = #{copy_code}
+			         and mbt.bus_type_code in (2,12)
+			         and to_char(mim.in_date,'yyyy-MM-dd') between #{begin_date} and #{end_date}
+			         
+			        <!--  <if test="store_id != null and store_id != '' ">
+				         and mim.store_id in (
+						  		select store_id from mat_store_detail
+								where group_id = #{group_id}
+								and hos_id = #{hos_id}
+								and set_id = #{store_id}
+						  	)
+			         </if>
+			          -->
+			         <if test="sup_type_code != null and sup_type_code != '' ">
+				         and hst.type_code = #{sup_type_code}
+			         </if>
+			         
+			         <if test="sup_id != null and sup_id != '' ">
+				         and mim.sup_id = #{sup_id}
+			         </if>
+			         
+			         <if test="dept_id != null and dept_id != '' ">
+				         and mim.app_dept = #{dept_id}
+			         </if>
+			         
+			         <if test="stocker != null and stocker != '' ">
+				         and mim.stocker = #{stocker}
+			         </if>
+			         and mid.in_detail_id in(
+				         select
+				              a.in_detail_id
+				         from  mat_bill_detail a
+				         left join mat_in_detail b
+				         on
+				              a.group_id = #{group_id}
+				              and a.hos_id = #{hos_id}
+				              and a.copy_code = #{copy_code}
+				              and a.in_id = b.in_id
+				              and a.in_detail_id = b.in_detail_id
+			    	)
+			    group by mim.in_id,mim.in_no,mtd.mat_type_id
+			) temp2 on temp.in_id = temp2.in_id
+			and temp.in_no = temp2.in_no
+			and temp.mat_type_id = temp2.mat_type_id
+			order by temp.in_date,temp.in_no 
+		)
+		select temp.in_id,temp.group_id, temp.hos_id, temp.copy_code, temp.store_name, temp.in_no
+		      , temp.in_date, temp.mat_type_name, temp.sup_name, temp.emp_name, temp.amount_money
+		      , temp.bill_money,temp.notpaymoney
+		from temp
+		union all
+		select NULL AS in_id,
+		       NULL AS group_id,NULL AS hos_id,NULL AS copy_code, '合计' AS store_name,NULL AS in_no
+		      , NULL AS in_date,NULL AS mat_type_name,NULL AS sup_name, NULL AS emp_name, sum(nvl(temp.amount_money,0)) as amount_money
+		      , sum(nvl(temp.bill_money,0)) as bill_money ,sum(nvl(temp.notpaymoney,0)) as notpaymoney
+		from temp 
+	</select>
+	<select id="queryMatAccountReportInvArrBillUnArrSup" resultMap="matAccountReportInvArrBillUnArrMap">
+		with temp as (
+			select 
+			   temp.in_id,
+		       temp.group_id,
+		       temp.hos_id,
+		       temp.copy_code,
+		       temp.store_name,
+		       temp.in_no,
+		       temp.in_date,
+		       temp.sup_name,
+		       temp.emp_name,
+		       temp.amount_money,
+		       temp2.bill_money,
+		       nvl(temp.amount_money,0)-nvl(temp2.bill_money,0) as notpaymoney
+			from 
+			(
+			    <!-- 应付金额 -->
+			    select
+			       mim.group_id,
+			       mim.hos_id,
+			       mim.copy_code,
+			       hsd.store_name,
+			       mim.in_id,
+			       mim.in_no,
+			       mim.in_date,
+			       hsdd.sup_name,
+			       hed.emp_name,
+			       sum(nvl(mid.amount_money,0)) as amount_money
+			    from mat_in_main mim
+			    left join mat_in_detail mid
+			    on
+			         mim.group_id = #{group_id}
+			         and mim.hos_id = #{hos_id}
+			         and mim.copy_code = #{copy_code}
+			         and mim.in_id = mid.in_id
+			         and mim.in_no = mid.in_no
+			    left join mat_bus_type mbt
+			    on
+			         mim.bus_type_code = mbt.bus_type_code
+			    left join hos_store_dict hsd
+			    on
+			         mim.group_id = #{group_id}
+			         and mim.hos_id = #{hos_id}
+			         and mim.store_id = hsd.store_id
+			         and mim.store_no = hsd.store_no
+			     <if test="set_id != null and set_id != '' ">
+				     
+			    left join mat_store_detail msd on mim.group_id=msd.group_id
+			            and mim.hos_id=msd.hos_id
+			            and hsd.store_id=msd.store_id
+			            
+			     </if>       
+			    left join hos_sup_dict hsdd
+			    on 
+			         mim.group_id = #{group_id}
+			         and mim.hos_id = #{hos_id}
+			         and mim.sup_id = hsdd.sup_id
+			         and mim.sup_no = hsdd.sup_no
+			    left join hos_sup hs
+			    on
+			         hsdd.sup_id = hs.sup_id 
+			         and hsdd.sup_code = hs.sup_code
+			    left join hos_sup_type hst
+			    on
+			         hs.type_code = hst.type_code
+			         and hst.is_stop = 0 
+			    left join hos_emp_dict hed
+			    on
+			         mim.group_id = #{group_id}
+			         and mim.hos_id = #{hos_id}
+			         and mim.stocker = hed.emp_id
+			         and hed.is_stop = 0
+			     
+			    where
+			         mim.group_id = #{group_id}
+			         and mim.hos_id = #{hos_id}
+			         and mim.copy_code = #{copy_code}
+			         and mbt.bus_type_code in (2,12)
+			         and to_char(mim.in_date,'yyyy-MM-dd') between #{begin_date} and #{end_date}
+			         <if test="store_id != null and store_id != '' ">
+				         and hsd.store_id = #{store_id}<!--in  (
+						  		select store_id from mat_store_detail
+								where group_id = #{group_id}
+								and hos_id = #{hos_id}
+								and set_id = #{store_id}
+						  	) -->
+			         </if>
+			         <if test="set_id != null and set_id != '' ">
+				         and msd.set_id = #{set_id}
+			         </if>
+			         
+			         <if test="sup_type_code != null and sup_type_code != '' ">
+				         and hst.type_code = #{sup_type_code}
+			         </if>
+			         
+			         <if test="sup_id != null and sup_id != '' ">
+				         and mim.sup_id = #{sup_id}
+			         </if>
+			         
+			         <if test="dept_id != null and dept_id != '' ">
+				         and mim.app_dept = #{dept_id}
+			         </if>
+			         
+			         <if test="stocker != null and stocker != '' ">
+				         and mim.stocker = #{stocker}
+			         </if>
+			group by mim.group_id,mim.hos_id,mim.copy_code,hsd.store_name,mim.in_id,mim.in_no,
+			         mim.in_date,hsdd.sup_name,hed.emp_name
+			) temp left join(
+			
+			    <!-- 已开票金额 -->
+			    select
+			         mim.in_id,
+			         mim.in_no,
+			         sum(nvl(mid.amount_money,0)) as bill_money
+			    from mat_in_main mim
+			    left join mat_in_detail mid
+			    on
+			         mim.group_id = #{group_id}
+			         and mim.hos_id = #{hos_id}
+			         and mim.copy_code = #{copy_code}
+			         and mim.in_id = mid.in_id
+			         and mim.in_no = mid.in_no
+			    left join mat_bus_type mbt
+			    on
+			         mim.bus_type_code = mbt.bus_type_code 
+			    left join hos_sup_dict hsdd
+			    on
+			          mim.group_id = #{group_id}
+			          and mim.hos_id = #{hos_id}
+			          and mim.sup_id = hsdd.sup_id
+			          and mim.sup_no = hsdd.sup_no
+			    left join hos_sup hs
+			    on
+			         hsdd.sup_id = hs.sup_id
+			         and hsdd.sup_code = hs.sup_code
+			    left join hos_sup_type hst
+			    on
+			         hs.type_code = hst.type_code
+			         and hst.is_stop = 0 
+			    where
+			         mim.group_id = #{group_id}
+			         and mim.hos_id = #{hos_id}
+			         and mim.copy_code = #{copy_code}
+			         and mbt.bus_type_code in (2,12)
+			         and to_char(mim.in_date,'yyyy-MM-dd') between #{begin_date} and #{end_date}
+			         
+			        <!--  <if test="store_id != null and store_id != '' ">
+				         and mim.store_id in (
+						  		select store_id from mat_store_detail
+								where group_id = #{group_id}
+								and hos_id = #{hos_id}
+								and set_id = #{store_id}
+						  	)
+			         </if>
+			          -->
+			         <if test="sup_type_code != null and sup_type_code != '' ">
+				         and hst.type_code = #{sup_type_code}
+			         </if>
+			         
+			         <if test="sup_id != null and sup_id != '' ">
+				         and mim.sup_id = #{sup_id}
+			         </if>
+			         
+			         <if test="dept_id != null and dept_id != '' ">
+				         and mim.app_dept = #{dept_id}
+			         </if>
+			         
+			         <if test="stocker != null and stocker != '' ">
+				         and mim.stocker = #{stocker}
+			         </if>
+			         and mid.in_detail_id in(
+				         select
+				              a.in_detail_id
+				         from  mat_bill_detail a
+				         left join mat_in_detail b
+				         on
+				              a.group_id = #{group_id}
+				              and a.hos_id = #{hos_id}
+				              and a.copy_code = #{copy_code}
+				              and a.in_id = b.in_id
+				              and a.in_detail_id = b.in_detail_id
+			    	)
+			    group by mim.in_id,mim.in_no
+			) temp2 on temp.in_id = temp2.in_id
+			and temp.in_no = temp2.in_no
+			order by temp.in_date,temp.in_no 
+		)
+		select temp.in_id,temp.group_id, temp.hos_id, temp.copy_code, temp.store_name, temp.in_no
+		      , temp.in_date, temp.sup_name, temp.emp_name, temp.amount_money
+		      , temp.bill_money,temp.notpaymoney
+		from temp
+		union all
+		select
+		       null as in_id, NULL AS group_id,NULL AS hos_id,NULL AS copy_code, '合计' AS store_name,NULL AS in_no
+		      , NULL AS in_date,NULL AS sup_name, NULL AS emp_name, sum(nvl(temp.amount_money,0)) as amount_money
+		      , sum(nvl(temp.bill_money,0)) as bill_money ,sum(nvl(temp.notpaymoney,0)) as notpaymoney
+		from temp 
+	</select>
+</mapper>

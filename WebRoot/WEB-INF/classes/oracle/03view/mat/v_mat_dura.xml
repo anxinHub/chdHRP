@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+
+	<sql id="v_mat_dura_store_stock_imme" type="view" desc="物流耐用品库房库存占用量"><![CDATA[
+		CREATE OR REPLACE VIEW V_MAT_DURA_STORE_STOCK_IMME AS
+		SELECT group_id, hos_id, copy_code, store_id, inv_id, price, bar_code, SUM(amount) as amount
+					FROM (
+						--库到库未确认单据
+						SELECT mdss.group_id, mdss.hos_id, mdss.copy_code, mdss.store_id,
+							mdssd.inv_id, mdssd.price, mdssd.bar_code, SUM(NVL(mdssd.amount, 0)) as amount
+						FROM mat_dura_store_store mdss
+						LEFT JOIN mat_dura_store_store_d mdssd
+							ON mdss.group_id = mdssd.group_id
+							AND mdss.hos_id = mdssd.hos_id
+							AND mdss.copy_code = mdssd.copy_code
+							AND mdss.dura_id = mdssd.dura_id
+						WHERE mdss.state < 3
+						GROUP BY mdss.group_id, mdss.hos_id, mdss.copy_code, mdss.store_id, mdssd.inv_id, mdssd.price, mdssd.bar_code
+						--库到科室未确认单据
+						UNION ALL
+						SELECT mdsd.group_id, mdsd.hos_id, mdsd.copy_code, mdsd.store_id,
+							mdsdd.inv_id, mdsdd.price, mdsdd.bar_code, SUM(NVL(mdsdd.amount, 0)) as amount
+						FROM mat_dura_store_dept mdsd
+						LEFT JOIN mat_dura_store_dept_d mdsdd
+							ON mdsd.group_id = mdsdd.group_id
+							AND mdsd.hos_id = mdsdd.hos_id
+							AND mdsd.copy_code = mdsdd.copy_code
+							AND mdsd.dura_id = mdsdd.dura_id
+						WHERE mdsd.state < 3
+							AND mdsd.bus_type_code = '37'
+						GROUP BY mdsd.group_id, mdsd.hos_id, mdsd.copy_code, mdsd.store_id, mdsdd.inv_id, mdsdd.price, mdsdd.bar_code
+		        --报废未确认单据
+		        union all
+		        select mdss.group_id, mdss.hos_id, mdss.copy_code,  mdss.store_id,
+		          mdssd.inv_id, mdssd.price, mdssd.bar_code, SUM(NVL(mdssd.amount, 0)) as amount
+		        from mat_dura_store_scrap mdss
+		        left join mat_dura_store_scrap_d mdssd
+		          on mdss.group_id = mdssd.group_id
+		         and mdss.hos_id = mdssd.hos_id
+		         and mdss.copy_code = mdssd.copy_code
+		         and mdss.scrap_id = mdssd.scrap_id
+		       where mdss.state < 3
+		       GROUP BY mdss.group_id, mdss.hos_id, mdss.copy_code, mdss.store_id, mdssd.inv_id, mdssd.price, mdssd.bar_code
+					)
+					GROUP BY group_id, hos_id, copy_code, store_id, inv_id, price, bar_code
+	]]></sql>
+	
+	<sql id="v_mat_dura_dept_stock_imme" type="view" desc="物流耐用品科室库存占用量"><![CDATA[
+		CREATE OR REPLACE VIEW V_MAT_DURA_DEPT_STOCK_IMME AS
+		SELECT group_id, hos_id, copy_code, dept_id, inv_id, price, bar_code, SUM(amount) as amount
+					FROM (
+						--科室到库未确认单据
+						SELECT mdsd.group_id, mdsd.hos_id, mdsd.copy_code, mdsd.dept_id, mdsdd.bar_code,
+							mdsdd.inv_id, mdsdd.price, SUM(NVL(mdsdd.amount, 0)) as amount
+						FROM mat_dura_store_dept mdsd
+						LEFT JOIN mat_dura_store_dept_d mdsdd
+							ON mdsd.group_id = mdsdd.group_id
+							AND mdsd.hos_id = mdsdd.hos_id
+							AND mdsd.copy_code = mdsdd.copy_code
+							AND mdsd.dura_id = mdsdd.dura_id
+						WHERE mdsd.state < 3
+							AND mdsd.bus_type_code = '38'
+						GROUP BY mdsd.group_id, mdsd.hos_id, mdsd.copy_code, mdsd.dept_id, mdsdd.inv_id, mdsdd.price, mdsdd.bar_code
+						--科室到科室未确认单据
+						UNION ALL
+						SELECT mddd.group_id, mddd.hos_id, mddd.copy_code, mddd.dept_id, mdddd.bar_code,
+							mdddd.inv_id, mdddd.price, SUM(NVL(mdddd.amount, 0)) as amount
+						FROM mat_dura_dept_dept mddd
+						LEFT JOIN mat_dura_dept_dept_d mdddd
+							ON mddd.group_id = mdddd.group_id
+							AND mddd.hos_id = mdddd.hos_id
+							AND mddd.copy_code = mdddd.copy_code
+							AND mddd.dura_id = mdddd.dura_id
+						WHERE mddd.state < 3
+						GROUP BY mddd.group_id, mddd.hos_id, mddd.copy_code, mddd.dept_id, mdddd.inv_id, mdddd.price, mdddd.bar_code
+		        --报废未确认单据
+		        union all
+		        SELECT mdds.group_id, mdds.hos_id, mdds.copy_code, mdds.dept_id, mddsd.bar_code,
+		          mddsd.inv_id, mddsd.price, SUM(NVL(mddsd.amount, 0)) as amount
+		        FROM mat_dura_dept_scrap mdds
+		        LEFT JOIN mat_dura_dept_scrap_d mddsd
+		          ON mdds.group_id = mddsd.group_id
+		          AND mdds.hos_id = mddsd.hos_id
+		          AND mdds.copy_code = mddsd.copy_code
+		          AND mdds.scrap_id = mddsd.scrap_id
+		        WHERE mdds.state < 3
+		        GROUP BY mdds.group_id, mdds.hos_id, mdds.copy_code, mdds.dept_id, mddsd.inv_id, mddsd.price, mddsd.bar_code
+					)
+					GROUP BY group_id, hos_id, copy_code, dept_id, inv_id, price, bar_code
+	]]></sql>
+	
+	<sql id="v_mat_dura_store_bar_imme" type="view" desc="物流耐用品库房条码占用量"><![CDATA[
+		CREATE OR REPLACE VIEW V_MAT_DURA_STORE_BAR_IMME AS
+			SELECT group_id, hos_id, copy_code, store_id, inv_id, price, bar_code, SUM(amount) as amount
+			FROM (
+				--库到库未确认单据
+				SELECT mdss.group_id, mdss.hos_id, mdss.copy_code, mdss.store_id,
+					mdssd.inv_id, mdssd.price, mdssd.bar_code, SUM(NVL(mdssd.amount, 0)) as amount
+				FROM mat_dura_store_store mdss
+				LEFT JOIN mat_dura_store_store_d mdssd
+					ON mdss.group_id = mdssd.group_id
+					AND mdss.hos_id = mdssd.hos_id
+					AND mdss.copy_code = mdssd.copy_code
+					AND mdss.dura_id = mdssd.dura_id
+				WHERE mdss.state < 3
+				GROUP BY mdss.group_id, mdss.hos_id, mdss.copy_code, mdss.store_id, mdssd.inv_id, mdssd.price, mdssd.bar_code 
+				--库到科室未确认单据
+				UNION ALL
+				SELECT mdsd.group_id, mdsd.hos_id, mdsd.copy_code, mdsd.store_id,
+					mdsdd.inv_id, mdsdd.price, mdsdd.bar_code, SUM(NVL(mdsdd.amount, 0)) as amount
+				FROM mat_dura_store_dept mdsd
+				LEFT JOIN mat_dura_store_dept_d mdsdd
+					ON mdsd.group_id = mdsdd.group_id
+					AND mdsd.hos_id = mdsdd.hos_id
+					AND mdsd.copy_code = mdsdd.copy_code
+					AND mdsd.dura_id = mdsdd.dura_id 
+				WHERE mdsd.state < 3
+					AND mdsd.bus_type_code = '37'
+				GROUP BY mdsd.group_id, mdsd.hos_id, mdsd.copy_code, mdsd.store_id, mdsdd.inv_id, mdsdd.price, mdsdd.bar_code 
+				--报废未确认单据
+                UNION ALL
+                SELECT mdssc.group_id, mdssc.hos_id, mdssc.copy_code, mdssc.store_id,
+                mdsscd.inv_id, mdsscd.price, mdsscd.bar_code, SUM(NVL(mdsscd.amount, 0)) as amount
+                FROM mat_dura_store_scrap mdssc
+                LEFT JOIN mat_dura_store_scrap_d mdsscd
+                ON mdssc.group_id = mdsscd.group_id
+                AND mdssc.hos_id = mdsscd.hos_id
+                AND mdssc.copy_code = mdsscd.copy_code
+                WHERE mdssc.state < 3
+                AND mdssc.bus_type_code = '37'
+                GROUP BY mdssc.group_id, mdssc.hos_id, mdssc.copy_code, mdssc.store_id, mdsscd.inv_id, mdsscd.price, mdsscd.bar_code 
+			)
+			GROUP BY group_id, hos_id, copy_code, store_id, inv_id, price, bar_code
+	]]></sql>
+	
+	<sql id="v_mat_dura_dept_bar_imme" type="view" desc="物流耐用品科室条码占用量"><![CDATA[
+		CREATE OR REPLACE VIEW V_MAT_DURA_DEPT_BAR_IMME AS
+			SELECT group_id, hos_id, copy_code, dept_id, inv_id, price, bar_code, SUM(amount) as amount
+			FROM (
+				--科室到库未确认单据
+				SELECT mdsd.group_id, mdsd.hos_id, mdsd.copy_code, mdsd.dept_id,
+					mdsdd.inv_id, mdsdd.price, mdsdd.bar_code, SUM(NVL(mdsdd.amount, 0)) as amount
+				FROM mat_dura_store_dept mdsd
+				LEFT JOIN mat_dura_store_dept_d mdsdd
+					ON mdsd.group_id = mdsdd.group_id
+					AND mdsd.hos_id = mdsdd.hos_id
+					AND mdsd.copy_code = mdsdd.copy_code
+					AND mdsd.dura_id = mdsdd.dura_id
+				WHERE mdsd.state < 3
+					AND mdsd.bus_type_code = '38'
+				GROUP BY mdsd.group_id, mdsd.hos_id, mdsd.copy_code, mdsd.dept_id, mdsdd.inv_id, mdsdd.price, mdsdd.bar_code 
+				--科室到科室未确认单据
+				UNION ALL
+				SELECT mddd.group_id, mddd.hos_id, mddd.copy_code, mddd.dept_id,
+					mdddd.inv_id, mdddd.price, mdddd.bar_code, SUM(NVL(mdddd.amount, 0)) as amount
+				FROM mat_dura_dept_dept mddd
+				LEFT JOIN mat_dura_dept_dept_d mdddd
+					ON mddd.group_id = mdddd.group_id
+					AND mddd.hos_id = mdddd.hos_id
+					AND mddd.copy_code = mdddd.copy_code
+					AND mddd.dura_id = mdddd.dura_id
+				WHERE mddd.state < 3
+				GROUP BY mddd.group_id, mddd.hos_id, mddd.copy_code, mddd.dept_id, mdddd.inv_id, mdddd.price, mdddd.bar_code 
+			)
+			GROUP BY group_id, hos_id, copy_code, dept_id, inv_id, price, bar_code
+	]]></sql>
+</root>
+

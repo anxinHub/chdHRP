@@ -1,0 +1,253 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.med.dao.affi.query.MedAffiSupCountMapper">
+
+	<resultMap id="medAffiSupCountMap" type="java.util.Map">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="sup_code" column="sup_code" />
+		<result property="sup_name" column="sup_name" />
+		<result property="amount_money" column="amount_money" />
+		<result property="med_type_count" column="med_type_count" />
+		<result property="in_id_count" column="in_id_count" />
+	</resultMap>
+
+	<!-- 代销-供应商采购汇总查询 -->
+	<select id="queryMedAffiSupCount" parameterType="java.util.Map"
+		resultMap="medAffiSupCountMap">
+		with temp as(
+		select
+		mai.sup_id,count(mai.in_id) c_in
+		from med_affi_in mai
+		<where>
+		     mai.state = '3'
+		     <!-- and mai.bus_type_code = '2' -->
+			<if test="group_id != null and group_id != ''">
+				and mai.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and mai.hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				and mai.copy_code = #{copy_code}
+			</if>
+			<if
+				test="begin_confirm_date != null and begin_confirm_date != '' and end_confirm_date != null and end_confirm_date != ''">
+				AND mai.confirm_date between
+				to_date(#{begin_confirm_date},'yyyy-MM-dd') and
+				to_date(#{end_confirm_date},'yyyy-MM-dd')
+			</if>
+			<!-- 只显示有权限的库房信息 -->
+			and mai.store_id in (
+				select perm_code from v_user_data_perm  
+				where group_id = #{group_id,jdbcType=INTEGER}
+					and hos_id = #{hos_id,jdbcType=INTEGER}
+					and table_code = 'HOS_STORE_DICT'
+					and user_id = #{user_id,jdbcType=INTEGER}
+					and is_read = 1 and is_write = 1 
+			)
+			<if test="store_id != null and store_id != ''">
+				and mai.store_id = #{store_id}
+			</if>
+			<if test="store_no!= null and store_no != ''">
+				and mai.store_no= #{store_no}
+			</if>
+		    <if test="begin_in_date != null and begin_in_date != '' and end_in_date != null and end_in_date != ''">
+				AND mai.in_date between to_date(#{begin_in_date},'yyyy-MM-dd')
+				and
+				to_date(#{end_in_date},'yyyy-MM-dd')
+			</if>
+			<if test="sup_id != null and sup_id != ''">
+				and mai.sup_id = #{sup_id}
+			</if>
+			<if test="sup_no !=null and sup_no != ''">
+				and mai.sup_no= #{sup_no}
+			</if>
+		</where>
+		group by mai.sup_id
+		), type_temp as (
+		select
+		mai.sup_id,count(midd.med_type_id) c_type
+		from med_affi_in mai
+		left join
+		med_affi_in_detail maid on mai.group_id = maid.group_id
+		and mai.hos_id =
+		maid.hos_id and mai.copy_code = maid.copy_code
+		and mai.in_id = maid.in_id
+		left join med_inv_dict midd on midd.group_id = maid.group_id
+		and
+		midd.hos_id = midd.hos_id and midd.copy_code = maid.copy_code
+		and
+		midd.inv_id = maid.inv_id and midd.inv_no = maid.inv_no
+		<where>
+		     mai.state = '3'
+		     <!-- and mai.bus_type_code = '2' -->
+			<if test="group_id != null and group_id != ''">
+				and mai.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and mai.hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				and mai.copy_code = #{copy_code}
+			</if>
+			<if
+				test="begin_confirm_date != null and begin_confirm_date != '' and end_confirm_date != null and end_confirm_date != ''">
+				AND mai.confirm_date between
+				to_date(#{begin_confirm_date},'yyyy-MM-dd') and
+				to_date(#{end_confirm_date},'yyyy-MM-dd')
+			</if>
+			<!-- 只显示有权限的库房信息 -->
+			and mai.store_id in (
+				select perm_code from v_user_data_perm  
+				where group_id = #{group_id,jdbcType=INTEGER}
+					and hos_id = #{hos_id,jdbcType=INTEGER}
+					and table_code = 'HOS_STORE_DICT'
+					and user_id = #{user_id,jdbcType=INTEGER}
+					and is_read = 1 and is_write = 1 
+			)
+			<if test="store_id != null and store_id != ''">
+				and mai.store_id = #{store_id}
+			</if>
+			<if test="store_no!= null and store_no != ''">
+				and mai.store_no= #{store_no}
+			</if>
+			<if test="med_type_id != null and med_type_id != ''">
+				and midd.med_type_id = #{med_type_id,jdbcType=INTEGER}
+			</if>
+			<if test="med_type_no !=null and med_type_no != ''">
+				and midd.med_type_no= #{med_type_no,jdbcType=INTEGER}
+			</if>
+			<if test="begin_in_date != null and begin_in_date != '' and end_in_date != null and end_in_date != ''">
+				AND mai.in_date between to_date(#{begin_in_date},'yyyy-MM-dd')
+				and
+				to_date(#{end_in_date},'yyyy-MM-dd')
+			</if>
+			<if test="sup_id != null and sup_id != ''">
+				and mai.sup_id = #{sup_id}
+			</if>
+			<if test="sup_no !=null and sup_no != ''">
+				and mai.sup_no= #{sup_no}
+			</if>
+			<if test="is_charge !=null and is_charge != ''">
+				and midd.is_charge= #{is_charge}
+			</if>
+		</where>
+		group by
+		mai.sup_id
+		), money_temp as (
+		select
+		mai.sup_id,sum(maid.amount_money)
+		amount_money
+		from med_affi_in mai
+		left
+		join med_affi_in_detail maid on
+		mai.group_id = maid.group_id
+		and mai.hos_id =
+		maid.hos_id and
+		mai.copy_code = maid.copy_code
+		and mai.in_id = maid.in_id
+		left join
+		med_inv_dict midd on midd.group_id = maid.group_id
+		and
+		midd.hos_id =
+		midd.hos_id and midd.copy_code = maid.copy_code
+		and
+		midd.inv_id =
+		maid.inv_id and midd.inv_no = maid.inv_no
+		<where>
+		     mai.state = '3'
+		     <!-- and mai.bus_type_code = '2' -->
+			<if test="group_id != null and group_id != ''">
+				and mai.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and mai.hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				and mai.copy_code = #{copy_code}
+			</if>
+			<if test="begin_confirm_date != null and begin_confirm_date != '' and end_confirm_date != null and end_confirm_date != ''">
+				AND mai.confirm_date between
+				to_date(#{begin_confirm_date},'yyyy-MM-dd') and
+				to_date(#{end_confirm_date},'yyyy-MM-dd')
+			</if>
+			<!-- 只显示有权限的库房信息 -->
+			and mai.store_id in (
+				select perm_code from v_user_data_perm  
+				where group_id = #{group_id,jdbcType=INTEGER}
+					and hos_id = #{hos_id,jdbcType=INTEGER}
+					and table_code = 'HOS_STORE_DICT'
+					and user_id = #{user_id,jdbcType=INTEGER}
+					and is_read = 1 and is_write = 1 
+			)
+			<if test="store_id != null and store_id != ''">
+				and mai.store_id = #{store_id}
+			</if>
+			<if test="store_no!= null and store_no != ''">
+				and mai.store_no= #{store_no}
+			</if>
+			<if test="med_type_id != null and med_type_id != ''">
+				and midd.med_type_id = #{med_type_id,jdbcType=INTEGER}
+			</if>
+			<if test="med_type_no !=null and med_type_no != ''">
+				and midd.med_type_no= #{med_type_no,jdbcType=INTEGER}
+			</if>
+			<if test="begin_in_date != null and begin_in_date != '' and end_in_date != null and end_in_date != ''">
+				AND mai.in_date between to_date(#{begin_in_date},'yyyy-MM-dd') and to_date(#{end_in_date},'yyyy-MM-dd')
+			</if>
+			<if test="sup_id != null and sup_id != ''">
+				and mai.sup_id = #{sup_id}
+			</if>
+			<if test="sup_no !=null and sup_no != ''">
+				and mai.sup_no= #{sup_no}
+			</if>
+			<if test="is_charge !=null and is_charge != ''">
+				and midd.is_charge= #{is_charge}
+			</if>
+			 <if test="inv_model != null and inv_model != ''">
+					and (midd.inv_model like '%${inv_model}%'
+					or midd.inv_name like '%${inv_model}%'
+				         or midd.inv_code like '%${inv_model}%'
+					     or upper(midd.spell_code) like '%${inv_model}%'
+					     or upper(midd.wbx_code) like '%${inv_model}%'
+					     or lower(midd.spell_code) like '%${inv_model}%'
+					     or lower(midd.wbx_code) like '%${inv_model}%'
+					     )
+			</if>
+		</where>
+		group by mai.sup_id
+		), count_temp as(
+		select
+		hsd.sup_code,hsd.sup_name,a.sup_id,c.amount_money,b.c_type
+		med_type_count, a.c_in in_id_count
+		from temp a
+		inner join type_temp b
+		on
+		a.sup_id = b.sup_id
+		inner join money_temp c
+		on a.sup_id = c.sup_id
+		inner join hos_sup_dict hsd
+		on hsd.sup_id = a.sup_id
+		<where>
+		        hsd.is_stop = '0'
+	    	<if test="group_id != null and group_id != ''">
+				and hsd.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and hsd.hos_id = #{hos_id}
+			</if>
+			<if test="sup_id != null and sup_id != ''">
+				and hsd.sup_id = #{sup_id}
+			</if>
+			<if test="sup_no !=null and sup_no != ''">
+				and hsd.sup_no= #{sup_no}
+			</if>
+		</where>
+		) select sup_code,to_char(sup_name) as sup_name, sup_id,amount_money, med_type_count,in_id_count from count_temp
+      union all
+      select null,to_char('合计'), null,sum(amount_money), sum(med_type_count),sum(in_id_count) from count_temp
+	</select>
+</mapper>
+

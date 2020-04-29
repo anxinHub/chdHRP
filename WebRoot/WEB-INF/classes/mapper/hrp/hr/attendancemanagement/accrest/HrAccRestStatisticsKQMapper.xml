@@ -1,0 +1,646 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper
+	namespace="com.chd.hrp.hr.dao.attendancemanagement.accrest.HrAccRestStatisticsKQMapper">
+	<resultMap type="java.util.Map" id="hrAccRestStatisticsKQ">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="emp_id" column="emp_id" />
+		<result property="emp_name" column="emp_name" />
+		<result property="dept_name" column="dept_name" />
+		<result property="dept_id" column="dept_id" />
+		<result property="attend_accdays" column="attend_accdays" />
+		<result property="attend_accchadays" column="attend_accchadays" />
+		<result property="attend_jxdays" column="attend_jxdays" />
+		<result property="end_xjdays" column="end_xjdays" />
+	</resultMap>
+
+	<select id="queryHrCycDateKQ" resultType="java.util.Map"
+		parameterType="java.util.Map">
+		select
+		group_id,hos_id,attdent_cycle_style,attdent_cycle_beg,attdent_cycle_end
+		from hr_attdent_cycle
+		<where>
+			and group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id =
+			#{hos_id,jdbcType=INTEGER}
+		</where>
+	</select>
+
+	<select id="queryHrAttdentAccstatKQIsUse" resultType="java.util.Map"
+		parameterType="java.util.Map">
+		select group_id,hos_id,emp_id,attend_accyear,attend_accmonth<!-- ,attend_end,attend_end_result -->
+		from hr_attdent_accstat
+		<where>
+			and group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id =
+			#{hos_id,jdbcType=INTEGER}
+			and ROWNUM &gt;= 10
+		</where>
+	</select>
+
+	<select id="queryAccYearMonthExistsKQ" resultType="java.util.Map"
+		parameterType="java.util.Map">
+		select group_id, hos_id, emp_id,attend_accyear ,attend_accmonth
+		,attend_accmonthend
+		from hr_attdent_accstat
+		<where>
+			and group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id =
+			#{hos_id,jdbcType=INTEGER}
+			and attend_accyear = #{attend_accyear}
+			and
+			attend_accmonth = #{attend_accmonth}
+		</where>
+	</select>
+
+
+	<!-- 查询 -->
+	<select id="query" resultType="java.util.Map" parameterType="java.util.Map">
+				with cs_tmp as (
+		    select he.group_id, he.hos_id, he.dept_id, he.emp_id
+		      , nvl(hr.attend_accdays, 0) as begin_days
+		    from hos_emp he
+		      left join hr_attend_accinit hr on he.emp_id = hr.emp_id
+		    and he.group_id = hr.group_id
+		    and he.hos_id = hr.hos_id 
+		    where he.group_id = #{group_id,jdbcType=INTEGER}
+		      and he.hos_id = #{hos_id,jdbcType=INTEGER}
+		      <if test="dept_id != null and dept_id != '' ">
+		      and he.dept_id = #{dept_id,jdbcType=INTEGER}
+		      </if>
+		      <if test="emp_id != null and emp_id != '' ">
+		      and he.emp_id = #{emp_id,jdbcType=INTEGER}
+		      </if>
+		      and exists (
+			select 1
+			from sys_user_perm_data b
+			where he.group_id = b.group_id
+			and he.hos_id = b.hos_id
+			and to_char(he.dept_id) = b.perm_code
+			and user_id =#{user_id,jdbcType=VARCHAR}
+			<if test="dept_source == 1">
+			and TABLE_CODE = 'HR_DEPT_DICT'
+			</if>
+			<if test="dept_source == 2">
+			and TABLE_CODE = 'HOS_DEPT_DICT'
+			</if>
+			and (b.is_read = 1 or b.is_write = 1)
+		)
+		  ), 
+		  cq_tmp as (
+		   
+		    select hr.group_id, hr.hos_id, hr.emp_id,he.dept_id ,sum(nvl(hr.attend_val,0)) as add_days from  hr_attend_result_d hr
+		    left join hos_emp he on hr.group_id=he.group_id and hr.hos_id=he.hos_id
+		    and hr.emp_id=he.emp_id and hr.dept_id_c=he.dept_id
+		    where hr.attend_code like '01%'
+		     and hr.group_id = #{group_id,jdbcType=INTEGER}
+		      and hr.hos_id = #{hos_id,jdbcType=INTEGER}
+		      <if test="dept_id != null and dept_id != '' ">
+		      and he.dept_id = #{dept_id}
+		      </if>
+		      <if test="yearmonth != null and yearmonth != '' ">
+		      and hr.year_month=#{yearmonth}
+		      </if>
+		       <if test="emp_id != null and emp_id != '' ">
+		      and hr.emp_id = #{emp_id,jdbcType=INTEGER}
+		      </if>
+		    group by hr.group_id, hr.hos_id, hr.emp_id,he.dept_id 
+		  ), 
+		  qx_tmp as (
+		    select hr.group_id, hr.hos_id, hr.emp_id,he.dept_id ,sum(nvl(hr.attend_val,0)) as del_days from  hr_attend_result_d hr
+		    left join hos_emp he on hr.group_id=he.group_id and hr.hos_id=he.hos_id
+		    and hr.emp_id=he.emp_id and hr.dept_id_c=he.dept_id
+		    where hr.attend_code like '04%' or hr.attend_code like '05%'
+		     and hr.group_id = #{group_id,jdbcType=INTEGER}
+		      and hr.hos_id = #{hos_id,jdbcType=INTEGER}
+		      <if test="dept_id != null and dept_id != '' ">
+		      and he.dept_id = #{dept_id}
+		      </if>
+		      <if test="yearmonth != null and yearmonth != '' ">
+		      and hr.year_month=#{yearmonth}
+		      </if>
+		      <if test="emp_id != null and emp_id != '' ">
+		      and hr.emp_id = #{emp_id,jdbcType=INTEGER}
+		      </if>
+		      group by hr.group_id, hr.hos_id, hr.emp_id,he.dept_id 
+		  ), 
+		  yx_tmp as (
+		    select h.group_id, h.hos_id ,count(*) as yx_days from HR_ATTEND_NONWORKDAYS  h
+		    where h.group_id = #{group_id,jdbcType=INTEGER}
+		      and h.hos_id = #{hos_id,jdbcType=INTEGER}
+		      and h.attend_date_state=0
+		      and to_char(h.attend_date,'yyyyMMdd') like #{yearmonth}||'%'
+		      group by h.group_id, h.hos_id 
+		  ),
+		  yyx_tmp as (
+		     select a.group_id, a.hos_id,b.emp_id,b.dept_id_c as dept_id,count(*) as yyx_days from HR_ATTEND_NONWORKDAYS a
+		      left join hr_attend_result_d b on a.group_id=b.group_id
+		    and a.hos_id=b.hos_id and a.attend_date=b.attend_date and a.attend_date_state=0
+		    where  to_char(a.attend_date, 'yyyyMMdd') like #{yearmonth}||'%'
+		     and b.attend_code like '04%' or b.attend_code like '05%'
+		     and a.group_id = #{group_id,jdbcType=INTEGER}
+		      and a.hos_id = #{hos_id,jdbcType=INTEGER}
+		      and a.attend_date_state=0
+		      <if test="dept_id != null and dept_id != '' ">
+		      and b.dept_id_c = #{dept_id,jdbcType=INTEGER}
+		      </if>
+		      <if test="emp_id != null and emp_id != '' ">
+		      and b.emp_id = #{emp_id,jdbcType=INTEGER}
+		      </if>
+		      <if test="yearmonth != null and yearmonth != '' ">
+		      and b.year_month = #{yearmonth}
+		      </if>
+		      group by a.group_id, a.hos_id,b.emp_id,b.dept_id_c
+		  )
+		select aa.dept_id, aa.dept_code, aa.dept_name, aa.emp_id, aa.emp_code
+		  , aa.emp_name
+		  , case 
+		    when nvl(aa.attend_accdays, 0) > nvl(bb.attend_acctop, 0) then nvl(bb.attend_acctop, 0)
+		    else nvl(aa.attend_accdays, 0)
+		  end as attend_accdays,  aa.attend_jxdays
+		  , case 
+		    when nvl(aa.end_xjdays, 0) > nvl(bb.attend_acctop, 0) then nvl(bb.attend_acctop, 0)
+		    else nvl(aa.end_xjdays, 0)
+		  end as end_xjdays
+		  ,  #{yearmonth} as year_month
+		from (
+		  select e.group_id, e.hos_id, d.emp_id, e.dept_id, e.dept_code
+		    , e.dept_code || '
+		    ' || e.dept_name as dept_name, d.emp_code
+		    , d.emp_code || ' ' || d.emp_name as emp_name, a.begin_days as attend_accdays
+		    , nvl(b.add_days, 0) as add_days
+		    , nvl((nvl(b.add_days, 0)-(#{month_day}-nvl(c.del_days, 0))+(nvl(x.yx_days,0)-nvl(yy.yyx_days,0))),0) as attend_jxdays
+		    , nvl(a.begin_days, 0) + nvl(nvl(b.add_days, 0) - (30 - nvl(c.del_days, 0)) + (nvl(x.yx_days, 0) - nvl(yy.yyx_days, 0)), 0)  as end_xjdays
+		  from cs_tmp a
+		  left join cq_tmp b on a.group_id = b.group_id
+		  and a.hos_id = b.hos_id
+		  and a.emp_id = b.emp_id 
+		  left join qx_tmp c on a.group_id = c.group_id
+		  and a.hos_id = c.hos_id
+		  and a.emp_id = c.emp_id 
+		   left join yx_tmp x on a.group_id = x.group_id
+		  and a.hos_id = x.hos_id
+		 left join yyx_tmp yy on a.group_id=yy.group_id
+		  and a.hos_id=yy.hos_id and a.emp_id=yy.emp_id
+		  and a.dept_id=yy.dept_id
+		  left join hos_emp d on a.group_id = d.group_id
+		  and a.hos_id = d.hos_id
+		  and a.emp_id = d.emp_id 
+		   <if test="dept_source == 1">
+		    left join hr_dept e on a.group_id = e.group_id
+		  and a.hos_id = e.hos_id
+		  and a.dept_id = e.dept_id 
+		  </if>
+		  <if test="dept_source == 2">
+		    left join hos_dept e on a.group_id = e.group_id
+		  and a.hos_id = e.hos_id
+		  and a.dept_id = e.dept_id 
+		  </if>
+		) aa
+		left join hr_attend_acctop bb on aa.group_id = bb.group_id
+		and aa.hos_id = bb.hos_id
+		and bb.attend_year = #{year} 
+		  left join HR_ATTEND_RESULT_MANAGE cc on aa.group_id = cc.group_id
+		and aa.hos_id = cc.hos_id
+		and aa.emp_id = cc.emp_id
+		and aa.dept_id = cc.DEPT_ID_B
+		<if test="acc_year_month != null and acc_year_month != ''">
+			and cc.year_month=#{acc_year_month}
+		</if>
+
+		order by aa.emp_id
+	</select>
+
+	<!-- 打印 -->
+	<select id="queryKQByPrint" resultType="java.util.Map" parameterType="java.util.Map">
+				with cs_tmp as (
+		    select he.group_id, he.hos_id, he.dept_id, he.emp_id
+		      , nvl(hr.attend_accdays, 0) as begin_days
+		    from hos_emp he
+		      left join hr_attend_accinit hr on he.emp_id = hr.emp_id
+		    and he.group_id = hr.group_id
+		    and he.hos_id = hr.hos_id 
+		    where he.group_id = #{group_id,jdbcType=INTEGER}
+		      and he.hos_id = #{hos_id,jdbcType=INTEGER}
+		      <if test="dept_id != null and dept_id != '' ">
+		      and he.dept_id = #{dept_id,jdbcType=INTEGER}
+		      </if>
+		      <if test="emp_id != null and emp_id != '' ">
+		      and he.emp_id = #{emp_id,jdbcType=INTEGER}
+		      </if>
+		  ), 
+		  cq_tmp as (
+		   
+		    select hr.group_id, hr.hos_id, hr.emp_id,he.dept_id ,sum(nvl(hr.attend_val,0)) as add_days from  hr_attend_result_d hr
+		    left join hos_emp he on hr.group_id=he.group_id and hr.hos_id=he.hos_id
+		    and hr.emp_id=he.emp_id and hr.dept_id_c=he.dept_id
+		    where hr.attend_code like '01%'
+		     and hr.group_id = #{group_id,jdbcType=INTEGER}
+		      and hr.hos_id = #{hos_id,jdbcType=INTEGER}
+		      <if test="dept_id != null and dept_id != '' ">
+		      and he.dept_id = #{dept_id}
+		      </if>
+		      <if test="yearmonth != null and yearmonth != '' ">
+		      and hr.year_month=#{yearmonth}
+		      </if>
+		       <if test="emp_id != null and emp_id != '' ">
+		      and hr.emp_id = #{emp_id,jdbcType=INTEGER}
+		      </if>
+		    group by hr.group_id, hr.hos_id, hr.emp_id,he.dept_id 
+		  ), 
+		  qx_tmp as (
+		    select hr.group_id, hr.hos_id, hr.emp_id,he.dept_id ,sum(nvl(hr.attend_val,0)) as del_days from  hr_attend_result_d hr
+		    left join hos_emp he on hr.group_id=he.group_id and hr.hos_id=he.hos_id
+		    and hr.emp_id=he.emp_id and hr.dept_id_c=he.dept_id
+		    where hr.attend_code like '04%' or hr.attend_code like '05%'
+		     and hr.group_id = #{group_id,jdbcType=INTEGER}
+		      and hr.hos_id = #{hos_id,jdbcType=INTEGER}
+		      <if test="dept_id != null and dept_id != '' ">
+		      and he.dept_id = #{dept_id}
+		      </if>
+		      <if test="yearmonth != null and yearmonth != '' ">
+		      and hr.year_month=#{yearmonth}
+		      </if>
+		      <if test="emp_id != null and emp_id != '' ">
+		      and hr.emp_id = #{emp_id,jdbcType=INTEGER}
+		      </if>
+		      group by hr.group_id, hr.hos_id, hr.emp_id,he.dept_id 
+		  ), 
+		  yx_tmp as (
+		    select h.group_id, h.hos_id ,count(*) as yx_days from HR_ATTEND_NONWORKDAYS  h
+		    where h.group_id = #{group_id,jdbcType=INTEGER}
+		      and h.hos_id = #{hos_id,jdbcType=INTEGER}
+		      and h.attend_date_state=0
+		      and to_char(h.attend_date,'yyyyMMdd') like #{yearmonth}||'%'
+		      group by h.group_id, h.hos_id 
+		  ),
+		  yyx_tmp as (
+		     select a.group_id, a.hos_id,b.emp_id,b.dept_id_c as dept_id,count(*) as yyx_days from HR_ATTEND_NONWORKDAYS a
+		      left join hr_attend_result_d b on a.group_id=b.group_id
+		    and a.hos_id=b.hos_id and a.attend_date=b.attend_date and a.attend_date_state=0
+		    where  to_char(a.attend_date, 'yyyyMMdd') like #{yearmonth}||'%'
+		     and b.attend_code like '04%' or b.attend_code like '05%'
+		     and a.group_id = #{group_id,jdbcType=INTEGER}
+		      and a.hos_id = #{hos_id,jdbcType=INTEGER}
+		      and a.attend_date_state=0
+		      <if test="dept_id != null and dept_id != '' ">
+		      and b.dept_id_c = #{dept_id,jdbcType=INTEGER}
+		      </if>
+		      <if test="emp_id != null and emp_id != '' ">
+		      and b.emp_id = #{emp_id,jdbcType=INTEGER}
+		      </if>
+		      <if test="yearmonth != null and yearmonth != '' ">
+		      and b.year_month = #{yearmonth}
+		      </if>
+		      group by a.group_id, a.hos_id,b.emp_id,b.dept_id_c
+		  )
+		select aa.dept_id, aa.dept_code, aa.dept_name, aa.emp_id, aa.emp_code
+		  , aa.emp_name
+		  , case 
+		    when nvl(aa.attend_accdays, 0) > nvl(bb.attend_acctop, 0) then nvl(bb.attend_acctop, 0)
+		    else nvl(aa.attend_accdays, 0)
+		  end as attend_accdays,  aa.attend_jxdays
+		  , case 
+		    when nvl(aa.end_xjdays, 0) > nvl(bb.attend_acctop, 0) then nvl(bb.attend_acctop, 0)
+		    else nvl(aa.end_xjdays, 0)
+		  end as end_xjdays
+		  ,  #{yearmonth} as year_month
+		from (
+		  select e.group_id, e.hos_id, d.emp_id, e.dept_id, e.dept_code
+		    , e.dept_code || '
+		    ' || e.dept_name as dept_name, d.emp_code
+		    , d.emp_code || ' ' || d.emp_name as emp_name, a.begin_days as attend_accdays
+		    , nvl(b.add_days, 0) as add_days
+		    , nvl((nvl(b.add_days, 0)-(#{month_day}-nvl(c.del_days, 0))+(nvl(x.yx_days,0)-nvl(yy.yyx_days,0))),0) as attend_jxdays
+		    , nvl(a.begin_days, 0) + nvl(nvl(b.add_days, 0) - (30 - nvl(c.del_days, 0)) + (nvl(x.yx_days, 0) - nvl(yy.yyx_days, 0)), 0)  as end_xjdays
+		  from cs_tmp a
+		  left join cq_tmp b on a.group_id = b.group_id
+		  and a.hos_id = b.hos_id
+		  and a.emp_id = b.emp_id 
+		  left join qx_tmp c on a.group_id = c.group_id
+		  and a.hos_id = c.hos_id
+		  and a.emp_id = c.emp_id 
+		   left join yx_tmp x on a.group_id = x.group_id
+		  and a.hos_id = x.hos_id
+		 left join yyx_tmp yy on a.group_id=yy.group_id
+		  and a.hos_id=yy.hos_id and a.emp_id=yy.emp_id
+		  and a.dept_id=yy.dept_id
+		  left join hos_emp d on a.group_id = d.group_id
+		  and a.hos_id = d.hos_id
+		  and a.emp_id = d.emp_id 
+		   <if test="dept_source == 1">
+		    left join hr_dept e on a.group_id = e.group_id
+		  and a.hos_id = e.hos_id
+		  and a.dept_id = e.dept_id 
+		  </if>
+		  <if test="dept_source == 2">
+		    left join hos_dept e on a.group_id = e.group_id
+		  and a.hos_id = e.hos_id
+		  and a.dept_id = e.dept_id 
+		  </if>
+		) aa
+		left join hr_attend_acctop bb on aa.group_id = bb.group_id
+		and aa.hos_id = bb.hos_id
+		and bb.attend_year = #{year} 
+		  left join HR_ATTEND_RESULT_MANAGE cc on aa.group_id = cc.group_id
+		and aa.hos_id = cc.hos_id
+		and aa.emp_id = cc.emp_id
+		and aa.dept_id = cc.DEPT_ID_B
+		<if test="acc_year_month != null and acc_year_month != ''">
+			and cc.year_month=#{acc_year_month}
+		</if>
+
+		order by aa.emp_id
+	</select>
+
+	<!-- 批量插入 -->
+	<insert id="addBatch" parameterType="java.util.List">
+		<foreach collection="list" item="item" index="index" open="begin"
+			close=";end;" separator=";">
+			insert into hr_attdent_accstat(
+			group_id,hos_id,emp_id,attend_accyear,attend_accmonth,
+			attend_accmonthbeg,attend_accmonthend
+			) VALUES (
+			#{item.group_id,jdbcType=INTEGER},
+			#{item.hos_id,jdbcType=INTEGER},
+			#{item.emp_id,jdbcType=INTEGER},
+			#{item.attend_accyear,jdbcType=VARCHAR},
+			#{item.attend_accmonth,jdbcType=VARCHAR},
+			#{item.attend_accmonthbeg,jdbcType=INTEGER},
+			#{item.attend_accmonthend,jdbcType=INTEGER}
+
+			)
+		</foreach>
+	</insert>
+
+	<!-- 批量更新 -->
+	<update id="updateBatch" parameterType="java.util.List">
+		<foreach collection="list" item="item" index="index" open="begin"
+			separator=";" close=";end;">
+			update hr_attdent_accstat set
+			attend_accmonthbeg =
+			#{item.attend_accmonthbeg,jdbcType=INTEGER},
+			attend_accmonthend =
+			#{item.attend_accmonthend,jdbcType=INTEGER}
+			<where>
+				and group_id = #{item.group_id,jdbcType=INTEGER}
+				and hos_id =
+				#{item.hos_id,jdbcType=INTEGER}
+				and attend_accyear =
+				#{item.attend_accyear,jdbcType=VARCHAR}
+				and attend_accmonth =
+				#{item.attend_accmonth,jdbcType=VARCHAR}
+				and emp_id =
+				#{item.emp_id,jdbcType=INTEGER}
+			</where>
+		</foreach>
+	</update>
+
+	<resultMap id="hrOvertimeMap" type="java.util.Map">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="attend_overtime_code" column="attend_overtime_code" />
+		<result property="emp_id" column="emp_id" />
+		<result property="emp_name" column="emp_name" />
+		<result property="dept_id" column="dept_id" />
+		<result property="dept_name" column="dept_name" />
+		<result property="photo" column="photo" />
+		<result property="attend_overtime_kind" column="attend_overtime_kind" />
+		<result property="kind_name" column="kind_name" />
+		<result property="attend_overtime_begdate" column="attend_overtime_begdate" />
+		<result property="dept_name" column="dept_name" />
+		<result property="attend_overtime_enddate" column="attend_overtime_enddate" />
+		<result property="attend_overtime_hour" column="attend_overtime_hour" />
+		<result property="attend_overtime_loginer" column="attend_overtime_loginer" />
+		<result property="loginer_name" column="loginer_name" />
+		<result property="attend_overtime_reg_operdate" column="attend_overtime_reg_operdate" />
+		<result property="attend_accchadays" column="attend_accchadays" />
+		<result property="attend_overtime_reviewdate" column="attend_overtime_reviewdate" />
+		<result property="attend_overtime_reviewer" column="attend_overtime_reviewer" />
+		<result property="reviewer_name" column="reviewer_name" />
+		<result property="attend_begdate" column="attend_begdate" />
+		<result property="file_type" column="file_type" />
+	</resultMap>
+
+	<select id="overtimeQuery" resultMap="hrOvertimeMap"
+		parameterType="java.util.Map">
+		select hao.OVERTIME_CODE, '增加' as file_type, hd.dept_name,
+		he.emp_name, hao.emp_id
+		, hai.attend_name as kind_name,
+		to_char(hao.overtime_date, 'mm') as
+		attend_overtime_begdate
+		,
+		to_char(hao.overtime_date, 'yyyy-mm-dd') as attend_begdate, hao.DAYS
+		attend_accchadays
+		, sy.user_name as loginer_name, hao.OPER_DATE,
+		sy1.user_name as
+		reviewer_name, hao.CHECK_DATE, hao.STATE
+		, case
+		when
+		hao.STATE = '0' then '新建'
+		when hao.STATE = '1' then '已提交'
+		when hao.STATE
+		= '2' then '审核通过'
+		else null
+		end as state_name
+		from HR_ATTEND_OVERTIME hao
+		left join hos_emp he on hao.emp_id = he.emp_id
+		and hao.group_id =
+		he.group_id
+		and hao.hos_id = he.hos_id
+		 <if test="dept_source == 1">
+		left join hr_dept_dict hd on
+		he.dept_id = hd.dept_id
+		and he.group_id = hd.grouhd.hos_id
+		</if>
+		<if test="dept_source == 2">
+		left join hos_dept_dict hd on
+		he.dept_id = hd.dept_id
+		and he.group_id = hd.grouhd.hos_id
+		</if>
+		left join HR_ATTEND_ITEM hai on hao.ATTEND_CODE =
+		hai.attend_code
+		and hao.group_id = hai.group_id
+		and hao.hos_id =
+		hai.hos_id
+
+		left join sys_user sy on hao.OPER = sy.user_id
+		and
+		hao.group_id = sy.group_id
+		and hao.hos_id = sy.hos_id
+
+		left join sys_user
+		sy1 on hao.CHECKER = sy1.user_id
+		and hao.group_id = sy1.group_id
+		and
+		hao.hos_id = sy1.hos_id
+		<where>
+			AND hao.group_id = #{group_id,jdbcType=INTEGER}
+			AND hao.hos_id =
+			#{hos_id,jdbcType=INTEGER}
+			and hao.state=2
+			<if test="attend_overtime_code != null and attend_overtime_code != ''">
+				AND hao.attend_overtime_code like
+				'%${attend_overtime_code}%'
+			</if>
+			<if test="emp_id != null and emp_id != ''">
+				AND hao.emp_id = #{emp_id,jdbcType=INTEGER}
+			</if>
+			<if test="dept_id != null and dept_id != ''">
+				AND hd.dept_id = #{dept_id,jdbcType=INTEGER}
+			</if>
+			<if test="attend_overtime_kind != null and attend_overtime_kind != ''">
+				AND hao.attend_overtime_kind =
+				#{attend_overtime_kind,jdbcType=INTEGER}
+			</if>
+			<if test="attend_overtime_state != null and attend_overtime_state != ''">
+				AND hao.state = #{attend_overtime_state,jdbcType=INTEGER}
+			</if>
+			<if
+				test="attend_overtime_begdate != null and attend_overtime_begdate != ''">
+				AND to_char(hao.BEGIN_DATE,'yyyy-mm-dd') &gt;=
+				#{attend_overtime_begdate}
+			</if>
+			<if
+				test="attend_overtime_enddate != null and attend_overtime_enddate != ''">
+				AND to_char(hao.END_DATE,'yyyy-mm-dd') &lt;=
+				#{attend_overtime_enddate}
+			</if>
+			<if
+				test="attend_overtime_reg_operdate1 != null and attend_overtime_reg_operdate1 != ''">
+				AND hao.OPER_DATE &gt;= #{attend_overtime_reg_operdate1}
+			</if>
+			<if
+				test="attend_overtime_reg_operdate2 != null and attend_overtime_reg_operdate2 != ''">
+				AND hao.CREATE_DATE &gt;= #{attend_overtime_reg_operdate2}
+			</if>
+		</where>
+		order by hao.OVERTIME_CODE asc
+	</select>
+
+	<resultMap id="hrApplyingLeavesMap" type="java.util.Map">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="attend_xjapply_code" column="attend_xjapply_code" />
+		<result property="file_type" column="file_type" />
+		<result property="attend_month" column="attend_month" />
+		<result property="attend_xjreg_date" column="attend_xjreg_date" />
+		<result property="emp_id" column="emp_id" />
+		<result property="emp_name" column="emp_name" />
+		<result property="dept_name" column="dept_name" />
+		<result property="attend_xjyear" column="attend_xjyear" />
+		<result property="attend_xjbegdate" column="attend_xjbegdate" />
+		<result property="attend_xjenddate" column="attend_xjenddate" />
+		<result property="attend_xjdays" column="attend_xjdays" />
+		<result property="attend_xxjdays" column="attend_xxjdays" />
+		<result property="attend_xjstate" column="attend_xjstate" />
+		<result property="attend_xjstate_name" column="attend_xjstate_name" />
+		<result property="attend_xjloginer" column="attend_xjloginer" />
+		<result property="attend_xjloginer_name" column="attend_xjloginer_name" />
+		<result property="attend_xjreg_operdate" column="attend_xjreg_operdate" />
+		<result property="attend_xjreviewer" column="attend_xjreviewer" />
+		<result property="attend_xjreviewer_name" column="attend_xjreviewer_name" />
+		<result property="attend_xjreg_reviewdate" column="attend_xjreg_reviewdate" />
+		<result property="attend_xj_reason" column="attend_xj_reason" />
+		<result property="attend_xjcheck_state" column="attend_xjcheck_state" />
+		<result property="attend_xjcheck_state_name" column="attend_xjcheck_state_name" />
+		<result property="attend_xjchecker" column="attend_xjchecker" />
+		<result property="attend_xjchecker_name" column="attend_xjchecker_name" />
+		<result property="attend_xjcheckdate" column="attend_xjcheckdate" />
+		<result property="attend_xj_add" column="attend_xj_add" />
+		<result property="attend_xj_add_name" column="attend_xj_add_name" />
+	</resultMap>
+
+	<select id="applyingLeavesQuery" resultMap="hrApplyingLeavesMap"
+		parameterType="java.util.Map">
+
+		select hx.ATTEND_XJREG_DATE, he.emp_name, hd.dept_name, '减少' as
+		file_type
+		, to_char(hx.ATTEND_XJBEGDATE, 'mm') as ATTEND_month,
+		hx.attend_xjenddate
+		,hx.attend_xjdays,  case 
+			when nvl(HXX.ATTEND_XXJDAYS, 0) = 0 then hx.ATTEND_XJDAYS
+			else HXX.ATTEND_XXJDAYS
+		end as ATTEND_XXJDAYS,
+		hx.attend_xjstate, hx.ATTEND_XJLOGINER,
+		he1.user_name as
+		attend_xjloginer_name, hx.Attend_Xjreg_Operdate
+		, hx.ATTEND_XJSTATE,
+		hx.CHECKER, hx.CHECK_DATE as Attend_Xjcheckdate,
+		hx.attend_xj_add
+		, case
+		when hx.attend_xj_add = 0 then '是'
+		when hx.attend_xj_add = 1 then '否'
+		else ' '
+		end as attend_xj_add_name
+		from HR_ATTEND_XJAPPLY hx
+		left join
+		hr_attend_xxjapply hxx on
+		hx.attend_xjapply_code=hxx.attend_xjapply_code
+		and
+		hx.group_id=hxx.group_id and hx.hos_id=hxx.hos_id
+		left join hos_emp he
+		on he.emp_id = hx.emp_id
+		and he.group_id = hx.group_id
+		and he.hos_id =
+		hx.hos_id
+		<if test="dept_source == 1">
+		left join hr_dept hd on he.dept_id = hd.dept_id
+		and
+		he.group_id = hd.group_id
+		and he.hos_id = hd.hos_id
+		</if>
+		<if test="dept_source == 2">
+		left join hos_dept hd on he.dept_id = hd.dept_id
+		and
+		he.group_id = hd.group_id
+		and he.hos_id = hd.hos_id
+		</if>
+		left join sys_user
+		he1 on he1.user_id = hx.ATTEND_XJLOGINER
+		and he1.group_id = hx.group_id
+		and he1.hos_id = hx.hos_id
+
+		left join HR_ATTEND_ITEM ha on
+		ha.attend_code = hx.attend_code
+		and ha.group_id = hx.group_id
+		and
+		ha.hos_id = hx.hos_id
+		<where>
+			hx.attend_xjstate = 3
+			  and ha.is_jx='1'
+			<if test="group_id != null and group_id != ''">
+				AND hx.group_id = #{group_id,jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND hx.hos_id = #{hos_id,jdbcType=INTEGER}
+			</if>
+			<if test="attend_xjapply_code != null and attend_xjapply_code != ''">
+				AND hx.attend_xjapply_code like
+				'%${attend_xjapply_code}%'
+			</if>
+			<if test="emp_id != null and emp_id != ''">
+				AND hx.emp_id = #{emp_id,jdbcType=INTEGER}
+			</if>
+			<if test="dept_id != null and dept_id != ''">
+				AND he.dept_id = #{dept_id,jdbcType=INTEGER}
+			</if>
+			<if test="attend_code != null and attend_code != ''">
+				AND hx.attend_code = #{attend_code,jdbcType=INTEGER}
+			</if>
+			<if test="attend_xjstate != null and attend_xjstate != ''">
+				AND hx.attend_xjstate =
+				#{attend_xjstate,jdbcType=INTEGER}
+			</if>
+			<if test="attend_xjreg_date != null and attend_xjreg_date != ''">
+				AND hx.attend_xjreg_date =to_date(#{attend_xjreg_date},'YYYY/MM/DD')<!-- 
+					#{attend_xjreg_date,jdbcType=DATE} -->
+			</if>
+			<if test="note != null and note != ''">
+				AND hx.note = #{note,jdbcType=VARCHAR}
+			</if>
+		</where>
+		order by hx.attend_xjapply_code asc
+	</select>
+</mapper>

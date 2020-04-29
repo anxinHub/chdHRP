@@ -1,0 +1,342 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.cost.dao.CostHrpDeptRefExecMapper">
+
+	<resultMap id="deptExecRefMap" type="java.util.Map">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="ref_id" column="ref_id" />
+		<result property="cost_custom_dept_id" column="cost_custom_dept_id" />
+		<result property="cost_custom_dept_code" column="cost_custom_dept_code" />
+		<result property="cost_custom_dept_name" column="cost_custom_dept_name" />
+		<result property="dept_id" column="dept_id" />
+		<result property="dept_code" column="dept_code" />
+		<result property="dept_name" column="dept_name" />
+		<result property="is_stop" column="is_stop" />
+		
+		<result property="id" column="id" />
+		<result property="text" column="text" />
+	</resultMap>
+	<insert id="add" useGeneratedKeys="true">
+
+		INSERT INTO COST_HRP_DEPT_REF_EXEC (
+		group_id
+		,
+		hos_id
+		,
+		ref_id
+		,
+		cost_custom_dept_id
+		,
+		dept_id
+		,
+		start_date
+		,
+		end_date
+		,
+		is_stop
+
+		) VALUES (
+		#{group_id,jdbcType=INTEGER} ,
+		#{hos_id,jdbcType=INTEGER} ,
+		COST_HRP_DEPT_REF_EXEC_SEQ.NEXTVAL ,
+		#{cost_custom_dept_id,jdbcType=INTEGER} ,
+		#{dept_id,jdbcType=INTEGER} ,
+		to_date(#{start_date},'yyyy-mm-dd'),
+		<if test="end_date != null and end_date != ''">
+		to_date(#{end_date},'yyyy-mm-dd'),
+		</if>
+		<if test="end_date == null or end_date == ''">
+		null ,
+		</if>
+		#{is_stop,jdbcType=INTEGER} 
+		)
+
+	</insert>
+	<insert id="addBatch" parameterType="java.util.List">
+
+		INSERT INTO COST_HRP_DEPT_REF_EXEC (
+		ref_id 
+		,
+		group_id
+		,
+		hos_id
+		,
+		cost_custom_dept_id
+		,
+		dept_id
+		,
+		start_date
+		,
+		end_date
+		,
+		is_stop
+
+		) select COST_HRP_DEPT_REF_EXEC_SEQ.NEXTVAL ,  t.*
+		from(
+		<foreach collection="list" item="item" index="index"
+			separator=" union all ">
+			select
+			#{item.group_id} ,
+			#{item.hos_id} ,
+			#{item.cost_custom_dept_id} ,
+			#{item.dept_id} ,
+			to_date(#{item.start_date},'yyyy-mm-dd') ,
+			<if test="item.end_date != null and item.end_date != ''">
+			to_date(#{item.end_date},'yyyy-mm-dd'),
+			</if>
+			<if test="item.end_date == null or item.end_date == ''">
+			null ,
+			</if>
+			#{item.is_stop}
+			from dual
+		</foreach>
+		) t
+	</insert>
+
+	<update id="update" parameterType="java.util.Map">
+
+		UPDATE COST_HRP_DEPT_REF_EXEC
+		<trim prefix="SET" suffixOverrides=",">
+			<if test="cost_custom_dept_id != null and cost_custom_dept_id != ''">
+				cost_custom_dept_id = #{cost_custom_dept_id,jdbcType=INTEGER}
+				,
+			</if>
+			<if test="dept_id != null and dept_id != ''">
+				dept_id = #{dept_id,jdbcType=INTEGER}
+				,
+			</if>
+			<if test="start_date != null and start_date != ''">
+				start_date = #{start_date,jdbcType=DATE}
+				,
+			</if>
+			<if test="end_date != null and end_date != ''">
+				end_date = #{end_date,jdbcType=DATE}
+				,
+			</if>
+			<if test="is_stop != null and is_stop != ''">
+				is_stop = #{is_stop,jdbcType=INTEGER}
+				,
+			</if>
+		</trim>
+		WHERE
+		group_id = #{group_id,jdbcType=INTEGER}
+		and hos_id = #{hos_id,jdbcType=INTEGER}
+		and ref_id = #{ref_id,jdbcType=INTEGER}
+	</update>
+
+
+	<update id="updateBatch" parameterType="java.util.List">
+
+		<foreach collection="list" item="item" index="index" open="begin"
+			close=";end;" separator=";">
+			UPDATE COST_HRP_DEPT_REF_EXEC SET
+			cost_custom_dept_id = #{item.cost_custom_dept_id}
+			,
+			dept_id = #{item.dept_id}
+			,
+			start_date = #{item.start_date}
+			,
+			end_date = #{item.end_date}
+			,
+			is_stop = #{item.is_stop}
+
+			WHERE
+			group_id = 	#{item.group_id}
+			and hos_id = #{item.hos_id}
+			and ref_id = #{item.ref_id}
+
+		</foreach>
+	</update>
+
+	<delete id="delete" parameterType="java.util.Map">
+
+		DELETE FROM COST_HRP_DEPT_REF_EXEC WHERE
+		group_id = #{group_id} and
+		hos_id = #{hos_id} and
+		ref_id = #{ref_id}
+	</delete>
+	<delete id="deleteBatch" parameterType="java.util.List">
+		DELETE FROM COST_HRP_DEPT_REF_EXEC WHERE
+		<foreach collection="list" index="index" item="item" open="("
+			separator="or" close=")">
+			group_id = #{item.group_id}
+			and hos_id =#{item.hos_id}
+			and ref_id = #{item.ref_id}
+		</foreach>
+
+ 
+	</delete>
+
+	<select id="queryByCode" resultMap="deptExecRefMap" parameterType="java.util.Map">
+
+		SELECT
+		a.group_id,
+		a.hos_id,
+		a.ref_id ,
+		a.cost_custom_dept_id,
+		b.dept_code cost_custom_dept_code,
+		b.dept_name cost_custom_dept_name,
+		a.dept_id,
+		c.dept_code ,
+		c.dept_name ,
+		a.is_stop,
+		a.start_date,
+		a.end_date
+		FROM COST_HRP_DEPT_REF_EXEC a
+		left join COST_CUSTOM_DEPT b 
+			on
+				a.group_id = b.group_id 
+				and a.hos_id = b.hos_id 
+				and	a.cost_custom_dept_id = b.cost_custom_dept_id
+		left join HOS_DEPT_DICT c 
+			on
+				a.group_id = c.group_id 
+				and a.hos_id = c.hos_id 
+				and a.dept_id = c.dept_id
+				and c.is_stop = 0
+		WHERE
+				a.group_id = #{group_id}
+				AND a.hos_id = #{hos_id}
+				AND a.ref_id = #{ref_id}
+	</select>
+	<select id="query" parameterType="java.util.Map" resultMap="deptExecRefMap">
+		SELECT
+		a.group_id,
+		a.hos_id,
+		a.ref_id ,
+		a.cost_custom_dept_id,
+		b.dept_code cost_custom_dept_code,
+		b.dept_name cost_custom_dept_name,
+		a.dept_id,
+		c.dept_code ,
+		c.dept_name ,
+		a.is_stop,
+		a.start_date,
+		a.end_date
+		FROM COST_HRP_DEPT_REF_EXEC a
+		left join COST_CUSTOM_DEPT b 
+			on
+				a.group_id = b.group_id 
+				and a.hos_id = b.hos_id 
+				and	a.cost_custom_dept_id = b.dept_id
+		left join HOS_DEPT_DICT c 
+			on
+				a.group_id = c.group_id 
+				and a.hos_id = c.hos_id 
+				and a.dept_id = c.dept_id
+				and c.is_stop = 0
+		<where>
+			<if test="group_id != null and group_id != ''">
+				AND a.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND a.hos_id = #{hos_id}
+			</if>
+			<if test="cost_custom_dept_code != null and cost_custom_dept_code != ''">
+				AND ( b.dept_code like '${cost_custom_dept_code}%' or
+					b.dept_name like '%${cost_custom_dept_code}%' or
+					b.spell_code like upper('%${cost_custom_dept_code}%') or
+					b.wbx_code like upper('%${cost_custom_dept_code}%')
+				)
+			</if>
+			<if test="dept_code != null and dept_code != ''">
+				AND ( c.dept_code like '${dept_code}%' or
+					c.dept_name like '%${dept_code}%' or
+					c.spell_code like upper('%${dept_code}%') or
+					c.wbx_code like upper('%${dept_code}%')
+				)
+			</if>
+				AND a.is_stop = 0
+			
+		</where>
+		order by b.dept_code asc
+	</select>
+
+	<select id="queryHrpDeptDate" resultMap="deptExecRefMap" parameterType="java.util.Map">
+
+		SELECT	dept_id , dept_code , dept_name
+		FROM hos_dept_dict
+		where 
+			group_id = #{group_id}
+			AND hos_id = #{hos_id}
+			and is_stop = 0
+			and is_last = 1
+	</select>
+	
+	<select id="queryCostDeptDate" resultMap="deptExecRefMap" parameterType="java.util.Map">
+
+		SELECT	dept_id  , dept_code , dept_name 
+		FROM cost_custom_dept
+		where 
+			group_id = #{group_id}
+			AND hos_id = #{hos_id}
+			and is_stop = 0
+	</select>
+	
+	<select id="queryExist" resultType="java.lang.Integer" parameterType="java.util.Map">
+
+		SELECT count(0)
+		FROM COST_HRP_DEPT_REF_EXEC 
+		WHERE
+				group_id = #{group_id}
+				AND hos_id = #{hos_id}
+				AND dept_id = #{dept_id}
+				and is_stop = 0 
+	</select>
+	
+	
+	<select id="queryHrpDept" resultMap="deptExecRefMap" parameterType="java.util.Map">
+
+		SELECT dept_id id , dept_code ||' ' || dept_name  text
+		FROM hos_dept_dict 
+		WHERE
+				group_id = #{group_id}
+				AND hos_id = #{hos_id}
+				AND is_stop = 0
+				and is_last = 1
+			<if test="key != null and key != ''">
+				AND ( dept_code like '${key}%' or
+					dept_name like '%${key}%' or
+					spell_code like upper('%${key}%') or
+					wbx_code like upper('%${key}%')
+				)
+			</if>
+	</select>
+	
+	<select id="queryCostCustomDept" resultMap="deptExecRefMap" parameterType="java.util.Map">
+
+		SELECT dept_id id , dept_code ||' ' || dept_name  text
+		FROM cost_custom_dept 
+		WHERE
+				group_id = #{group_id}
+				AND hos_id = #{hos_id}
+				AND is_stop = 0
+				<if test="key != null and key != ''">
+				AND ( dept_code like '${key}%' or
+					dept_name like '%${key}%' or
+					spell_code like upper('%${key}%') or
+					wbx_code like upper('%${key}%')
+				)
+			</if>
+	</select>
+	
+	<!-- 停用 -->
+	<update id="endCostHrpDeptExecRef" parameterType="java.util.List">
+
+		<foreach collection="list" item="item" index="index" open="begin"
+			close=";end;" separator=";">
+			UPDATE COST_HRP_DEPT_REF_EXEC SET
+			end_date = to_date(#{item.end_date},'yyyy-mm-dd')
+			,
+			is_stop = #{item.is_stop}
+
+			WHERE
+			group_id = 	#{item.group_id}
+			and hos_id = #{item.hos_id}
+			and ref_id = #{item.ref_id}
+
+		</foreach>
+	</update>
+</mapper>
+

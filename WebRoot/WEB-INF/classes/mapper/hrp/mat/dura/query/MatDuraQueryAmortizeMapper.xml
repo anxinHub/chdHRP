@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.mat.dao.dura.query.MatDuraQueryAmortizeMapper">
+	<select id="queryMatDuraQueryAmortize" parameterType="java.util.Map"  resultType="java.util.Map">
+		SELECT hdd.dept_code, hdd.dept_name, mid.inv_code, mid.inv_name, mid.inv_model, hu.unit_name, 
+			<!-- mddb.bar_code,  -->mdss.price, mdss.begin_amount, mdss.begin_money, mdss.in_amount, mdss.in_money, 
+			mdss.out_amount, mdss.out_money, mdss.end_amount, mdss.end_money
+		FROM mat_dura_dept_surplus mdss
+		<!-- LEFT JOIN mat_dura_dept_bar mddb 
+			ON mdss.group_id = mddb.group_id 
+			AND mdss.hos_id = mddb.hos_id 
+			AND mdss.copy_code = mddb.copy_code 
+			AND mdss.dept_id = mddb.dept_id 
+			AND mdss.inv_id = mddb.inv_id  
+			AND mdss.price = mddb.price  -->
+		LEFT JOIN hos_dept_dict hdd
+			ON mdss.group_id = hdd.group_id 
+			AND mdss.hos_id = hdd.hos_id 
+			AND mdss.dept_id = hdd.dept_id 
+			AND hdd.is_stop = 0 
+		LEFT JOIN mat_inv_dict mid 
+			ON mdss.group_id = mid.group_id 
+			AND mdss.hos_id = mid.hos_id 
+			AND mdss.copy_code = mid.copy_code 
+			AND mdss.inv_id = mid.inv_id 
+			AND mid.is_stop = 0
+		LEFT JOIN hos_unit hu 
+			ON mid.group_id = hu.group_id 
+			AND mid.hos_id = hu.hos_id 
+			AND mid.unit_code = hu.unit_code 
+		LEFT JOIN hos_fac_dict hfd 
+			ON mid.group_id = hfd.group_id 
+			AND mid.hos_id = hfd.hos_id 
+			AND mid.fac_id = hfd.fac_id 
+			AND mid.fac_no = hfd.fac_no 
+		where mdss.group_id = #{group_id,jdbcType=INTEGER} 
+			AND mdss.hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND mdss.copy_code = #{copy_code,jdbcType=VARCHAR} 
+			AND mdss.year = #{year,jdbcType=VARCHAR} 
+			AND mdss.month = #{month,jdbcType=VARCHAR} 
+			<if test="dept_id != null and dept_id != ''">
+				AND mdss.dept_id = #{dept_id,jdbcType=INTEGER} 
+			</if>
+			<if test="dept_id == null or dept_id == ''">
+				AND exists( 
+					SELECT 1 from v_user_data_perm 
+					WHERE group_id = #{group_id,jdbcType=INTEGER} 
+						AND hos_id = #{hos_id,jdbcType=INTEGER} 
+						AND table_code = 'HOS_DEPT_DICT' 
+						AND user_id = #{user_id,jdbcType=INTEGER} 
+						AND is_read = 1 and is_write = 1 
+						AND perm_code = mdss.dept_id 
+				)
+			</if>
+			<if test="inv_code != null and inv_code != ''">
+				AND (
+					mid.inv_code like '%' || #{inv_code,jdbcType=VARCHAR} || '%'
+					OR
+					mid.inv_name like '%' || #{inv_code,jdbcType=VARCHAR} || '%'
+					OR
+					mid.spell_code like '%' || #{inv_code,jdbcType=VARCHAR} || '%'
+					OR
+					mid.wbx_code like '%' || #{inv_code,jdbcType=VARCHAR} || '%'
+					OR
+					mid.inv_model like '%' || #{inv_code,jdbcType=VARCHAR} || '%'
+					OR
+					mid.alias like '%' || #{inv_code,jdbcType=VARCHAR} || '%'
+					OR
+					mid.alias_spell like '%' || #{inv_code,jdbcType=VARCHAR} || '%'
+				)
+			</if>
+	</select>
+</mapper>
+

@@ -1,0 +1,1372 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.ass.dao.repair.repairrecord.AssRepairRecordMapper">
+	<resultMap type="java.util.Map" id="hrSelectMap">
+		<result property="id" column="id" />
+		<result property="text" column="text" />
+		<result property="name" column="name" />
+		<result property="label" column="label" />
+		<result property="type" column="type" />
+		<result property="is_write" column="is_write" />
+		<result property="spell_code" column="spell_code" /> 
+		<result property="wbx_code" column="wbx_code" />
+	</resultMap>
+	
+	<!-- <select id="queryAssRepairCenter" parameterType="java.util.Map" resultType="java.util.Map"> 
+	
+		select ar.group_id,
+			    ar.hos_id,
+			    ar.copy_code,
+			    ar.rep_code,
+			    ar.fau_code,
+			    aft.fau_name,
+			    ar.loc_code,
+			    al.loc_name,
+			    case ar.eme_status
+			    when 1 then
+			    '非常紧急'
+			    when 2 then
+			    '紧急'
+			    when 3 then
+			    '一般'
+			    end as eme_status,
+			    ar.rep_user,
+			    su.user_name,
+			    ar.rep_dept,
+			    hd.dept_name,
+			    ar.phone,
+			    ar.fau_note,
+			    to_char(ar.app_time,'yyyy-mm-dd hh24:mi:ss') as app_time,
+			    case  ar.rep_bz  when 1 then '内部维修' when 2 then '外部维修' end as rep_bz,
+			    case ar.is_base
+			    when 1 then
+			    '是'
+			    when 0 then
+			    '否'
+			    end as is_base,
+			    case ar.is_card
+			    when 1 then
+			    '是'
+			    when 0 then
+			    '否'
+			    end as is_card,
+			    ar.rep_comp,
+			    ar.rep_comp_user,
+			    ar.ass_card_no,
+			    ar.ass_name,
+			    ar.rep_note,
+			    to_char(ar.order_time,'yyyy-mm-dd hh24:mi:ss') as order_time,
+			    to_char(ar.comp_time,'yyyy-mm-dd hh24:mi:ss') as comp_time,
+			    ar.rep_hours,
+			    case ar.is_urg
+			    when 0 then
+			    '否'
+			    when 1 then
+			    '是'
+			    end as is_urg,
+			    ar.urg_note,
+			    (select bsd.value_name from 
+			         (select rep_code, task_id, state from ass_repair_task
+			          order by task_time desc
+			          ) tmp 
+			           left join budg_sys_dict bsd
+			          on tmp.state = bsd.value_code
+			         and bsd.F_CODE = 'ASS_REPAIR_STATE'
+			         where tmp.rep_code = ar.rep_code
+			            and rownum = 1 
+			       ) as state,
+			    ar.voice,
+			    case ar.flag
+			    when 1 then
+			    'PC端'
+			    when 2 then
+			    '移动端'
+			    end flag,
+			    du.user_name task_name
+			    from ass_repair ar
+			    left join sys_user su
+			    on ar.group_id = su.group_id
+			    and ar.hos_id = su.hos_id
+			    and ar.copy_code = su.copy_code
+			    and ar.rep_user = su.user_id
+			    left join hos_dept hd
+			    on ar.group_id = hd.group_id
+			    and ar.hos_id = hd.hos_id
+			    and ar.rep_dept = hd.dept_id
+			    and hd.is_stop = 0
+			    left join ass_location al
+			    on ar.group_id = al.group_id
+			    and ar.hos_id = al.hos_id
+			    and ar.copy_code = al.copy_code
+			    and ar.loc_code = al.loc_code
+			    and al.is_stop = 0
+			    left join ass_fault_type aft
+			    on ar.group_id = aft.group_id
+			    and ar.hos_id = aft.hos_id
+			    and ar.copy_code = aft.copy_code
+			    and ar.fau_code = aft.fau_code
+			    left join budg_sys_dict  bsd
+			    on ar.state = bsd.value_code
+			    and bsd.F_CODE='ASS_REPAIR_STATE'
+			      left join (select rep_code ,state,task_user,group_id,hos_id,copy_code  from (
+			  select ROW_NUMBER() over(partition by rep_code order by task_time desc) as rn,
+			         c.rep_code,
+			         c.task_time,
+			         c.state,
+			         c.task_user,
+			         c.group_id,
+			         c.hos_id,
+			         c.copy_code
+			    from ass_repair_task c
+			  )
+			   where rn = 1) b on ar.rep_code = b.rep_code and b.state >= 3
+			   and ar.group_id = b.group_id
+			   and ar.hos_id = b.hos_id
+			   and ar.copy_code = b.copy_code
+			    left join sys_user du
+			      on b.task_user = du.user_id
+			      and b.group_id = du.group_id
+			      and b.hos_id = du.hos_id
+		
+		where ar.group_id = #{group_id}
+		and ar.hos_id = #{hos_id}
+		and ar.copy_code = #{copy_code}
+		and ar.state >1
+		and exists (select 1 from ass_repair_task art
+	    where  ar.group_id = art.group_id 
+	    and ar.hos_id = art.hos_id
+	    and ar.copy_code = art.copy_code
+	    and ar.rep_code = art.rep_code)
+		<if test="rep_code != null and rep_code != '' ">
+			and ar.rep_code like '%${rep_code}%'
+		</if>
+		<if test="app_time_begin != null and app_time_begin != '' ">
+			and ar.app_time between to_date('${app_time_begin} 00:00:00','yyyy-mm-dd
+			hh24:mi:ss')
+			and to_date('${app_time_end} 23:59:59','yyyy-mm-dd hh24:mi:ss')
+		</if>
+		<if test="eme_status != null and eme_status != '' "> 
+			and ar.eme_status = #{eme_status}
+		</if>
+		<if test="rep_dept != null and rep_dept != '' ">
+			and ar.rep_dept = #{rep_dept}
+		</if>
+		<if test="fau_note != null and fau_note != '' ">
+			and ar.fau_note like '%${fau_note}%'
+		</if>
+		<if test="fau_code != null and fau_code != '' ">
+			and ar.fau_code = #{fau_code}
+		</if>
+	</select>
+	 -->
+	<select id="queryAssRepairCenterPrint" parameterType="java.util.Map" resultType="java.util.Map"> 
+	
+		select ar.group_id,
+			    ar.hos_id,
+			    ar.copy_code,
+			    ar.rep_code,
+			    aft.fau_name fau_code,
+			    al.loc_name loc_code,
+			    case ar.eme_status
+			    when 1 then
+			    '非常紧急'
+			    when 2 then
+			    '紧急'
+			    when 3 then
+			    '一般'
+			    end as eme_status,
+			    su.user_name rep_user,
+			    hd.dept_name rep_dept,
+			    ar.phone,
+			    ar.fau_note,
+			    to_char(ar.app_time,'yyyy-mm-dd hh24:mi:ss') as app_time,
+			    case  ar.rep_bz  when 1 then '内部维修' when 2 then '外部维修' end as rep_bz,
+			    case ar.is_base
+			    when 1 then
+			    '是'
+			    when 0 then
+			    '否'
+			    end as is_base,
+			    case ar.is_card
+			    when 1 then
+			    '是'
+			    when 0 then
+			    '否'
+			    end as is_card,
+			    ar.rep_comp,
+			    ar.rep_comp_user,
+			    ar.ass_card_no,
+			    ar.ass_name,
+			    ar.rep_note,
+			    to_char(ar.order_time,'yyyy-mm-dd hh24:mi:ss') as order_time,
+			    to_char(ar.comp_time,'yyyy-mm-dd hh24:mi:ss') as comp_time,
+			    ar.rep_hours,
+			    case ar.is_urg
+			    when 0 then
+			    '否'
+			    when 1 then
+			    '是'
+			    end as is_urg,
+			    ar.urg_note,
+			    (select bsd.value_name from 
+			         (select rep_code, task_id, state from ass_repair_task
+			          order by task_time desc
+			          ) tmp 
+			           left join budg_sys_dict bsd
+			          on tmp.state = bsd.value_code
+			         and bsd.F_CODE = 'ASS_REPAIR_STATE'
+			         where tmp.rep_code = ar.rep_code
+			            and rownum = 1 
+			       ) as state,
+			    ar.voice,
+			    case ar.flag
+			    when 1 then
+			    'PC端'
+			    when 2 then
+			    '移动端'
+			    end flag,
+			    du.user_name task_name
+			    from ass_repair ar
+			    left join sys_user su
+			    on ar.group_id = su.group_id
+			    and ar.hos_id = su.hos_id
+			    and ar.copy_code = su.copy_code
+			    and ar.rep_user = su.user_id
+			    left join hos_dept hd
+			    on ar.group_id = hd.group_id
+			    and ar.hos_id = hd.hos_id
+			    and ar.rep_dept = hd.dept_id
+			    and hd.is_stop = 0
+			    left join ass_location al
+			    on ar.group_id = al.group_id
+			    and ar.hos_id = al.hos_id
+			    and ar.copy_code = al.copy_code
+			    and ar.loc_code = al.loc_code
+			    and al.is_stop = 0
+			    left join ass_fault_type aft
+			    on ar.group_id = aft.group_id
+			    and ar.hos_id = aft.hos_id
+			    and ar.copy_code = aft.copy_code
+			    and ar.fau_code = aft.fau_code
+			    left join budg_sys_dict  bsd
+			    on ar.state = bsd.value_code
+			    and bsd.F_CODE='ASS_REPAIR_STATE'
+			      left join (select rep_code ,state,task_user,group_id,hos_id,copy_code  from (
+			  select ROW_NUMBER() over(partition by rep_code order by task_time desc) as rn,
+			         c.rep_code,
+			         c.task_time,
+			         c.state,
+			         c.task_user,
+			         c.group_id,
+			         c.hos_id,
+			         c.copy_code
+			    from ass_repair_task c
+			  )
+			   where rn = 1) b on ar.rep_code = b.rep_code and b.state >= 3
+			   and ar.group_id = b.group_id
+			   and ar.hos_id = b.hos_id
+			   and ar.copy_code = b.copy_code
+			    left join sys_user du
+			      on b.task_user = du.user_id
+			      and b.group_id = du.group_id
+			      and b.hos_id = du.hos_id
+		
+		where ar.group_id = #{group_id}
+		and ar.hos_id = #{hos_id}
+		and ar.copy_code = #{copy_code}
+		and ar.state >1
+		and exists (select 1 from ass_repair_task art
+	    where  ar.group_id = art.group_id 
+	    and ar.hos_id = art.hos_id
+	    and ar.copy_code = art.copy_code
+	    and ar.rep_code = art.rep_code)
+		<if test="rep_code != null and rep_code != '' ">
+			and ar.rep_code like '%${rep_code}%'
+		</if>
+		<if test="app_time_begin != null and app_time_begin != '' ">
+			and ar.app_time between to_date('${app_time_begin} 00:00:00','yyyy-mm-dd
+			hh24:mi:ss')
+			and to_date('${app_time_end} 23:59:59','yyyy-mm-dd hh24:mi:ss')
+		</if>
+		<if test="eme_status != null and eme_status != '' "> 
+			and ar.eme_status = #{eme_status}
+		</if>
+		<if test="rep_dept != null and rep_dept != '' ">
+			and ar.rep_dept = #{rep_dept}
+		</if>
+		<if test="fau_note != null and fau_note != '' ">
+			and ar.fau_note like '%${fau_note}%'
+		</if>
+		<if test="fau_code != null and fau_code != '' ">
+			and ar.fau_code = #{fau_code}
+		</if>
+	</select>
+	
+	<select id="queryRepTeamUser" resultType="java.util.Map" parameterType="java.util.Map">
+		with repData as
+		(select a.rep_team_code as id,
+		a.rep_team_name as name,
+		'0' as pId, 'team' as flag
+		from ass_repair_team_dict a
+		where a.group_id= #{group_id}
+		and a.hos_id =#{hos_id}
+		union all
+		select to_char(b.user_id) as id,
+		b.user_name as name,
+		c.rep_team_code as pId, 'user' as flag
+		from sys_user b
+		left join ass_repair_user c
+		on b.group_id = c.group_id
+		and b.hos_id = c.hos_id
+		and b.copy_code = c.copy_code
+		and b.user_id = c.rep_user
+		and b.is_stop = 0
+		where b.group_id = #{group_id}
+		and b.hos_id = #{hos_id}
+		and b.copy_code = #{copy_code}
+		)
+		select id as "id", name as "name", pId as "pId", flag as "flag"
+		from repData
+		start with pId = 0
+		connect by prior id = pId
+	</select>
+	
+	<select id="queryTimeLineRender"  resultType="java.util.Map" parameterType="java.util.Map">
+ 		select   to_char(a.task_time,'yyyy-mm-dd hh24:mi:ss')as "task_time",
+		          b.user_name as "user_name",
+		          	 bsd.value_name  as "state_name",      
+				      d.rep_team_name as "team_name",
+				      c.phone1 as "phone1",
+		          c.phone2 as "phone2"
+			      from ass_repair_task a
+		      left join sys_user b 
+			      on a.group_id = b.group_id
+			      and a.hos_id = b.hos_id
+			      and a.copy_code = b.copy_code
+			      and a.task_user = b.user_id
+		      left join ass_repair_user c
+			       on a.group_id = c.group_id
+			      and a.hos_id = c.hos_id
+			      and a.copy_code = c.copy_code
+			      and a.task_user = c.rep_user
+		      left join ASS_REPAIR_TEAM_DICT d
+			      on c.group_id = d.group_id
+			       and c.hos_id = d.hos_id
+			       and c.rep_team_code = d.rep_team_code
+	          left join budg_sys_dict  bsd
+				  on a.state = bsd.value_code
+				   and bsd.F_CODE='ASS_REPAIR_STATE'
+			   where a.group_id =  #{group_id}
+			   and a.hos_id =  #{hos_id}
+			   and a.copy_code =  #{copy_code}
+			   and a.rep_code =  #{rep_code}
+			     order by task_time desc
+ 	</select>
+ 	
+ 	<select id="queryAssRepairByCode" resultType="java.util.Map" parameterType="java.util.Map">
+		select a.group_id,
+		       a.hos_id,
+		       a.copy_code,
+		       a.rep_code,
+		       a.fau_code,
+		       a.loc_code,
+		       a.eme_status,
+		       a.rep_user,
+		       a.rep_dept||'@'||b.dept_no as rep_dept,
+		       a.phone,
+		       a.fau_note,
+		       a.app_time,
+		       a.rep_bz,
+		       a.is_base,
+		       a.is_card,
+		       a.rep_comp,
+		       a.rep_comp_user,
+		       a.ass_card_no,
+		       a.ass_name,
+		       a.rep_note,
+		       a.order_time,
+		       a.comp_time,
+		       a.rep_hours,
+		       a.is_urg,
+		       a.urg_note,
+		       a.state,
+		       a.voice,
+		       a.flag,
+		       a.score,
+		       a.score_note
+		  from ass_repair a
+  	left join HOS_DEPT_DICT b 
+  	 on a.group_id = b.group_id
+  	 and a.hos_id = b.hos_id
+  	 and a.rep_dept = b.dept_id
+  	 and b.is_stop=0
+		 where a.group_id = #{group_id}
+		   and a.hos_id = #{hos_id}
+		   and a.copy_code = #{copy_code}
+		   and a.rep_code = #{rep_code}
+	</select>
+	
+	<!-- 卡片明细页查询SQL -->
+	<select id="queryCardDataByCode" parameterType="java.util.Map" resultType="java.util.Map">
+		select  vc.ASS_CARD_NO,
+				an.ass_name,
+				hf.fac_name,
+				hsd.sup_name,
+				vc.ass_spec,
+				vc.ass_brand,
+				hf.fac_name,
+				hsd.sup_name,
+				acd.contract_no,
+				aam.accept_date,
+				hed.emp_name,
+				vc.run_date,
+				an.usage_code,
+				hdd.dept_name,
+				vc.ass_seq_no
+			from v_ass_card vc
+			left join ass_no_dict an
+				on an.group_id = vc.group_id
+				and an.hos_id = vc.hos_id
+				and an.ass_id = vc.ass_id
+			left join hos_fac_dict hf
+				on hf.group_id = vc.group_id
+				and hf.hos_id = vc.hos_id
+				and hf.fac_id = vc.fac_id
+				and hf.fac_no = vc.fac_no
+			left join hos_sup_dict hsd
+				on hsd.group_id = vc.group_id
+				and hsd.hos_id = vc.hos_id
+				and hsd.sup_id = vc.ven_id
+				and hsd.sup_no = vc.ven_no
+			left join ass_contract_detail acd
+				on acd.group_id = vc.group_id
+				and acd.hos_id = vc.hos_id
+				and acd.copy_code = vc.copy_code
+				and acd.ass_id = vc.ass_id
+			left join ass_accept_main aam
+				on acd.group_id = aam.group_id
+				and acd.hos_id = aam.hos_id
+				and acd.copy_code = aam.copy_code
+				and acd.contract_id = aam.contract_id
+			left join hos_emp_dict hed
+				on hed.group_id = aam.group_id
+				and hed.hos_id = aam.hos_id
+				and hed.emp_id = aam.accept_emp
+				and hed.is_stop = 0
+			left join hos_dept_dict hdd
+				on hdd.group_id = vc.group_id
+				and hdd.hos_id = vc.hos_id
+				and hdd.dept_id = vc.dept_id
+				and hdd.dept_no = vc.dept_no
+			where vc.group_id = #{group_id}
+				and vc.hos_id = #{hos_id}
+				and vc.copy_code = #{copy_code}
+				and vc.ass_card_no = #{ass_card_no}
+				order by vc.ass_card_no
+	</select>
+	
+	
+	
+	<select id="queryImgUrlByRepRecordCode" parameterType="java.util.Map" resultType="java.util.Map">
+		select  ara.att_path,	
+				ara.att_name_n
+			from ass_repair_att ara
+			where ara.group_id = #{group_id}
+				and ara.hos_id = #{hos_id}
+				and ara.copy_code = #{copy_code}
+				and ara.rep_code = #{rep_code}
+	</select>
+	
+	<!-- 检查任务状态 -->
+	<select id="existsAssRepairTaskState" parameterType="java.util.Map" resultType="java.util.Map">
+	 select rep_code, state ,task_user
+	 from (
+		select  ROW_NUMBER() over (partition by rep_code order by task_time desc) as arownum ,rep_code,state,task_user
+			from ass_repair_task
+			where group_id = #{group_id}
+				and hos_id = #{hos_id}
+				and copy_code = #{copy_code}
+				and rep_code in(${rep_code})
+				order by task_time desc
+				)				
+				where arownum = 1
+	</select>
+	<select id="queryMatInvDict" resultType="java.util.Map">
+		select a.inv_id ||' '||a.inv_no as inv_id,
+		       a.inv_code,
+		       a.inv_name,
+		       a.brand_name,
+		       a.inv_model,
+		       b.mat_type_name
+		  from mat_inv_dict a
+		  left join mat_type_dict b 
+		  on a.group_id = b.group_id
+		  and a.hos_id = b.hos_id
+		  and a.copy_code = b.copy_code
+		  and a.mat_type_no = b.mat_type_no
+		  and a.mat_type_id = b.mat_type_id
+		 where  a.group_id = #{group_id}
+		   and  a.hos_id = #{hos_id}
+		   and  a.copy_code = #{copy_code}
+		   <if test="inv_name !=null and inv_name !=''">
+		   and (
+				a.inv_name like '%'||UPPER('${inv_name}')||'%' or
+				a.inv_code like '%'||UPPER('${inv_name}')||'%' or
+				a.spell_code like '%'||UPPER('${inv_name}')||'%' or
+				a.wbx_code like '%'||UPPER('${inv_name}')||'%'
+				)
+		   </if>
+				
+	</select>
+	<!-- 检查单据发送状态 -->
+	<select id="queryAssRepairStateByRepcode" parameterType="java.util.Map" resultType="String">
+		select  rep_code
+			from ass_repair
+			where group_id = #{group_id}
+				and hos_id = #{hos_id}
+				and copy_code = #{copy_code}
+				and state not in (${state})
+				and rep_code in(${rep_code})
+	</select>
+	
+		<!-- 接单 -->
+	<update id="updateAssRepairState" parameterType="java.util.Map" >
+		update  ass_repair 
+		set 
+			state=3,
+			order_time = sysdate
+			where group_id = #{group_id}
+				and hos_id = #{hos_id}
+				and copy_code = #{copy_code}				
+				and rep_code in (${rep_code})
+	</update>
+	<!--  更新单据维修状态 -->
+	<update id="updateAssRepairSend" parameterType="java.util.Map" >
+		update  ass_repair set state=#{state}
+			where group_id = #{group_id}
+				and hos_id = #{hos_id}
+				and copy_code = #{copy_code}				
+				and rep_code in (${rep_code})
+	</update>
+	<!--  更新单据误报状态 -->
+	<update id="updateAssRepairEndState" parameterType="java.util.Map" >
+		update  ass_repair 
+			set state=6,
+			COMP_TIME = sysdate,
+			REP_HOURS = ceil((sysdate-ORDER_TIME ) * 24),
+			REP_NOTE = #{rep_note}
+			where group_id = #{group_id}
+				and hos_id = #{hos_id}
+				and copy_code = #{copy_code}
+				and rep_code in (${rep_code})
+	</update>
+	
+	<!-- 完成维修更新状态并填写维修数据 -->
+	<update id="updateEndRepairState" parameterType="java.util.Map" >
+		update  ass_repair 
+			set state=5,
+			comp_time = sysdate,
+			rep_hours = ceil((sysdate-ORDER_TIME ) * 24),
+			rep_note = #{rep_note},
+			rep_comp = #{rep_comp},
+			rep_comp_user= #{rep_comp_user},
+			is_card= #{is_card},
+			is_base= #{is_base},
+			rep_bz= #{rep_bz},
+			ass_card_no = #{ass_card_no},
+			ass_name = #{ass_name}
+			where group_id = #{group_id}
+				and hos_id = #{hos_id}
+				and copy_code = #{copy_code}
+				and rep_code in (${rep_code})
+	</update>
+	
+	<insert id="addRepairInv" parameterType="java.util.Map">
+	 insert into ass_repair_inv
+		   (group_id, hos_id, copy_code, rep_code, inv_id, inv_no, amount)
+		 values
+		   (
+		   #{group_id,jdbcType=INTEGER},
+		   #{hos_id,jdbcType=INTEGER},
+		   #{copy_code,jdbcType=VARCHAR},
+		   #{rep_code,jdbcType=VARCHAR},
+		   #{inv_id,jdbcType=INTEGER},
+		   #{inv_no,jdbcType=INTEGER},
+		   #{amount,jdbcType=NUMERIC}
+		   )
+	</insert>
+	
+	<!-- 接单时 添加任务表数据 -->
+	<insert id="addAssRepTask" parameterType="java.util.Map">
+		insert into ass_repair_task
+		  (group_id, hos_id, copy_code, rep_code, task_id, task_user, task_time, state 
+		  )
+		  select group_id, hos_id, copy_code,rep_code,task_id,task_user, task_time, state
+		from (
+		select  ROW_NUMBER() over (partition by rep_code order by task_time desc) as arownum ,
+		  group_id, hos_id, copy_code,rep_code, substr(cast(dbms_random.value as varchar2(38)),3,15) as task_id,task_user, sysdate as task_time, #{state} as state
+		 from ass_repair_task
+		 where group_id = #{group_id}
+		 and hos_id = #{hos_id}
+		 and copy_code = #{copy_code}				
+		 and rep_code in (${rep_code})
+		 order by task_time desc
+		 )
+		 where arownum = 1
+	</insert>
+	<!-- 转单时 添加任务表数据 -->
+	<insert id="addAssRepTaskToTuskUser" parameterType="java.util.Map">
+			insert into ass_repair_task
+		  (group_id, hos_id, copy_code, rep_code, task_id, task_user, task_time, state 
+		  )
+		 select 
+		  group_id, hos_id, copy_code,rep_code, substr(cast(dbms_random.value as varchar2(38)),3,15),#{task_user}, sysdate+1/(24*60*60), #{state}
+		 from ass_repair
+		 where group_id = #{group_id}
+		 and hos_id = #{hos_id}
+		 and copy_code = #{copy_code}				
+		 and rep_code in (${rep_code})
+	</insert>
+	
+	<insert id="addAssRepTaskByMyUserId" parameterType="java.util.Map">
+	insert into ass_repair_task
+		  (group_id, hos_id, copy_code, rep_code, task_id, task_user, task_time, state 
+		  )
+		select group_id, hos_id, copy_code,rep_code,task_id,task_user, task_time, state
+		from (
+		select  ROW_NUMBER() over (partition by rep_code order by task_time desc) as arownum ,
+		  group_id, hos_id, copy_code,rep_code, substr(cast(dbms_random.value as varchar2(38)),3,15) as task_id,task_user, sysdate as task_time, '4' as state
+		 from ass_repair_task
+		 where group_id = #{group_id}
+		 and hos_id = #{hos_id}
+		 and copy_code = #{copy_code}				
+		 and rep_code in (${rep_code})
+		 order by task_time desc
+		 )
+		 where arownum = 1
+	</insert>
+	
+	<select id="queryCountState" resultType="int" parameterType="java.util.Map">
+		 select count(*)  
+		 from  ass_repair 
+		 where 
+		 group_id = #{group_id}
+		 and hos_id = #{hos_id}
+		 and copy_code = #{copy_code}				
+		 and state = #{state}
+		 <if test="app_time_begin != null and app_time_begin != '' ">
+			and app_time between to_date('${app_time_begin} 00:00:00','yyyy-mm-dd
+			hh24:mi:ss')
+			and to_date('${app_time_end} 23:59:59','yyyy-mm-dd hh24:mi:ss')
+		</if>
+	</select>
+	
+	<select id="queryAssRepInv" resultType="java.util.Map">
+		select a.inv_id ||' '||a.inv_no as inv_id,
+           a.inv_code,
+           a.inv_name,
+           a.brand_name,
+           a.inv_model,
+           b.mat_type_name,
+           c.amount
+      from mat_inv_dict a 
+      left join ass_repair_inv c
+      on c.group_id = a.group_id 
+      and c.hos_id = a.hos_id
+      and c.copy_code = a.copy_code
+
+      and c.inv_id = a.inv_id
+      and c.inv_no = a.inv_no
+      left join mat_type_dict b 
+      on a.group_id = b.group_id
+      and a.hos_id = b.hos_id
+      and a.copy_code = b.copy_code
+      and a.mat_type_no = b.mat_type_no
+      and a.mat_type_id = b.mat_type_id
+		 where  a.group_id = #{group_id}
+		   and  a.hos_id = #{hos_id}
+		   and  a.copy_code = #{copy_code}
+		   and c.rep_code = #{rep_code}
+				
+	</select>
+	
+	<!-- <select id="queryAssRepInvCode" resultType="java.util.Map">
+		select a.group_id,
+	       a.hos_id,
+	       a.copy_code,
+	       a.rep_code,
+	       a.inv_id,
+	       a.inv_no,
+	       a.amount
+	  from ass_repair_inv a
+	  where  a.group_id = #{group_id,jdbcType=INTEGER}
+		   and  a.hos_id = #{hos_id,jdbcType=INTEGER}
+		   and  a.copy_code = #{copy_code,jdbcType=VARCHAR}
+		   and a.rep_code = #{rep_code,jdbcType=VARCHAR}
+	
+	</select> -->
+	
+	<select id="queryMatInvDictSelect" parameterType="java.util.Map"
+		resultMap="hrSelectMap"> 
+select * from  (select a.inv_id ||' '||a.inv_no as id,
+		  
+		       a.inv_name text
+		  from mat_inv_dict a
+		  left join mat_type_dict b 
+		  on a.group_id = b.group_id
+		  and a.hos_id = b.hos_id
+		  and a.copy_code = b.copy_code
+		  and a.mat_type_no = b.mat_type_no
+		  and a.mat_type_id = b.mat_type_id
+		 where  a.group_id = #{group_id}
+		   and  a.hos_id = #{hos_id}
+		   and  a.copy_code = #{copy_code}
+		   <if test="key !=null and key !=''">
+		   and (
+				a.inv_name like '%'||UPPER('${key}')||'%' or
+				a.inv_code like '%'||UPPER('${key}')||'%' or
+				a.spell_code like '%'||UPPER('${key}')||'%' or
+				a.wbx_code like '%'||UPPER('${key}')||'%'
+				)
+		   </if>
+		   )
+		   where rownum &lt; 100
+		   </select>
+		   <select id="queryMatInvDictSelectInfo" resultType="java.util.Map">
+		   select a.inv_id ||' '||a.inv_no as inv_id,
+		       a.inv_code,
+		       a.inv_name,
+		       a.brand_name,
+		       a.inv_model,
+		       b.mat_type_name
+		  from mat_inv_dict a
+		  left join mat_type_dict b 
+		  on a.group_id = b.group_id
+		  and a.hos_id = b.hos_id
+		  and a.copy_code = b.copy_code
+		  and a.mat_type_no = b.mat_type_no
+		  and a.mat_type_id = b.mat_type_id
+		 where  a.group_id = #{group_id}
+		   and  a.hos_id = #{hos_id}
+		   and  a.copy_code = #{copy_code}
+		   and a.inv_id||' '||a.inv_no=#{inv_code}
+		   <if test="inv_name !=null and inv_name !=''">
+		   and (
+				a.inv_name like '%'||UPPER('${inv_name}')||'%' or
+				a.inv_code like '%'||UPPER('${inv_name}')||'%' or
+				a.spell_code like '%'||UPPER('${inv_name}')||'%' or
+				a.wbx_code like '%'||UPPER('${inv_name}')||'%'
+				)
+		   </if>
+		   
+		   
+		   </select>
+		   <insert id="addAssRepairRecord" parameterType="java.util.Map">
+		insert into ass_repair
+		(group_id,
+		hos_id,
+		copy_code,
+		rep_code,
+		fau_code,
+		loc_code,
+		eme_status,
+		rep_user,
+		rep_dept,
+		phone,
+		fau_note,
+		app_time,
+		comp_time,
+		rep_hours,
+		is_base,
+		is_card,
+		IS_ANY,
+		SEQ_NO,
+		<if test="ass_name != '' and  ass_name != null">
+			ass_card_no,
+			ass_name,
+		</if>
+			rep_bz,
+		is_urg,
+		state,
+	rep_note,
+		flag)
+		values
+		(#{group_id},
+		#{hos_id},
+		#{copy_code},
+		#{rep_code},
+		#{fau_code},
+		#{loc_code},
+		#{eme_status},
+		#{rep_user},
+		#{rep_dept},
+		#{phone},
+		#{fau_note},
+		to_date(#{app_times},'yyyy-mm-dd HH24:MI:SS'),
+		to_date(#{comp_times},'yyyy-mm-dd HH24:MI:SS'),
+		#{rep_hours},
+		#{is_base},
+		#{is_card},
+		0,
+		#{seq_no},
+		<if test="ass_name != '' and  ass_name != null">
+			#{ass_card_no},
+			#{ass_name},
+		</if>
+		#{rep_bz},
+		0,
+		5,
+		#{rep_note},
+		1
+		)
+ </insert>
+ <insert id="addRecordRepairInv" parameterType="java.util.Map">
+	 insert into ass_repair_inv
+		   (group_id, hos_id, copy_code, rep_code, inv_id, inv_no, amount)
+		 values
+		   (
+		   #{group_id,jdbcType=INTEGER},
+		   #{hos_id,jdbcType=INTEGER},
+		   #{copy_code,jdbcType=VARCHAR},
+		   #{rep_code,jdbcType=VARCHAR},
+		   #{inv_id,jdbcType=INTEGER},
+		   #{inv_no,jdbcType=INTEGER},
+		   #{amount,jdbcType=NUMERIC}
+		   )</insert>
+ <select id="queryAssRepairRecord" parameterType="java.util.Map"
+		resultType="java.util.Map">
+		select ar.group_id,
+		ar.hos_id,
+		ar.copy_code,
+		ar.rep_code,
+		ar.fau_code,
+		aft.fau_name,
+		ar.loc_code,
+		al.loc_name,
+		case ar.eme_status
+		when 1 then
+		'非常紧急'
+		when 2 then
+		'紧急'
+		when 3 then
+		'一般'
+		end as eme_status,
+		ar.rep_user,
+		su.user_name,
+		ar.rep_dept,
+		hd.dept_name,
+		ar.phone,
+		ar.fau_note,
+		to_char(ar.app_time, 'yy-mm-dd hh24:mi:ss') as app_time,
+		case ar.rep_bz 
+    when 1 then '内部维修'
+    when 2 then '外部维修'
+  end as rep_bz,
+		case ar.is_base
+		when 1 then
+		'是'
+		when 0 then
+		'否'
+		end as is_base,
+		case ar.is_card
+		when 1 then
+		'是'
+		when 0 then
+		'否'
+		end as is_card,
+		ar.rep_comp,
+		ar.rep_comp_user,
+		ar.ass_card_no,
+		ar.ass_name,
+		ar.rep_note,
+		to_char(ar.order_time,'yyyy-mm-dd hh24:mi:ss') as order_time,
+		to_char(ar.comp_time,'yyyy-mm-dd hh24:mi:ss') as comp_time,
+		ar.rep_hours,
+		case ar.is_urg
+		when 0 then
+		'否'
+		when 1 then
+		'是'
+		end as is_urg,
+		ar.urg_note,
+		bsd.value_name as state,
+		ar.voice,
+		case ar.flag
+		when 1 then
+		'PC端'
+		when 2 then
+		'移动端'
+		end flag,
+		ar.score,
+		ar.score_note,
+		ar.is_any
+		from ass_repair ar
+		left join sys_user su
+		on ar.group_id = su.group_id
+		and ar.hos_id = su.hos_id
+		and ar.copy_code = su.copy_code
+		and ar.rep_user = su.user_id
+		left join hos_dept hd
+		on ar.group_id = hd.group_id
+		and ar.hos_id = hd.hos_id
+		and ar.rep_dept = hd.dept_id
+		and hd.is_stop = 0
+		left join ass_location al
+		on ar.group_id = al.group_id
+		and ar.hos_id = al.hos_id
+		and ar.copy_code = al.copy_code
+		and ar.loc_code = al.loc_code
+		and al.is_stop = 0
+		left join ass_fault_type aft
+		on ar.group_id = aft.group_id
+		and ar.hos_id = aft.hos_id
+		and ar.copy_code = aft.copy_code
+		and ar.fau_code = aft.fau_code
+		left join budg_sys_dict bsd
+          on ar.state = bsd.value_code
+         and bsd.F_CODE = 'ASS_REPAIR_STATE'
+		where ar.group_id = #{group_id}
+		and ar.hos_id = #{hos_id}
+		and ar.copy_code = #{copy_code}
+	<!-- 	and ar.rep_user = #{rep_user} -->
+		<if test="rep_code != null and rep_code != '' ">
+			and ar.rep_code like '%${rep_code}%'
+		</if>
+		<if test="app_time_begin != null and app_time_begin != '' ">
+			and ar.app_time between to_date('${app_time_begin} 00:00:00','yyyy-mm-dd
+			hh24:mi:ss')
+			and to_date('${app_time_end} 23:59:59','yyyy-mm-dd hh24:mi:ss')
+		</if>
+		<if test="state != null and state != '' ">
+			and ar.state = #{state}
+		</if>
+		<if test="eme_status != null and eme_status != '' ">
+			and ar.eme_status = #{eme_status}
+		</if>
+		<if test="rep_dept != null and rep_dept != '' ">
+			and ar.rep_dept = #{rep_dept}
+		</if>
+		<if test="fau_note != null and fau_note != '' ">
+			and ar.fau_note like '%${fau_note}%'
+		</if>
+		<if test="fau_code != null and fau_code != '' ">
+			and ar.fau_code = #{fau_code}
+		</if>
+</select>
+<select id="queryAssRecordByCode" resultType="java.util.Map" parameterType="java.util.Map">
+		select a.group_id,
+		       a.hos_id,
+		       a.copy_code,
+		       a.rep_code,
+		       a.fau_code,
+		       a.loc_code,
+		       a.eme_status,
+		       a.rep_user,
+		       a.rep_dept||'@'||b.dept_no as rep_dept,
+		       a.phone,
+		       a.fau_note,
+		       a.app_time,
+		       a.rep_bz,
+		       a.is_base,
+		       a.is_card,
+		       a.rep_comp,
+		       a.rep_comp_user,
+		       a.ass_card_no,
+		       a.ass_name,
+		       a.rep_note,
+		       a.order_time,
+		       a.comp_time,
+		       a.rep_hours,
+		       a.is_urg,
+		       a.urg_note,
+		       a.state,
+		       a.voice,
+		       a.flag,
+		       a.score,
+		       a.score_note,
+		       a.seq_no
+		  from ass_repair a
+  	left join HOS_DEPT_DICT b 
+  	 on a.group_id = b.group_id
+  	 and a.hos_id = b.hos_id
+  	 and a.rep_dept = b.dept_id
+  	 and b.is_stop=0
+		 where a.group_id = #{group_id}
+		   and a.hos_id = #{hos_id}
+		   and a.copy_code = #{copy_code}
+		   and a.rep_code = #{rep_code}
+	</select>
+		
+	<select id="queryImgUrlByRecordCode" parameterType="java.util.Map" resultType="java.util.Map">
+		select  ara.att_path,
+				ara.att_name_n
+			from ass_repair_att ara
+			where ara.group_id = #{group_id}
+				and ara.hos_id = #{hos_id}
+				and ara.copy_code = #{copy_code}
+				and ara.rep_code = #{rep_code}
+	</select>
+	<select id="queryInvUpdate" parameterType="java.util.Map" resultType="java.util.Map">
+	
+	select 
+ari.amount,
+  a.inv_id ||' '||a.inv_no inv_code,
+           a.inv_name,
+           a.brand_name,
+           a.inv_model,
+           b.mat_type_name
+           
+from 
+ASS_REPAIR_INV ari left join mat_inv_dict a
+on ari.group_id=a.group_id
+and ari.hos_id=a.hos_id
+and ari.inv_id=a.inv_id
+and ari.inv_no=a.inv_no
+		  left join mat_type_dict b  on a.group_id = b.group_id
+      and a.hos_id = b.hos_id
+      and a.copy_code = b.copy_code
+      and a.mat_type_no = b.mat_type_no
+      and a.mat_type_id = b.mat_type_id
+		where ari.group_id = #{group_id}
+				and ari.hos_id = #{hos_id}
+				and ari.copy_code = #{copy_code}
+				and ari.rep_code = #{rep_code}
+	</select>
+	<update id="updateAssRepairRecord" parameterType="java.util.Map">
+		update ass_repair
+		set
+		fau_code = #{fau_code},
+		loc_code = #{loc_code},
+		eme_status = #{eme_status},
+		rep_user = #{rep_user},
+		rep_dept = #{rep_dept},
+		phone = #{phone},
+		fau_note = #{fau_note},
+		is_card = #{is_card},
+		seq_no = #{seq_no},
+		ass_card_no = #{ass_card_no},
+		ass_name = #{ass_name},
+		rep_bz = #{rep_bz},
+		is_base = #{is_base},
+		rep_comp = #{rep_comp},
+		rep_comp_user = #{rep_comp_user},
+		app_time=to_date(#{app_times},'yyyy-mm-dd HH24:MI:SS'),
+		rep_hours=#{rep_hours},
+		comp_time=to_date(#{comp_times},'yyyy-mm-dd HH24:MI:SS')
+		where group_id = #{group_id}
+		and hos_id = #{hos_id}
+		and copy_code = #{copy_code}
+		and rep_code = #{rep_code}
+
+	</update>
+	 <delete id="deleteBatchRecordRepairInv" parameterType="java.util.Map">
+		
+		delete ASS_REPAIR_INV
+		where group_id = #{group_id,jdbcType=INTEGER}
+		and hos_id = #{hos_id,jdbcType=INTEGER}
+		and copy_code = #{copy_code,jdbcType=VARCHAR}
+		and
+		rep_code = #{rep_code,jdbcType=VARCHAR} 
+		
+		
+	
+	</delete>
+		<select id="queryTimeLineRecordRender"  resultType="java.util.Map" parameterType="java.util.Map">
+ 		select    to_char(a.task_time,'yyyy-mm-dd hh24:mi:ss') as "task_time",
+		          b.user_name as "user_name",
+		          bsd.value_name as "state_name",      
+				      d.rep_team_name as "team_name",
+				      c.phone1 as "phone1",
+		          c.phone2 as "phone2"
+		      from ass_repair_task a
+		      left join sys_user b 
+		      on a.group_id = b.group_id
+		      and a.hos_id = b.hos_id
+		      and a.copy_code = b.copy_code
+		      and a.task_user = b.user_id
+		      left join ass_repair_user c
+		       on a.group_id = c.group_id
+		      and a.hos_id = c.hos_id
+		      and a.copy_code = c.copy_code
+		      and a.task_user = c.rep_user
+		      left join ASS_REPAIR_TEAM_DICT d
+		      on c.group_id = d.group_id
+		       and c.hos_id = d.hos_id
+		       and c.rep_team_code = d.rep_team_code
+		       left join budg_sys_dict bsd
+        	  on a.state = bsd.value_code
+         	and bsd.F_CODE = 'ASS_REPAIR_STATE'
+		   where a.group_id =  #{group_id}
+		   and a.hos_id =  #{hos_id}
+		   and a.copy_code =  #{copy_code}
+		   and a.rep_code =  #{rep_code}
+ 	</select>
+	<!-- 卡片明细页查询SQL -->
+	<select id="queryRecordCardDataByCode" parameterType="java.util.Map" resultType="java.util.Map">
+		select  vc.ASS_CARD_NO,
+				an.ass_name,
+				hf.fac_name,
+				hsd.sup_name,
+				vc.ass_spec,
+				vc.ass_brand,
+				hf.fac_name,
+				hsd.sup_name,
+				acd.contract_no,
+				aam.accept_date,
+				hed.emp_name,
+				vc.run_date,
+				an.usage_code,
+				hdd.dept_name,
+				vc.ass_seq_no
+			from v_ass_card vc
+			left join ass_no_dict an
+				on an.group_id = vc.group_id
+				and an.hos_id = vc.hos_id
+				and an.ass_id = vc.ass_id
+			left join hos_fac_dict hf
+				on hf.group_id = vc.group_id
+				and hf.hos_id = vc.hos_id
+				and hf.fac_id = vc.fac_id
+				and hf.fac_no = vc.fac_no
+			left join hos_sup_dict hsd
+				on hsd.group_id = vc.group_id
+				and hsd.hos_id = vc.hos_id
+				and hsd.sup_id = vc.ven_id
+				and hsd.sup_no = vc.ven_no
+			left join ass_contract_detail acd
+				on acd.group_id = vc.group_id
+				and acd.hos_id = vc.hos_id
+				and acd.copy_code = vc.copy_code
+				and acd.ass_id = vc.ass_id
+			left join ass_accept_main aam
+				on acd.group_id = aam.group_id
+				and acd.hos_id = aam.hos_id
+				and acd.copy_code = aam.copy_code
+				and acd.contract_id = aam.contract_id
+			left join hos_emp_dict hed
+				on hed.group_id = aam.group_id
+				and hed.hos_id = aam.hos_id
+				and hed.emp_id = aam.accept_emp
+				and hed.is_stop = 0
+			left join hos_dept_dict hdd
+				on hdd.group_id = vc.group_id
+				and hdd.hos_id = vc.hos_id
+				and hdd.dept_id = vc.dept_id
+				and hdd.dept_no = vc.dept_no
+			where vc.group_id = #{group_id}
+				and vc.hos_id = #{hos_id}
+				and vc.copy_code = #{copy_code}
+				and vc.ass_card_no = #{ass_card_no}
+				order by vc.ass_card_no
+	</select>
+	<select id="queryAssRepairRecordPrint" parameterType="java.util.Map" resultType="java.util.Map"> 
+	
+		select ar.group_id,
+			    ar.hos_id,
+			    ar.copy_code,
+			     ar.rep_code as id,
+			    ar.rep_code ,
+			    aft.fau_name fau_code,
+			    al.loc_name loc_code,
+			    case ar.eme_status
+			    when 1 then
+			    '非常紧急'
+			    when 2 then
+			    '紧急'
+			    when 3 then
+			    '一般'
+			    end as eme_status,
+			    su.user_name rep_user,
+			    hd.dept_name rep_dept,
+			    ar.phone,
+			    ar.fau_note,
+			    to_char(ar.app_time,'yyyy-mm-dd hh24:mi:ss') as app_time,
+			    case  ar.rep_bz  when 1 then '内部维修' when 2 then '外部维修' end as rep_bz,
+			    case ar.is_base
+			    when 1 then
+			    '是'
+			    when 0 then
+			    '否'
+			    end as is_base,
+			    case ar.is_card
+			    when 1 then
+			    '是'
+			    when 0 then
+			    '否'
+			    end as is_card,
+			    ar.rep_comp,
+			    ar.rep_comp_user,
+			    ar.ass_card_no,
+			    ar.ass_name,
+			    ar.rep_note,
+			    to_char(ar.order_time,'yyyy-mm-dd hh24:mi:ss') as order_time,
+			    to_char(ar.comp_time,'yyyy-mm-dd hh24:mi:ss') as comp_time,
+			    ar.rep_hours,
+			    case ar.is_urg
+			    when 0 then
+			    '否'
+			    when 1 then
+			    '是'
+			    end as is_urg,
+			    ar.urg_note,
+			    (select bsd.value_name from 
+			         (select rep_code, task_id, state from ass_repair_task
+			          order by task_time desc
+			          ) tmp 
+			           left join budg_sys_dict bsd
+			          on tmp.state = bsd.value_code
+			         and bsd.F_CODE = 'ASS_REPAIR_STATE'
+			         where tmp.rep_code = ar.rep_code
+			            and rownum = 1 
+			       ) as state,
+			    ar.voice,
+			    case ar.flag
+			    when 1 then
+			    'PC端'
+			    when 2 then
+			    '移动端'
+			    end flag,
+			    du.user_name task_name
+			    from ass_repair ar
+			    left join sys_user su
+			    on ar.group_id = su.group_id
+			    and ar.hos_id = su.hos_id
+			    and ar.copy_code = su.copy_code
+			    and ar.rep_user = su.user_id
+			    left join hos_dept hd
+			    on ar.group_id = hd.group_id
+			    and ar.hos_id = hd.hos_id
+			    and ar.rep_dept = hd.dept_id
+			    and hd.is_stop = 0
+			    left join ass_location al
+			    on ar.group_id = al.group_id
+			    and ar.hos_id = al.hos_id
+			    and ar.copy_code = al.copy_code
+			    and ar.loc_code = al.loc_code
+			    and al.is_stop = 0
+			    left join ass_fault_type aft
+			    on ar.group_id = aft.group_id
+			    and ar.hos_id = aft.hos_id
+			    and ar.copy_code = aft.copy_code
+			    and ar.fau_code = aft.fau_code
+			    left join budg_sys_dict  bsd
+			    on ar.state = bsd.value_code
+			    and bsd.F_CODE='ASS_REPAIR_STATE'
+			      left join (select rep_code ,state,task_user,group_id,hos_id,copy_code  from (
+			  select ROW_NUMBER() over(partition by rep_code order by task_time desc) as rn,
+			         c.rep_code,
+			         c.task_time,
+			         c.state,
+			         c.task_user,
+			         c.group_id,
+			         c.hos_id,
+			         c.copy_code
+			    from ass_repair_task c
+			  )
+			   where rn = 1) b on ar.rep_code = b.rep_code and b.state >= 3
+			   and ar.group_id = b.group_id
+			   and ar.hos_id = b.hos_id
+			   and ar.copy_code = b.copy_code
+			    left join sys_user du
+			      on b.task_user = du.user_id
+			      and b.group_id = du.group_id
+			      and b.hos_id = du.hos_id
+		
+		where ar.group_id = #{group_id}
+		and ar.hos_id = #{hos_id}
+		and ar.copy_code = #{copy_code}
+		and ar.state >1
+		<!-- and exists (select 1 from ass_repair_task art
+	    where  ar.group_id = art.group_id 
+	    and ar.hos_id = art.hos_id
+	    and ar.copy_code = art.copy_code
+	    and ar.rep_code = art.rep_code) -->
+		<if test="rep_codes != null and rep_codes != '' ">
+			and ar.rep_code in (${rep_codes})
+		</if>
+		<if test="app_time_begin != null and app_time_begin != '' ">
+			and ar.app_time between to_date('${app_time_begin} 00:00:00','yyyy-mm-dd
+			hh24:mi:ss')
+			and to_date('${app_time_end} 23:59:59','yyyy-mm-dd hh24:mi:ss')
+		</if>
+		<if test="eme_status != null and eme_status != '' "> 
+			and ar.eme_status = #{eme_status}
+		</if>
+		<if test="rep_dept != null and rep_dept != '' ">
+			and ar.rep_dept = #{rep_dept}
+		</if>
+		<if test="fau_note != null and fau_note != '' ">
+			and ar.fau_note like '%${fau_note}%'
+		</if>
+		<if test="fau_code != null and fau_code != '' ">
+			and ar.fau_code = #{fau_code}
+		</if>
+	</select>
+		<delete id="deleteAssRepairRecord" parameterType="java.util.Map">
+		begin
+		delete ASS_REPAIR_INV
+		where group_id = #{group_id}
+		and hos_id = #{hos_id}
+		and copy_code = #{copy_code}
+		and
+		rep_code = #{rep_code} ;
+		delete ass_repair_att
+		where group_id = #{group_id}
+		and hos_id = #{hos_id}
+		and copy_code = #{copy_code}
+		and
+		rep_code = #{rep_code} ;
+		delete ass_repair
+		where group_id = #{group_id}
+		and hos_id = #{hos_id}
+		and copy_code = #{copy_code}
+		and
+		rep_code = #{rep_code} ;
+		end;
+	</delete>
+	<insert id="addassRepairRecordAtt" parameterType="java.util.Map">
+		insert into ass_repair_att
+		(group_id,
+		hos_id,
+		copy_code,
+		rep_code,
+		att_name_n,
+		att_name_o,
+		att_path,
+		att_size,
+		create_user,
+		create_date)
+		values
+		(#{group_id},
+		#{hos_id},
+		#{copy_code},
+		#{rep_code},
+		#{att_name_n},
+		#{att_name_o},
+		#{att_path},
+		#{att_size},
+		#{create_user},
+		to_date(#{create_date},'yyyy-MM-dd hh24:mi:ss')
+		)
+
+	</insert>
+	<select id="queryRecordMaxNo" resultType="String" parameterType="java.util.Map">
+		select max(rep_code)+1
+		from ass_repair c
+		where c.app_time BETWEEN
+		to_date('${app_time} 00:00:00', 'yyyy-mm-dd hh24:mi:ss') and
+		to_date('${comp_time} 23:59:59', 'yyyy-mm-dd hh24:mi:ss')
+
+
+
+	</select>
+		<delete id="deleteassRecordRepairAtt" parameterType="java.util.Map">
+		delete ass_repair_att
+		where group_id = #{group_id}
+		and hos_id = #{hos_id}
+		and copy_code = #{copy_code}
+		and rep_code = #{rep_code}
+		and att_name_n = #{old_name}
+	</delete>
+		
+</mapper>

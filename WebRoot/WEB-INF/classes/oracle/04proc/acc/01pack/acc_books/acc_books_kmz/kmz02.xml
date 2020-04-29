@@ -1,0 +1,2048 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root>
+	<sql id="PRC_KMZZY" type="proc"><![CDATA[
+		/*-------------------------------------------------------------------------
+		|| 过程名称 ：科目总账(按月)
+		|| 参数描述 ：
+		||            -------------------------------------------------------------
+		|| 作    者 ：               完成日期 ：
+		||-------------------------------------------------------------------------
+		|| 修改记录 ：
+		||-------------------------------------------------------------------------*/
+		CREATE OR REPLACE PROCEDURE PRC_KMZZY (
+		  p_group_id number,
+		  p_hos_id number,
+		  p_copy_code varchar2,
+		  p_acc_year_b varchar2,
+		  p_acc_month_b varchar2,
+		  p_acc_year_e varchar2,
+		  p_acc_month_e varchar2,
+		  p_sch_id varchar2, --方案ID
+		  p_subj_code varchar2, --科目编码
+		  p_isLastChk INTEGER, --科目是否含非末级
+		  p_pagesize INTEGER,--每页显示数量
+		  p_page INTEGER,--当前显示页
+		  p_tcount out INTEGER,
+		  p_result_data OUT ACC_BOOKS.recursor
+		)
+		IS
+		  ddl_sql varchar2(4000);
+		  count_sql varchar2(500);
+		  p_state number;
+		  p_is_nacc number;
+		  p_is_bqwfs number;--无本期发生是否显示
+		  p_subj_level_b number;  --科目开始级次
+		  p_subj_level_e number;  --科目结束级次
+		  p_subj_code_b varchar2(20);  --开始科目
+		  p_subj_code_e varchar2(20);  --结束科目
+		  p_is_last number; 
+		  p_copy_codes varchar2(200);
+		  p_cur_code varchar2(20);
+		  p_is_fw number;
+		  p_is_sch number;
+		  subj_code_begin varchar2(200);--开始科目编码
+		  subj_code_end varchar2(200);--结束科目编码
+		          	
+		  summary varchar2(20);
+		BEGIN
+		  /*条件处理begin*/
+		  if nvl(p_sch_id, '00') <> '00' then
+		    select ';' || b.che_copy_code || ';', b.is_nacc, b.is_bqwfs, 
+		      b.is_last, b.cur_code, b.subj_level_begin, b.subj_level_end, 
+		      b.is_fw, b.subj_code_begin, b.subj_code_end
+		    into p_copy_codes, p_is_nacc, p_is_bqwfs, p_is_last, p_cur_code, 
+		      p_subj_level_b, p_subj_level_e, p_is_fw, p_subj_code_b, p_subj_code_e
+		    from acc_book_sch a 
+		    left join acc_book_sch_con b 
+		      on a.group_id = b.group_id 
+		      and a.hos_id = b.hos_id 
+		      and a.copy_code = b.copy_code 
+		      and a.sch_id = b.sch_id 
+		    where a.group_id = p_group_id 
+		      and a.hos_id = p_hos_id 
+		      and a.copy_code = p_copy_code 
+		      and a.sch_id = p_sch_id;
+		                
+		    p_is_sch := 1;
+		  else
+		    p_copy_codes := ';' || p_copy_code || ';'; 
+		    p_is_nacc := 1;
+		    p_is_bqwfs := 0;
+		    p_is_last := 0;
+		    p_cur_code := '';
+		    p_subj_level_b := 0;
+		    p_subj_level_e := 0;
+		    p_is_fw := 0;
+		    p_subj_code_b := '';
+		    p_subj_code_e := '';
+		    p_is_sch := 0;
+		  end if;
+		            
+		  /*处理是否含未记账*/
+		  if p_is_nacc = 1 then 
+		    p_state := 1;
+		  else
+		    p_state := 99;
+		  end if;
+		  /*处理范围查询的最大科目最小科目*/
+		  if p_is_fw = 1 then
+		    select min(subj_code)
+		    into subj_code_begin
+		    from acc_subj 
+		    where group_id = p_group_id 
+		      and hos_id = p_hos_id 
+		      and instr(p_copy_codes, ';' || copy_code || ';') > 0 
+		      and acc_year between p_acc_year_b and p_acc_year_e
+		      and subj_code like p_subj_code_b || '%';
+		                
+		    select max(subj_code) 
+		    into subj_code_end
+		    from acc_subj 
+		    where group_id = p_group_id 
+		      and hos_id = p_hos_id 
+		      and instr(p_copy_codes, ';' || copy_code || ';') > 0 
+		      and acc_year between p_acc_year_b and p_acc_year_e
+		      and subj_code like p_subj_code_e || '%';
+		  end if;
+		
+		            
+		  /*根据方案科目或者页面科目得到科目临时表*/
+		  insert into t_acc_books_subj(
+		    subj_code, subj_name, subj_name_all, subj_dire
+		  )
+		  select distinct subj_code, subj_name, subj_name_all, subj_dire
+		  from acc_subj 
+		  where group_id = p_group_id 
+		    and hos_id = p_hos_id 
+		    and instr(p_copy_codes, ';' || copy_code || ';') > 0 
+		    and acc_year between p_acc_year_b and p_acc_year_e
+		    and (p_subj_level_b = 0 or subj_level >= p_subj_level_b)
+		    and (p_subj_level_e = 0 or subj_level <= p_subj_level_e)
+		    and (
+		      (p_is_fw = 1 and subj_code between subj_code_begin and subj_code_end)
+		      or
+		      (p_is_fw = 0 and (
+		          (p_is_sch <> 0 and subj_code in(
+		            select b.subj_code 
+		            from acc_book_sch_subj a
+		            left join acc_subj b 
+		              on a.group_id = b.group_id 
+		              and a.hos_id = b.hos_id 
+		              and a.copy_code = b.copy_code 
+		              and b.acc_year between p_acc_year_b and p_acc_year_e
+		              and a.subj_code like b.subj_code || '%'
+		            where a.group_id = p_group_id 
+		              and a.hos_id = p_hos_id 
+		              and a.copy_code = p_copy_code 
+		              and sch_id = p_sch_id
+		          ))
+		          or
+		          (p_is_sch = 0 and subj_code like p_subj_code || '%')
+		        )
+		      )  
+		    )
+		    and (
+		    	p_isLastChk = 1 or is_last = 1
+		    );
+		              
+		  /*追加末级*/
+		  if p_is_last = 1 then 
+		    insert into t_acc_books_subj(
+		      subj_code, subj_name, subj_name_all, subj_dire
+		    )
+		    select subj_code, subj_name, subj_name_all, subj_dire
+		    from acc_subj 
+		    where group_id = p_group_id 
+		      and hos_id = p_hos_id 
+		      and instr(p_copy_codes, ';' || copy_code || ';') > 0 
+		      and acc_year between p_acc_year_b and p_acc_year_e
+		      and is_last = 1
+		      and (
+		        (p_is_fw = 1 and subj_code between subj_code_begin and subj_code_end)
+		        or
+		        (p_is_fw = 0 and (
+		            (p_is_sch <> 0 and subj_code in(
+		              select b.subj_code 
+		              from acc_book_sch_subj a
+		              left join acc_subj b 
+		                on a.group_id = b.group_id 
+		                and a.hos_id = b.hos_id 
+		                and a.copy_code = b.copy_code 
+		                and b.acc_year between p_acc_year_b and p_acc_year_e
+		                and a.subj_code like b.subj_code || '%'
+		              where a.group_id = p_group_id 
+		                and a.hos_id = p_hos_id 
+		                and a.copy_code = p_copy_code 
+		                and sch_id = p_sch_id
+		            ))
+		            or
+		            (p_is_sch = 0 and subj_code like p_subj_code || '%')
+		          )
+		        )  
+		      )
+		      and not exists(
+		        select 1 from t_acc_books_subj 
+		        where acc_subj.subj_code = t_acc_books_subj.subj_code
+		      );
+		  end if;
+		  /*条件处理end*/
+		            
+		  if p_acc_month_b='01' then
+		    /*年初余额*/
+		    summary:='上年结转';
+		    execute immediate '
+		      insert into T_ACC_BOOKS_KMZZY(
+		        xh,  acc_year, acc_month, subj_code, subj_name, 
+		        summary, debit, credit, subj_dire, end_os
+		      )
+		      select 1, '''||p_acc_year_b||''', ''00'', hs.subj_code, hs.subj_name, 
+		        ''上年结转'', sum(c.sum_od), sum(c.sum_oc), hs.subj_dire, 
+		        sum(c.end_os) 
+		      from acc_leder c
+		      inner join t_acc_books_subj hs 
+		        on hs.subj_code = c.subj_code
+		      where c.group_id = ' || p_group_id || ' 
+		        and c.hos_id = ' || p_hos_id || ' 
+		        and instr(''' || p_copy_codes || ''', '';'' || c.copy_code || '';'') > 0 
+		        and c.acc_year = ''' || p_acc_year_b || '''
+		        and c.acc_month = ''00''
+		      group by hs.subj_code, hs.subj_name, hs.subj_dire
+		    ';
+		  else
+		    /*期初余额*/
+		    summary:='期初余额';
+		    execute immediate '
+		      insert into T_ACC_BOOKS_KMZZY(
+		        xh, acc_year, acc_month, subj_code, subj_name, 
+		        summary, debit, credit, subj_dire, end_os 
+		      )
+		      select 1 xh, ''' || p_acc_year_b ||''' as acc_year, ''00'' acc_month, t1.subj_code, t1.subj_name, 
+		        ''期初余额'' summary, sum(t1.debit) debit, sum(t1.credit) credit, 
+		        t1.subj_dire subj_dire, sum(t1.end_os) end_os 
+		      from (
+		        select hs.subj_code, hs.subj_name, sum(c.sum_od) debit, 
+		          sum(c.sum_oc) credit, hs.subj_dire, sum(c.end_os) end_os 
+		        from acc_leder c
+		        inner join t_acc_books_subj hs 
+		          on hs.subj_code = c.subj_code
+		        where c.group_id = ' || p_group_id || ' 
+		          and c.hos_id = ' || p_hos_id || ' 
+		          and instr(''' || p_copy_codes || ''', '';'' || c.copy_code || '';'') > 0 
+		          and c.acc_year = ''' || p_acc_year_b || '''
+		          and c.acc_month = ''00''
+		        group by hs.subj_code, hs.subj_name, hs.subj_dire 
+		        union all
+		        select hs.subj_code, hs.subj_name, sum(c.debit) debit,
+		          sum(c.credit) credit, hs.subj_dire,
+		          sum(case when hs.subj_dire=0 then c.debit-c.credit else c.credit-c.debit end) end_os
+		        from acc_vouch_detail c
+		        inner join acc_vouch v 
+		          on c.group_id = v.group_id 
+		          and c.hos_id = v.hos_id 
+		          and c.copy_code = v.copy_code
+		          and v.vouch_id = c.vouch_id
+		        inner join t_acc_books_subj hs 
+		          on hs.subj_code = c.subj_code
+		        where c.group_id = ' || p_group_id || ' 
+		          and c.hos_id = ' || p_hos_id || ' 
+		          and instr(''' || p_copy_codes || ''', '';'' || c.copy_code || '';'') > 0 
+		          and v.acc_year = ''' || p_acc_year_b || ''' 
+		          and v.acc_month < ''' || p_acc_month_b || ''' 
+		          and v.state >= ' || p_state || ' 
+		        group by hs.subj_code, hs.subj_name, hs.subj_dire
+		      ) t1 
+		      group by t1.subj_code, t1.subj_name, t1.subj_dire
+		    ';
+		  end if;
+		  
+		  /*本月合计数据*/
+		  execute immediate '
+		    insert into T_ACC_BOOKS_KMZZY(
+		      xh, acc_year, acc_month, subj_code, subj_name, 
+		      summary, debit, credit, subj_dire, end_os
+		    )
+		    select 2, v.acc_year, v.acc_month, hs.subj_code, hs.subj_name, 
+		      ''本月合计'', sum(c.debit) debit, sum(c.credit) credit, hs.subj_dire, 
+		      sum((case when hs.subj_dire=0 then c.debit-c.credit else c.credit-c.debit end)) end_os
+		    from acc_vouch_detail c
+		    inner join acc_vouch v 
+		      on c.group_id = v.group_id 
+		      and c.hos_id = v.hos_id 
+		      and c.copy_code = v.copy_code
+		      and v.vouch_id = c.vouch_id
+		    inner join acc_vouch_type t 
+		      on t.group_id = v.group_id 
+		      and t.hos_id = v.hos_id 
+		      and t.copy_code = v.copy_code 
+		      and t.vouch_type_code = v.vouch_type_code 
+		    inner join t_acc_books_subj hs 
+		      on hs.subj_code = c.subj_code
+		    where c.group_id = ' || p_group_id || ' 
+		      and c.hos_id = ' || p_hos_id || ' 
+		      and instr(''' || p_copy_codes || ''', '';'' || c.copy_code || '';'') > 0 
+		      and v.acc_year || v.acc_month between ''' || p_acc_year_b || p_acc_month_b || ''' 
+		        and ''' || p_acc_year_e || p_acc_month_e || ''' 
+		      and v.state >= ' || p_state || '
+		    group by v.acc_year, v.acc_month, hs.subj_code, hs.subj_name, hs.subj_dire
+		  ';
+		  --更新本月合计
+		  declare
+		    end_os_sum numeric(19,2);
+        beg_os_month varchar2(2);
+        mid_os_month varchar2(2);
+		    end_os_month varchar2(2);
+		    subj_id varchar(200);
+        v_subj_name varchar(500);
+		    v_flag integer :=0;
+		    v_acc_month varchar(2) :='';	
+        v_subj_dire number(10);    
+        v_min_subj_code varchar2(50);  
+		    i number;
+        i_exsit number;
+		  begin
+		    i := 1;
+		    subj_id := '';
+        v_subj_name := '';
+        beg_os_month:= p_acc_month_b;
+        mid_os_month:= '00';
+		    end_os_month := '00';
+        v_subj_dire := 0 ;
+        end_os_month := p_acc_month_e;
+        v_min_subj_code := '' ;
+            
+		    v_flag := 0;
+		    end_os_sum := 0;
+		    for cr in (
+		      select r.xh, r.subj_code, r.subj_name, r.end_os, r.acc_year, r.acc_month, r.subj_dire 
+		      from T_ACC_BOOKS_KMZZY r
+		      where r.xh < 3
+		      order by r.subj_code asc, r.acc_year asc, r.acc_month asc, r.xh asc
+		    ) loop            
+		      
+          /* 新的科目从 0 开始计算 */
+		      if subj_id <> cr.subj_code then
+           
+            end_os_sum  := 0 ;
+            
+		        /*有发生数据没有期初余额新增加一条期初余额*/
+		        if cr.xh > 1 then
+		          v_flag := 1;
+		          insert into T_ACC_BOOKS_KMZZY(
+		            xh, acc_year, acc_month, subj_code, subj_name, summary, end_os,SUBJ_DIRE
+		          )
+		          values(
+		            1, cr.acc_year, '00', cr.subj_code, cr.subj_name, summary, 0,cr.subj_dire
+		          );
+		        end if;
+		      end if;
+		  		
+		      end_os_sum := end_os_sum + cr.end_os;
+		      		          
+		      /*本月合计余额*/
+		      if cr.xh = 2 then              
+		        update T_ACC_BOOKS_KMZZY 
+		        set end_os = end_os_sum 
+		        where xh = 2 
+		          and subj_code = cr.subj_code 
+		          and acc_year = cr.acc_year 
+		          and acc_month = cr.acc_month;
+		        --插入本年累计
+		        insert into T_ACC_BOOKS_KMZZY(
+		          xh, acc_year, acc_month, subj_code, subj_name, 
+		          summary, debit, credit, subj_dire, end_os
+		        )
+		        select 3, cr.acc_year, cr.acc_month, subj_code, 
+		          subj_name, '本年累计', sum(nvl(debit,0)), 
+		          sum(nvl(credit,0)), subj_dire, end_os_sum
+		        from T_ACC_BOOKS_KMZZY
+		        where xh = 2 
+		          and subj_code = cr.subj_code 
+		          and acc_year = cr.acc_year 
+		          and acc_month <= cr.acc_month
+		        group by subj_code, subj_name, subj_dire;
+		      end if;
+          
+		      --补中间月断的数据
+          if substr('00'||to_char(to_number(v_acc_month)+1),-2) <> cr.acc_month and subj_id = cr.subj_code then
+             mid_os_month :=substr('00'||to_char(to_number(v_acc_month)+1),-2);
+             while(mid_os_month < cr.acc_month) loop
+                insert into T_ACC_BOOKS_KMZZY(
+                     xh, acc_year, acc_month, subj_code, subj_name, summary,  debit, credit, end_os,subj_dire
+                  )
+                  select
+                    2,cr.acc_year, mid_os_month
+                    , subj_id, v_subj_name, '本月合计',0,0, end_os_sum-cr.end_os,v_subj_dire
+                    from dual;
+                   
+                --插入本年累计
+                insert into T_ACC_BOOKS_KMZZY(
+                  xh, acc_year, acc_month, subj_code, subj_name, 
+                  summary, debit, credit, subj_dire, end_os
+                )
+                select 3, case when cr.acc_year = '0000' then p_acc_year_b else cr.acc_year end, mid_os_month, subj_code, 
+                  subj_name, '本年累计', sum(nvl(debit,0)), 
+                  sum(nvl(credit,0)), subj_dire, end_os_sum-cr.end_os
+                from T_ACC_BOOKS_KMZZY
+                where xh = 2 
+                  and subj_code = subj_id
+                  and acc_year = case when cr.acc_year = '0000' then p_acc_year_b else cr.acc_year end
+                  and acc_month <= mid_os_month
+                group by subj_code, subj_name, subj_dire;
+                
+                mid_os_month :=substr('00'||to_char(to_number(mid_os_month)+1),-2);
+             end loop;
+             mid_os_month := '00';
+          end if;  
+          
+          --补最小月至开始月数据
+          if to_number(cr.acc_month) > to_number(p_acc_month_b) and subj_id = cr.subj_code and cr.acc_month <> '00' then
+             select count(1) 
+               into i_exsit
+               from T_ACC_BOOKS_KMZZY t 
+              where xh = 2 
+                and subj_code = subj_id
+                and acc_year = case when cr.acc_year = '0000' then p_acc_year_b else cr.acc_year end
+                and acc_month < cr.acc_month
+                and acc_month <> '00'
+                ;
+             if i_exsit = 0 then 
+                 --补小于开始月数据
+                 while(to_number(cr.acc_month) > to_number(beg_os_month)) loop
+                    insert into T_ACC_BOOKS_KMZZY(
+                         xh, acc_year, acc_month, subj_code, subj_name, summary,  debit, credit, end_os,subj_dire
+                      )
+                      select
+                        2,cr.acc_year, substr('00'||beg_os_month,-2)
+                        , subj_id, v_subj_name, '本月合计',0,0, end_os_sum-cr.end_os,v_subj_dire
+                        from dual;
+                   
+                    --插入本年累计
+                    insert into T_ACC_BOOKS_KMZZY(
+                      xh, acc_year, acc_month, subj_code, subj_name, 
+                      summary, debit, credit, subj_dire, end_os
+                    )
+                    select 3, case when cr.acc_year = '0000' then p_acc_year_b else cr.acc_year end, substr('00'||beg_os_month,-2), subj_code, 
+                      subj_name, '本年累计', sum(nvl(debit,0)), 
+                      sum(nvl(credit,0)), subj_dire, end_os_sum-cr.end_os
+                    from T_ACC_BOOKS_KMZZY
+                    where xh = 2 
+                      and subj_code = subj_id
+                      and acc_year = case when cr.acc_year = '0000' then p_acc_year_b else cr.acc_year end
+                      and acc_month <= substr('00'||beg_os_month,-2)
+                    group by subj_code, subj_name, subj_dire;
+                                    
+                    beg_os_month := substr('00'||to_char(to_number(beg_os_month)+1),-2);               
+                  
+                 end loop;
+                 beg_os_month := p_acc_month_b;
+            end if;  
+            i_exsit := 0 ;   
+          end if;
+          
+		      i := i + 1;
+		      subj_id := cr.subj_code;
+          v_subj_name := cr.subj_name ; 
+          v_subj_dire := cr.subj_dire;
+		      v_acc_month := cr.acc_month;
+        end loop;
+		  end;
+		 
+      --补仅有期初的数据
+      insert into T_ACC_BOOKS_KMZZY(
+           xh, acc_year, acc_month, subj_code, subj_name, summary,  debit, credit, end_os,subj_dire
+        )
+         select 2 xh,acc_year,t2.acc_month,subj_code,subj_name,'本月合计' as summary,
+                0 as debit,0 as credit,end_os,subj_dire
+           from T_ACC_BOOKS_KMZZY t1
+           left join (select acc_month
+                        from acc_year_month
+                       where group_id = p_group_id
+                         and hos_id = p_hos_id
+                         and copy_code = p_copy_code
+                         and acc_year||acc_month >= p_acc_year_b ||p_acc_month_b
+                         and acc_year||acc_month <= p_acc_year_e ||p_acc_month_e                          
+                          ) t2
+             on 1 = 1
+          where t1.acc_month = '00'
+            and t1.subj_code not in (select subj_code 
+                                       from T_ACC_BOOKS_KMZZY 
+                                      where acc_month > '00'
+                                    )
+            and t1.xh = 1                        
+       union all
+         select 3 xh,acc_year,t2.acc_month,subj_code,subj_name,'本年累计' as summary,
+                0 as debit,0 as credit,end_os,subj_dire
+           from T_ACC_BOOKS_KMZZY t1
+           left join (select acc_month
+                        from acc_year_month
+                       where group_id = p_group_id
+                         and hos_id = p_hos_id
+                         and copy_code = p_copy_code
+                         and acc_year||acc_month >= p_acc_year_b ||p_acc_month_b
+                         and acc_year||acc_month <= p_acc_year_e ||p_acc_month_e                          
+                          ) t2
+             on 1 = 1
+          where t1.acc_month = '00'
+            and t1.subj_code not in (select subj_code 
+                                       from T_ACC_BOOKS_KMZZY 
+                                      where acc_month > '00'
+                                    )
+            and t1.xh = 1                        
+           ;
+        
+        --补最大发生数<最大月的数据
+        insert into T_ACC_BOOKS_KMZZY(
+             xh, acc_year, acc_month, subj_code, subj_name, summary,  debit, credit, end_os,subj_dire
+          )  
+          select xh,b.acc_year,b.acc_month,a.subj_code,a.subj_name,'本月合计' as summary,
+                  0 as debit,0 as credit,end_os,subj_dire
+            from (select xh,acc_year,t1.acc_month,t1.subj_code,t1.subj_name,'本月合计' as summary,
+                          0 as debit,0 as credit,end_os,subj_dire
+                    from T_ACC_BOOKS_KMZZY t1  
+                    inner join (select a.subj_code,a.year_month 
+                                  from  (   
+                                        select subj_code,max(t.acc_year||t.acc_month) as year_month 
+                                          from T_ACC_BOOKS_KMZZY t
+                                          group by t.subj_code
+                                        ) a
+                                 where a.year_month < p_acc_year_e||p_acc_month_e 
+                               ) t3 on  t1.subj_code = t3.subj_code and t1.acc_year||t1.acc_month = t3.year_month   
+                   where t1.xh = 2 
+                 ) a     
+           left join (select acc_year,acc_month
+                          from acc_year_month
+                         where group_id = p_group_id
+                           and hos_id = p_hos_id
+                           and copy_code = p_copy_code
+                           and acc_year||acc_month >= p_acc_year_b ||p_acc_month_b
+                           and acc_year||acc_month <= p_acc_year_e ||p_acc_month_e                          
+                      ) b
+               on a.acc_year||a.acc_month < b.acc_year||b.acc_month      
+       union all
+          select xh,b.acc_year,b.acc_month,a.subj_code,a.subj_name,a.summary,
+                  a.debit,a.credit,end_os,subj_dire
+            from (select 3 as xh,acc_year,t1.acc_month,t1.subj_code,t1.subj_name,'本年累计' as summary,
+                          0 as debit,0 as credit,end_os,subj_dire
+                    from T_ACC_BOOKS_KMZZY t1  
+                    inner join (select a.subj_code,a.year_month 
+                                  from  (   
+                                        select subj_code,max(t.acc_year||t.acc_month) as year_month 
+                                          from T_ACC_BOOKS_KMZZY t
+                                          group by t.subj_code
+                                        ) a
+                                 where a.year_month < p_acc_year_e||p_acc_month_e 
+                               ) t3 on  t1.subj_code = t3.subj_code and t1.acc_year||t1.acc_month = t3.year_month   
+                   where t1.xh = 2 
+                 ) a     
+           left join (select acc_year,acc_month
+                          from acc_year_month
+                         where group_id = p_group_id
+                           and hos_id = p_hos_id
+                           and copy_code = p_copy_code
+                           and acc_year||acc_month >= p_acc_year_b ||p_acc_month_b
+                           and acc_year||acc_month <= p_acc_year_e ||p_acc_month_e                          
+                      ) b
+               on a.acc_year||a.acc_month < b.acc_year||b.acc_month      
+          ;
+             
+		  /*插入汇总数据*/
+		  INSERT INTO T_ACC_BOOKS_KMZZY(
+		    xh, acc_year, acc_month, subj_code, subj_name, 
+		    summary, debit, credit, subj_dire, end_os
+		  )
+		  SELECT b.xh, b.acc_year, b.acc_month, a.subj_code, a.subj_name, 
+		    b.summary, sum(b.debit) debit, sum(b.credit) credit, 
+		    b.subj_dire, sum(b.end_os) end_os 
+		  FROM t_acc_books_subj a 
+		  inner join T_ACC_BOOKS_KMZZY b
+		    on b.subj_code like a.subj_code || '%'
+		  where not exists(
+		    select 1 from T_ACC_BOOKS_KMZZY
+		    where T_ACC_BOOKS_KMZZY.subj_code = a.subj_code
+		  )
+		  group by b.xh, b.acc_year, b.acc_month, a.subj_code, 
+		    a.subj_name, b.summary, b.subj_dire;
+     
+    	/*是否显示本期无发生数据*/
+		  if p_is_bqwfs = 0 then 
+		    /*删除本期无发生数据的科目*/
+		    DELETE FROM T_ACC_BOOKS_KMZZY 
+		    WHERE acc_year||acc_month||subj_code in(
+		      SELECT acc_year||acc_month||subj_code 
+		      FROM (
+		        SELECT acc_year,acc_month,subj_code, sum(credit) credit, sum(debit) debit
+		        FROM T_ACC_BOOKS_KMZZY
+		        WHERE xh = 2 
+		        GROUP BY acc_year,acc_month,subj_code
+		      )
+		      WHERE credit = 0 
+		        AND debit = 0 
+		    );
+		  end if;   
+		            
+		  /*返回结果集游标*/
+		  ddl_sql := '
+		    select * from (
+		      select rownum rn, ab.* from(
+		        select
+		          case when t.summary = ''期初余额'' then replace(t.acc_year,t.acc_year,'''') 
+		          when t.summary = ''上年结转'' then replace(t.acc_year,t.acc_year,'''')
+		          else t.acc_year end acc_year,
+		          case when t.summary = ''期初余额'' then replace(t.acc_month,t.acc_month,'''') 
+		          when t.summary = ''上年结转'' then replace(t.acc_month,t.acc_month,'''')
+		          else t.acc_month end acc_month,
+		          t.subj_code||'' ''||t.subj_name subj_name,t.summary,
+		          t.debit as debit,
+		          t.credit as credit,
+		          case when t.end_os=0 then ''平'' when t.subj_dire=0 then ''借'' else ''贷'' end subj_dire,
+		          t.end_os
+		        from T_ACC_BOOKS_KMZZY t
+		        order by t.subj_code asc,t.acc_year asc,t.acc_month asc,t.xh asc
+		      ) ab 
+		    ) 
+		  ';
+		                    
+		  if p_pagesize>0 then
+		    ddl_sql:=ddl_sql||' where rn >'||(p_page-1)*p_pagesize||' and rn<='||p_page*p_pagesize;
+		  end if;
+		                
+		  open p_result_data for ddl_sql;
+		  p_tcount := 0;
+		  count_sql := ' select count(*)  from T_ACC_BOOKS_KMZZY t ';
+		
+		  EXECUTE IMMEDIATE count_sql INTO p_tcount; 
+		  	
+		END PRC_KMZZY;
+	]]></sql>
+	
+	<sql id="PRC_KMZZT" type="proc"><![CDATA[
+		/*-------------------------------------------------------------------------
+		|| 过程名称 ：科目总账(按天)
+		|| 参数描述 ：
+		||            -------------------------------------------------------------
+		|| 作    者 ：               完成日期 ：
+		||-------------------------------------------------------------------------
+		|| 修改记录 ：
+		||-------------------------------------------------------------------------*/
+		CREATE OR REPLACE PROCEDURE PRC_KMZZT (
+		  p_group_id number,
+		  p_hos_id number,
+		  p_copy_code varchar2,
+		  p_acc_year_b varchar2,
+		  p_acc_month_b varchar2,
+		  p_acc_year_e varchar2,
+		  p_acc_month_e varchar2,
+		  p_sch_id varchar2, --方案ID
+		  p_subj_code varchar2, --科目编码
+		  p_isLastChk INTEGER, --科目是否含非末级
+		  p_pagesize INTEGER,--每页显示数量
+		  p_page INTEGER,--当前显示页
+		  p_tcount out INTEGER,
+		  p_result_data OUT ACC_BOOKS.recursor
+		)
+		IS
+		  ddl_sql varchar2(4000);
+		  count_sql varchar2(500);
+		  p_state number;
+		  p_is_nacc number;
+		  p_is_bqwfs number;--无本期发生是否显示
+		  p_subj_level_b number;  --科目开始级次
+		  p_subj_level_e number;  --科目结束级次
+		  p_subj_code_b varchar2(20);  --开始科目
+		  p_subj_code_e varchar2(20);  --结束科目
+		  p_is_last number; 
+		  p_copy_codes varchar2(200);
+		  p_cur_code varchar2(20);
+		  p_is_fw number;
+		  p_is_sch number;
+		  subj_code_begin varchar2(200);--开始科目编码
+		  subj_code_end varchar2(200);--结束科目编码
+		          	
+		  summary varchar2(20);
+		BEGIN
+		  /*条件处理begin*/
+		  if nvl(p_sch_id, '00') <> '00' then
+		    select ';' || b.che_copy_code || ';', b.is_nacc, b.is_bqwfs, 
+		      b.is_last, b.cur_code, b.subj_level_begin, b.subj_level_end, 
+		      b.is_fw, b.subj_code_begin, b.subj_code_end
+		    into p_copy_codes, p_is_nacc, p_is_bqwfs, p_is_last, p_cur_code, 
+		      p_subj_level_b, p_subj_level_e, p_is_fw, p_subj_code_b, p_subj_code_e
+		    from acc_book_sch a 
+		    left join acc_book_sch_con b 
+		      on a.group_id = b.group_id 
+		      and a.hos_id = b.hos_id 
+		      and a.copy_code = b.copy_code 
+		      and a.sch_id = b.sch_id 
+		    where a.group_id = p_group_id 
+		      and a.hos_id = p_hos_id 
+		      and a.copy_code = p_copy_code 
+		      and a.sch_id = p_sch_id;
+		                
+		    p_is_sch := 1;
+		  else
+		    p_copy_codes := ';' || p_copy_code || ';'; 
+		    p_is_nacc := 1;
+		    p_is_bqwfs := 0;
+		    p_is_last := 0;
+		    p_cur_code := '';
+		    p_subj_level_b := 0;
+		    p_subj_level_e := 0;
+		    p_is_fw := 0;
+		    p_subj_code_b := '';
+		    p_subj_code_e := '';
+		    p_is_sch := 0;
+		  end if;
+		            
+		  /*处理是否含未记账*/
+		  if p_is_nacc = 1 then 
+		    p_state := 1;
+		  else
+		    p_state := 99;
+		  end if;
+		  /*处理范围查询的最大科目最小科目*/
+		  if p_is_fw = 1 then
+		    select min(subj_code)
+		    into subj_code_begin
+		    from acc_subj 
+		    where group_id = p_group_id 
+		      and hos_id = p_hos_id 
+		      and instr(p_copy_codes, ';' || copy_code || ';') > 0 
+		      and acc_year between p_acc_year_b and p_acc_year_e
+		      and subj_code like p_subj_code_b || '%';
+		                
+		    select max(subj_code) 
+		    into subj_code_end
+		    from acc_subj 
+		    where group_id = p_group_id 
+		      and hos_id = p_hos_id 
+		      and instr(p_copy_codes, ';' || copy_code || ';') > 0 
+		      and acc_year between p_acc_year_b and p_acc_year_e
+		      and subj_code like p_subj_code_e || '%';
+		  end if;
+		
+		            
+		  /*根据方案科目或者页面科目得到科目临时表*/
+		  insert into t_acc_books_subj(
+		    subj_code, subj_name, subj_name_all, subj_dire
+		  )
+		  select distinct subj_code, subj_name, subj_name_all, subj_dire
+		  from acc_subj 
+		  where group_id = p_group_id 
+		    and hos_id = p_hos_id 
+		    and instr(p_copy_codes, ';' || copy_code || ';') > 0 
+		    and acc_year between p_acc_year_b and p_acc_year_e
+		    and (p_subj_level_b = 0 or subj_level >= p_subj_level_b)
+		    and (p_subj_level_e = 0 or subj_level <= p_subj_level_e)
+		    and (
+		      (p_is_fw = 1 and subj_code between subj_code_begin and subj_code_end)
+		      or
+		      (p_is_fw = 0 and (
+		          (p_is_sch <> 0 and subj_code in(
+		            select b.subj_code 
+		            from acc_book_sch_subj a
+		            left join acc_subj b 
+		              on a.group_id = b.group_id 
+		              and a.hos_id = b.hos_id 
+		              and a.copy_code = b.copy_code 
+		              and b.acc_year between p_acc_year_b and p_acc_year_e
+		              and a.subj_code like b.subj_code || '%'
+		            where a.group_id = p_group_id 
+		              and a.hos_id = p_hos_id 
+		              and a.copy_code = p_copy_code 
+		              and sch_id = p_sch_id
+		          ))
+		          or
+		          (p_is_sch = 0 and subj_code like p_subj_code || '%')
+		        )
+		      )  
+		    )
+		    and (
+		    	p_isLastChk = 1 or is_last = 1
+		    );
+		              
+		  /*追加末级*/
+		  if p_is_last = 1 then 
+		    insert into t_acc_books_subj(
+		      subj_code, subj_name, subj_name_all, subj_dire
+		    )
+		    select subj_code, subj_name, subj_name_all, subj_dire
+		    from acc_subj 
+		    where group_id = p_group_id 
+		      and hos_id = p_hos_id 
+		      and instr(p_copy_codes, ';' || copy_code || ';') > 0 
+		      and acc_year between p_acc_year_b and p_acc_year_e
+		      and is_last = 1
+		      and (
+		        (p_is_fw = 1 and subj_code between subj_code_begin and subj_code_end)
+		        or
+		        (p_is_fw = 0 and (
+		            (p_is_sch <> 0 and subj_code in(
+		              select b.subj_code 
+		              from acc_book_sch_subj a
+		              left join acc_subj b 
+		                on a.group_id = b.group_id 
+		                and a.hos_id = b.hos_id 
+		                and a.copy_code = b.copy_code 
+		                and b.acc_year between p_acc_year_b and p_acc_year_e
+		                and a.subj_code like b.subj_code || '%'
+		              where a.group_id = p_group_id 
+		                and a.hos_id = p_hos_id 
+		                and a.copy_code = p_copy_code 
+		                and sch_id = p_sch_id
+		            ))
+		            or
+		            (p_is_sch = 0 and subj_code like p_subj_code || '%')
+		          )
+		        )  
+		      )
+		      and not exists(
+		        select 1 from t_acc_books_subj 
+		        where acc_subj.subj_code = t_acc_books_subj.subj_code
+		      );
+		  end if;
+		  /*条件处理end*/
+		  
+		  if p_acc_month_b='01' then
+		    /*年初余额*/
+		    summary:='上年结转';
+		    execute immediate '
+		      insert into T_ACC_BOOKS_KMZZT(
+		        xh, acc_year, acc_month, acc_day, vouch_no, subj_code, subj_name, 
+		        summary, debit, credit, subj_dire, end_os
+		      )
+		      select 1, ''' || p_acc_year_b || ''', ''00'', ''00'', '''', hs.subj_code, hs.subj_name, 
+		        ''上年结转'', sum(c.sum_od), sum(c.sum_oc), hs.subj_dire, sum(c.end_os)
+		      from acc_leder c
+		      inner join t_acc_books_subj hs 
+		        on hs.subj_code = c.subj_code
+		      where c.group_id = ' || p_group_id || ' 
+		        and c.hos_id = ' || p_hos_id || ' 
+		        and instr(''' || p_copy_codes || ''', '';'' ||c.copy_code|| '';'') > 0 
+		        and c.acc_year = ''' || p_acc_year_b || '''
+		        and c.acc_month = ''00''
+		      group by hs.subj_code,hs.subj_name,hs.subj_dire
+		    ';
+		  else
+		    /*期初余额*/
+		    summary:='期初余额';
+		    execute immediate '
+		      insert into T_ACC_BOOKS_KMZZT(
+		        xh, acc_year, acc_month, acc_day, vouch_no, subj_code, subj_name, 
+		        summary, debit, credit, subj_dire, end_os
+		      )
+		      select 1, ''' || p_acc_year_b || ''', ''00'', ''00'', '''', t1.subj_code, t1.subj_name, 
+		        ''期初余额'', sum(t1.debit), sum(t1.credit), t1.subj_dire, sum(t1.end_os) 
+		      from (
+		        select hs.subj_code, hs.subj_name, sum(c.sum_od) debit, 
+		          sum(c.sum_oc) credit, hs.subj_dire, sum(c.end_os) end_os
+		        from acc_leder c
+		        inner join t_acc_books_subj hs 
+		          on hs.subj_code = c.subj_code
+		        where c.group_id = ' || p_group_id || ' 
+		          and c.hos_id = ' || p_hos_id || ' 
+		          and instr(''' || p_copy_codes || ''', '';'' || c.copy_code || '';'') > 0 
+		          and c.acc_year = ''' || p_acc_year_b || '''
+		          and c.acc_month = ''00''
+		        group by hs.subj_code, hs.subj_name, hs.subj_dire
+		        union all
+		        select hs.subj_code, hs.subj_name, sum(c.debit) debit, 
+		          sum(c.credit) credit, hs.subj_dire,
+		          sum(case when hs.subj_dire=0 then c.debit-c.credit else c.credit-c.debit end) end_os
+		        from acc_vouch_detail c 
+		        inner join acc_vouch v 
+		          on c.group_id = v.group_id 
+		          and c.hos_id = v.hos_id 
+		          and c.copy_code = v.copy_code 
+		          and c.vouch_id = v.vouch_id 
+		        inner join t_acc_books_subj hs 
+		          on hs.subj_code = c.subj_code
+		        where c.group_id = ' || p_group_id || ' 
+		          and c.hos_id = ' || p_hos_id || ' 
+		          and instr(''' || p_copy_codes || ''', '';'' || c.copy_code || '';'') > 0 
+		          and v.acc_year = ''' || p_acc_year_b || ''' 
+		          and v.acc_month < ''' || p_acc_month_b || ''' 
+		          and v.state >= ' || p_state || '
+		        group by hs.subj_code, hs.subj_name, hs.subj_dire 
+		      ) t1 group by t1.subj_code, t1.subj_name, t1.subj_dire 
+		    ';
+		  end if;
+		  
+		  /*本期发生数据*/
+		  execute immediate '
+		    insert into T_ACC_BOOKS_KMZZT (
+		      xh, acc_year, acc_month, acc_day, subj_code, subj_name, 
+		      summary, vouch_date, vouch_no, debit, credit, subj_dire, end_os
+		    )
+        select xh, acc_year, acc_month, acc_day, subj_code, subj_name,
+               summary, vouch_date, vouch_no, debit, credit, subj_dire, end_os
+        from (
+		    select 99 xh, v.acc_year, v.acc_month, to_char(v.vouch_date,''dd'') acc_day, 
+		      hs.subj_code, hs.subj_name, ROW_NUMBER() over(PARTITION by hs.subj_code order by v.vouch_no asc) as summary, 
+		      v.vouch_date, t.vouch_type_short||''-''||v.vouch_no vouch_no,c.vouch_detail_id,
+		      nvl(c.debit, 0) debit, nvl(c.credit, 0) credit, hs.subj_dire,
+		      (case when hs.subj_dire=0 then nvl(c.debit, 0) - nvl(c.credit, 0) else nvl(c.credit, 0) - nvl(c.debit, 0) end) end_os
+		    from acc_vouch_detail c
+		    inner join acc_vouch v 
+		      on v.group_id = c.group_id 
+		      and v.hos_id = c.hos_id 
+		      and v.copy_code = c.copy_code
+		      and v.vouch_id = c.vouch_id
+		    inner join acc_vouch_type t 
+		      on v.group_id = t.group_id 
+		      and v.hos_id = t.hos_id 
+		      and v.copy_code = t.copy_code
+		      and v.vouch_type_code = t.vouch_type_code
+		    inner join t_acc_books_subj hs 
+		      on hs.subj_code = c.subj_code
+		    where c.group_id = ' || p_group_id || ' 
+		      and c.hos_id = ' || p_hos_id || ' 
+		      and instr(''' || p_copy_codes || ''', '';'' || c.copy_code || '';'') > 0 
+		      and v.acc_year || v.acc_month 
+		        between ''' || p_acc_year_b || '01' || ''' 
+		        and ''' || p_acc_year_e || p_acc_month_e || ''' 
+		      and v.state >= ' || p_state || '
+		    group by v.acc_year, v.acc_month, v.vouch_date, hs.subj_code, 
+		      hs.subj_name, t.vouch_type_short, v.vouch_no, nvl(c.debit, 0), 
+		      nvl(c.credit, 0), hs.subj_dire, c.vouch_detail_id
+        )
+		  ';
+		  /*按天汇总本期发生数据*/
+		  insert into T_ACC_BOOKS_KMZZT (
+		    xh, acc_year, acc_month, acc_day, subj_code, subj_name, 
+		    summary, vouch_date, vouch_no, debit, credit, subj_dire, end_os
+		  )
+		  select 2, a.acc_year, a.acc_month, a.acc_day, 
+		    a.subj_code, a.subj_name, '', a.vouch_date, 
+		    case when length(b.vouch_no) > 23 then b.vouch_no || '...' else b.vouch_no end vouch_no, 
+		    sum(a.debit) debit, sum(a.credit) credit,a. subj_dire, sum(a.end_os) end_os 
+		  from T_ACC_BOOKS_KMZZT a 
+		  left join (
+		    select acc_year, acc_month, acc_day, subj_code, 
+		      to_char(substr(XMLAGG(XMLELEMENT(E, vouch_no || ',')).EXTRACT('//text()').getclobval(), 0, 24)) vouch_no
+		    from T_ACC_BOOKS_KMZZT 
+		    where xh = 99 
+		    group by acc_year, acc_month, acc_day, subj_code 
+		  ) b 
+		    on a.acc_year = b.acc_year 
+		    and a.acc_month = b.acc_month 
+		    and a.acc_day = b.acc_day
+		    and a.subj_code = b.subj_code 
+		  where a.xh = 99 
+		  group by a.acc_year, a.acc_month, a.acc_day, a.subj_code, a.subj_name, 
+		    a.vouch_date, b.vouch_no, a.subj_dire;
+		    
+		  /*删除临时数据*/
+		  delete from T_ACC_BOOKS_KMZZT where xh = 99;
+		  
+      /*本月合计数据*/
+      execute immediate '
+        insert into T_ACC_BOOKS_KMZZT(
+          xh, acc_year, acc_month, acc_day, vouch_no, subj_code, 
+          subj_name, summary, debit, credit, subj_dire, end_os 
+        )
+        select 3, acc_year, acc_month, ''00'', '''', subj_code, 
+          subj_name, ''本月合计'', sum(debit), sum(credit), 
+          subj_dire, 0 end_os
+        from T_ACC_BOOKS_KMZZT
+        where xh = 2
+        group by acc_year, acc_month, subj_code, subj_name, subj_dire 
+      ';
+      
+		/*条件范围外的余额不参与计算，设置为0*/
+        update T_ACC_BOOKS_KMZZT
+        set end_os = 0
+        where xh = 2
+          and acc_year = p_acc_year_b
+          and acc_month < p_acc_month_b;
+          
+		  /*计算本期发生凭证、本月合计余额*/   
+		  declare
+	
+        end_os_sum numeric(19,2);
+        end_os_before numeric(19,2);
+        beg_os_month varchar2(2);
+        mid_os_month varchar2(2);
+		    end_os_month varchar2(2);
+		    subj_id varchar(200);
+        v_subj_name varchar(500);
+		    v_flag integer :=0;
+		    v_acc_month varchar(2) :='';	
+        v_subj_dire number(10);    
+        v_min_subj_code varchar2(50);  
+		    i number;
+        i_exsit number;
+		  begin
+		 
+        i := 1;
+		    subj_id := '';
+        v_subj_name := '';
+        beg_os_month:= p_acc_month_b;
+        mid_os_month:= '00';
+		    end_os_month := '00';
+        v_subj_dire := 0 ;
+        end_os_month := p_acc_month_e;
+        v_min_subj_code := '' ;
+        end_os_before := 0 ;
+            
+		    v_flag := 0;
+		    end_os_sum := 0;
+        
+		    for cr in (select xh, subj_code, subj_name, end_os, acc_year, 
+		                      acc_month, acc_day, vouch_no, subj_dire 
+		               from T_ACC_BOOKS_KMZZT
+		               where xh < 4
+		               order by subj_code asc, acc_year asc, acc_month asc, xh asc, vouch_date asc) loop
+		      /*新的科目从0开始计算*/
+		      if subj_id <> cr.subj_code  then
+            end_os_sum := 0;
+		        /*有发生数据没有期初余额新增加一条期初余额*/
+		        if  (cr.xh > 1) then
+		          v_flag := 1;
+		          insert into T_ACC_BOOKS_KMZZT(
+		            xh, acc_year, acc_month, acc_day, vouch_no, 
+		            subj_code, subj_name, summary, end_os,Subj_Dire
+		          )
+		          values( 
+		            1, cr.acc_year, '00', '00', '', cr.subj_code, 
+		            cr.subj_name, '期初余额', 0,cr.subj_dire
+		          );
+		        end if;
+		      end if;
+		
+		      /*if v_acc_month<>cr.acc_month and v_flag = 0 then
+		      if (cr.xh>1 and v_acc_month <> '00')  then
+		      insert into T_ACC_BOOKS_KMZZT(xh,acc_year,acc_month,acc_day,vouch_no,subj_code,subj_name,summary,subj_dire,end_os)
+		      values( 1,cr.acc_year,cr.acc_month,'00','',cr.subj_code,cr.subj_name,'期初余额',cr.subj_dire,end_os_sum);
+		      end if;
+		      end if;*/
+		      end_os_sum := end_os_sum+cr.end_os;
+		
+		      /*本期发生凭证余额*/
+		      if cr.xh = 2 then
+		        update T_ACC_BOOKS_KMZZT 
+		        set end_os = end_os_sum 
+		        where xh = 2 
+		          and acc_year = cr.acc_year
+		          and acc_month = cr.acc_month 
+		          and acc_day = cr.acc_day 
+		          and subj_code = cr.subj_code;
+		      end if;
+		      
+		      /*本月合计余额*/
+		      if cr.xh = 3 then
+		        update T_ACC_BOOKS_KMZZT 
+		        set end_os = end_os_sum 
+		        where xh = 3 
+		          and acc_year = cr.acc_year 
+		          and acc_month = cr.acc_month
+		          and acc_day = '00'
+		          and subj_code = cr.subj_code;
+		        /*本年累计数*/
+		        insert into T_ACC_BOOKS_KMZZT(
+		          xh, acc_year, acc_month, acc_day, vouch_no, subj_code, 
+		          subj_name, summary, debit, credit, subj_dire, end_os 
+		        )
+		        select 4, cr.acc_year, cr.acc_month, '00', '', subj_code, 
+		          subj_name, '本年累计', sum(debit) debit, sum(credit) credit, 
+		          subj_dire, end_os_sum
+		        from T_ACC_BOOKS_KMZZT r
+		        where r.xh = 3
+		          and acc_year = cr.acc_year 
+		          and acc_month <= cr.acc_month
+		          --and acc_day = '00'
+		          and subj_code = cr.subj_code
+		        group by subj_code, subj_name, subj_dire; 
+		      end if;
+		      
+          --补中间月断的数据
+          if substr('00'||to_char(to_number(v_acc_month)+1),-2) <> cr.acc_month and subj_id = cr.subj_code then
+             mid_os_month :=substr('00'||to_char(to_number(v_acc_month)+1),-2);
+             while(mid_os_month < cr.acc_month) loop
+                insert into T_ACC_BOOKS_KMZZT(
+                     xh, acc_year, acc_month, acc_day,subj_code, subj_name, summary,  debit, credit, end_os,subj_dire
+                  )
+                  select
+                    3,cr.acc_year, mid_os_month,'00'
+                    , subj_id, v_subj_name, '本月合计',0,0, end_os_sum-cr.end_os,v_subj_dire
+                    from dual
+                     ;
+                   
+                --插入本年累计
+                insert into T_ACC_BOOKS_KMZZT(
+                  xh, acc_year, acc_month,acc_day ,subj_code, subj_name, 
+                  summary, debit, credit, subj_dire, end_os
+                )
+                select 4, case when cr.acc_year = '0000' then p_acc_year_b else cr.acc_year end, mid_os_month,'00', subj_code, 
+                  subj_name, '本年累计', sum(nvl(debit,0)), 
+                  sum(nvl(credit,0)), subj_dire, end_os_sum-cr.end_os
+                from T_ACC_BOOKS_KMZZT
+                where xh = 3 
+                  and subj_code = subj_id
+                  and acc_year = case when cr.acc_year = '0000' then p_acc_year_b else cr.acc_year end
+                  and acc_month <= mid_os_month                 
+                group by subj_code, subj_name, subj_dire;
+                
+                mid_os_month :=substr('00'||to_char(to_number(mid_os_month)+1),-2);
+             end loop;
+             mid_os_month := '00';
+          end if;  
+          
+          --补最小月至开始月数据
+          if to_number(cr.acc_month) > to_number(p_acc_month_b) and subj_id = cr.subj_code and cr.acc_month <> '00' then
+             select count(1) 
+               into i_exsit
+               from T_ACC_BOOKS_KMZZT t 
+              where xh = 3 
+                and subj_code = subj_id
+                and acc_year = case when cr.acc_year = '0000' then p_acc_year_b else cr.acc_year end
+                and acc_month < cr.acc_month
+                and acc_month <> '00'
+                ;
+             if i_exsit = 0 then 
+                 end_os_before := 0 ;
+                 begin
+                   select end_os
+                     into end_os_before
+                     from T_ACC_BOOKS_KMZZT t 
+                    where xh = 3 
+                      and subj_code = subj_id
+                      and acc_year = case when cr.acc_year = '0000' then p_acc_year_b else cr.acc_year end
+                      and acc_month = cr.acc_month
+                      and acc_month <> '00'
+                      ;
+                 EXCEPTION
+                   WHEN OTHERS THEN
+                     end_os_before := 0;      
+                 end ;     
+                 --补小于开始月数据
+                 while(to_number(cr.acc_month) > to_number(beg_os_month)) loop
+                    insert into T_ACC_BOOKS_KMZZT(
+                         xh, acc_year, acc_month, acc_day,subj_code, subj_name, summary,  debit, credit, end_os,subj_dire
+                      )
+                      select
+                        3,cr.acc_year, substr('00'||beg_os_month,-2),'00'
+                        , subj_id, v_subj_name, '本月合计',0,0, end_os_sum-end_os_before,v_subj_dire
+                        from dual
+                        ;
+                   
+                    --插入本年累计
+                    insert into T_ACC_BOOKS_KMZZT(
+                      xh, acc_year, acc_month, acc_day,subj_code, subj_name, 
+                      summary, debit, credit, subj_dire, end_os
+                    )
+                    select 4, case when cr.acc_year = '0000' then p_acc_year_b else cr.acc_year end, substr('00'||beg_os_month,-2),'00', subj_code, 
+                      subj_name, '本年累计', sum(nvl(debit,0)), 
+                      sum(nvl(credit,0)), subj_dire, end_os_sum-end_os_before
+                    from T_ACC_BOOKS_KMZZT
+                    where xh = 3 
+                      and subj_code = subj_id
+                      and acc_year = case when cr.acc_year = '0000' then p_acc_year_b else cr.acc_year end
+                      and acc_month <= substr('00'||beg_os_month,-2)                      
+                    group by subj_code, subj_name, subj_dire;
+                                    
+                    beg_os_month := substr('00'||to_char(to_number(beg_os_month)+1),-2);               
+                  
+                 end loop;
+                 beg_os_month := p_acc_month_b;
+            end if;  
+            i_exsit := 0 ;   
+          end if;
+          
+	        i := i + 1;
+		      subj_id := cr.subj_code;
+          v_subj_name := cr.subj_name ; 
+          v_subj_dire := cr.subj_dire;
+		      v_acc_month := cr.acc_month;
+          --i_first := 0 ;
+          v_flag := 0;
+		    end loop;
+		  end;
+      
+      --补仅有期初的数据
+      insert into T_ACC_BOOKS_KMZZT(
+           xh, acc_year, acc_month, acc_day,subj_code, subj_name, summary,  debit, credit, end_os,subj_dire
+        )
+         select 3 xh,acc_year,t2.acc_month,'00',subj_code,subj_name,'本月合计' as summary,
+                0 as debit,0 as credit,end_os,subj_dire
+           from T_ACC_BOOKS_KMZZT t1
+           left join (select acc_month
+                        from acc_year_month
+                       where group_id = p_group_id
+                         and hos_id = p_hos_id
+                         and copy_code = p_copy_code
+                         and acc_year||acc_month >= p_acc_year_b ||p_acc_month_b
+                         and acc_year||acc_month <= p_acc_year_e ||p_acc_month_e                          
+                          ) t2
+             on 1 = 1
+          where t1.acc_month = '00'
+            and t1.subj_code not in (select subj_code 
+                                       from T_ACC_BOOKS_KMZZT 
+                                      where acc_month > '00'
+                                    )
+            and t1.xh = 1                        
+       union all
+         select 4 xh,acc_year,t2.acc_month,'00',subj_code,subj_name,'本年累计' as summary,
+                0 as debit,0 as credit,end_os,subj_dire
+           from T_ACC_BOOKS_KMZZT t1
+           left join (select acc_month
+                        from acc_year_month
+                       where group_id = p_group_id
+                         and hos_id = p_hos_id
+                         and copy_code = p_copy_code
+                         and acc_year||acc_month >= p_acc_year_b ||p_acc_month_b
+                         and acc_year||acc_month <= p_acc_year_e ||p_acc_month_e                          
+                          ) t2
+             on 1 = 1
+          where t1.acc_month = '00'
+            and t1.subj_code not in (select subj_code 
+                                       from T_ACC_BOOKS_KMZZT 
+                                      where acc_month > '00'
+                                    )
+            and t1.xh = 1                        
+           ;
+        
+        --补最大发生数<最大月的数据
+        insert into T_ACC_BOOKS_KMZZT(
+             xh, acc_year, acc_month, acc_day,subj_code, subj_name, summary,  debit, credit, end_os,subj_dire
+          )  
+          select xh,b.acc_year,b.acc_month,'00' ,a.subj_code,a.subj_name,'本月合计' as summary,
+                  0 as debit,0 as credit,end_os,subj_dire
+            from (select xh,acc_year,t1.acc_month,t1.subj_code,t1.subj_name,'本月合计' as summary,
+                          0 as debit,0 as credit,end_os,subj_dire
+                    from T_ACC_BOOKS_KMZZT t1  
+                    inner join (select a.subj_code,a.year_month 
+                                  from  (   
+                                        select subj_code,max(t.acc_year||t.acc_month) as year_month 
+                                          from T_ACC_BOOKS_KMZZT t
+                                          group by t.subj_code
+                                        ) a
+                                 where a.year_month < p_acc_year_e||p_acc_month_e 
+                               ) t3 on  t1.subj_code = t3.subj_code and t1.acc_year||t1.acc_month = t3.year_month   
+                   where t1.xh = 3 
+                 ) a     
+           left join (select acc_year,acc_month
+                          from acc_year_month
+                         where group_id = p_group_id
+                           and hos_id = p_hos_id
+                           and copy_code = p_copy_code
+                           and acc_year||acc_month >= p_acc_year_b ||p_acc_month_b
+                           and acc_year||acc_month <= p_acc_year_e ||p_acc_month_e                          
+                      ) b
+               on a.acc_year||a.acc_month < b.acc_year||b.acc_month      
+       union all
+          select xh,b.acc_year,b.acc_month,'00',a.subj_code,a.subj_name,a.summary,
+                  a.debit,a.credit,end_os,subj_dire
+            from (select 4 as xh,acc_year,t1.acc_month,t1.subj_code,t1.subj_name,'本年累计' as summary,
+                          0 as debit,0 as credit,end_os,subj_dire
+                    from T_ACC_BOOKS_KMZZT t1  
+                    inner join (select a.subj_code,a.year_month 
+                                  from  (   
+                                        select subj_code,max(t.acc_year||t.acc_month) as year_month 
+                                          from T_ACC_BOOKS_KMZZT t
+                                          group by t.subj_code
+                                        ) a
+                                 where a.year_month < p_acc_year_e||p_acc_month_e 
+                               ) t3 on  t1.subj_code = t3.subj_code and t1.acc_year||t1.acc_month = t3.year_month   
+                   where t1.xh = 3 
+                 ) a     
+           left join (select acc_year,acc_month
+                          from acc_year_month
+                         where group_id = p_group_id
+                           and hos_id = p_hos_id
+                           and copy_code = p_copy_code
+                           and acc_year||acc_month >= p_acc_year_b ||p_acc_month_b
+                           and acc_year||acc_month <= p_acc_year_e ||p_acc_month_e                          
+                      ) b
+               on a.acc_year||a.acc_month < b.acc_year||b.acc_month      
+          ;
+      
+      /*插入汇总数据*/
+		  INSERT INTO T_ACC_BOOKS_KMZZT(
+		    xh, acc_year, acc_month, acc_day, vouch_no, subj_code, 
+		    subj_name, summary, debit, credit, subj_dire, end_os
+		  )
+		  SELECT b.xh, b.acc_year, b.acc_month, '00', '', a.subj_code, 
+		    a.subj_name, case when xh = 1 then '上年结转' else b.summary end summary
+        , sum(b.debit) debit, sum(b.credit) credit, 
+		    b.subj_dire, sum(b.end_os) end_os 
+		  FROM t_acc_books_subj a 
+		  inner join T_ACC_BOOKS_KMZZT b
+		    on b.subj_code like a.subj_code || '%'
+		  where b.xh in (1, 3, 4)
+		    and not exists(
+		    select 1 from T_ACC_BOOKS_KMZZT
+		    where T_ACC_BOOKS_KMZZT.subj_code = a.subj_code
+		  )
+		  group by b.xh, b.acc_year, b.acc_month, a.subj_code, 
+		    a.subj_name,  case when xh = 1 then '上年结转' else b.summary end , b.subj_dire;
+    
+    	/*是否显示本期无发生数据*/
+		  if p_is_bqwfs = 0 then 
+		    /*删除本期无发生数据的科目*/
+		    DELETE FROM T_ACC_BOOKS_KMZZT 
+		    WHERE acc_year||acc_month||acc_day||subj_code in(
+		      SELECT acc_year||acc_month||acc_day||subj_code 
+		      FROM (
+		        SELECT acc_year,acc_month,acc_day,subj_code,sum(credit) credit, sum(debit) debit
+		        FROM T_ACC_BOOKS_KMZZT
+		        WHERE xh = 3 
+		        GROUP BY acc_year,acc_month,acc_day,subj_code
+		      )
+		      WHERE credit = 0 
+		        AND debit = 0 
+		    );
+		  end if;
+      
+		 /*删除条件之外的临时数据*/
+     delete from t_acc_books_kmzzt where acc_year = p_acc_year_b and acc_month < p_acc_month_b and xh <> 1;
+         
+		  /*返回结果集游标*/
+		  ddl_sql := '
+		    select * from (
+		      select rownum rn, ab.* from(
+		        select
+		          case when t.summary = ''期初余额'' then replace(t.acc_year,t.acc_year,'''')
+		          when t.summary = ''上年结转'' then replace(t.acc_year,t.acc_year,'''')
+		          else t.acc_year end acc_year,
+		          case when t.summary = ''期初余额'' then replace(t.acc_month,t.acc_month,'''')
+		          when t.summary = ''上年结转'' then replace(t.acc_month,t.acc_month,'''')
+		          else t.acc_month end acc_month,
+		          case when t.summary = ''期初余额'' then replace(t.acc_day,t.acc_day,'''')
+		          when t.summary = ''上年结转'' then replace(t.acc_day,t.acc_day,'''')
+		          when t.summary = ''本月合计'' then replace(t.acc_day,t.acc_day,'''')
+		          when t.summary = ''本年累计'' then replace(t.acc_day,t.acc_day,'''')
+		          else t.acc_day end acc_day,
+		          t.vouch_no, 
+		          t.subj_code||'' ''||t.subj_name subj_name,t.summary,
+		          t.debit as debit,
+		          t.credit as credit,
+		          case when t.end_os=0 then ''平'' when t.subj_dire=0 then ''借'' else ''贷'' end subj_dire,t.end_os
+		        from T_ACC_BOOKS_KMZZT t
+		      order by t.subj_code, t.acc_year, t.acc_month, t.xh, t.acc_day, t.vouch_date asc
+		    ) ab 
+		  ) ';
+		                    
+		  if p_pagesize > 0 then
+		    ddl_sql:=ddl_sql||' where rn >'||(p_page-1)*p_pagesize||' and rn<='||p_page*p_pagesize;
+		  end if;
+		                
+		  open p_result_data for ddl_sql;
+		  p_tcount:=0;
+		  count_sql := ' select count(1) from T_ACC_BOOKS_KMZZT t';
+		
+		  EXECUTE IMMEDIATE count_sql INTO p_tcount;
+		  	      
+		END PRC_KMZZT;
+	]]></sql>
+	
+	<sql id="PRC_SLMXZ" type="proc"><![CDATA[
+		/*-------------------------------------------------------------------------
+		|| 过程名称 ：三栏明细账
+		|| 参数描述 ：
+		||            -------------------------------------------------------------
+		|| 作    者 ：               完成日期 ：
+		||-------------------------------------------------------------------------
+		|| 修改记录 ：
+		||-------------------------------------------------------------------------*/
+		CREATE OR REPLACE PROCEDURE PRC_SLMXZ (
+         p_group_id number,
+         p_hos_id number,
+         p_copy_code varchar2,
+         p_acc_year_b varchar2,
+         p_acc_month_b varchar2,
+         p_acc_year_e varchar2,
+         p_acc_month_e varchar2,
+         p_sch_id number, --科目方案
+         p_subj_code varchar2,--科目编码
+         p_summary varchar2,  ---摘要
+         p_vouch_no_begin  number ,--凭证开始号
+         p_vouch_no_end  number ,--凭证结束号
+         p_pagesize INTEGER,--每页显示数量
+         p_page INTEGER,--当前显示页
+         p_isLastChk IN  NUMBER,      --是否显示非末级
+         p_tcount out INTEGER,
+         p_result_data OUT ACC_BOOKS.recursor
+         )
+        IS
+            ddl_sql varchar2(8000);
+            count_sql varchar2(4000);
+            p_state number;--包含未记账:1,99
+            p_is_nacc number;
+            p_is_bqwfs number;--无本期发生是否显示
+            p_subj_level_b number;  --科目开始级次
+            p_subj_level_e number;  --科目结束级次
+            p_subj_code_b varchar2(20);  --开始科目
+            p_subj_code_e varchar2(20);  --结束科目
+            p_is_last number;
+            p_copy_codes varchar2(200);
+            p_cur_code varchar2(20);
+            p_is_fw number;
+            p_is_sch number;
+            subj_code_begin varchar2(200);--开始科目编码
+            subj_code_end varchar2(200);--结束科目编码
+            subj_id varchar2(4000);
+            v_summary varchar2(20);
+            vouch_no_num varchar2(200);
+            summary1_num varchar2(200);
+        BEGIN
+            /*条件处理begin*/
+            /*方案条件*/
+            if nvl(p_sch_id, '00') <> '00' then
+              select ';' || b.che_copy_code || ';', b.is_nacc, b.is_bqwfs,
+                b.is_last, b.cur_code, b.subj_level_begin, b.subj_level_end,
+                b.is_fw, b.subj_code_begin, b.subj_code_end
+              into p_copy_codes, p_is_nacc, p_is_bqwfs, p_is_last, p_cur_code,
+                p_subj_level_b, p_subj_level_e, p_is_fw, p_subj_code_b, p_subj_code_e
+              from acc_book_sch a
+              left join acc_book_sch_con b
+                on a.group_id = b.group_id
+                and a.hos_id = b.hos_id
+                and a.copy_code = b.copy_code
+                and a.sch_id = b.sch_id
+              where a.group_id = p_group_id
+                and a.hos_id = p_hos_id
+                and a.copy_code = p_copy_code
+                and a.sch_id = p_sch_id;
+
+              p_is_sch := 1;
+            else
+              p_copy_codes := ';' || p_copy_code || ';';
+              p_is_nacc := 1;
+              p_is_bqwfs := 0;
+              p_is_last := 0;
+              p_cur_code := '';
+              p_subj_level_b := 0;
+              p_subj_level_e := 0;
+              p_is_fw := 0;
+              p_subj_code_b := '';
+              p_subj_code_e := '';
+              p_is_sch := 0;
+            end if;
+
+            /*处理是否含未记账*/
+            if p_is_nacc = 1 then
+              p_state := 1;
+            else
+              p_state := 99;
+            end if;
+            /*处理范围查询的最大科目最小科目*/
+            if p_is_fw = 1 then
+              select min(subj_code)
+              into subj_code_begin
+              from acc_subj
+              where group_id = p_group_id
+                and hos_id = p_hos_id
+                and instr(p_copy_codes, ';' || copy_code || ';') > 0
+                and is_last=1
+                and acc_year between p_acc_year_b and p_acc_year_e
+                and subj_code like p_subj_code_b || '%';
+
+              select max(subj_code)
+              into subj_code_end
+              from acc_subj
+              where group_id = p_group_id
+                and hos_id = p_hos_id
+                and instr(p_copy_codes, ';' || copy_code || ';') > 0
+                and acc_year between p_acc_year_b and p_acc_year_e
+                and subj_code like p_subj_code_e || '%';
+            end if;
+
+
+            /*根据方案科目或者页面科目得到科目临时表*/
+            if  p_isLastChk =0 then
+              
+            insert into t_acc_books_subj(
+              subj_code, subj_name, subj_name_all, subj_dire
+               )
+                select distinct subj_code, subj_name, subj_name_all, subj_dire
+                from acc_subj
+                where group_id = p_group_id
+                  and hos_id = p_hos_id
+                  and instr(p_copy_codes, ';' || copy_code || ';') > 0
+                  and acc_year between p_acc_year_b and p_acc_year_e
+                  and (p_subj_level_b = 0 or subj_level >= p_subj_level_b)
+                  and (p_subj_level_e = 0 or subj_level <= p_subj_level_e)
+                  and is_last=1
+                  and (
+                    (p_is_fw = 1 and subj_code between subj_code_begin and subj_code_end)
+                    or
+                    (p_is_fw = 0 and (
+                        (p_is_sch <> 0 and subj_code in(
+                          select b.subj_code
+                          from acc_book_sch_subj a
+                          left join acc_subj b
+                            on a.group_id = b.group_id
+                            and a.hos_id = b.hos_id
+                            and a.copy_code = b.copy_code
+                            and b.acc_year between p_acc_year_b and p_acc_year_e
+                            and a.subj_code like b.subj_code || '%'
+                          where a.group_id = p_group_id
+                            and a.hos_id = p_hos_id
+                            and a.copy_code = p_copy_code
+                            and sch_id = p_sch_id
+                        ))
+                        or
+                        (p_is_sch = 0 and subj_code like p_subj_code || '%')
+                      )
+                    )
+                  );
+               
+              else
+              
+              insert into t_acc_books_subj(
+              subj_code, subj_name, subj_name_all, subj_dire
+               )
+                select distinct subj_code, subj_name, subj_name_all, subj_dire
+                from acc_subj
+                where group_id = p_group_id
+                  and hos_id = p_hos_id
+                  and instr(p_copy_codes, ';' || copy_code || ';') > 0
+                  and acc_year between p_acc_year_b and p_acc_year_e
+                  and (p_subj_level_b = 0 or subj_level >= p_subj_level_b)
+                  and (p_subj_level_e = 0 or subj_level <= p_subj_level_e)
+                  and (
+                    (p_is_fw = 1 and subj_code between subj_code_begin and subj_code_end)
+                    or
+                    (p_is_fw = 0 and (
+                        (p_is_sch <> 0 and subj_code in(
+                          select b.subj_code
+                          from acc_book_sch_subj a
+                          left join acc_subj b
+                            on a.group_id = b.group_id
+                            and a.hos_id = b.hos_id
+                            and a.copy_code = b.copy_code
+                            and b.acc_year between p_acc_year_b and p_acc_year_e
+                            and a.subj_code like b.subj_code || '%'
+                          where a.group_id = p_group_id
+                            and a.hos_id = p_hos_id
+                            and a.copy_code = p_copy_code
+                            and sch_id = p_sch_id
+                        ))
+                        or
+                        (p_is_sch = 0 and subj_code like p_subj_code || '%')
+                      )
+                    )
+                  );
+              
+              end if;
+
+            /*追加末级*/
+            if p_is_last = 1 then
+              insert into t_acc_books_subj(
+                subj_code, subj_name, subj_name_all, subj_dire
+              )
+              select subj_code, subj_name, subj_name_all, subj_dire
+              from acc_subj
+              where group_id = p_group_id
+                and hos_id = p_hos_id
+                and instr(p_copy_codes, ';' || copy_code || ';') > 0
+                and acc_year between p_acc_year_b and p_acc_year_e
+                and (
+                  (p_is_fw = 1 and subj_code between subj_code_begin and subj_code_end)
+                  or
+                  (p_is_fw = 0 and (
+                      (p_is_sch <> 0 and subj_code in(
+                        select b.subj_code
+                        from acc_book_sch_subj a
+                        left join acc_subj b
+                          on a.group_id = b.group_id
+                          and a.hos_id = b.hos_id
+                          and a.copy_code = b.copy_code
+                          and b.acc_year between p_acc_year_b and p_acc_year_e
+                          and a.subj_code like b.subj_code || '%'
+                        where a.group_id = p_group_id
+                          and a.hos_id = p_hos_id
+                          and a.copy_code = p_copy_code
+                          and sch_id = p_sch_id
+                      ))
+                      or
+                      (p_is_sch = 0 and subj_code like p_subj_code || '%')
+                    )
+                  )
+                )
+                and not exists(
+                  select 1 from t_acc_books_subj
+                  where acc_subj.subj_code = t_acc_books_subj.subj_code
+                );
+            end if;
+
+            /*凭证号查询条件处理*/
+            vouch_no_num:= '';
+            if p_vouch_no_begin <> '0' then
+                 vouch_no_num :=  ' and TO_NUMBER(v.vouch_no) >= '||p_vouch_no_begin||'' ;
+            end if ;
+            if p_vouch_no_end <> '0'   then
+                 vouch_no_num := vouch_no_num || ' and TO_NUMBER(v.vouch_no) <= '||p_vouch_no_end||'' ;
+            end if;
+            /* 摘要查询条件处理*/
+            summary1_num:= '';
+            if p_summary <> '0' then
+                 summary1_num :=summary1_num || ' and c.summary like ''%'||p_summary||'%'' ';
+            else
+              summary1_num :='';
+            end if ;
+            /*条件处理end*/
+
+            if p_acc_month_b = '01' then
+              /*年初余额*/
+              v_summary := '上年结转';
+              execute immediate '
+                insert into t_acc_books_slmxz(
+                  xh, acc_year, acc_month, subj_code, subj_name, summary,
+                  debit, credit, subj_dire, end_os)
+                select 1, ''0000'', ''00'', hs.subj_code, hs.subj_name, :summary,
+                  sum(nvl(c.sum_od,0)), sum(nvl(c.sum_oc,0)),
+                  hs.subj_dire, sum(nvl(c.end_os,0))
+                from t_acc_books_subj hs
+                left join acc_leder c
+                  on c.group_id = :group_id
+                  and c.hos_id = :hos_id
+                  and instr(''' || p_copy_codes || ''', '';'' || c.copy_code || '';'') > 0
+                  and c.acc_year = :acc_year_b
+                  and c.acc_month = ''00''
+                  and c.subj_code like hs.subj_code||''%''
+                group by hs.subj_code, hs.subj_name, hs.subj_dire
+                '
+              using v_summary, p_group_id, p_hos_id, p_acc_year_b;
+              
+            else
+              /*期初余额*/
+              v_summary := '期初余额';
+
+              execute immediate '
+                insert into t_acc_books_slmxz(
+                  xh, acc_year, acc_month, subj_code, subj_name, summary,
+                  debit, credit, subj_dire, end_os)
+                select 1, ''0000'', ''00'', t1.subj_code, t1.subj_name, :summary,
+                  0, 0, t1.subj_dire, sum(nvl(t1.end_os,0))
+                from(
+                  select hs.subj_code, hs.subj_name, sum(nvl(c.sum_od,0)) debit,
+                    sum(nvl(c.sum_oc,0)) credit, hs.subj_dire,
+                    sum(nvl(c.end_os,0)) end_os
+                  from t_acc_books_subj hs
+                  left join acc_leder c
+                    on c.group_id = :group_id
+                    and c.hos_id = :hos_id
+                    and instr(''' || p_copy_codes || ''', '';'' || c.copy_code || '';'') > 0
+                    and c.acc_year = :acc_year_b
+                    and c.acc_month = ''00''
+                   and c.subj_code like hs.subj_code||''%''
+                  group by hs.subj_code, hs.subj_name, hs.subj_dire
+                  union all
+                  select hs.subj_code, hs.subj_name, sum(nvl(c.debit,0)) debit,
+                    sum(nvl(c.credit,0)) credit, hs.subj_dire,
+                    sum(nvl(case when hs.subj_dire=0 then nvl(c.debit,0)-nvl(c.credit,0) else nvl(c.credit,0)-nvl(c.debit,0) end,0)) end_os
+                  from acc_vouch_detail c
+                  left join acc_vouch v
+                    on c.group_id = v.group_id
+                    and c.hos_id = v.hos_id
+                    and c.copy_code = v.copy_code
+                    and c.acc_year = v.acc_year
+                    and c.vouch_id = v.vouch_id
+                  inner join t_acc_books_subj hs
+                    on c.subj_code like hs.subj_code||''%''
+                  where v.group_id = :group_id
+                    and v.hos_id = :hos_id
+                    and instr(''' || p_copy_codes || ''', '';'' || v.copy_code || '';'') > 0
+                    and v.acc_year = :acc_year_b
+                    and v.acc_month < :acc_month_b
+                    and v.state >= :p_state
+                  group by hs.subj_code, hs.subj_name, hs.subj_dire
+                ) t1  
+                group by t1.subj_code, t1.subj_name, t1.subj_dire'
+              using v_summary, p_group_id, p_hos_id, p_acc_year_b,
+                p_group_id, p_hos_id, p_acc_year_b, p_acc_month_b, p_state;
+
+            end if;
+
+            /*本期发生数据*/
+            execute immediate '
+              insert into t_acc_books_slmxz(
+                id, xh, acc_year, acc_month, vouch_date, vouch_no, vouch_id,
+                subj_code, subj_name, summary, debit, credit, subj_dire, end_os)
+              select c.vouch_detail_id, 2, v.acc_year, v.acc_month, v.vouch_date,
+                t.vouch_type_short||''-''||v.vouch_no vouch_no, v.vouch_id, hs.subj_code,
+                hs.subj_name, c.summary, nvl(c.debit,0), nvl(c.credit,0), hs.subj_dire,
+                (case when hs.subj_dire=0 then nvl(c.debit,0)-nvl(c.credit,0) else nvl(c.credit,0)-nvl(c.debit,0) end) end_os
+              from acc_vouch_detail c
+              inner join acc_vouch v
+                on c.group_id = v.group_id
+                and c.hos_id = v.hos_id
+                and c.copy_code = v.copy_code
+                and c.acc_year = v.acc_year
+                and c.vouch_id = v.vouch_id
+              inner join acc_vouch_type t
+                on v.group_id = t.group_id
+                and v.hos_id = t.hos_id
+                and v.copy_code = t.copy_code
+                and v.vouch_type_code = t.vouch_type_code
+              inner join t_acc_books_subj hs
+                on c.subj_code = hs.subj_code
+              where v.group_id = :group_id
+                and v.hos_id = :hos_id
+                and instr(''' || p_copy_codes || ''', '';'' || v.copy_code || '';'') > 0
+                and TO_NUMBER(v.acc_year||''''||v.acc_month) between TO_NUMBER(:acc_year_b||''''||:acc_month_b) and TO_NUMBER(:acc_year_e||''''||:acc_month_e)
+                and v.state >= :p_state
+                '||vouch_no_num||''||summary1_num||'
+            ' using p_group_id, p_hos_id, p_acc_year_b, p_acc_month_b,
+              p_acc_year_e, p_acc_month_e, p_state;
+
+              execute immediate '
+              insert into t_acc_books_slmxz(
+                 xh, acc_year, acc_month, subj_code, subj_name,
+              summary, debit, credit, subj_dire, end_os)
+              select  3, v.acc_year, v.acc_month, hs.subj_code,
+                hs.subj_name, ''本月合计'', sum(nvl(c.debit,0)), sum(nvl(c.credit,0)), hs.subj_dire,
+                0 end_os
+              from acc_vouch_detail c
+              inner join acc_vouch v
+                on c.group_id = v.group_id
+                and c.hos_id = v.hos_id
+                and c.copy_code = v.copy_code
+                and c.acc_year = v.acc_year
+                and c.vouch_id = v.vouch_id
+              inner join acc_vouch_type t
+                on v.group_id = t.group_id
+                and v.hos_id = t.hos_id
+                and v.copy_code = t.copy_code
+                and v.vouch_type_code = t.vouch_type_code
+              inner join t_acc_books_subj hs
+                on c.subj_code = hs.subj_code
+              where v.group_id = :group_id
+                and v.hos_id = :hos_id
+                and instr(''' || p_copy_codes || ''', '';'' || v.copy_code || '';'') > 0
+                and TO_NUMBER(v.acc_year||''''||v.acc_month) between TO_NUMBER(:acc_year_b||''01'') and TO_NUMBER(:acc_year_e||''''||:acc_month_e)
+                and v.state >= :p_state
+                '||vouch_no_num||''||summary1_num||' group by v.acc_year,  v.acc_month, hs.subj_code, hs.subj_name, hs.subj_dire
+            ' using p_group_id, p_hos_id, p_acc_year_b,
+              p_acc_year_e, p_acc_month_e, p_state;
+              
+              --插入非末级科目的本月合计
+            execute immediate '
+              insert into t_acc_books_slmxz(
+                 xh, acc_year, acc_month, subj_code, subj_name,
+              summary, debit, credit, subj_dire, end_os,is_last)
+              select  3, v.acc_year, v.acc_month, hs.subj_code,
+                hs.subj_name, ''本月合计'', sum(nvl(c.debit,0)), sum(nvl(c.credit,0)), hs.subj_dire,
+               case when hs.subj_dire = 0 then sum(nvl(c.debit,0))-sum(nvl(c.credit,0)) else sum(nvl(c.credit,0))-sum(nvl(c.debit,0)) end  end_os,
+                 ahs.is_last
+              from acc_vouch_detail c
+              inner join acc_vouch v
+                on c.group_id = v.group_id
+                and c.hos_id = v.hos_id
+                and c.copy_code = v.copy_code
+                and c.acc_year = v.acc_year
+                and c.vouch_id = v.vouch_id
+              inner join acc_vouch_type t
+                on v.group_id = t.group_id
+                and v.hos_id = t.hos_id
+                and v.copy_code = t.copy_code
+                and v.vouch_type_code = t.vouch_type_code
+              inner join t_acc_books_subj hs
+                on c.subj_code like hs.subj_code ||''%''
+                  inner join acc_subj ahs
+                on ahs.subj_code = hs.subj_code
+                and ahs.is_last=0 
+              where v.group_id = :group_id
+                and v.hos_id = :hos_id
+                and instr(''' || p_copy_codes || ''', '';'' || v.copy_code || '';'') > 0
+                and TO_NUMBER(v.acc_year||''''||v.acc_month) between TO_NUMBER(:acc_year_b||:acc_month_b) and TO_NUMBER(:acc_year_e||''''||:acc_month_e)
+               and ahs.acc_year='||p_acc_year_b||' 
+               and v.state >= :p_state
+                '||vouch_no_num||''||summary1_num||' group by v.acc_year,  v.acc_month, hs.subj_code, hs.subj_name, hs.subj_dire,ahs.is_last
+            ' using p_group_id, p_hos_id, p_acc_year_b,p_acc_month_b,
+              p_acc_year_e, p_acc_month_e, p_state;
+
+            /*本月合计数据*/
+           /* insert into t_acc_books_slmxz(
+              xh, acc_year, acc_month, subj_code, subj_name,
+              summary, debit, credit, subj_dire, end_os
+            )
+            select 3, acc_year, acc_month, subj_code, subj_name,
+              '本月合计', sum(nvl(debit,0)), sum(nvl(credit,0)),
+              subj_dire, 0 end_os
+            from t_acc_books_slmxz
+            where xh = 2
+            group by acc_year, acc_month, subj_code, subj_name, subj_dire;*/
+
+            /*计算本期发生凭证、本月合计的余额*/
+            --dbms_output.put_line(ddl_sql);
+            declare
+              end_os_sum numeric(19,2);
+              subj_id numeric(18);
+              v_acc_month varchar(2) :='';
+              v_flag integer :=0;
+              i number;
+            begin
+              i := 1;
+              subj_id := 0;
+              end_os_sum := 0;
+              for cr in (
+                select r.xh, r.subj_code, r.subj_name, r.id, r.end_os,
+                  r.acc_year, r.acc_month, r.subj_dire, r.vouch_date,r.is_last
+                from t_acc_books_slmxz r
+                where r.xh < 4
+                order by r.subj_code asc, r.acc_year asc, r.acc_month asc,
+                  r.xh asc, r.vouch_date asc, r.vouch_no asc, r.id asc
+              ) loop
+              
+              dbms_output.put_line(cr.subj_code||'---'||cr.acc_year||'---'||cr.acc_month||'---'||cr.end_os);
+                /*新的科目从0开始计算*/
+                if subj_id <> cr.subj_code then
+                  end_os_sum := 0;
+                  /*有发生数据没有期初余额新增加一条期初余额*/
+                  if cr.xh > 1 then
+                    v_flag := 1;
+                    insert into t_acc_books_slmxz(
+                      xh, acc_year, acc_month, subj_dire,vouch_date, vouch_no,
+                      subj_code, subj_name, summary, end_os
+                    )
+                    values(
+                      1, '0000', '00', cr.subj_dire, cr.vouch_date,'',
+                      cr.subj_code, cr.subj_name, v_summary, 0
+                    );
+                  end if;
+                end if;
+
+                /*if v_acc_month <> cr.acc_month and v_flag = 0 then
+                  if cr.xh > 1 and v_acc_month <> '00' then
+                    insert into t_acc_books_slmxz(
+                      xh, acc_year, acc_month, vouch_date, vouch_no,
+                      subj_code, subj_name, summary, subj_dire, end_os
+                    )
+                    values(
+                      1, cr.acc_year, cr.acc_month, cr.vouch_date, '', cr.subj_code,
+                      cr.subj_name, '期初余额1', cr.subj_dire, end_os_sum
+                    );
+                  end if;
+                end if;*/
+
+             
+                    end_os_sum := end_os_sum + cr.end_os;
+
+                    /*本期发生凭证余额*/
+                    if cr.xh = 2 then
+                       update t_acc_books_slmxz
+                       set end_os = end_os_sum
+                       where id = cr.id and xh = 2;
+                    end if;
+
+                    /*本月合计余额*/
+                    if cr.xh = 3 then
+                      update t_acc_books_slmxz
+                      set end_os = end_os_sum
+                      where xh = 3
+                      and subj_code = cr.subj_code
+                      and acc_year = cr.acc_year
+                      and acc_month = cr.acc_month;
+                      --插入本年累计
+                      --插入本年累计
+                      execute immediate '
+                        insert into t_acc_books_slmxz(
+                          xh, acc_year, acc_month, subj_code, subj_name,
+                          summary, debit, credit, end_os)
+                        select  4, 
+                          '''||cr.acc_year||''', 
+                          '''||cr.acc_month||''', 
+                          '''||cr.subj_code||''', 
+                          '''||cr.subj_name||''', 
+                          ''本年累计'', 
+                          sum(nvl(c.debit,0)), 
+                          sum(nvl(c.credit,0)), 
+                          '||end_os_sum||'
+                        from acc_vouch_detail c
+                        inner join acc_vouch v
+                          on c.group_id = v.group_id
+                          and c.hos_id = v.hos_id
+                          and c.copy_code = v.copy_code
+                          and c.acc_year = v.acc_year
+                          and c.vouch_id = v.vouch_id
+                        inner join t_acc_books_subj hs
+                          on c.subj_code like hs.subj_code ||''%''
+                        where v.group_id = '||p_group_id||'
+                          and v.hos_id = '||p_hos_id||'
+                          and instr(''' || p_copy_codes || ''', '';'' || v.copy_code || '';'') > 0
+                          and v.acc_year = '''||cr.acc_year||'''
+                          and v.acc_month <= '''||cr.acc_month||'''
+                          and v.state >= '||p_state||'
+                          and hs.subj_code = '''||cr.subj_code||'''
+                          '||vouch_no_num||''||summary1_num||' 
+                      ';
+                    end if;
+                
+                i:=i+1;
+                subj_id:=cr.subj_code;
+                v_flag := 0;
+                v_acc_month:=cr.acc_month;
+              end loop;
+            end;
+
+            /*是否显示本期无发生数据*/
+            if p_is_bqwfs = 0 then
+              /*删除本期无发生数据的科目*/
+              DELETE FROM t_acc_books_slmxz
+              WHERE 'Y'||acc_year||'M'||acc_month||'S'||subj_code in(
+                SELECT subj_code FROM(
+                  SELECT 'Y'||acc_year||'M'||acc_month||'S'||subj_code as subj_code, sum(nvl(debit, 0)) debit,
+                    sum(nvl(credit, 0)) credit
+                  FROM t_acc_books_slmxz
+                  where xh = 3
+                  GROUP BY 'Y'||acc_year||'M'||acc_month||'S'||subj_code
+                ) a
+                WHERE a.credit = 0
+                  AND a.debit = 0
+              );
+            end if;
+
+            /*返回结果集游标*/
+            /*ddl_sql:='select * from (
+              select rownum rn, ab.* from(
+                select
+                  case when t.summary = ''期初余额'' then replace(t.acc_year,t.acc_year,'''')
+                       when t.summary = ''上年结转'' then replace(t.acc_year,t.acc_year,'''')
+                       else t.acc_year
+                  end acc_year,
+                  case when t.summary = ''期初余额'' then replace(t.acc_month,t.acc_month,'''')
+                       when t.summary = ''上年结转'' then replace(t.acc_month,t.acc_month,'''')
+                       else t.acc_month
+                  end acc_month,
+                  case when t.summary = ''期初余额'' then replace(t.vouch_date,t.vouch_date,'''')
+                       when t.summary = ''上年结转'' then replace(t.vouch_date,t.vouch_date,'''')
+                       when t.summary = ''本月合计'' then replace(t.vouch_date,t.vouch_date,'''')
+                       when t.summary = ''本年累计'' then replace(t.vouch_date,t.vouch_date,'''')
+                       else to_char(t.vouch_date,''dd'')
+                  end acc_day,
+                  t.vouch_no,
+                  t.vouch_id,
+                  t.subj_code||'' ''||t.subj_name subj_name,
+                  t.summary,
+                  t.debit as debit,
+                  t.credit as credit,
+                  case when t.end_os=0 then ''平'' when t.subj_dire=0 then ''借'' else ''贷'' end subj_dire,
+                  t.end_os
+                from (
+                  select acc_year, acc_month, subj_code, subj_name, vouch_date,
+                    summary, vouch_no, vouch_id, debit, credit, end_os, subj_dire, xh,id
+                  from t_acc_books_slmxz
+                    where  nvl('||p_is_bqwfs||',0) != 0
+                       or (     nvl('||p_is_bqwfs||',0) = 0
+                            and ''Y''||acc_year||''M''||acc_month||''S''||subj_code not in(
+                                SELECT subj_code_all FROM(
+                                  SELECT ''Y''||acc_year||''M''||acc_month||''S''||subj_code as subj_code_all
+                                      , sum(nvl(debit, 0)) debit,
+                                        sum(nvl(credit, 0)) credit
+                                  FROM t_acc_books_slmxz
+                                  where xh = 3
+                                  GROUP BY ''Y''||acc_year||''M''||acc_month||''S''||subj_code
+                                ) a
+                                WHERE a.credit = 0
+                                  and a.debit = 0
+                                )
+                         )
+                  union all
+                  select b.acc_year, b.acc_month, a.subj_code, a.subj_name, null vouch_date,
+                    b.summary, null vouch_no, null vouch_id, sum(b.debit) debit, sum(b.credit) credit,
+                    sum(b.end_os) end_os, b.subj_dire, b.xh,b.id
+                  from t_acc_books_subj a
+                  left join t_acc_books_slmxz b
+                    on b.subj_code like a.subj_code || ''%''
+                    and b.xh in(1,3,4)
+                  where not exists(
+                    select 1 from t_acc_books_slmxz
+                    where t_acc_books_slmxz.subj_code = a.subj_code
+                  )
+                  group by b.acc_year, b.acc_month, a.subj_code, a.subj_name,
+                    b.summary, b.subj_dire, b.xh,b.id
+                )t
+                where t.xh <= 4 and (t.acc_month>='||p_acc_month_b||' and t.acc_month<='||p_acc_month_e||' or t.acc_month is null or t.acc_month =''00'')
+                order by t.subj_code asc, t.acc_year asc, t.acc_month asc,
+                t.xh asc, t.vouch_date asc, t.vouch_no asc, t.id asc
+              ) ab
+           )';
+
+           if p_pagesize>0 then
+                ddl_sql:=ddl_sql||' where rn >'||(p_page-1)*p_pagesize||' and rn<='||p_page*p_pagesize;
+           end if;*/
+           
+           ddl_sql:=' select * from (
+           select rownum rn, ab.* from(
+    			select 
+                  case when t.summary = ''期初余额'' then replace(t.acc_year,t.acc_year,'''')
+                       when t.summary = ''上年结转'' then replace(t.acc_year,t.acc_year,'''')
+                       else t.acc_year
+                  end acc_year,
+                  case when t.summary = ''期初余额'' then replace(t.acc_month,t.acc_month,'''')
+                       when t.summary = ''上年结转'' then replace(t.acc_month,t.acc_month,'''')
+                       else t.acc_month
+                  end acc_month,
+                  case when t.summary = ''期初余额'' then replace(t.vouch_date,t.vouch_date,'''')
+                       when t.summary = ''上年结转'' then replace(t.vouch_date,t.vouch_date,'''')
+                       when t.summary = ''本月合计'' then replace(t.vouch_date,t.vouch_date,'''')
+                       when t.summary = ''本年累计'' then replace(t.vouch_date,t.vouch_date,'''')
+                       else to_char(t.vouch_date,''dd'')
+                  end acc_day,
+                  t.vouch_no,
+                  t.vouch_id,
+                  t.subj_code||'' ''||t.subj_name subj_name,
+                  t.summary,
+                  t.debit as debit,
+                  t.credit as credit,
+                  case when t.end_os=0 then ''平'' when t.subj_dire=0 then ''借'' else ''贷'' end subj_dire,
+                  t.end_os from t_acc_books_slmxz t  where (t.acc_month>='||p_acc_month_b||' and t.acc_month<='||p_acc_month_e||' or t.acc_month is null or t.acc_month =''00'') order by t.subj_code asc, t.acc_year asc, t.acc_month asc,
+                t.xh asc, t.vouch_date asc, t.vouch_no asc, t.id asc 
+                ) ab
+           )';
+
+	 	   if p_pagesize>0 then
+                ddl_sql:=ddl_sql||' where rn >'||(p_page-1)*p_pagesize||' and rn<='||p_page*p_pagesize;
+           end if;
+
+           open p_result_data for ddl_sql;
+
+           p_tcount:=0;
+           if p_pagesize>0 then
+             count_sql:='
+             select count(1)
+             from (
+              select acc_year, acc_month, subj_code, subj_name, vouch_date,
+                summary, vouch_no, vouch_id, debit, credit, end_os, subj_dire, xh
+              from t_acc_books_slmxz
+              where nvl('||p_is_bqwfs||',0) != 0
+                       or (     nvl('||p_is_bqwfs||',0) = 0
+                            and ''Y''||acc_year||''M''||acc_month||''S''||subj_code not in(
+                                SELECT subj_code_all FROM(
+                                  SELECT ''Y''||acc_year||''M''||acc_month||''S''||subj_code as subj_code_all
+                                      , sum(nvl(debit, 0)) debit,
+                                        sum(nvl(credit, 0)) credit
+                                  FROM t_acc_books_slmxz
+                                  where xh = 3
+                                  GROUP BY ''Y''||acc_year||''M''||acc_month||''S''||subj_code
+                                ) a
+                                WHERE a.credit = 0
+                                  and a.debit = 0
+                                )
+                         )
+              union all
+              select b.acc_year, b.acc_month, a.subj_code, a.subj_name, null vouch_date,
+                b.summary, null vouch_no, null vouch_id, sum(b.debit) debit, sum(b.credit) credit,
+                sum(b.end_os) end_os, b.subj_dire, b.xh
+              from t_acc_books_subj a
+              left join t_acc_books_slmxz b
+                on b.subj_code like a.subj_code || ''%''
+                and b.xh in(1,3,4)
+              where not exists(
+                select 1 from t_acc_books_slmxz
+                where t_acc_books_slmxz.subj_code = a.subj_code
+              )
+              group by b.acc_year, b.acc_month, a.subj_code, a.subj_name,
+                b.summary, b.subj_dire, b.xh
+             ) t
+             where t.xh<=4 and (t.acc_month>='||p_acc_month_b||' and t.acc_month<='||p_acc_month_e||')';
+
+             EXECUTE IMMEDIATE count_sql INTO p_tcount;
+           end if;
+
+     END PRC_SLMXZ;
+
+	]]></sql>
+</root>

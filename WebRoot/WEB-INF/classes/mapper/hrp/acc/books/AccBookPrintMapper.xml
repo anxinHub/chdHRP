@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.acc.dao.books.AccBookPrintMapper">
+	<resultMap id="accBookPrintSubj" type="java.util.Map">
+		<result property="print_code" column="print_code" />
+		<result property="subj_name" column="subj_name" />
+		<result property="print_name" column="print_name" />
+		<result property="subj_level" column="subj_level" />
+	</resultMap>
+	
+	<resultMap id="accBookPrint" type="java.util.Map">
+		<result property="acc_year" column="acc_year" />
+		<result property="acc_month" column="acc_month" />
+		<result property="acc_day" column="acc_day" />
+		<result property="vouch_no" column="vouch_no" />
+		<result property="vouch_id" column="vouch_id" />
+		<result property="subj_name" column="subj_name" />
+		<result property="summary" column="summary" />
+		<result property="debit" column="debit" />
+		<result property="credit" column="credit" />
+		<result property="end_os" column="end_os" />
+	</resultMap>
+	
+	<!-- 打印科目查询 -->
+	<select id="queryAccBooksPrintSubj" resultMap="accBookPrintSubj" parameterType="java.util.Map">
+		SELECT subj_code print_code, subj_name, subj_name_all print_name, subj_level 
+		FROM acc_subj
+		WHERE group_id = #{group_id,jdbcType=INTEGER} 
+			AND hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND copy_code = #{copy_code,jdbcType=VARCHAR} 
+			AND acc_year = #{acc_year,jdbcType=VARCHAR} 
+			<if test="subj_level != null and subj_level != ''">
+				AND (
+					(#{subj_level,jdbcType=INTEGER} = 99 AND is_last = 1) 
+					or subj_level = #{subj_level,jdbcType=INTEGER}
+				)
+			</if>
+			<if test="begin_subj_code != null and begin_subj_code != ''">
+				AND subj_code &gt;= #{begin_subj_code,jdbcType=VARCHAR}
+			</if>
+			<if test="end_subj_code != null and end_subj_code != ''">
+				AND (
+					subj_code &lt;= #{end_subj_code,jdbcType=VARCHAR}  
+					OR subj_code like '${end_subj_code}%'
+				)
+			</if>
+		ORDER BY subj_code
+	</select>
+	
+	<!-- 打印查询 -->
+	<select id="collectAccBooksPrint" statementType="CALLABLE" parameterType="java.util.Map" >
+		<![CDATA[{call PROC_ACC_BOOKS_PRINT( 
+			#{group_id,jdbcType=INTEGER}, 
+			#{hos_id,jdbcType=INTEGER}, 
+			#{copy_code,jdbcType=VARCHAR}, 
+			#{acc_year,jdbcType=VARCHAR}, 
+		    #{begin_month,jdbcType=VARCHAR}, 
+		    #{end_month,jdbcType=VARCHAR}, 
+		    #{print_code,jdbcType=VARCHAR}, 
+			#{rst,jdbcType=CURSOR,mode=OUT,resultMap=com.chd.hrp.acc.dao.books.AccBookPrintMapper.accBookPrint,javaType=java.sql.ResultSet}
+			)}
+		]]>
+	</select>
+</mapper>
+

@@ -1,0 +1,766 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.hr.dao.scientificresearch.HrSRStatisticsMapper">
+	
+	<resultMap type="java.util.Map" id="scoreSetMap">
+		<result property="field_col_code" column="field_col_code"/>
+		<result property="field_col_name" column="field_col_name"/>
+		<result property="score" column="score"/>
+	</resultMap>
+	
+	<resultMap type="com.chd.hrp.hr.entity.sysstruc.HrFiiedData" id="fiiedDataMap">
+		<result property="field_col_code" column="field_col_code"/>
+		<result property="field_col_name" column="field_col_name"/>
+	</resultMap>
+	
+	<resultMap type="com.chd.hrp.hr.entity.scientificresearch.HrPaperSet" id="hrPaperSetMap">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="year" column="year"/>
+		<result property="paper_type_code" column="paper_type_code"/>
+		<result property="paper_type_name" column="paper_type_name"/>
+		<result property="affect_para" column="affect_para"/>
+		<result property="affect_para_name" column="affect_para_name"/>
+		<result property="score" column="score"/>
+		<result property="note" column="note"/>
+	</resultMap>
+	
+	<resultMap type="com.chd.hrp.hr.entity.scientificresearch.HrResearchTotSet" id="hrResearchTotSetMap">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="year" column="year"/>
+		<result property="acade_honor" column="acade_honor"/>
+		<result property="acade_status" column="acade_status"/>
+		<result property="proj" column="proj"/>
+		<result property="paper" column="paper"/>
+		<result property="note" column="note"/>
+	</resultMap>
+	
+	<select id="queryHonorStatistics" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+			select #{year} year, he.emp_code,he.emp_name,extract (year from t.get_date) get_date,t.honor_code,
+				hd.dept_code||' '||hd.dept_name dept_name,
+			    case when SUM(hs.score) over(PARTITION BY emp_code) > nvl(ts.acade_honor, 0) 
+			    then nvl(ts.acade_honor,0) 
+			    else nvl(SUM(hs.score) over(PARTITION BY emp_code),0) end score 
+			  from HR_EMP_ACADE_HONOR t
+			  left join  hos_emp he
+			    on t.emp_id = he.emp_id
+			   and t.group_id = he.group_id
+			   and t.hos_id = he.hos_id
+			  left join hos_dept hd on he.group_id=hd.group_id and he.hos_id=hd.hos_id
+			  	and he.dept_id=hd.dept_id
+			  left join HR_ACADE_HONOR_SET hs
+			    on t.group_id = hs.group_id
+			   and t.hos_id = hs.hos_id
+			   and t.honor_code = hs.honor_code
+			   and hs.year = #{year}
+			  left join HR_RESEARCH_TOT_SET ts
+			    on t.group_id = ts.group_id
+			   and t.hos_id = ts.hos_id
+			   and ts.year = #{year}
+			 where t.group_id = #{group_id}
+			   	and t.hos_id = #{hos_id}
+			   	and extract (year from t.get_date) = #{year}
+			   	<if test="emp_name != null and emp_name != ''">
+			   		and he.emp_name like '%'|| #{emp_name} ||'%'
+			   	</if>
+			   	<if test="dept_id != null and dept_id != ''">
+			   		and <!-- he.dept_no||'@'|| -->he.dept_id = #{dept_id}
+			   	</if>
+		)
+		pivot (max(get_date) for honor_code in(${sql}))
+		order by year,emp_code,dept_name
+	</select>
+	
+	<select id="queryHonorStatisticsByPrint" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+			select #{year} year, he.emp_code,he.emp_name,extract (year from t.get_date) get_date,t.honor_code,
+				hd.dept_code||' '||hd.dept_name dept_name,
+			    case when SUM(hs.score) over(PARTITION BY emp_code) > nvl(ts.acade_honor, 0) 
+			    then nvl(ts.acade_honor,0) 
+			    else nvl(SUM(hs.score) over(PARTITION BY emp_code),0) end score 
+			  from HR_EMP_ACADE_HONOR t
+			  left join  hos_emp he on t.emp_id = he.emp_id
+			   	and t.group_id = he.group_id
+			   	and t.hos_id = he.hos_id
+			  left join hos_dept hd on he.group_id=hd.group_id and he.hos_id=hd.hos_id
+			  	and he.dept_id=hd.dept_id
+			  left join HR_ACADE_HONOR_SET hs
+			    on t.group_id = hs.group_id
+			   and t.hos_id = hs.hos_id
+			   and t.honor_code = hs.honor_code
+			   and hs.year = #{year}
+			  left join HR_RESEARCH_TOT_SET ts
+			    on t.group_id = ts.group_id
+			   and t.hos_id = ts.hos_id
+			   and ts.year = #{year}
+			 where t.group_id = #{group_id}
+			   and t.hos_id = #{hos_id}
+			   and extract (year from t.get_date) = #{year}
+			   <if test="emp_name != null and emp_name != ''">
+			   		and he.emp_name like '%'|| #{emp_name} ||'%'
+			   </if>
+			   <if test="dept_id != null and dept_id != ''">
+			   		and <!-- he.dept_no||'@'|| -->he.dept_id = #{dept_id}
+			   </if>
+		)
+		pivot (max(get_date) for honor_code in(${sql}))
+		order by year,emp_code,dept_name
+	</select>
+	
+	<select id="queryStatusStatistics" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+			select #{year} year, he.emp_code,he.emp_name,extract (year from t.beg_date)||'-'||extract (year from t.end_date) off_date,t.status_code,
+			       hd.dept_code||' '||hd.dept_name dept_name,
+			       case when SUM(ss.score) over(PARTITION BY emp_code) > nvl(ts.acade_status, 0) 
+			       then nvl(ts.acade_status,0) 
+			       else nvl(SUM(ss.score) over(PARTITION BY emp_code),0) end score 
+			  from HR_EMP_ACADE_STATUS t
+			  left join  hos_emp he
+			    on t.emp_id = he.emp_id
+			   and t.group_id = he.group_id
+			   and t.hos_id = he.hos_id
+			  left join hos_dept hd on he.group_id=hd.group_id and he.hos_id=hd.hos_id
+			  	and he.dept_id=hd.dept_id 
+			  left join HR_ACADE_STATUS_SET ss
+			    on t.group_id = ss.group_id
+			   and t.hos_id = ss.hos_id
+			   and t.status_code = ss.status_code
+			   and ss.year = #{year}
+			  left join HR_RESEARCH_TOT_SET ts
+			    on t.group_id = ts.group_id
+			   and t.hos_id = ts.hos_id
+			   and ts.year = #{year}
+			 where t.group_id = #{group_id}
+			   and t.hos_id = #{hos_id}
+			   and #{year} &gt;= extract (year from t.beg_date)  
+			   and #{year} &lt;= extract (year from t.end_date) 
+			   <if test="emp_name != null and emp_name != ''">
+			   	and he.emp_name like '%'|| #{emp_name} ||'%'
+			   </if>
+			   <if test="dept_id != null and dept_id != ''">
+			   	and <!-- he.dept_no||'@'|| -->he.dept_id = #{dept_id}
+			   </if>
+			   and he.emp_code is not null
+		)
+		pivot (max(off_date) for status_code in(${sql}))
+		order by year,emp_code,dept_name
+	</select>
+	
+	<!--打印学术地位统计 -->
+	<select id="queryStatusStatisticsByPrint" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+			select #{year} year, he.emp_code,he.emp_name,extract (year from t.beg_date)||'-'||extract (year from t.end_date) off_date,t.status_code,
+			       hd.dept_code||' '||hd.dept_name dept_name,
+			       case when SUM(ss.score) over(PARTITION BY emp_code) > nvl(ts.acade_status, 0) 
+			       then nvl(ts.acade_status,0) 
+			       else nvl(SUM(ss.score) over(PARTITION BY emp_code),0) end score 
+			  from HR_EMP_ACADE_STATUS t
+			  left join  hos_emp he
+			    on t.emp_id = he.emp_id
+			   and t.group_id = he.group_id
+			   and t.hos_id = he.hos_id
+			  left join hos_dept hd on he.group_id=hd.group_id and he.hos_id=hd.hos_id
+			  	and he.dept_id=hd.dept_id 
+			  left join HR_ACADE_STATUS_SET ss
+			    on t.group_id = ss.group_id
+			   and t.hos_id = ss.hos_id
+			   and t.status_code = ss.status_code
+			   and ss.year = #{year}
+			  left join HR_RESEARCH_TOT_SET ts
+			    on t.group_id = ts.group_id
+			   and t.hos_id = ts.hos_id
+			   and ts.year = #{year}
+			 where t.group_id = #{group_id}
+			   and t.hos_id = #{hos_id}
+			   and #{year} &gt;= extract (year from t.beg_date)  
+			   and #{year} &lt;= extract (year from t.end_date) 
+			   <if test="emp_name != null and emp_name != ''">
+			   and he.emp_name like '%'|| #{emp_name} ||'%'
+			   </if>
+			   <if test="dept_id != null and dept_id != ''">
+			   and <!-- he.dept_no||'@'|| -->he.dept_id = #{dept_id}
+			   </if>
+		)
+		pivot (max(off_date) for status_code in(${sql}))
+		order by year,emp_code,dept_name
+	</select>
+	
+	<select id="queryScientificStatistics" parameterType="java.util.Map" resultType="java.util.Map">
+		with temp as (
+			select ep.group_id,
+		         ep.hos_id,
+		         ep.emp_id,
+		         ep.proj_level,
+		         extract(year from ep.beg_date) || '-' ||
+		         extract(year from ep.end_date) get_date
+		    from HR_EMP_PROJ ep
+		    where ep.group_id=#{group_id} and ep.hos_id=#{hos_id} 
+		    	and #{year} &gt;= extract (year from ep.beg_date)  
+			    and #{year} &lt;= extract (year from ep.end_date) 
+		  	union all
+		  	select epc.group_id,
+		         epc.hos_id,
+		         epc.emp_id,
+		         epc.proj_level,
+		         to_char(extract(year from epc.check_date)) get_date
+		    from HR_EMP_PROJ_CHECK epc
+		    where epc.group_id=#{group_id} and epc.hos_id=#{hos_id} 
+		    	and #{year} = extract (year from epc.check_date)  
+		  	union all
+		  	select epa.group_id,
+		         epa.hos_id,
+		         epa.emp_id,
+		         epa.proj_level,
+		         to_char(extract(year from epa.get_date)) get_date
+		    from HR_EMP_PROJ_AWARD epa
+		    where epa.group_id=#{group_id} and epa.hos_id=#{hos_id}
+		    	and #{year} = extract (year from epa.get_date)
+		  	union all
+		  	select epp.group_id,
+		         epp.hos_id,
+		         epp.emp_id,
+		         epp.proj_level,
+		         to_char(extract(year from epp.get_date)) get_date
+		    from HR_EMP_PROJ_PATENT epp
+		    where epp.group_id=#{group_id} and epp.hos_id=#{hos_id}
+		    	and #{year} = extract (year from epp.get_date)
+		 )
+		 select * from (
+		 	select he.emp_code, he.emp_name, t.get_date, t.proj_level,hd.dept_code||' '||hd.dept_name dept_name,
+		    	case when sum(ps.score) over(partition by emp_code) > nvl(ts.proj, 0) 
+		    		then nvl(ts.proj, 0) else
+		            nvl(sum(ps.score) over(partition by emp_code), 0) end as score
+		          from temp t
+		          left join hos_emp he
+		            on t.emp_id = he.emp_id
+		           and t.group_id = he.group_id
+		           and t.hos_id = he.hos_id
+		          left join hos_dept hd on he.group_id=hd.group_id and he.hos_id=hd.hos_id
+			  		and he.dept_id=hd.dept_id
+		          left join HR_EMP_PROJ_SET ps
+		            on t.group_id = ps.group_id
+		           and t.hos_id = ps.hos_id
+		           and ps.year = #{year}
+		           and t.proj_level = ps.proj_level
+		          left join HR_RESEARCH_TOT_SET ts
+		            on t.group_id = ts.group_id
+		           and t.hos_id = ts.hos_id
+		           and ts.year = #{year}
+		         where t.group_id = #{group_id}
+				   and t.hos_id = #{hos_id}
+				   <if test="emp_name != null and emp_name != ''">
+				   	and he.emp_name like '%'|| #{emp_name} ||'%'
+				   </if>
+				   <if test="dept_id != null and dept_id != ''">
+				   	and <!-- he.dept_no||'@'|| -->he.dept_id = #{dept_id}
+				   </if>
+		) pivot(max(get_date) for proj_level in(${sql}))
+		order by emp_code,dept_name
+	</select>
+	
+	
+	<select id="queryScientificStatisticsByPrint" parameterType="java.util.Map" resultType="java.util.Map">
+		with temp as (
+			select ep.group_id,
+		         ep.hos_id,
+		         ep.emp_id,
+		         ep.proj_level,
+		         extract(year from ep.beg_date) || '-' ||
+		         extract(year from ep.end_date) get_date
+		    from HR_EMP_PROJ ep
+		    where ep.group_id=#{group_id} and ep.hos_id=#{hos_id} 
+		    	and #{year} &gt;= extract (year from ep.beg_date)  
+			    and #{year} &lt;= extract (year from ep.end_date) 
+		  	union all
+		  	select epc.group_id,
+		         epc.hos_id,
+		         epc.emp_id,
+		         epc.proj_level,
+		         to_char(extract(year from epc.check_date)) get_date
+		    from HR_EMP_PROJ_CHECK epc
+		    where epc.group_id=#{group_id} and epc.hos_id=#{hos_id} 
+		    	and #{year} = extract (year from epc.check_date)  
+		  	union all
+		  	select epa.group_id,
+		         epa.hos_id,
+		         epa.emp_id,
+		         epa.proj_level,
+		         to_char(extract(year from epa.get_date)) get_date
+		    from HR_EMP_PROJ_AWARD epa
+		    where epa.group_id=#{group_id} and epa.hos_id=#{hos_id}
+		    	and #{year} = extract (year from epa.get_date)
+		  	union all
+		  	select epp.group_id,
+		         epp.hos_id,
+		         epp.emp_id,
+		         epp.proj_level,
+		         to_char(extract(year from epp.get_date)) get_date
+		    from HR_EMP_PROJ_PATENT epp
+		    where epp.group_id=#{group_id} and epp.hos_id=#{hos_id}
+		    	and #{year} = extract (year from epp.get_date)
+		 )
+		 select * from (
+		 	select he.emp_code, he.emp_name, t.get_date, t.proj_level,hd.dept_code||' '||hd.dept_name dept_name,
+		    	case when sum(ps.score) over(partition by emp_code) > nvl(ts.proj, 0) 
+		    		then nvl(ts.proj, 0) else
+		            nvl(sum(ps.score) over(partition by emp_code), 0) end as score
+		          from temp t
+		          left join hos_emp he
+		            on t.emp_id = he.emp_id
+		           and t.group_id = he.group_id
+		           and t.hos_id = he.hos_id
+		          left join hos_dept hd on he.group_id=hd.group_id and he.hos_id=hd.hos_id
+			  		and he.dept_id=hd.dept_id
+		          left join HR_EMP_PROJ_SET ps
+		            on t.group_id = ps.group_id
+		           and t.hos_id = ps.hos_id
+		           and ps.year = #{year}
+		           and t.proj_level = ps.proj_level
+		          left join HR_RESEARCH_TOT_SET ts
+		            on t.group_id = ts.group_id
+		           and t.hos_id = ts.hos_id
+		           and ts.year = #{year}
+		         where t.group_id = #{group_id}
+				   and t.hos_id = #{hos_id}
+				   <if test="emp_name != null and emp_name != ''">
+				   	and he.emp_name like '%'|| #{emp_name} ||'%'
+				   </if>
+				   <if test="dept_id != null and dept_id != ''">
+				   	and <!-- he.dept_no||'@'|| -->he.dept_id = #{dept_id}
+				   </if>
+		) pivot(max(get_date) for proj_level in(${sql}))
+		order by emp_code,dept_name
+		
+	</select>
+	
+	<select id="queryPaperStatistics" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+	      select he.emp_code,he.emp_name,extract (year from t.publish_date) get_date,
+	      		hd.dept_code||' '||hd.dept_name dept_name,
+	      		t.paper_type_code || t.affect_para type_code,
+	            case when SUM(ps.score) over(PARTITION BY emp_code) > nvl(ts.PAPER, 0) 
+	            then nvl(ts.PAPER,0) 
+	            else nvl(SUM(ps.score) over(PARTITION BY emp_code),0) end score 
+	        from HR_EMP_PAPER t
+	        left join  hos_emp he
+	          on t.emp_id = he.emp_id
+	         and t.group_id = he.group_id
+	         and t.hos_id = he.hos_id
+	        left join hos_dept hd on he.group_id=hd.group_id and he.hos_id=hd.hos_id
+			  		and he.dept_id=hd.dept_id
+	        left join HR_PAPER_SET ps
+	          on t.group_id = ps.group_id
+	         and t.hos_id = ps.hos_id
+	         and t.paper_type_code = ps.paper_type_code
+	         and t.affect_para = ps.affect_para
+	         and ps.year = #{year}
+	        left join HR_RESEARCH_TOT_SET ts
+	          on t.group_id = ts.group_id
+	         and t.hos_id = ts.hos_id
+	         and ts.year = #{year}
+	       where t.group_id = #{group_id}
+			 and t.hos_id = #{hos_id}
+			 and #{year} = extract (year from t.publish_date)
+			 <if test="emp_name != null and emp_name != ''">
+			 	and he.emp_name like '%'|| #{emp_name} ||'%'
+			 </if>
+			 <if test="dept_id != null and dept_id != ''">
+			 	and <!-- he.dept_no||'@'|| -->he.dept_id = #{dept_id}
+			 </if>
+	    )
+	    pivot (max(get_date) for type_code in(${sql}))
+	    order by emp_code,dept_name
+	</select>
+	
+	
+	<!-- 打印学术地位统计 -->
+	<select id="queryPaperDynamicTabHeadByPrint" parameterType="java.util.Map" resultType="java.util.Map">
+		select * from (
+	      select he.emp_code,he.emp_name,extract (year from t.publish_date) get_date,
+	      		hd.dept_code||' '||hd.dept_name dept_name,
+	      		t.paper_type_code || t.affect_para type_code,
+	            case when SUM(ps.score) over(PARTITION BY emp_code) > nvl(ts.PAPER, 0) 
+	            then nvl(ts.PAPER,0) 
+	            else nvl(SUM(ps.score) over(PARTITION BY emp_code),0) end score 
+	        from HR_EMP_PAPER t
+	        left join  hos_emp he
+	          on t.emp_id = he.emp_id
+	         and t.group_id = he.group_id
+	         and t.hos_id = he.hos_id
+	        left join hos_dept hd on he.group_id=hd.group_id and he.hos_id=hd.hos_id
+			  		and he.dept_id=hd.dept_id
+	        left join HR_PAPER_SET ps
+	          on t.group_id = ps.group_id
+	         and t.hos_id = ps.hos_id
+	         and t.paper_type_code = ps.paper_type_code
+	         and t.affect_para = ps.affect_para
+	         and ps.year = #{year}
+	        left join HR_RESEARCH_TOT_SET ts
+	          on t.group_id = ts.group_id
+	         and t.hos_id = ts.hos_id
+	         and ts.year = #{year}
+	       where t.group_id = #{group_id}
+			 and t.hos_id = #{hos_id}
+			 and #{year} = extract (year from t.publish_date)
+			 <if test="emp_name != null and emp_name != ''">
+			 	and he.emp_name like '%'|| #{emp_name} ||'%'
+			 </if>
+			 <if test="dept_id != null and dept_id != ''">
+			 	and <!-- he.dept_no||'@'|| -->he.dept_id = #{dept_id}
+			 </if>
+	    )
+	    pivot (max(get_date) for type_code in(${sql}))
+	    order by emp_code,dept_name
+	</select>
+	
+	<select id="queryFieldDataParent" parameterType="java.util.Map" resultMap="fiiedDataMap">
+		select t.field_col_code,t.field_col_name  
+		  from hr_fiied_data t
+		 where t.group_id = #{group_id}
+		   and t.hos_id = #{hos_id}
+		   and t.field_tab_code = #{field_tab_code}
+		   and t.super_col_code is null
+		 order by t.field_col_code
+	</select>
+	
+	<select id="queryFiiedDataByTab" parameterType="java.util.Map" resultMap="fiiedDataMap">
+		select t.field_col_code, t.field_col_name
+		  from hr_fiied_data t
+		 where t.group_id = #{group_id}
+		   and t.hos_id = #{hos_id}
+		   and t.field_tab_code = #{field_tab_code}
+		   and t.is_last = 1
+		   <if test="super_col_code != null and super_col_code != ''">
+		   and t.super_col_code = #{super_col_code}
+		   </if>
+		 order by t.field_col_code
+	</select>
+
+	<select id="queryScoreSet" parameterType="java.util.Map" resultMap="scoreSetMap">
+		select t.field_col_code, t.field_col_name, nvl(hs.score,0) score 
+		  from hr_fiied_data t 
+		  <if test="field_tab_code == 'DIC_ACADE_HONOR'">
+		  left join HR_ACADE_HONOR_SET hs
+		    on t.group_id = hs.group_id
+		   and t.hos_id = hs.hos_id
+		   and t.field_col_code = hs.honor_code
+		   and hs.year = #{year}
+		  </if>
+		  <if test="field_tab_code == 'DIC_ACADE_STATUS'">
+		  left join HR_ACADE_STATUS_SET hs
+		    on t.group_id = hs.group_id
+		   and t.hos_id = hs.hos_id
+		   and t.field_col_code = hs.status_code
+		   and hs.year = #{year}
+		  </if>
+		  <if test="field_tab_code == 'DIC_PROJ_LEVEL'">
+		  left join HR_EMP_PROJ_SET hs
+		    on t.group_id = hs.group_id
+		   and t.hos_id = hs.hos_id
+		   and t.field_col_code = hs.proj_level
+		   and hs.year = #{year}
+		  </if>
+		 where t.group_id = #{group_id}
+		   and t.hos_id = #{hos_id}
+		   and t.field_tab_code = #{field_tab_code}
+		   and t.is_last = 1
+		   <if test="super_col_code != null and super_col_code != ''">
+		   and t.super_col_code = #{super_col_code}
+		   </if>
+		 order by t.field_col_code
+	</select>
+	
+	<select id="queryHrPaperSetByPaperType" parameterType="java.util.Map" resultMap="hrPaperSetMap">
+		select t.year, t.paper_type_code,fd.field_col_name paper_type_name, t.affect_para, fd2.field_col_name affect_para_name, t.score
+		  from HR_PAPER_SET t
+		  left join hr_fiied_data fd
+		    on t.group_id = fd.group_id
+		   and t.hos_id = fd.hos_id
+		   and t.paper_type_code = fd.field_col_code
+		   and fd.field_tab_code = 'DIC_PAPER_TYPE'
+		  left join hr_fiied_data fd2
+		    on t.group_id = fd2.group_id
+		   and t.hos_id = fd2.hos_id
+		   and t.affect_para = fd2.field_col_code
+		   and fd2.field_tab_code = 'DIC_AFFECT_PARA'
+		 where t.group_id = #{group_id}
+		   and t.hos_id = #{hos_id}
+		   and t.year = #{year}
+		   and t.paper_type_code = #{paper_type_code}
+		 <!--   group by t.year, t.paper_type_code, fd.field_col_name , t.affect_para, fd2.field_col_name 
+	, t.score -->
+	</select>
+	
+	<select id="queryScoreStandard" parameterType="java.util.Map" resultMap="hrResearchTotSetMap">
+		select group_id,hos_id,year,nvl(acade_honor,0) acade_honor,nvl(acade_status,0) acade_status,nvl(proj,0) proj,nvl(paper,0) paper,note
+		  from HR_RESEARCH_TOT_SET
+		 where group_id = #{group_id}
+		   and hos_id = #{hos_id}
+		   and year = #{year}
+	</select>
+	
+	<resultMap type="java.util.Map" id="hrSRStatisticsMap">
+		<result property="emp_code" column="emp_code"/>
+		<result property="emp_name" column="emp_name"/>
+		<result property="honor_score" column="honor_score"/>
+		<result property="status_score" column="status_score"/>
+		<result property="proj_score" column="proj_score"/>
+		<result property="paper_score" column="paper_score"/>
+		<result property="total" column="total"/>
+	</resultMap>
+	<select id="querySRStatistics" parameterType="java.util.Map" resultMap="hrSRStatisticsMap">
+		with temp as (
+			select ep.group_id,
+			       ep.hos_id,
+			       ep.emp_id,
+			       ep.proj_level
+			from HR_EMP_PROJ ep
+			where ep.group_id=#{group_id} and ep.hos_id = #{hos_id} 
+				and #{year} &gt;= extract (year from ep.beg_date)  
+			    and #{year} &lt;= extract (year from ep.end_date)  
+			union all
+			select epc.group_id,
+			       epc.hos_id,
+			       epc.emp_id,
+			       epc.proj_level
+			from HR_EMP_PROJ_CHECK epc
+			where epc.group_id=#{group_id} and epc.hos_id = #{hos_id} 
+				and extract (year from epc.check_date) = #{year}   
+			union all
+			select epa.group_id,
+			       epa.hos_id,
+			       epa.emp_id,
+			       epa.proj_level
+			from HR_EMP_PROJ_AWARD epa
+			where epa.group_id=#{group_id} and epa.hos_id = #{hos_id} 
+				and extract (year from epa.get_date) = #{year}
+			union all
+			select epp.group_id,
+			       epp.hos_id,
+			       epp.emp_id,
+			      epp.proj_level
+			from HR_EMP_PROJ_PATENT epp
+			where epp.group_id=#{group_id} and epp.hos_id = #{hos_id} 
+			and extract (year from epp.get_date) = #{year}
+		), t_honor as (
+			select ah.group_id,ah.hos_id,ah.emp_id,nvl(sum(ahs.score),0) score from 
+			HR_EMP_ACADE_HONOR ah
+			left join HR_ACADE_HONOR_SET ahs
+			    on ah.honor_code = ahs.honor_code
+			   and ah.group_id = ahs.group_id
+			   and ah.hos_id = ahs.hos_id
+			   and ahs.year = #{year}
+			 where  extract (year from ah.get_date) = #{year} 
+			 	and ah.group_id=#{group_id} 
+			 	and ah.hos_id = #{hos_id} 
+			 group by ah.group_id,ah.hos_id,ah.emp_id
+		), t_status as(
+			select eas.group_id,eas.hos_id,eas.emp_id,nvl(sum(eass.score),0) score 
+			from HR_EMP_ACADE_STATUS eas
+			left join HR_ACADE_STATUS_SET eass
+			    on eas.status_code = eass.status_code
+			   and eas.group_id = eass.group_id
+			   and eas.hos_id = eass.hos_id
+			   and eass.year = #{year}
+			 where eass.group_id=#{group_id} 
+			 	and eass.hos_id = #{hos_id}
+			 	and #{year} &gt;= extract (year from eas.beg_date)  
+			    and #{year} &lt;= extract (year from eas.end_date)   
+			 group by eas.group_id,eas.hos_id,eas.emp_id
+		),t_proj as(
+			select t.group_id,t.hos_id,t.emp_id,nvl(sum(ps.score),0) score 
+			from temp t
+			left join HR_EMP_PROJ_SET ps 
+				on t.proj_level = ps.proj_level
+			   and t.group_id = ps.group_id
+			   and t.hos_id = ps.hos_id
+			   and ps.year = #{year}
+			 where ps.group_id=#{group_id} and ps.hos_id = #{hos_id}
+			 group by t.group_id,t.hos_id,t.emp_id
+		), t_paper as(
+			select epap.group_id,epap.hos_id,epap.emp_id,nvl(sum(epas.score),0) score 
+			from HR_EMP_PAPER epap
+			  left join HR_PAPER_SET epas
+			    on epap.PAPER_TYPE_CODE = epas.paper_type_code
+			   and epap.AFFECT_PARA = epas.affect_para
+			   and epap.group_id = epas.group_id
+			   and epap.hos_id = epas.hos_id
+			   and epas.year = #{year}
+			 where epap.group_id=#{group_id} and epap.hos_id = #{hos_id}
+			 	and extract (year from epap.publish_date) = #{year}
+			 group by epap.group_id,epap.hos_id,epap.emp_id
+		 )
+		select he.emp_code,he.emp_name, hd.dept_code||' '||hd.dept_name dept_name, 
+		       case when nvl(t_honor.score,0) > nvl(rts.acade_honor,0) then nvl(rts.acade_honor,0) else nvl(t_honor.score,0) end honor_score,
+		       case when nvl(t_status.score,0) > nvl(rts.acade_status,0) then nvl(rts.acade_status,0) else nvl(t_status.score,0) end status_score,
+		       case when nvl(t_proj.score,0) > nvl(rts.proj,0) then nvl(rts.proj,0) else nvl(t_proj.score,0) end proj_score,
+		       case when nvl(t_paper.score,0) > nvl(rts.paper,0) then nvl(rts.paper,0) else nvl(t_paper.score,0) end paper_score,
+		       case when nvl(t_honor.score,0) > nvl(rts.acade_honor,0) then nvl(rts.acade_honor,0) else nvl(t_honor.score,0) end +
+		       case when nvl(t_status.score,0) > nvl(rts.acade_status,0) then nvl(rts.acade_status,0) else nvl(t_status.score,0) end +
+		       case when nvl(t_proj.score,0) > nvl(rts.proj,0) then nvl(rts.proj,0) else nvl(t_proj.score,0) end +
+		       case when nvl(t_paper.score,0) > nvl(rts.paper,0) then nvl(rts.paper,0) else nvl(t_paper.score,0) end total
+		  from hos_emp he
+		  left join hos_dept hd on he.group_id=hd.group_id and he.hos_id=hd.hos_id
+		  	and he.dept_id=hd.dept_id
+		  left join t_honor 
+		    on he.emp_id = t_honor.emp_id
+		   and he.group_id = t_honor.group_id
+		   and he.hos_id = t_honor.hos_id 
+		  left join t_status
+		    on he.emp_id = t_status.emp_id
+		   and he.group_id = t_status.group_id
+		   and he.hos_id = t_status.hos_id
+		  left join t_proj
+		    on he.emp_id = t_proj.emp_id
+		   and he.group_id = t_proj.group_id
+		   and he.hos_id = t_proj.hos_id
+		  left join t_paper
+		    on he.emp_id = t_paper.emp_id
+		   and he.group_id = t_paper.group_id
+		   and he.hos_id = t_paper.hos_id
+		  left join HR_RESEARCH_TOT_SET rts
+		    on he.group_id = rts.group_id
+		   and he.hos_id = rts.hos_id
+		   and rts.year = #{year}
+		 where he.group_id = #{group_id}
+		   and he.hos_id = #{hos_id}
+		   <if test="emp_name != null and emp_name != ''">
+		   	and he.emp_name like '%'|| #{emp_name} ||'%'
+		   </if>
+		   <if test="dept_id != null and dept_id != ''">
+		   	and <!-- he.dept_no||'@'|| -->he.dept_id = #{dept_id}
+		   </if>
+		  order by emp_code,dept_name
+	</select>
+	
+	
+	
+	
+		<select id="querySRStatisticsByPrint" parameterType="java.util.Map" resultMap="hrSRStatisticsMap">
+		with temp as (
+			select ep.group_id,
+			       ep.hos_id,
+			       ep.emp_id,
+			       ep.proj_level
+			from HR_EMP_PROJ ep
+			where ep.group_id=#{group_id} and ep.hos_id = #{hos_id} 
+				and #{year} &gt;= extract (year from ep.beg_date)  
+			    and #{year} &lt;= extract (year from ep.end_date)  
+			union all
+			select epc.group_id,
+			       epc.hos_id,
+			       epc.emp_id,
+			       epc.proj_level
+			from HR_EMP_PROJ_CHECK epc
+			where epc.group_id=#{group_id} and epc.hos_id = #{hos_id} 
+				and extract (year from epc.check_date) = #{year}   
+			union all
+			select epa.group_id,
+			       epa.hos_id,
+			       epa.emp_id,
+			       epa.proj_level
+			from HR_EMP_PROJ_AWARD epa
+			where epa.group_id=#{group_id} and epa.hos_id = #{hos_id} 
+				and extract (year from epa.get_date) = #{year}
+			union all
+			select epp.group_id,
+			       epp.hos_id,
+			       epp.emp_id,
+			      epp.proj_level
+			from HR_EMP_PROJ_PATENT epp
+			where epp.group_id=#{group_id} and epp.hos_id = #{hos_id} 
+			and extract (year from epp.get_date) = #{year}
+		), t_honor as (
+			select ah.group_id,ah.hos_id,ah.emp_id,nvl(sum(ahs.score),0) score from 
+			HR_EMP_ACADE_HONOR ah
+			left join HR_ACADE_HONOR_SET ahs
+			    on ah.honor_code = ahs.honor_code
+			   and ah.group_id = ahs.group_id
+			   and ah.hos_id = ahs.hos_id
+			   and ahs.year = #{year}
+			 where  extract (year from ah.get_date) = #{year} 
+			 	and ah.group_id=#{group_id} 
+			 	and ah.hos_id = #{hos_id} 
+			 group by ah.group_id,ah.hos_id,ah.emp_id
+		), t_status as(
+			select eas.group_id,eas.hos_id,eas.emp_id,nvl(sum(eass.score),0) score 
+			from HR_EMP_ACADE_STATUS eas
+			left join HR_ACADE_STATUS_SET eass
+			    on eas.status_code = eass.status_code
+			   and eas.group_id = eass.group_id
+			   and eas.hos_id = eass.hos_id
+			   and eass.year = #{year}
+			 where eass.group_id=#{group_id} 
+			 	and eass.hos_id = #{hos_id}
+			 	and #{year} &gt;= extract (year from eas.beg_date)  
+			    and #{year} &lt;= extract (year from eas.end_date)   
+			 group by eas.group_id,eas.hos_id,eas.emp_id
+		),t_proj as(
+			select t.group_id,t.hos_id,t.emp_id,nvl(sum(ps.score),0) score 
+			from temp t
+			left join HR_EMP_PROJ_SET ps 
+				on t.proj_level = ps.proj_level
+			   and t.group_id = ps.group_id
+			   and t.hos_id = ps.hos_id
+			   and ps.year = #{year}
+			 where ps.group_id=#{group_id} and ps.hos_id = #{hos_id}
+			 group by t.group_id,t.hos_id,t.emp_id
+		), t_paper as(
+			select epap.group_id,epap.hos_id,epap.emp_id,nvl(sum(epas.score),0) score 
+			from HR_EMP_PAPER epap
+			  left join HR_PAPER_SET epas
+			    on epap.PAPER_TYPE_CODE = epas.paper_type_code
+			   and epap.AFFECT_PARA = epas.affect_para
+			   and epap.group_id = epas.group_id
+			   and epap.hos_id = epas.hos_id
+			   and epas.year = #{year}
+			 where epap.group_id=#{group_id} and epap.hos_id = #{hos_id}
+			 	and extract (year from epap.publish_date) = #{year}
+			 group by epap.group_id,epap.hos_id,epap.emp_id
+		 )
+		select he.emp_code,he.emp_name, hd.dept_code||' '||hd.dept_name dept_name, 
+		       case when nvl(t_honor.score,0) > nvl(rts.acade_honor,0) then nvl(rts.acade_honor,0) else nvl(t_honor.score,0) end honor_score,
+		       case when nvl(t_status.score,0) > nvl(rts.acade_status,0) then nvl(rts.acade_status,0) else nvl(t_status.score,0) end status_score,
+		       case when nvl(t_proj.score,0) > nvl(rts.proj,0) then nvl(rts.proj,0) else nvl(t_proj.score,0) end proj_score,
+		       case when nvl(t_paper.score,0) > nvl(rts.paper,0) then nvl(rts.paper,0) else nvl(t_paper.score,0) end paper_score,
+		       case when nvl(t_honor.score,0) > nvl(rts.acade_honor,0) then nvl(rts.acade_honor,0) else nvl(t_honor.score,0) end +
+		       case when nvl(t_status.score,0) > nvl(rts.acade_status,0) then nvl(rts.acade_status,0) else nvl(t_status.score,0) end +
+		       case when nvl(t_proj.score,0) > nvl(rts.proj,0) then nvl(rts.proj,0) else nvl(t_proj.score,0) end +
+		       case when nvl(t_paper.score,0) > nvl(rts.paper,0) then nvl(rts.paper,0) else nvl(t_paper.score,0) end total
+		  from hos_emp he
+		  left join hos_dept hd on he.group_id=hd.group_id and he.hos_id=hd.hos_id
+		  	and he.dept_id=hd.dept_id
+		  left join t_honor 
+		    on he.emp_id = t_honor.emp_id
+		   and he.group_id = t_honor.group_id
+		   and he.hos_id = t_honor.hos_id 
+		  left join t_status
+		    on he.emp_id = t_status.emp_id
+		   and he.group_id = t_status.group_id
+		   and he.hos_id = t_status.hos_id
+		  left join t_proj
+		    on he.emp_id = t_proj.emp_id
+		   and he.group_id = t_proj.group_id
+		   and he.hos_id = t_proj.hos_id
+		  left join t_paper
+		    on he.emp_id = t_paper.emp_id
+		   and he.group_id = t_paper.group_id
+		   and he.hos_id = t_paper.hos_id
+		  left join HR_RESEARCH_TOT_SET rts
+		    on he.group_id = rts.group_id
+		   and he.hos_id = rts.hos_id
+		   and rts.year = #{year}
+		 where he.group_id = #{group_id}
+		   and he.hos_id = #{hos_id}
+		   <if test="emp_name != null and emp_name != ''">
+		   	and he.emp_name like '%'|| #{emp_name} ||'%'
+		   </if>
+		   <if test="dept_id != null and dept_id != ''">
+		   	and <!-- he.dept_no||'@'|| -->he.dept_id = #{dept_id}
+		   </if>
+		  order by emp_code,dept_name
+	</select>
+	
+</mapper>

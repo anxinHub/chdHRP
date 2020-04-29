@@ -1,0 +1,212 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper
+	namespace="com.chd.hrp.pac.dao.basicset.elsesub.PactElseSubMapper">
+	<resultMap id="pactStateEntity"
+		type="com.chd.hrp.pac.entity.basicset.elsesub.PactElseSubEntity">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="sub_id" column="sub_id" />
+		<result property="sub_code" column="sub_code" />
+		<result property="sub_name" column="sub_name" />
+		<result property="is_stop" column="is_stop" />
+		<result property="spell_code" column="spell_code" />
+		<result property="wbx_code" column="wbx_code" />
+		<result property="note" column="note" />
+	</resultMap>
+
+	<select id="query" parameterType="java.util.Map"
+		resultMap="pactStateEntity">
+		select
+		group_id,hos_id,copy_code,sub_id,sub_code,sub_name,is_stop,spell_code,wbx_code,note
+		from PACT_ELSE_SUB
+		where
+		group_id=#{group_id,jdbcType=NUMERIC}
+		and hos_id=#{hos_id,jdbcType=NUMERIC}
+		and copy_code=#{copy_code,jdbcType=VARCHAR}
+		<if test="is_stop != null and is_stop != ''">
+			and is_stop=#{is_stop,jdbcType=NUMERIC}
+		</if>
+		<if test="sub_id != null and sub_id != ''">
+			and sub_id=#{sub_id,jdbcType=NUMERIC}
+		</if>
+		<if test="sub_name != null and sub_name != ''">
+			and (
+			sub_code like '%'||#{sub_name}||'%' or
+			sub_name
+			like '%'||#{sub_name}||'%'
+			)
+		</if>
+		order by sub_code
+	</select>
+
+	<select id="queryPactElseSubByName" parameterType="java.util.Map"
+		resultType="com.chd.hrp.pac.entity.basicset.elsesub.PactElseSubEntity">
+		select
+		sub_id,sub_code,sub_name
+		from PACT_ELSE_SUB
+		where
+		group_id=#{group_id,jdbcType=NUMERIC}
+		and hos_id=#{hos_id,jdbcType=NUMERIC}
+		and copy_code=#{copy_code,jdbcType=VARCHAR}
+		and sub_name =#{sub_name,jdbcType=VARCHAR}
+		<if test="is_stop != null and is_stop != ''">
+			and is_stop=#{is_stop,jdbcType=NUMERIC}
+		</if>
+	</select>
+
+	<insert id="add" parameterType="java.util.Map">
+		INSERT INTO PACT_ELSE_SUB
+		(group_id,hos_id,copy_code,sub_id,sub_code,sub_name,is_stop,spell_code,wbx_code,note)
+		VALUES(
+		#{group_id,jdbcType=NUMERIC},
+		#{hos_id,jdbcType=NUMERIC},
+		#{copy_code,jdbcType=VARCHAR},
+		PACT_ELSE_SUB_SEQ.nextval,
+		#{sub_code,jdbcType=VARCHAR},
+		#{sub_name,jdbcType=VARCHAR},
+		#{is_stop,jdbcType=NUMERIC},
+		#{spell_code,jdbcType=VARCHAR},
+		#{wbx_code,jdbcType=VARCHAR},
+		#{note,jdbcType=VARCHAR}
+		)
+	</insert>
+
+	<delete id="deleteAllBatch" parameterType="java.util.List">
+		DELETE FROM PACT_ELSE_SUB
+		<where>
+				GROUP_ID = #{group_id,jdbcType=NUMERIC}
+				and HOS_ID =#{hos_id,jdbcType=NUMERIC}
+				AND COPY_CODE = #{copy_code,jdbcType=VARCHAR}
+				AND sub_id in
+			<foreach collection="list" index="index" item="item" open="("
+				separator="," close=")">
+				#{item.sub_id,jdbcType=VARCHAR}
+			</foreach>
+		</where>
+	</delete>
+
+	<update id="update" parameterType="java.util.Map">
+		UPDATE PACT_ELSE_SUB SET
+		<if test="sub_name != null and sub_name != ''">
+			sub_name=#{sub_name,jdbcType=VARCHAR},
+		</if>
+		<if test="spell_code != null and spell_code != ''">
+			spell_code=#{spell_code,jdbcType=VARCHAR},
+		</if>
+		<if test="wbx_code != null and wbx_code != ''">
+			wbx_code=#{wbx_code,jdbcType=VARCHAR},
+		</if>
+		<if test="is_stop != null and is_stop != ''">
+			is_stop=#{is_stop,jdbcType=NUMERIC},
+		</if>
+		note=#{note,jdbcType=VARCHAR}
+		WHERE
+		GROUP_ID = #{group_id,jdbcType=NUMERIC}
+		AND HOS_ID = #{hos_id,jdbcType=NUMERIC}
+		AND COPY_CODE = #{copy_code,jdbcType=VARCHAR}
+		AND sub_id = #{sub_id,jdbcType=VARCHAR}
+	</update>
+	
+	<select id="queryUsing" parameterType="java.util.Map" resultType="java.lang.Integer">
+		SELECT COUNT(1) FROM (
+			SELECT SUBJECT_ID FROM PACT_DET_FKHT
+			<where>
+				SUBJECT_TYPE = '05'
+				and GROUP_ID = #{group_id,jdbcType=NUMERIC}
+				and HOS_ID =#{hos_id,jdbcType=NUMERIC}
+				AND COPY_CODE = #{copy_code,jdbcType=VARCHAR}
+				and subject_id in 
+				<foreach collection="list" index="index" item="item" open="("
+					separator="," close=")">
+					#{item.sub_no,jdbcType=VARCHAR}
+				</foreach>
+			</where>
+			union SELECT SUBJECT_ID FROM PACT_DET_FKXY
+			<where>
+				SUBJECT_TYPE = '05'
+				and GROUP_ID = #{group_id,jdbcType=NUMERIC}
+				and HOS_ID =#{hos_id,jdbcType=NUMERIC}
+				AND COPY_CODE = #{copy_code,jdbcType=VARCHAR}
+				and subject_id in 
+				<foreach collection="list" index="index" item="item" open="("
+					separator="," close=")">
+					#{item.sub_no,jdbcType=VARCHAR}
+				</foreach>
+			</where>
+			union SELECT SUBJECT_ID FROM PACT_DET_SKHT
+			<where>
+				SUBJECT_TYPE = '05'
+				and GROUP_ID = #{group_id,jdbcType=NUMERIC}
+				and HOS_ID =#{hos_id,jdbcType=NUMERIC}
+				AND COPY_CODE = #{copy_code,jdbcType=VARCHAR}
+				and subject_id in 
+				<foreach collection="list" index="index" item="item" open="("
+					separator="," close=")">
+					#{item.sub_no,jdbcType=VARCHAR}
+				</foreach>
+			</where>
+			union SELECT SUBJECT_ID FROM PACT_DET_SKXY
+			<where>
+				SUBJECT_TYPE = '05'
+				and GROUP_ID = #{group_id,jdbcType=NUMERIC}
+				and HOS_ID =#{hos_id,jdbcType=NUMERIC}
+				AND COPY_CODE = #{copy_code,jdbcType=VARCHAR}
+				and subject_id in 
+				<foreach collection="list" index="index" item="item" open="("
+					separator="," close=")">
+					#{item.sub_no,jdbcType=VARCHAR}
+				</foreach>
+			</where>
+			union SELECT SUBJECT_ID FROM PACT_DET_FKHT_C 
+			<where>
+				SUBJECT_TYPE = '05'
+				and GROUP_ID = #{group_id,jdbcType=NUMERIC}
+				and HOS_ID =#{hos_id,jdbcType=NUMERIC}
+				AND COPY_CODE = #{copy_code,jdbcType=VARCHAR}
+				and subject_id in 
+				<foreach collection="list" index="index" item="item" open="("
+					separator="," close=")">
+					#{item.sub_no,jdbcType=VARCHAR}
+				</foreach>
+			</where>
+			union SELECT SUBJECT_ID FROM PACT_DET_FKXY_C
+			<where>
+				SUBJECT_TYPE = '05'
+				and GROUP_ID = #{group_id,jdbcType=NUMERIC}
+				and HOS_ID =#{hos_id,jdbcType=NUMERIC}
+				AND COPY_CODE = #{copy_code,jdbcType=VARCHAR}
+				and subject_id in 
+				<foreach collection="list" index="index" item="item" open="("
+					separator="," close=")">
+					#{item.sub_no,jdbcType=VARCHAR}
+				</foreach>
+			</where>
+			union SELECT SUBJECT_ID FROM PACT_DET_SKHT_C
+			<where>
+				SUBJECT_TYPE = '05'
+				and GROUP_ID = #{group_id,jdbcType=NUMERIC}
+				and HOS_ID =#{hos_id,jdbcType=NUMERIC}
+				AND COPY_CODE = #{copy_code,jdbcType=VARCHAR}
+				and subject_id in 
+				<foreach collection="list" index="index" item="item" open="("
+					separator="," close=")">
+					#{item.sub_no,jdbcType=VARCHAR}
+				</foreach>
+			</where>
+			union SELECT SUBJECT_ID FROM PACT_DET_SKXY_C
+			<where>
+				SUBJECT_TYPE = '05'
+				and GROUP_ID = #{group_id,jdbcType=NUMERIC}
+				and HOS_ID =#{hos_id,jdbcType=NUMERIC}
+				AND COPY_CODE = #{copy_code,jdbcType=VARCHAR}
+				and subject_id in 
+				<foreach collection="list" index="index" item="item" open="("
+					separator="," close=")">
+					#{item.sub_no,jdbcType=VARCHAR}
+				</foreach>
+			</where>
+		)
+	</select>
+</mapper>

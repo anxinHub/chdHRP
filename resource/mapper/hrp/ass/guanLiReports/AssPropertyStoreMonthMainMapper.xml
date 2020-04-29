@@ -1,0 +1,714 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper
+	namespace="com.chd.hrp.ass.dao.guanLiReports.AssPropertyStoreMonthMainMapper">
+
+	<resultMap id="assPropertyStoreMonthMain"
+		type="com.chd.hrp.ass.entity.guanLiReports.AssPropertyStoreMonthMain">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="depre_year" column="depre_year" />
+		<result property="depre_month" column="depre_month" />
+		<result property="ass_card_no" column="ass_card_no" />
+		<result property="now_depre_amount" column="now_depre_amount" />
+		<result property="remain_price" column="remain_price" />
+		<result property="ass_type_code" column="ass_type_code" />
+		<result property="ass_type_name" column="ass_type_name" />
+		<result property="store_code" column="store_code" />
+		<result property="store_name" column="store_name" />
+		<result property="dept_code" column="dept_code" />
+		<result property="dept_name" column="dept_name" />
+		<result property="begin_money" column="begin_money" />
+		<result property="add_money" column="add_money" />
+		<result property="dec_money" column="dec_money" />
+		<result property="end_money" column="end_money" />
+		<result property="balance_money" column="balance_money" />
+		<result property="ass_naturs" column="ass_naturs" />
+		<result property="ass_naturs_name" column="ass_naturs_name" />
+
+	</resultMap>
+
+	<resultMap id="assPropertyStoreMonthMainMap"
+		type="java.util.Map">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="depre_year" column="depre_year" />
+		<result property="depre_month" column="depre_month" />
+		<result property="ass_card_no" column="ass_card_no" />
+		<result property="now_depre_amount" column="now_depre_amount" />
+		<result property="remain_price" column="remain_price" />
+		<result property="ass_type_code" column="ass_type_code" />
+		<result property="ass_type_name" column="ass_type_name" />
+		<result property="store_code" column="store_code" />
+		<result property="store_name" column="store_name" />
+		<result property="dept_code" column="dept_code" />
+		<result property="dept_name" column="dept_name" />
+		<result property="begin_money" column="begin_money" />
+		<result property="add_money" column="add_money" />
+		<result property="dec_money" column="dec_money" />
+		<result property="end_money" column="end_money" />
+		<result property="balance_money" column="balance_money" />
+		<result property="ass_naturs" column="ass_naturs" />
+		<result property="ass_naturs_name" column="ass_naturs_name" />
+
+	</resultMap>
+
+	<select id="queryin">
+		select ass_type_code,ass_type_name from ass_type_dict
+
+	</select>
+
+	<!-- 资产月报 <财务制度> 按性质 -->
+	<select id="queryAssPropertyStoreMonthMain"
+		parameterType="java.util.Map" resultMap="assPropertyStoreMonthMain">
+		WITH type_main_rep AS
+		(SELECT a.GROUP_ID
+		,a.HOS_ID
+		,a.COPY_CODE
+		,ACC_YEAR
+		,ACC_MONTH
+		,a.ASS_TYPE_ID
+		,ass_type_code
+		,super_code
+		,ass_naturs
+		,begin_money R_BEGIN
+		,add_money R_ADD
+		,dec_money R_DEC
+		,end_money R_END
+		,0 L_BEGIN
+		,0 L_ADD
+		,0 L_DEC
+		,0 L_END
+		FROM ASS_COLLECT_MAIN a
+		INNER JOIN ass_type_dict b
+		ON a.group_id = b.group_id
+		AND a.hos_id = b.hos_id
+		AND a.copy_code = b.copy_code
+		AND a.ass_type_id = b.ass_type_id
+		WHERE a.group_id =#{group_id}
+		AND a.hos_id =#{hos_id}
+		AND a.copy_code =#{copy_code}
+		AND a.acc_year || a.acc_month between #{year_month_begin,jdbcType=VARCHAR} and #{year_month_end,jdbcType=VARCHAR}
+		AND a.is_flag = 0
+		<if test="store_id != null and store_id != ''">
+			and store_id = #{store_id}
+		</if>
+		UNION ALL
+		SELECT a.GROUP_ID
+		,a.HOS_ID
+		,a.COPY_CODE
+		,ACC_YEAR
+		,ACC_MONTH
+		,a.ASS_TYPE_ID
+		,ass_type_code
+		,super_code
+		,ass_naturs
+		,0 R_BEGIN
+		,0 R_ADD
+		,0 R_DEC
+		,0 R_END
+		,begin_money L_BEGIN
+		,add_money L_ADD
+		,dec_money L_DEC
+		,end_money L_END
+		FROM ASS_COLLECT_MAIN a
+		INNER JOIN ass_type_dict b
+		ON a.group_id = b.group_id
+		AND a.hos_id = b.hos_id
+		AND a.copy_code = b.copy_code
+		AND a.ass_type_id = b.ass_type_id
+		WHERE a.group_id =#{group_id}
+		AND a.hos_id =#{hos_id}
+		AND a.copy_code =#{copy_code}
+		AND a.acc_year || a.acc_month between #{year_month_begin,jdbcType=VARCHAR} and #{year_month_end,jdbcType=VARCHAR}
+		AND a.is_flag = 1
+		<if test="store_id != null and store_id != ''">
+			and store_id = #{store_id}
+		</if>
+		),
+		type_dict AS
+		(SELECT GROUP_ID
+		,HOS_ID
+		,COPY_CODE
+		,ASS_TYPE_ID
+		,ASS_TYPE_CODE
+		,ASS_TYPE_NAME
+		,SUPER_CODE
+		,TYPE_LEVEL
+		,a.ASS_NATURS
+		,naturs_name ass_naturs_name
+		FROM ASS_TYPE_DICT a
+		LEFT JOIN ASS_NATURS b
+		ON a.ASS_NATURS = b.naturs_code
+		WHERE a.group_id =#{group_id}
+		AND a.hos_id =#{hos_id}
+		AND a.copy_code =#{copy_code}),
+		type_begin AS
+		(SELECT t1.ass_type_code
+		,nvl(t2.r_begin, 0) AS begin_money
+		,nvl(t2.l_begin, 0) AS depre_begin_money
+		FROM type_dict t1
+		LEFT JOIN type_main_rep t2
+		ON t1.group_id = t2.group_id
+		AND t1.hos_id = t2.hos_id
+		AND t1.copy_code = t2.copy_code
+		AND t1.ass_type_id = t2.ass_type_id
+		AND t2.acc_year || t2.acc_month between #{year_month_begin,jdbcType=VARCHAR} and #{year_month_end,jdbcType=VARCHAR}
+		WHERE t1.group_id =#{group_id}
+		AND t1.hos_id =#{hos_id}
+		AND t1.copy_code =#{copy_code}
+		AND EXISTS (SELECT 1
+		FROM v_user_data_perm b
+		WHERE t1.group_id = b.group_id
+		AND t1.hos_id = b.hos_id
+		AND to_char(t1.ass_naturs) = b.perm_code
+		AND TABLE_CODE = upper('ass_naturs')
+		AND b.user_id = 5
+		AND (b.is_read = 1 OR b.is_write = 1))
+		<if test="ass_naturs != null and ass_naturs != ''">
+			and t1.ass_naturs = #{ass_naturs,jdbcType=VARCHAR}
+		</if>
+		),
+		type_end AS
+		(SELECT t1.ass_type_code
+		,nvl(t2.r_end, 0) AS end_money
+		,nvl(t2.l_end, 0) AS depre_end_money
+		FROM type_dict t1
+		LEFT JOIN type_main_rep t2
+		ON t1.group_id = t2.group_id
+		AND t1.hos_id = t2.hos_id
+		AND t1.copy_code = t2.copy_code
+		AND t1.ass_type_id = t2.ass_type_id
+		AND t2.acc_year || t2.acc_month between #{year_month_begin,jdbcType=VARCHAR} and #{year_month_end,jdbcType=VARCHAR}
+		WHERE t1.group_id =#{group_id}
+		AND t1.hos_id =#{hos_id}
+		AND t1.copy_code =#{copy_code}
+		AND EXISTS (SELECT 1
+		FROM v_user_data_perm b
+		WHERE t1.group_id = b.group_id
+		AND t1.hos_id = b.hos_id
+		AND to_char(t1.ass_naturs) = b.perm_code
+		AND TABLE_CODE = upper('ass_naturs')
+		AND b.user_id = 5
+		AND (b.is_read = 1 OR b.is_write = 1))
+		<if test="ass_naturs != null and ass_naturs != ''">
+			and t1.ass_naturs = #{ass_naturs,jdbcType=VARCHAR}
+		</if>
+		),
+
+		type_t AS
+		(SELECT t1.ass_type_code
+		,t1.ass_type_name
+		,nvl(t1.super_code, 0) super_code
+		,SUM(nvl(t2.r_add, 0)) AS add_money
+		,SUM(nvl(t2.r_dec, 0)) AS dec_money
+		,SUM(nvl(t2.l_add, 0)) AS depre_add_money
+		,SUM(nvl(t2.l_dec, 0)) AS depre_dec_money
+		FROM type_dict t1
+		LEFT JOIN type_main_rep t2
+		ON t1.group_id = t2.group_id
+		AND t1.hos_id = t2.hos_id
+		AND t1.copy_code = t2.copy_code
+		AND t1.ass_type_id = t2.ass_type_id
+		AND t2.acc_year || t2.acc_month between #{year_month_begin,jdbcType=VARCHAR} and #{year_month_end,jdbcType=VARCHAR}
+
+		WHERE t1.group_id =#{group_id}
+		AND t1.hos_id =#{hos_id}
+		AND t1.copy_code =#{copy_code}
+		<if test="ass_naturs != null and ass_naturs != ''">
+			and t1.ass_naturs = #{ass_naturs,jdbcType=VARCHAR}
+		</if>
+		AND EXISTS (SELECT 1
+		FROM v_user_data_perm b
+		WHERE t1.group_id = b.group_id
+		AND t1.hos_id = b.hos_id
+		AND to_char(t1.ass_naturs) = b.perm_code
+		AND TABLE_CODE = upper('ass_naturs')
+		AND b.user_id = 5
+		AND (b.is_read = 1 OR b.is_write = 1))
+		GROUP BY t1.ass_type_code, t1.ass_type_name, t1.super_code),
+		test_all AS
+		(SELECT t1.ass_type_code
+		,t1.ass_type_name
+		,t1.type_level
+		,t1.ass_naturs
+		,t1.ass_naturs_name
+		,nvl(t1.super_code, 0) super_code
+		,SUM(begin_money) begin_money
+		,SUM(add_money) add_money
+		,SUM(dec_money) dec_money
+		,SUM(depre_begin_money) depre_begin_money
+		,SUM(depre_add_money) depre_add_money
+		,SUM(depre_dec_money) depre_dec_money
+		,SUM(end_money) end_money
+		,SUM(depre_balance_money) depre_balance_money
+		,SUM(remain_begin_money) remain_begin_money
+		,SUM(remain_end_money) remain_end_money
+		FROM (SELECT ass_type_code
+		,begin_money
+		,0 add_money
+		,0 dec_money
+		,depre_begin_money
+		,0 depre_add_money
+		,0 depre_dec_money
+		,0 end_money
+		,0 depre_balance_money
+		,nvl(begin_money, 0) - nvl(depre_begin_money, 0) remain_begin_money
+		,0 remain_end_money
+		FROM type_begin
+		UNION ALL
+		SELECT ass_type_code
+		,0 begin_money
+		,add_money
+		,dec_money
+		,0 depre_begin_money
+		,depre_add_money
+		,depre_dec_money
+		,0 end_money
+		,0 depre_balance_money
+		,0 remain_begin_money
+		,0 remain_end_money
+		FROM type_t
+		UNION ALL
+		SELECT ass_type_code
+		,0 begin_money
+		,0 add_money
+		,0 dec_money
+		,0 depre_begin_money
+		,0 depre_add_money
+		,0 depre_dec_money
+		,end_money
+		,depre_end_money depre_balance_money
+		,0 remain_begin_money
+		,(nvl(end_money, 0)) - (nvl(depre_end_money, 0)) remain_end_money
+		FROM type_end) t
+		LEFT JOIN type_dict t1
+		ON t.ass_type_code = t1.ass_type_code
+		GROUP BY t1.ass_type_code
+		,t1.ass_type_name
+		,t1.type_level
+		,t1.ass_naturs
+		,t1.ass_naturs_name
+		,t1.super_code),
+		temp1 AS
+		(SELECT t2.ass_type_code
+		,t2.ass_type_name
+		,t2.ass_naturs
+		,t2.ass_naturs_name
+		,SUM(t2.begin_money) begin_money
+		,SUM(t2.add_money) add_money
+		,SUM(t2.dec_money) dec_money
+		,SUM(t2.end_money) end_money
+		,SUM(t2.depre_begin_money) depre_begin_money
+		,SUM(t2.depre_add_money) depre_add_money
+		,SUM(t2.depre_dec_money) depre_dec_money
+		,SUM(t2.depre_balance_money) depre_balance_money
+		,SUM(t2.remain_begin_money) remain_begin_money
+		,SUM(t2.remain_end_money) remain_end_money
+		FROM (SELECT connect_by_root(t1.ass_type_code) ass_type_code
+		,connect_by_root(t1.ass_type_name) ass_type_name
+		,connect_by_root(t1.ass_naturs) ass_naturs
+		,connect_by_root(t1.ass_naturs_name) ass_naturs_name
+		,t1.begin_money
+		,t1.add_money
+		,t1.dec_money
+		,t1.end_money
+		,t1.depre_begin_money
+		,t1.depre_add_money
+		,t1.depre_dec_money
+		,t1.depre_balance_money
+		,t1.remain_begin_money
+		,t1.remain_end_money
+		FROM test_all t1
+
+		START WITH t1.super_code IN (SELECT super_code
+		FROM test_all
+		<if test="type_level != null and type_level != ''">
+			WHERE type_level <![CDATA[ <= ]]>
+			#{type_level,jdbcType=INTEGER}
+		</if>
+		)
+		CONNECT BY PRIOR t1.ass_type_code = t1.super_code) t2
+		GROUP BY t2.ass_type_code
+		,t2.ass_type_name
+		,t2.ass_naturs
+		,t2.ass_naturs_name
+		ORDER BY t2.ass_type_code),
+		temp2 AS
+		(SELECT t.ass_type_code
+		,CAST(lpad(chr(41377), LEVEL * 2 - 1, chr(41377)) ||
+		t.ass_type_name AS VARCHAR2(50)) ass_type_name
+		FROM type_t t
+		START WITH t.super_code = 0
+		CONNECT BY PRIOR t.ass_type_code = t.super_code)
+		SELECT *
+		FROM (SELECT t2.ass_type_code
+		,t2.ass_type_name
+		,ass_naturs
+		,ass_naturs_name
+		,t1.begin_money
+		,t1.add_money
+		,t1.dec_money
+		,t1.end_money
+		,t1.depre_begin_money
+		,t1.depre_add_money
+		,t1.depre_dec_money
+		,t1.depre_balance_money
+		,t1.remain_begin_money
+		,t1.remain_end_money
+		FROM temp1 t1, temp2 t2
+		WHERE t1.ass_type_code = t2.ass_type_code
+
+		UNION ALL
+
+		SELECT '合计' AS ass_type_code
+		,NULL AS ass_type_name
+		,NULL AS ass_naturs
+		,NULL AS ass_naturs_name
+		,nvl(SUM(t3.begin_money), 0) AS begin_money
+		,nvl(SUM(t3.add_money), 0) AS add_money
+		,nvl(SUM(t3.dec_money), 0) AS dec_money
+		,nvl(SUM(t3.end_money), 0) AS end_money
+		,nvl(SUM(t3.depre_begin_money), 0) AS depre_begin_money
+		,nvl(SUM(t3.depre_add_money), 0) AS depre_add_money
+		,nvl(SUM(t3.depre_dec_money), 0) AS depre_dec_money
+		,nvl(SUM(t3.depre_balance_money), 0) AS depre_balance_money
+		,nvl(SUM(t3.remain_begin_money), 0) AS remain_begin_money
+		,nvl(SUM(t3.remain_end_money), 0) AS remain_end_money
+		FROM test_all t3
+
+		) t
+		ORDER BY t.ass_type_code
+
+
+	</select>
+
+
+
+	<!-- 打印 -->
+	<select id="queryAssPropertyStoreMonthMainPrint"
+		parameterType="java.util.Map" resultMap="assPropertyStoreMonthMainMap">
+	WITH type_main_rep AS
+		(SELECT a.GROUP_ID
+		,a.HOS_ID
+		,a.COPY_CODE
+		,ACC_YEAR
+		,ACC_MONTH
+		,a.ASS_TYPE_ID
+		,ass_type_code
+		,super_code
+		,ass_naturs
+		,begin_money R_BEGIN
+		,add_money R_ADD
+		,dec_money R_DEC
+		,end_money R_END
+		,0 L_BEGIN
+		,0 L_ADD
+		,0 L_DEC
+		,0 L_END
+		FROM ASS_COLLECT_MAIN a
+		INNER JOIN ass_type_dict b
+		ON a.group_id = b.group_id
+		AND a.hos_id = b.hos_id
+		AND a.copy_code = b.copy_code
+		AND a.ass_type_id = b.ass_type_id
+		WHERE a.group_id =#{group_id}
+		AND a.hos_id =#{hos_id}
+		AND a.copy_code =#{copy_code}
+		AND a.acc_year || a.acc_month between #{year_month_begin,jdbcType=VARCHAR} and #{year_month_end,jdbcType=VARCHAR}
+		AND a.is_flag = 0
+		<if test="store_id != null and store_id != ''">
+			and store_id = #{store_id}
+		</if>
+		UNION ALL
+		SELECT a.GROUP_ID
+		,a.HOS_ID
+		,a.COPY_CODE
+		,ACC_YEAR
+		,ACC_MONTH
+		,a.ASS_TYPE_ID
+		,ass_type_code
+		,super_code
+		,ass_naturs
+		,0 R_BEGIN
+		,0 R_ADD
+		,0 R_DEC
+		,0 R_END
+		,begin_money L_BEGIN
+		,add_money L_ADD
+		,dec_money L_DEC
+		,end_money L_END
+		FROM ASS_COLLECT_MAIN a
+		INNER JOIN ass_type_dict b
+		ON a.group_id = b.group_id
+		AND a.hos_id = b.hos_id
+		AND a.copy_code = b.copy_code
+		AND a.ass_type_id = b.ass_type_id
+		WHERE a.group_id =#{group_id}
+		AND a.hos_id =#{hos_id}
+		AND a.copy_code =#{copy_code}
+		AND a.acc_year || a.acc_month between #{year_month_begin,jdbcType=VARCHAR} and #{year_month_end,jdbcType=VARCHAR}
+		AND a.is_flag = 1
+		<if test="store_id != null and store_id != ''">
+			and store_id = #{store_id}
+		</if>
+		),
+		type_dict AS
+		(SELECT GROUP_ID
+		,HOS_ID
+		,COPY_CODE
+		,ASS_TYPE_ID
+		,ASS_TYPE_CODE
+		,ASS_TYPE_NAME
+		,SUPER_CODE
+		,TYPE_LEVEL
+		,a.ASS_NATURS
+		,naturs_name ass_naturs_name
+		FROM ASS_TYPE_DICT a
+		LEFT JOIN ASS_NATURS b
+		ON a.ASS_NATURS = b.naturs_code
+		WHERE a.group_id =#{group_id}
+		AND a.hos_id =#{hos_id}
+		AND a.copy_code =#{copy_code}),
+		type_begin AS
+		(SELECT t1.ass_type_code
+		,nvl(t2.r_begin, 0) AS begin_money
+		,nvl(t2.l_begin, 0) AS depre_begin_money
+		FROM type_dict t1
+		LEFT JOIN type_main_rep t2
+		ON t1.group_id = t2.group_id
+		AND t1.hos_id = t2.hos_id
+		AND t1.copy_code = t2.copy_code
+		AND t1.ass_type_id = t2.ass_type_id
+		AND t2.acc_year || t2.acc_month between #{year_month_begin,jdbcType=VARCHAR} and #{year_month_end,jdbcType=VARCHAR}
+		WHERE t1.group_id =#{group_id}
+		AND t1.hos_id =#{hos_id}
+		AND t1.copy_code =#{copy_code}
+		AND EXISTS (SELECT 1
+		FROM v_user_data_perm b
+		WHERE t1.group_id = b.group_id
+		AND t1.hos_id = b.hos_id
+		AND to_char(t1.ass_naturs) = b.perm_code
+		AND TABLE_CODE = upper('ass_naturs')
+		AND b.user_id = 5
+		AND (b.is_read = 1 OR b.is_write = 1))
+		<if test="ass_naturs != null and ass_naturs != ''">
+			and t1.ass_naturs = #{ass_naturs,jdbcType=VARCHAR}
+		</if>
+		),
+		type_end AS
+		(SELECT t1.ass_type_code
+		,nvl(t2.r_end, 0) AS end_money
+		,nvl(t2.l_end, 0) AS depre_end_money
+		FROM type_dict t1
+		LEFT JOIN type_main_rep t2
+		ON t1.group_id = t2.group_id
+		AND t1.hos_id = t2.hos_id
+		AND t1.copy_code = t2.copy_code
+		AND t1.ass_type_id = t2.ass_type_id
+		AND t2.acc_year || t2.acc_month between #{year_month_begin,jdbcType=VARCHAR} and #{year_month_end,jdbcType=VARCHAR}
+		WHERE t1.group_id =#{group_id}
+		AND t1.hos_id =#{hos_id}
+		AND t1.copy_code =#{copy_code}
+		AND EXISTS (SELECT 1
+		FROM v_user_data_perm b
+		WHERE t1.group_id = b.group_id
+		AND t1.hos_id = b.hos_id
+		AND to_char(t1.ass_naturs) = b.perm_code
+		AND TABLE_CODE = upper('ass_naturs')
+		AND b.user_id = 5
+		AND (b.is_read = 1 OR b.is_write = 1))
+		<if test="ass_naturs != null and ass_naturs != ''">
+			and t1.ass_naturs = #{ass_naturs,jdbcType=VARCHAR}
+		</if>
+		),
+
+		type_t AS
+		(SELECT t1.ass_type_code
+		,t1.ass_type_name
+		,nvl(t1.super_code, 0) super_code
+		,SUM(nvl(t2.r_add, 0)) AS add_money
+		,SUM(nvl(t2.r_dec, 0)) AS dec_money
+		,SUM(nvl(t2.l_add, 0)) AS depre_add_money
+		,SUM(nvl(t2.l_dec, 0)) AS depre_dec_money
+		FROM type_dict t1
+		LEFT JOIN type_main_rep t2
+		ON t1.group_id = t2.group_id
+		AND t1.hos_id = t2.hos_id
+		AND t1.copy_code = t2.copy_code
+		AND t1.ass_type_id = t2.ass_type_id
+		AND t2.acc_year || t2.acc_month between #{year_month_begin,jdbcType=VARCHAR} and #{year_month_end,jdbcType=VARCHAR}
+
+		WHERE t1.group_id =#{group_id}
+		AND t1.hos_id =#{hos_id}
+		AND t1.copy_code =#{copy_code}
+		<if test="ass_naturs != null and ass_naturs != ''">
+			and t1.ass_naturs = #{ass_naturs,jdbcType=VARCHAR}
+		</if>
+		AND EXISTS (SELECT 1
+		FROM v_user_data_perm b
+		WHERE t1.group_id = b.group_id
+		AND t1.hos_id = b.hos_id
+		AND to_char(t1.ass_naturs) = b.perm_code
+		AND TABLE_CODE = upper('ass_naturs')
+		AND b.user_id = 5
+		AND (b.is_read = 1 OR b.is_write = 1))
+		GROUP BY t1.ass_type_code, t1.ass_type_name, t1.super_code),
+		test_all AS
+		(SELECT t1.ass_type_code
+		,t1.ass_type_name
+		,t1.type_level
+		,t1.ass_naturs
+		,t1.ass_naturs_name
+		,nvl(t1.super_code, 0) super_code
+		,SUM(begin_money) begin_money
+		,SUM(add_money) add_money
+		,SUM(dec_money) dec_money
+		,SUM(depre_begin_money) depre_begin_money
+		,SUM(depre_add_money) depre_add_money
+		,SUM(depre_dec_money) depre_dec_money
+		,SUM(end_money) end_money
+		,SUM(depre_balance_money) depre_balance_money
+		,SUM(remain_begin_money) remain_begin_money
+		,SUM(remain_end_money) remain_end_money
+		FROM (SELECT ass_type_code
+		,begin_money
+		,0 add_money
+		,0 dec_money
+		,depre_begin_money
+		,0 depre_add_money
+		,0 depre_dec_money
+		,0 end_money
+		,0 depre_balance_money
+		,nvl(begin_money, 0) - nvl(depre_begin_money, 0) remain_begin_money
+		,0 remain_end_money
+		FROM type_begin
+		UNION ALL
+		SELECT ass_type_code
+		,0 begin_money
+		,add_money
+		,dec_money
+		,0 depre_begin_money
+		,depre_add_money
+		,depre_dec_money
+		,0 end_money
+		,0 depre_balance_money
+		,0 remain_begin_money
+		,0 remain_end_money
+		FROM type_t
+		UNION ALL
+		SELECT ass_type_code
+		,0 begin_money
+		,0 add_money
+		,0 dec_money
+		,0 depre_begin_money
+		,0 depre_add_money
+		,0 depre_dec_money
+		,end_money
+		,depre_end_money depre_balance_money
+		,0 remain_begin_money
+		,(nvl(end_money, 0)) - (nvl(depre_end_money, 0)) remain_end_money
+		FROM type_end) t
+		LEFT JOIN type_dict t1
+		ON t.ass_type_code = t1.ass_type_code
+		GROUP BY t1.ass_type_code
+		,t1.ass_type_name
+		,t1.type_level
+		,t1.ass_naturs
+		,t1.ass_naturs_name
+		,t1.super_code),
+		temp1 AS
+		(SELECT t2.ass_type_code
+		,t2.ass_type_name
+		,t2.ass_naturs
+		,t2.ass_naturs_name
+		,SUM(t2.begin_money) begin_money
+		,SUM(t2.add_money) add_money
+		,SUM(t2.dec_money) dec_money
+		,SUM(t2.end_money) end_money
+		,SUM(t2.depre_begin_money) depre_begin_money
+		,SUM(t2.depre_add_money) depre_add_money
+		,SUM(t2.depre_dec_money) depre_dec_money
+		,SUM(t2.depre_balance_money) depre_balance_money
+		,SUM(t2.remain_begin_money) remain_begin_money
+		,SUM(t2.remain_end_money) remain_end_money
+		FROM (SELECT connect_by_root(t1.ass_type_code) ass_type_code
+		,connect_by_root(t1.ass_type_name) ass_type_name
+		,connect_by_root(t1.ass_naturs) ass_naturs
+		,connect_by_root(t1.ass_naturs_name) ass_naturs_name
+		,t1.begin_money
+		,t1.add_money
+		,t1.dec_money
+		,t1.end_money
+		,t1.depre_begin_money
+		,t1.depre_add_money
+		,t1.depre_dec_money
+		,t1.depre_balance_money
+		,t1.remain_begin_money
+		,t1.remain_end_money
+		FROM test_all t1
+
+		START WITH t1.super_code IN (SELECT super_code
+		FROM test_all
+		<if test="type_level != null and type_level != ''">
+			WHERE type_level <![CDATA[ <= ]]>
+			#{type_level,jdbcType=INTEGER}
+		</if>
+		)
+		CONNECT BY PRIOR t1.ass_type_code = t1.super_code) t2
+		GROUP BY t2.ass_type_code
+		,t2.ass_type_name
+		,t2.ass_naturs
+		,t2.ass_naturs_name
+		ORDER BY t2.ass_type_code),
+		temp2 AS
+		(SELECT t.ass_type_code
+		,CAST(lpad(chr(41377), LEVEL * 2 - 1, chr(41377)) ||
+		t.ass_type_name AS VARCHAR2(50)) ass_type_name
+		FROM type_t t
+		START WITH t.super_code = 0
+		CONNECT BY PRIOR t.ass_type_code = t.super_code)
+		SELECT *
+		FROM (SELECT t2.ass_type_code
+		,t2.ass_type_name
+		,ass_naturs
+		,ass_naturs_name
+		,t1.begin_money
+		,t1.add_money
+		,t1.dec_money
+		,t1.end_money
+		,t1.depre_begin_money
+		,t1.depre_add_money
+		,t1.depre_dec_money
+		,t1.depre_balance_money
+		,t1.remain_begin_money
+		,t1.remain_end_money
+		FROM temp1 t1, temp2 t2
+		WHERE t1.ass_type_code = t2.ass_type_code
+
+		UNION ALL
+
+		SELECT '合计' AS ass_type_code
+		,NULL AS ass_type_name
+		,NULL AS ass_naturs
+		,NULL AS ass_naturs_name
+		,nvl(SUM(t3.begin_money), 0) AS begin_money
+		,nvl(SUM(t3.add_money), 0) AS add_money
+		,nvl(SUM(t3.dec_money), 0) AS dec_money
+		,nvl(SUM(t3.end_money), 0) AS end_money
+		,nvl(SUM(t3.depre_begin_money), 0) AS depre_begin_money
+		,nvl(SUM(t3.depre_add_money), 0) AS depre_add_money
+		,nvl(SUM(t3.depre_dec_money), 0) AS depre_dec_money
+		,nvl(SUM(t3.depre_balance_money), 0) AS depre_balance_money
+		,nvl(SUM(t3.remain_begin_money), 0) AS remain_begin_money
+		,nvl(SUM(t3.remain_end_money), 0) AS remain_end_money
+		FROM test_all t3
+
+		) t
+		ORDER BY t.ass_type_code
+
+	</select>
+
+</mapper>

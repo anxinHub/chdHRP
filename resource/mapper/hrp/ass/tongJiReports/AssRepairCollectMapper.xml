@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.ass.dao.tongJiReports.AssRepairCollectMapper">
+	<resultMap id="assRepairCollect" type="java.util.Map">
+		<result property="dept_code" column="dept_code" />
+		<result property="dept_name" column="dept_name" />
+		<result property="repair_hours" column="repair_hours" />
+		<result property="small_maintain_times" column="small_maintain_times" />
+		<result property="middle_maintain_times" column="middle_maintain_times" />
+		<result property="large_maintain_times" column="large_maintain_times" />
+		<result property="sum_maintain_times" column="sum_maintain_times" />
+		
+	</resultMap>
+	<select id="queryAssRepairCollect" resultMap="assRepairCollect" parameterType="java.util.Map">
+		
+		with temp as(
+		select *
+	 	 from (
+	 	 select b.dept_code, b.dept_name,a.repair_hours,a.trouble_level
+          from ASS_REPAIR_REC a
+          left join hos_dept_dict b
+            on a.group_id = b.group_id
+           and a.hos_id = b.hos_id
+           and a.fixed_dept_id = b.dept_id
+           and a.fixed_dept_no = b.dept_no
+           and b.is_stop = 0
+           and b.is_disable = 0
+         where a.group_id = #{group_id}
+           and a.hos_id = #{hos_id}
+           and a.copy_code = #{copy_code} 
+           <if test="dept_id != null and dept_id != '' ">
+           and a.fixed_dept_id = #{dept_id}
+           </if>
+           <if test="year_month_begin != null and year_month_begin != '' and year_month_end != null and year_month_end != ''">
+           and a.ass_year||a.ass_month  between  #{year_month_begin} and #{year_month_end}
+           </if>
+           ) 
+           pivot(count(trouble_level) for trouble_level 
+              in
+             (0 as
+	          small_maintain_times,
+	          1 as
+	          middle_maintain_times,
+	          2 as
+	          large_maintain_times))
+		)
+		select 
+		t.dept_code, t.dept_name,
+		nvl(t.repair_hours,0) repair_hours,
+		nvl(t.small_maintain_times,0) small_maintain_times,
+		nvl(t.middle_maintain_times,0) middle_maintain_times,
+		nvl(t.large_maintain_times,0) large_maintain_times,
+		nvl(t.small_maintain_times,0)+nvl(t.middle_maintain_times,0)+nvl(t.large_maintain_times,0) sum_maintain_times
+		 from temp t
+		
+		union all
+		
+		select 
+		'合计' dept_code, null dept_name,
+		sum(t.repair_hours) repair_hours,
+		sum(t.small_maintain_times) small_maintain_times,
+		sum(t.middle_maintain_times) middle_maintain_times,
+		sum(t.large_maintain_times) large_maintain_times,
+		sum(nvl(t.small_maintain_times,0)+nvl(t.middle_maintain_times,0)+nvl(t.large_maintain_times,0)) sum_maintain_times
+		from temp t
+	</select>
+	
+	<!-- 打印 -->
+	<select id="queryAssRepairCollectPrint" resultMap="assRepairCollect" parameterType="java.util.Map">
+	with temp as(
+		select *
+	 	 from (
+	 	 select b.dept_code, b.dept_name,a.repair_hours,a.trouble_level
+          from ASS_REPAIR_REC a
+          left join hos_dept_dict b
+            on a.group_id = b.group_id
+           and a.hos_id = b.hos_id
+           and a.fixed_dept_id = b.dept_id
+           and a.fixed_dept_no = b.dept_no
+           and b.is_stop = 0
+           and b.is_disable = 0
+         where a.group_id = #{group_id}
+           and a.hos_id = #{hos_id}
+           and a.copy_code = #{copy_code} 
+           <if test="dept_id != null and dept_id != '' ">
+           and a.fixed_dept_id = #{dept_id}
+           </if>
+           <if test="year_month_begin != null and year_month_begin != '' and year_month_end != null and year_month_end != ''">
+           and a.ass_year||a.ass_month  between  #{year_month_begin} and #{year_month_end}
+           </if>
+           ) 
+           pivot(count(trouble_level) for trouble_level 
+              in
+             (0 as
+	          small_maintain_times,
+	          1 as
+	          middle_maintain_times,
+	          2 as
+	          large_maintain_times))
+		)
+		select 
+		t.dept_code, t.dept_name,
+		nvl(t.repair_hours,0) repair_hours,
+		nvl(t.small_maintain_times,0) small_maintain_times,
+		nvl(t.middle_maintain_times,0) middle_maintain_times,
+		nvl(t.large_maintain_times,0) large_maintain_times,
+		nvl(t.small_maintain_times,0)+nvl(t.middle_maintain_times,0)+nvl(t.large_maintain_times,0) sum_maintain_times
+		 from temp t
+		
+		union all
+		
+		select 
+		'合计' dept_code, null dept_name,
+		sum(t.repair_hours) repair_hours,
+		sum(t.small_maintain_times) small_maintain_times,
+		sum(t.middle_maintain_times) middle_maintain_times,
+		sum(t.large_maintain_times) large_maintain_times,
+		sum(nvl(t.small_maintain_times,0)+nvl(t.middle_maintain_times,0)+nvl(t.large_maintain_times,0)) sum_maintain_times
+		from temp t
+	
+	
+	
+	
+	</select>
+</mapper>

@@ -1,0 +1,150 @@
+﻿<!doctype html>
+<html>
+<head>
+    <title>Spread.Sheets - GeneralSlicerData</title>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+    
+    <link href="../../../external/spreadjs/css/gc.spread.sheets.excel2013white.10.1.0.css" rel="stylesheet" type="text/css" />
+
+    <script src="../../../external/external/jquery-1.8.2.min.js" type="text/javascript"></script>
+
+    <script type="text/javascript" src="../../../external/spreadjs/gc.spread.sheets.all.10.1.0.min.js"></script>
+    
+    <style type="text/css">
+    /*css_begin*/
+        table th,
+        table td {
+            padding: 4px 8px;
+        }
+    /*css_end*/
+    </style>
+
+    <script id="scriptInit" type="text/javascript">
+        /*code_begin*/
+        $(document).ready(function () {
+            // Define data source.
+            var columnNames = ["Name", "Sex", "City", "Birthday"],
+                data = [
+                    ["Bob", "Man", "NewYork", "1968/06/08"],
+                    ["Betty", "Woman", "Washington", "1972/07/03"],
+                    ["Alice", "Woman", "Atlanta", "1964/03/02"],
+                    ["Tom", "Man", "Houston", "1986/12/03"],
+                    ["Jenny", "Woman", "Washington", "1956/10/13"],
+                    ["Nacy", "Woman", "NewYork", "1989/01/14"],
+                    ["John", "Man", "Houston", "1995/01/01"],
+                    ["Mark", "Man", "Atlanta", "1965/11/11"],
+                    ["Susan", "Woman", "Atlanta", "1983/07/08"]];
+
+            // Build data UI.
+            initFilteredResultList(columnNames, data);
+
+            // Create GeneralSlicerData.
+            var slicerData = new GC.Spread.Slicers.GeneralSlicerData(data, columnNames);
+
+            // Create a custom slicer and attach it to dom tree.
+            var slicer1 = new CustomSlicer($("#cityContainer")[0]);
+            slicer1.setData(slicerData, "City");
+
+            var slicer2 = new CustomSlicer($("#sexContainer")[0]);
+            slicer2.setData(slicerData, "Sex");
+        });
+        
+        // Define custom slicer.
+        function CustomSlicer(container) {
+            this.container = container;
+            this.slicerData = null;
+            this.columnName = null;
+        }
+        CustomSlicer.prototype.setData = function (slicerData, columnName) {
+            this.slicerData = slicerData;
+            this.columnName = columnName;
+            // Invoke attachListener method.
+            this.slicerData.attachListener(this);
+            this.onDataLoaded();
+        }
+        CustomSlicer.prototype.onDataLoaded = function () {
+            // Create slicer dom tree.
+            var columnName = this.columnName,
+                exclusiveData = this.slicerData.getExclusiveData(columnName);
+            $(this.container).append($('<span>' + this.columnName + ':</span>' + '<br />'));
+            var domString = "", id;
+            for (var i = 0; i < exclusiveData.length; i++) {
+                id = columnName + (i + 1);
+                domString += '<input type="checkbox" name="' + columnName + '" value="' + exclusiveData[i] + '" id="' + id + '" style="margin-left:10px;" checked>';
+                domString += '<label for="' + id + '">' + exclusiveData[i] + '</label>';
+                domString += '<br />';
+            }
+            $(this.container).append($(domString));
+            // Attach events to dom element.
+            var self = this;
+            $("[name='" + self.columnName + "']").change(function () {
+                // Invoke getExclusiveData method to get exclusive data from slicerData.
+                var exclusiveData = self.slicerData.getExclusiveData(self.columnName),
+                    parent = $(this).parent(),
+                    items = parent.children(),
+                    indexes = [];
+                for (var i = 0, length = items.length; i < length; i++) {
+                    if (items[i].checked) {
+                        var value = items[i].value;
+                        if (!isNaN(parseInt(value))) {
+                            value = parseInt(value);
+                        }
+                        indexes.push(exclusiveData.indexOf(value))
+                    }
+                }
+                if (indexes.length === 0) {
+                    // Invoke doUnfilter method when all item are not selected.
+                    self.slicerData.doUnfilter(self.columnName);
+                }
+                else {
+                    // Invoke doFilter method when any item is selected.
+                    self.slicerData.doFilter(self.columnName, { exclusiveRowIndexes: indexes });
+                }
+            });
+        };
+        // OverWrite onFiltered method to filter your data.
+        CustomSlicer.prototype.onFiltered = function () {
+            var slicerdata = this.slicerData;
+            var filteredRowIndexs = slicerdata.getFilteredRowIndexes();
+            var trs = $listTable.find("tr");
+            for (var i = 0; i < slicerdata.data.length; i++) {
+                if (filteredRowIndexs.indexOf(i) !== -1) {
+                    $(trs[i + 1]).show();
+                } else {
+                    $(trs[i + 1]).hide();
+                }
+            }
+        }
+
+        function initFilteredResultList(columnNames, data) {
+            var tableStr = "<table border='1' cellpadding='0' cellspacing='0'><tr>";
+            for (var i = 0; i < columnNames.length; i++) {
+                tableStr += "<th>" + columnNames[i] + "</th>";
+            }
+            tableStr += "</tr>";
+            for (var i = 0; i < data.length; i++) {
+                tableStr += "<tr>";
+                for (var j = 0; j < data[i].length; j++) {
+                    tableStr += "<td>" + data[i][j] + "</td>";
+                }
+                tableStr += "</tr>";
+            }
+            tableStr += "</table>";
+            $listTable = $(tableStr);
+            $("#ss").append($listTable);
+        }
+        /*code_end*/
+    </script>
+
+</head>
+<body>
+    <div class="sample-turtorial">
+        <div style="float: left;">
+            <div id="cityContainer"></div>
+            <div id="sexContainer" style="margin-top: 30px;"></div>
+        </div>
+        <div id="ss" style="position: absolute; left: 160px;"></div>
+    </div>
+</body>
+</html>

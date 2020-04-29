@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+
+	<sql id="v_mat_in_main" type="view" desc="物流入库主表视图"><![CDATA[
+	CREATE OR REPLACE VIEW V_MAT_IN_MAIN AS
+	SELECT 
+	    MIM.GROUP_ID,  --集团ID
+	    MIM.HOS_ID,    --医院ID
+	    MIM.COPY_CODE, --账套编码
+	    MIM.IN_ID AS BUSINESS_ID,     --入库单ID
+	    MIM.IN_NO AS BUSINESS_NO,     --入库单号
+	    MIM.YEAR,      --年份
+	    MIM.MONTH,     --月份
+	    MIM.BUS_TYPE_CODE,--业务类型
+	    MBT.BUS_TYPE_NAME,--业务类型名称
+	    MIM.SUP_ID,  --供应商ID
+	    HSD.SUP_NO,  --供应商变更ID
+	    HSD.SUP_CODE,    --供应商编码
+	    HSD.SUP_NAME,    --供应商名称
+	    MIM.STORE_ID,  --仓库ID
+	    HST.STORE_NO,  --仓库变更ID
+	    HST.STORE_CODE,    --仓库编码
+	    HST.STORE_NAME,    --仓库名称
+	    MIM.BRIEF,    --摘要
+	    MIM.MAKER,    --制单人ID
+	    SM.USER_NAME AS MAKER_NAME, --制单人名称
+	    MIM.IN_DATE AS MAKE_DATE,    --编制日期
+	    MIM.CHECKER,    --审核人ID
+	    SC.USER_NAME AS CHECKER_NAME,    --审核人
+	    MIM.CHECK_DATE,    --审核日期
+	    MIM.CONFIRMER,    --入库确认人ID
+	    SF.USER_NAME  AS CONFIRMER_NAME,    --入库确认人
+	    MIM.CONFIRM_DATE AS BUSI_DATE,    --业务日期
+	    MIM.PROTOCOL_CODE ,    --协议编号
+	    MIM.PROJ_ID,  --项目ID
+	    HPD.PROJ_NO,  --项目变更ID
+	    HPD.PROJ_CODE,    --项目编码
+	    HPD.PROJ_NAME,    --项目名称
+	    HS.SOURCE_ID,    --资金来源ID
+	    HS.SOURCE_CODE,    --资金来源编码
+	    HS.SOURCE_NAME,    --资金来源名称
+	    HSN.NATURE_CODE AS SOURCE_NATURE_CODE, --资金来源属性
+	    HSN.NATURE_NAME AS SOURCE_NATURE_NAME, --资金来源性质名称
+	    BILL.BILL_NO,  --发票号
+	    MIM.STOCKER AS EMP_ID,   --采购员ID
+	    HED.EMP_NO AS EMP_NO,
+	    HED.EMP_CODE,  --采购员编码
+	    HED.EMP_NAME,  --采购员名称
+	    HDD.DEPT_ID,   --采购科室ID
+	    HDD.DEPT_NO,   --采购科室变更ID
+	    HDD.DEPT_NAME,  --采购科室名称
+	    MIM.STATE,       --状态
+	    nvl(MIM.BILL_STATE,0) BILL_STATE, --发票状态
+        HS.SOURCE_ATTR FUND_SOURCE_ATTR--资金来源性质
+	 FROM MAT_IN_MAIN MIM
+	 LEFT JOIN MAT_BUS_TYPE MBT
+	 ON 
+	    MIM.BUS_TYPE_CODE=MBT.BUS_TYPE_CODE
+	 LEFT JOIN HOS_SUP_DICT HSD 
+	 ON 
+	    MIM.GROUP_ID=HSD.GROUP_ID 
+	    AND MIM.HOS_ID=HSD.HOS_ID
+	    AND MIM.SUP_ID=HSD.SUP_ID
+	    AND MIM.SUP_NO=HSD.SUP_NO
+	 LEFT JOIN HOS_STORE_DICT HST
+	 ON 
+	    MIM.GROUP_ID=HST.GROUP_ID
+	    AND MIM.HOS_ID=HST.HOS_ID
+	    AND MIM.STORE_ID=HST.STORE_ID
+	    AND MIM.STORE_NO=HST.STORE_NO
+	 LEFT JOIN SYS_USER SM  --制单人
+	 ON 
+	    MIM.GROUP_ID=SM.GROUP_ID
+	    AND MIM.HOS_ID=SM.HOS_ID
+	    AND MIM.COPY_CODE=SM.COPY_CODE
+	    AND MIM.MAKER=SM.USER_ID
+	 LEFT JOIN SYS_USER SC   --审核人
+	 ON 
+	    MIM.GROUP_ID=SC.GROUP_ID
+	    AND MIM.HOS_ID=SC.HOS_ID
+	    AND MIM.COPY_CODE=SC.COPY_CODE
+	    AND MIM.CHECKER=SC.USER_ID
+	 LEFT JOIN SYS_USER SF   --确认人
+	 ON 
+	    MIM.GROUP_ID=SF.GROUP_ID
+	    AND MIM.HOS_ID=SF.HOS_ID
+	    AND MIM.COPY_CODE=SF.COPY_CODE
+	    AND MIM.CONFIRMER=SF.USER_ID
+	 LEFT JOIN HOS_EMP_DICT HED   --采购员
+	 ON 
+	    MIM.GROUP_ID=HED.GROUP_ID
+	    AND MIM.HOS_ID=HED.HOS_ID
+	    AND MIM.STOCKER=HED.EMP_ID
+	    AND HED.IS_STOP=0
+	 LEFT JOIN HOS_DEPT_DICT HDD   --采购科室   
+	 ON 
+	    MIM.GROUP_ID=HDD.GROUP_ID
+	    AND MIM.HOS_ID=HDD.HOS_ID
+	    AND HED.DEPT_ID=HDD.DEPT_ID
+	    AND HED.DEPT_NO=HDD.DEPT_NO
+	 LEFT JOIN HOS_PROJ_DICT HPD 
+	 ON 
+	    MIM.GROUP_ID=HPD.GROUP_ID 
+	    AND MIM.HOS_ID=HPD.HOS_ID
+	    AND MIM.PROJ_ID=HPD.PROJ_ID
+	    AND HPD.IS_STOP=0   
+	 LEFT JOIN MAT_IN_RESOURCE MIR 
+	 ON 
+	    MIM.GROUP_ID=MIR.GROUP_ID 
+	    AND MIM.HOS_ID=MIR.HOS_ID
+	    AND MIM.COPY_CODE=MIR.COPY_CODE
+	    AND MIM.IN_ID=MIR.IN_ID
+	 LEFT JOIN HOS_SOURCE HS
+	 ON 
+	    MIR.GROUP_ID=HS.GROUP_ID
+	    AND MIR.HOS_ID=HS.HOS_ID
+	    AND MIR.SOURCE_ID=HS.SOURCE_ID
+	 LEFT JOIN HOS_SOURCE_NATURE HSN
+	 ON 
+	    HS.SOURCE_ATTR=HSN.NATURE_CODE
+	 LEFT JOIN 
+	      ( 
+	        SELECT GROUP_ID,HOS_ID,COPY_CODE,IN_ID,TO_CHAR(WM_CONCAT(TO_CHAR(BILL_NO)))  BILL_NO
+	        FROM 
+	           (SELECT DISTINCT MBD.GROUP_ID,MBD.HOS_ID,MBD.COPY_CODE,MBD.IN_ID,MBD.BILL_NO 
+	           FROM MAT_BILL_DETAIL  MBD
+	           ) RS
+	        GROUP BY GROUP_ID,HOS_ID,COPY_CODE,IN_ID  
+	       ) BILL
+	 ON 
+	     MIM.IN_ID=BILL.IN_ID
+	     AND MIM.GROUP_ID=BILL.GROUP_ID
+	     AND MIM.HOS_ID=BILL.HOS_ID
+	     AND MIM.COPY_CODE=BILL.COPY_CODE  
+	 WHERE MIM.STATE=3 
+ 
+	]]></sql>
+	<sql id="v_mat_in_detail" type="view" desc="物流入库明细视图"><![CDATA[
+	CREATE OR REPLACE VIEW V_MAT_IN_DETAIL AS
+	SELECT 
+     MID.GROUP_ID,  --集团ID
+     MID.HOS_ID,    --单位ID
+     MID.COPY_CODE, --账套编码
+     MID.IN_ID AS BUSINESS_ID,     --入库ID
+     MID.IN_NO  AS BUSINESS_NO,     --入库单号
+     MID.IN_DETAIL_ID AS DETAIL_ID,--明细ID
+     MIV.MAT_TYPE_ID AS SUB_TYPE_ID, --物资分类ID
+     MIV.INV_CODE,  --材料编码
+     MID.BATCH_NO,  --批号
+     MID.PRICE,     --单价
+     MID.AMOUNT,    --数量
+     MID.AMOUNT_MONEY, --金额
+     MIV.AMORTIZE_TYPE, --摊销方式
+       MID.NOTE          --备注
+    FROM MAT_IN_DETAIL MID
+    LEFT JOIN MAT_INV_DICT MIV
+    ON 
+          MID.GROUP_ID=MIV.GROUP_ID
+      AND MID.HOS_ID=MIV.HOS_ID
+      AND MID.COPY_CODE=MIV.COPY_CODE
+      AND MID.INV_ID=MIV.INV_ID
+      AND MID.INV_NO=MIV.INV_NO
+ 
+	]]></sql>
+	
+</root>
+

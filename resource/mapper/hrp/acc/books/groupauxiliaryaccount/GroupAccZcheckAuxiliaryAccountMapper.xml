@@ -1,0 +1,274 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.acc.dao.books.groupauxiliaryaccount.GroupAccZcheckAuxiliaryAccountMapper">
+	<resultMap id="accSupAuxiliaryAccount" type="com.chd.hrp.acc.entity.AccSupAuxiliaryAccount">
+        <result property="acc_year" column="acc_year"/>
+        <result property="acc_month" column="acc_month"/>
+        <result property="acc_day" column="acc_day"/>
+        <result property="sup_code" column="obj_code"/>
+        <result property="sup_name" column="obj_name"/>
+        <result property="subj_code" column="subj_code"/>
+        <result property="subj_name" column="subj_name"/>
+        <result property="obj_code" column="obj_code"/>
+        <result property="obj_name" column="obj_name"/>
+        <result property="summary" column="summary"/>
+        <result property="debit" column="debit"/>
+        <result property="credit" column="credit"/>
+        <result property="subj_dire" column="subj_dire"/>
+        <result property="vouch_id" column="vouch_id"/>
+        <result property="vouch_no" column="vouch_no"/>  
+        <result property="balance" column="balance"/>
+	</resultMap>
+	
+	
+	<select id="collectGroupAccZcheckGeneralLedger" statementType="CALLABLE" parameterType="java.util.Map" >
+		 <![CDATA[ 
+		{call group_subjzcheckgeneral(
+			#{group_id,jdbcType=INTEGER, mode=IN},  
+	        #{hos_id,jdbcType=INTEGER, mode=IN},  
+	        #{copy_code,jdbcType=VARCHAR, mode=IN},  
+	        #{acc_year_b,jdbcType=VARCHAR, mode=IN},
+	        #{acc_month_b,jdbcType=VARCHAR, mode=IN},
+	        #{acc_year_e,jdbcType=VARCHAR, mode=IN},
+	        #{acc_month_e,jdbcType=VARCHAR, mode=IN},
+	        #{is_state,jdbcType=INTEGER, mode=IN},
+	        #{subj_select_flag,jdbcType=INTEGER, mode=IN},
+	        #{subj_code,jdbcType=VARCHAR, mode=IN},
+	        #{check_item_type,jdbcType=INTEGER, mode=IN},
+	        #{check_item_code,jdbcType=VARCHAR, mode=IN},
+	        #{source_id,jdbcType=INTEGER, mode=IN},
+	        #{rst,jdbcType=CURSOR,mode=OUT,resultMap=com.chd.hrp.acc.dao.books.subjaccount.AccSubjLedgerMapper.accBooksMap,javaType=java.sql.ResultSet} 
+        )} 
+		 ]]>
+	</select>
+	
+	<select id="collectGroupAccZcheckDetailLedger" statementType="CALLABLE" parameterType="java.util.Map"  >
+		 <![CDATA[ 
+		{call group_subjobjzcheckdetail(
+			#{group_id},  
+	        #{hos_id},  
+	        #{copy_code},  
+	        #{acc_year_b},
+	        #{acc_month_b},
+	        #{acc_year_e},
+	        #{acc_month_e},
+	        #{is_state},
+	        #{subj_select_flag},
+	        #{subj_code},
+	        #{check_item_type,jdbcType=INTEGER, mode=IN},
+	        #{check_item_code,jdbcType=VARCHAR, mode=IN},
+	        #{source_id},
+	        #{rst,jdbcType=CURSOR,mode=OUT,resultMap=com.chd.hrp.acc.dao.books.subjaccount.AccSubjLedgerMapper.accBooksMap,javaType=java.sql.ResultSet} 
+        )} 
+		 ]]>
+	</select>
+	
+	<select id="collectGroupAccSubjZcheckGeneralLedger" statementType="CALLABLE" parameterType="java.util.Map"  >
+		 <![CDATA[ 
+		{call group_zchecksubjobjledger(
+			#{group_id},  
+	        #{hos_id},  
+	        #{copy_code},  
+	        #{acc_year_b},
+	        #{acc_month_b},
+	        #{acc_year_e},
+	        #{acc_month_e},
+	        #{is_state},
+	        #{subj_select_flag},
+	        #{subj_code},
+	        #{check_item_type,jdbcType=INTEGER, mode=IN},
+	        #{check_item_code,jdbcType=VARCHAR, mode=IN},
+	        #{source_id},
+	        #{rst,jdbcType=CURSOR,mode=OUT,resultMap=com.chd.hrp.acc.dao.books.subjaccount.AccSubjLedgerMapper.accBooksMap,javaType=java.sql.ResultSet} 
+        )} 
+		 ]]>
+	</select>
+	
+	<select id="collectGroupAccSubjZcheckDetailLedger" statementType="CALLABLE" parameterType="java.util.Map"  >
+		 <![CDATA[ 
+		{call group_zchecksubjobjdetail(
+			#{group_id},  
+	        #{hos_id},  
+	        #{copy_code},  
+	        #{acc_year_b},
+	        #{acc_month_b},
+	        #{acc_year_e},
+	        #{acc_month_e},
+	        #{is_state},
+	        #{subj_select_flag},
+	        #{subj_code},
+	        #{check_item_type,jdbcType=INTEGER, mode=IN},
+	        #{check_item_code,jdbcType=VARCHAR, mode=IN},
+	        #{source_id},
+	        #{is_happend},
+	        #{rst,jdbcType=CURSOR,mode=OUT,resultMap=com.chd.hrp.acc.dao.books.subjaccount.AccSubjLedgerMapper.accBooksMap,javaType=java.sql.ResultSet} 
+        
+        )} 
+		 ]]>
+	</select>
+	
+	<!-- 查询科目方向,下面计算需要用到，其实也可以写sql块一起执行 -->
+	<select id="queryGroupAccSubjDire" parameterType="java.util.Map" resultType="int">
+		select subj_dire from acc_subj where group_id=#{group_id} and hos_id=#{hos_id} and copy_code=#{copy_code} 
+		and acc_year=#{begin_year} and subj_code=#{subj_code}
+	</select>
+	
+	<!--自定义科目核算项余额表查询  -->
+	<select id="collectGroupAccZcheckEndOs" parameterType="java.util.Map" resultType="java.util.Map">
+		<!--年初余额-->
+		with y_balance as
+		(   
+		      select c.${column_check} obj_id,sum(c.end_os) end_os,sum(sum_od) sum_od,sum(sum_oc) sum_oc from acc_leder_check c 
+		      inner join acc_subj s on c.group_id=s.group_id and c.hos_id=s.hos_id and c.copy_code=s.copy_code and c.subj_id=s.subj_id 
+		      left join hos_copy_rela hcr on c.group_id = hcr.group_id and c.hos_id = hcr.hos_id and c.copy_code = hcr.copy_code
+		      where c.group_id=#{group_id} <!-- and c.hos_id=#{hos_id} and c.copy_code=#{copy_code}  -->
+		      and hcr.rela_code in (#{rela_code})
+		      and c.acc_year=#{begin_year} and c.acc_month='00'
+		      and s.subj_code like '${subj_code}%'
+		      ${where_sql}
+		      group by c.${column_check}
+		        
+		),
+		<!--所有凭证数据-->
+		vouch_data as(
+		  select v.acc_month,c.${column_check} obj_id,sum(c.debit) debit,sum(c.credit) credit from acc_vouch v		  
+		  inner join acc_vouch_check c on c.group_id=v.group_id and c.hos_id=v.hos_id and c.copy_code=v.copy_code and c.vouch_id=v.vouch_id
+		  inner join acc_subj s on c.group_id=s.group_id and c.hos_id=s.hos_id and c.copy_code=s.copy_code and c.subj_id=s.subj_id 
+		  left join hos_copy_rela hcr on v.group_id = hcr.group_id and v.hos_id = hcr.hos_id and v.copy_code = hcr.copy_code
+		  where v.group_id=#{group_id} <!-- and v.hos_id=#{hos_id} and v.copy_code=#{copy_code}  -->
+		  and hcr.rela_code in (#{rela_code})
+		  and v.acc_year=#{begin_year} and to_number(acc_month) &lt;=to_number(#{end_month})
+		  and s.subj_code like '${subj_code}%'
+		  and v.state &gt;=#{state}
+		  ${where_sql}
+		  group by v.acc_month,c.${column_check}
+		),
+		
+		<!--期初凭证数据-->
+		q_vouch_data as(
+		  select c.obj_id,sum(c.debit) debit,sum(c.credit) credit 
+		  from vouch_data c
+		  where to_number(c.acc_month) &lt;to_number(#{begin_month})
+		  group by c.obj_id
+		),
+		
+		<!--本期凭证数据-->
+		b_vouch_data as(
+		  select c.obj_id,sum(c.debit) debit,sum(c.credit) credit 
+		  from vouch_data c
+		  where to_number(c.acc_month) between to_number(#{begin_month}) and to_number(#{end_month})
+		  group by c.obj_id
+		),
+		
+		<!--合并计算-->
+		result_1 as(
+		
+		  <!--  年初余额-->
+		  select a.obj_id,
+		  sum(a.nc_d) nc_d,sum(a.nc_c) nc_c,<!--年初余额-->
+		  sum(a.qc_d) qc_d,sum(a.qc_c) qc_c,<!--期初余额-->
+		  sum(bq_d) bq_d,sum(bq_c) bq_c,<!--本期发生-->
+		  sum(sum_od) sum_od,sum(sum_oc) sum_oc<!--累计发生-->
+		  from(
+		    select y.obj_id,
+		    case ${dire} when 0 then y.end_os else 0 end nc_d,<!--年初借-->
+		    case ${dire} when 0 then 0 else y.end_os end nc_c,<!--年初贷-->
+		    0 qc_d,<!--期初借-->
+		    0 qc_c,<!--期初贷-->
+		    0 bq_d,<!--本期借-->
+		    0 bq_c,<!--本期贷-->
+		    sum_od,<!--累计借-->
+		    sum_oc<!--累计贷-->
+		    from y_balance y
+		    
+		    union
+		    
+		    <!--期初凭证数据 -->
+		    select q.obj_id,
+		    0 nc_d,<!--年初借-->
+		    0 nc_c,<!--年初贷-->
+		    (case ${dire} when 0 then q.debit-q.credit else 0 end) qc_d,<!--期初借=借-贷-->
+		    (case ${dire} when 0 then 0 else q.credit-q.debit end) qc_c,<!--期初贷=贷-借-->
+		    0 bq_d,<!--本期借-->
+		    0 bq_c,<!--本期贷-->
+		    q.debit sum_od,<!--累计借-->
+		    q.credit sum_oc<!--累计借-->
+		    from q_vouch_data q
+		    
+		    union
+		    
+		    <!--本期凭证数据 -->
+		    select b.obj_id,
+		    0 nc_d,<!--年初借-->
+		    0 nc_c,<!--年初贷-->
+		    0 qc_d,<!--期初借-->
+		    0 qc_c,<!--期初贷-->
+		    b.debit bq_d,<!--本期借-->
+		    b.credit bq_c,<!--本期贷-->
+		    b.debit sum_od,<!--累计借-->
+		    b.credit sum_oc<!--累计贷-->
+		    from b_vouch_data b
+		    
+		  )a
+		  group by a.obj_id
+		),
+		
+		<!--合并计算-->
+		result_2 as(
+		  select ck.${obj_code} obj_code,ck.${obj_name} obj_name,
+		  nc_d,<!--年初借-->
+		  nc_c,<!--年初贷-->
+		  nc_d+qc_d qc_d,<!--期初借=年初借+期初借-->
+		  nc_c+qc_c qc_c,<!--期初贷=年初贷+期初贷-->
+		  bq_d,<!--本期借-->
+		  bq_c,<!--本期贷 -->
+		  sum_od,<!--累计借-->
+		  sum_oc,<!--累计贷-->
+		  (case ${dire} when 0 then nc_d+qc_d+bq_d-bq_c else 0 end) end_d,<!--期末借=年初借+期初借+本期借-本期贷-->
+		  (case ${dire} when 0 then 0 else nc_c+qc_c+bq_c-bq_d end) end_c<!--期末贷=年初贷+期初贷+本期贷-本期借-->
+		  from result_1 r1
+		  <!-- 
+		    此处根据核算类取动态sql
+		  left join acc_check_item check on check.group_id=1 and check.hos_id=3 and check.copy_code='01' 
+		  and i.check_type_id=27 and r1.obj_id=check.check_item_id
+		  -->
+		  ${check_sql}
+		  order by ck.${obj_code}
+		)
+		
+		 <!--返回结果集-->
+		 select obj_code "obj_code",obj_name "obj_name",
+		  nc_d "nc_d",<!--年初借-->
+		  nc_c "nc_c",<!--年初贷-->
+		  qc_d "qc_d",<!--期初借-->
+		  qc_c "qc_c",<!--期初贷-->
+		  bq_d "bq_d",<!--本期借-->
+		  bq_c "bq_c",<!--本期贷 -->
+		  sum_od "sum_od",<!--累计借-->
+		  sum_oc "sum_oc",<!--累计贷-->
+		  end_d "end_d",<!--期末借-->
+		  end_c "end_c"<!--期末贷-->
+		  from result_2 r2
+		 	<where>
+	 			<if test=" is_end ==0 "> 
+					(end_d !=0 or end_c!=0) 
+				</if>
+			 </where>
+		  union all
+		  
+		  select '合计' obj_code,null obj_name,
+		  sum(nc_d) nc_d,<!--年初借-->
+		  sum(nc_c) nc_c,<!--年初贷-->
+		  sum(qc_d) qc_d,<!--期初借-->
+		  sum(qc_c) qc_c,<!--期初贷-->
+		  sum(bq_d) bq_d,<!--本期借-->
+		  sum(bq_c) bq_c,<!--本期贷 -->
+		  sum(sum_od) sum_od,<!--累计借-->
+		  sum(sum_oc) sum_oc,<!--累计贷-->
+		  sum(end_d) end_d,<!--期末借-->
+		  sum(end_c) end_c<!--期末贷-->
+		  from result_2 r2
+
+	</select>
+	
+</mapper>

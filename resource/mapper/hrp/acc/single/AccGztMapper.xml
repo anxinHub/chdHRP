@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.acc.dao.single.AccGztMapper">
+	<resultMap id="accWageScheme" type="com.chd.hrp.acc.entity.AccWageScheme">
+        <result property="group_id" column="group_id"/>
+        <result property="hos_id" column="hos_id"/>
+        <result property="copy_code" column="copy_code"/>
+        <result property="scheme_id" column="scheme_id"/>
+        <result property="wage_code" column="wage_code"/>
+        <result property="scheme_code" column="scheme_code"/>
+        <result property="scheme_name" column="scheme_name"/>
+        <result property="scheme_type_code" column="scheme_type_code"/>
+        <result property="create_user" column="create_user"/>
+        <result property="create_date" column="create_date"/>
+        <result property="is_gzt" column="is_gzt"/>
+	</resultMap>
+
+	<!-- 通过指定职工查询工资条方案 -->
+	<select id="queryGztSchemeByEmpId" parameterType="java.util.Map" resultMap="accWageScheme">
+		select t1.scheme_id
+		from acc_wage_scheme t1
+		inner join acc_wage_scheme_kind t2 on t2.scheme_id = t1.scheme_id
+		where  t1.group_id = #{group_id, jdbcType=INTEGER}
+	  	and t1.hos_id = #{hos_id, jdbcType=INTEGER}
+		and t1.scheme_type_code = '04'
+		and t1.wage_code=#{wage_code}
+		and t2.emp_id = #{emp_id, jdbcType=INTEGER}
+	    and rownum = 1
+	</select>
+	
+	<select id="queryAccWagePayByMonth" parameterType="java.util.Map" resultType="java.lang.Integer">
+		select count(*)
+		from acc_wage_pay
+		where group_id = #{group_id, jdbcType=INTEGER}
+		  and hos_id = #{hos_id, jdbcType=INTEGER}
+		  and copy_code = #{copy_code, jdbcType=INTEGER}
+		  and acc_year = #{acc_year, jdbcType=VARCHAR}
+		  and acc_month = #{acc_month, jdbcType=VARCHAR}
+		  and emp_id = #{emp_id, jdbcType=INTEGER}
+		  and wage_code = #{wage_code, jdbcType=VARCHAR}
+		  and pay_state=1
+	</select>
+	
+	<select id="queryGztDetail" parameterType="java.util.Map" resultType="java.util.Map">
+		select emp_id, emp_no, note, ${sql}
+        from (
+        	  select * from acc_wage_pay
+              where group_id = #{group_id, jdbcType=INTEGER}
+	            AND hos_id = #{hos_id, jdbcType=INTEGER}
+	            AND copy_code = #{copy_code, jdbcType=VARCHAR}
+	            AND wage_code = #{wage_code, jdbcType=VARCHAR}
+	            AND emp_id = #{emp_id, jdbcType=INTEGER}
+	            AND acc_year = #{acc_year, jdbcType=VARCHAR}
+	            and acc_month = #{acc_month, jdbcType=VARCHAR}
+	            and pay_state=1
+	         )
+	</select>
+	
+	<!-- 查询职工信息 -->
+	<select id="queryGztEmpById" parameterType="java.util.Map" resultType="java.util.Map">
+		select t1.emp_code "emp_code",t1.emp_name "emp_name",
+		t1.dept_id "dept_id",t2.dept_code "dept_code",t2.dept_name "dept_name"
+		from hos_emp t1
+		left join hos_dept t2 on t2.group_id = t1.group_id and t2.hos_id = t1.hos_id and t2.dept_id = t1.dept_id
+        where t1.group_id = #{group_id, jdbcType=INTEGER}
+        and t1.hos_id = #{hos_id, jdbcType=INTEGER}
+        and t1.emp_id = #{emp_id, jdbcType=INTEGER}
+	</select>
+	
+	<!-- 查询工资套 -->
+	<select id="queryGztWage" parameterType="java.util.Map" resultType="java.util.Map">
+		select distinct s.wage_code "wage_code",w.wage_name "wage_name",s.copy_code "copy_code"
+		from acc_wage_scheme s 
+		inner join acc_wage_scheme_kind k on s.scheme_id=k.scheme_id and k.emp_id=#{emp_id, jdbcType=INTEGER}
+		inner join acc_wage w on s.group_id=w.group_id and s.hos_id=w.hos_id and s.copy_code=w.copy_code and s.wage_code=w.wage_code 
+		where s.group_id=#{group_id, jdbcType=INTEGER} and s.hos_id=#{hos_id, jdbcType=INTEGER} 
+		and s.scheme_type_code = '04'
+		and s.wage_code in(
+			select distinct a.wage_code from acc_wage_pay a 
+			where a.group_id=w.group_id and a.hos_id=w.hos_id and a.copy_code=w.copy_code and a.emp_id=k.emp_id and a.pay_state=1
+		)
+	</select>
+	
+</mapper>
+

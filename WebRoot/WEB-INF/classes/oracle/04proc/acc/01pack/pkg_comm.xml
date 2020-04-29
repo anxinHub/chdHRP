@@ -1,0 +1,2397 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+	<sql id="pkg_com" type="proc"><![CDATA[
+		CREATE OR REPLACE PACKAGE PKG_COMM AS
+
+   /*-------------------------------------------------------------------------*/
+   /* 变量声明区                                                              */
+   /*-------------------------------------------------------------------------*/
+   def_OK                    CONSTANT NUMBER      := 0;            -- 成功
+   def_ERR                   CONSTANT NUMBER      := -1 ;          -- 系统错误
+   def_WARNING               CONSTANT NUMBER      := 100;          -- 系统警告
+
+    TYPE ty_row_str_split IS RECORD (strValue VARCHAR2 (4000));
+    
+    TYPE ty_tbl_str_split IS TABLE OF ty_row_str_split INDEX BY BINARY_INTEGER;
+
+   /*-------------------------------------------------------------------------
+   || 函数名称 ：fun_cal_num
+   || 功能描述 ：计算要拆分字符串数量
+   || 参数描述 ：参数标识          名称             输入/输出    类型
+   ||            -------------------------------------------------------------
+   ||            prm_InputStr        字符串           IN           VARCHAR2
+   ||            prm_Split           分割符           IN           VARCHAR2
+   ||
+   || 返 回 值 ：                    总数量           OUT           NUMBER
+   ||
+   || 作    者 ：           完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：           修改日期：
+   ||-------------------------------------------------------------------------*/
+   FUNCTION fun_cal_num( prm_InputStr IN VARCHAR2 --字符串
+                        ,prm_split    IN Varchar2 --分割符
+                       ) RETURN NUMBER;
+
+   /*-------------------------------------------------------------------------
+   || 过程名称 ：prc_SplitChar
+   || 功能描述 ：拆分字符串数量A|B|C，1：A 2:B  3:C
+   || 参数描述 ：参数标识          名称             输入/输出    类型
+   ||            -------------------------------------------------------------
+   ||            prm_InputStr        字符串           IN           VARCHAR2
+   ||            prm_Split           分割符           IN           VARCHAR2
+   ||            prm_pos             位置             IN           VARCHAR2
+   ||            prm_str             返回字符串       OUT          VARCHAR2
+   ||            prm_AppCode        业务处理标志     OUT          Number
+   ||            prm_ErrTxt         返回信息         OUT          Varchar2
+   ||
+   ||
+   || 作    者 ：           完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：           修改日期：
+   ||-------------------------------------------------------------------------*/
+    PROCEDURE prc_SplitChar( prm_inputstr   IN   Varchar2
+                             ,prm_split      IN   Varchar2
+                             ,prm_pos        IN   Number
+                             ,prm_str        Out  Varchar2
+                             ,prm_AppCode    Out  Number
+                             ,prm_DataBuffer Out  Varchar2
+                            );
+   /*-------------------------------------------------------------------------
+   || 过程名称 ：prc_ReplaceChar
+   || 功能描述 ：拆分字符串数量A|B|C|，1：A 2:B  3:C
+   || 参数描述 ：参数标识          名称             输入/输出    类型
+   ||            -------------------------------------------------------------
+   ||            prm_InputStr        字符串           IN           VARCHAR2
+   ||            prm_Split           分割符           IN           VARCHAR2
+   ||            prm_pos             位置             IN           VARCHAR2
+   ||            prm_str             要替换的串       IN           VARCHAR2
+   ||            prm_OutPutStr       返回字符串       OUT          VARCHAR2
+   ||            prm_AppCode        业务处理标志      OUT          Number
+   ||            prm_ErrTxt         返回信息          OUT          Varchar2
+   ||
+   ||
+   || 作    者 ：           完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：           修改日期：
+   ||-------------------------------------------------------------------------*/
+    PROCEDURE prc_ReplaceChar(  prm_inputstr   IN   Varchar2
+                               ,prm_split      IN   Varchar2
+                               ,prm_pos        IN   Number
+                               ,prm_str        IN   Varchar2
+                               ,prm_OutputStr  Out  Varchar2
+                               ,prm_AppCode    Out  Number
+                               ,prm_DataBuffer Out  Varchar2
+                            );   
+   /*-------------------------------------------------------------------------
+   || 函数名称 ：fun_GetSpellCode
+   || 功能描述 ：获取拼音码
+   || 参数描述 ：参数标识          名称             输入/输出    类型
+   ||            -------------------------------------------------------------
+   ||            prm_InputStr        字符串           IN           VARCHAR2
+   ||
+   || 返 回 值 ：                    拼音码           OUT           VARCHAR2
+   ||
+   || 作    者 ：           完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：           修改日期：
+   ||-------------------------------------------------------------------------*/
+    function fun_GetSpellCode( prm_InputStr in varchar2
+                             )    return varchar2  ;
+
+   /*-------------------------------------------------------------------------
+   || 函数名称 ：fun_GetWbxCode
+   || 功能描述 ：获取拼音码
+   || 参数描述 ：参数标识          名称             输入/输出    类型
+   ||            -------------------------------------------------------------
+   ||            prm_InputStr        字符串           IN           VARCHAR2
+   ||
+   || 返 回 值 ：                    五笔码           OUT           VARCHAR2
+   ||
+   || 作    者 ：           完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：           修改日期：
+   ||-------------------------------------------------------------------------*/
+   function fun_GetWbxCode(prm_InputStr in varchar2
+                          )return varchar2;
+
+   /*-------------------------------------------------------------------------
+   || 过程名称 ：prc_UpdateSubjInfoSigle
+   || 功能描述 ：根据传入的科目编码更新科目全称、拼音码、五笔码
+   || 参数描述 ：参数标识           名称        输入/输出  类型
+   ||            -------------------------------------------------------------
+   ||            prm_group_id       集团             IN           NUMBER
+   ||            prm_hos_id         医院             IN           NUMBER
+   ||            prm_copy_code      账套             IN           VARCHAR2
+   ||            prm_acc_year       年度             IN           VARCHAR2
+   ||            prm_subj_code      科目编码         IN           Number
+   ||            prm_AppCode        业务处理标志     OUT          Number
+   ||            prm_ErrTxt         返回信息         OUT          Varchar2
+   ||
+   || 作    者 ：               完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：
+   ||-------------------------------------------------------------------------*/
+   PROCEDURE prc_UpdateSubjInfoSigle(  prm_group_id          IN   NUMBER         --集团
+                                      ,prm_hos_id            IN   NUMBER         --医院
+                                      ,prm_copy_code         IN   VARCHAR2       --账套
+                                      ,prm_acc_year          IN   VARCHAR2       --年度
+                                      ,prm_subj_code         IN   VARCHAR2       --科目编码
+                                      ,prm_AppCode           Out  Number         --执行代码
+                                      ,prm_ErrTxt            Out  Varchar2       --错误信息
+                                     );
+   /*-------------------------------------------------------------------------
+   || 过程名称 ：prc_UpdateSubjInfoSigle
+   || 功能描述 ：根据传入的科目编码更新科目全称、拼音码、五笔码
+   || 参数描述 ：参数标识           名称        输入/输出  类型
+   ||            -------------------------------------------------------------
+   ||            prm_group_id       集团             IN           NUMBER
+   ||            prm_hos_id         医院             IN           NUMBER
+   ||            prm_copy_code      账套             IN           VARCHAR2
+   ||            prm_acc_year       年度             IN           VARCHAR2
+   ||            prm_subj_code      科目编码         IN           Number
+   ||            prm_AppCode        业务处理标志     OUT          Number
+   ||            prm_ErrTxt         返回信息         OUT          Varchar2
+   ||
+   || 作    者 ：               完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：
+   ||-------------------------------------------------------------------------*/
+   PROCEDURE prc_UpdateSubjInfoALL(  prm_group_id          IN   NUMBER         --集团
+                                    ,prm_hos_id            IN   NUMBER         --医院
+                                    ,prm_copy_code         IN   VARCHAR2       --账套
+                                    ,prm_acc_year          IN   VARCHAR2       --年度
+                                    ,prm_AppCode           Out  Number         --执行代码
+                                    ,prm_ErrTxt            Out  Varchar2       --错误信息
+                                   );
+                                /*-------------------------------------------------------------------------
+   || 过程名称 ：prc_UpdateSubjInfo
+   || 功能描述 ：根据传入的科目编码更新子级科目全称、拼音码、五笔码
+   || 参数描述 ：参数标识           名称        输入/输出  类型
+   ||            -------------------------------------------------------------
+   ||            prm_group_id       集团             IN           NUMBER
+   ||            prm_hos_id         医院             IN           NUMBER
+   ||            prm_copy_code      账套             IN           VARCHAR2
+   ||            prm_acc_year       年度             IN           VARCHAR2
+   ||            prm_subj_code      科目编码         IN           Number
+   ||            prm_AppCode        业务处理标志     OUT          Number
+   ||            prm_ErrTxt         返回信息         OUT          Varchar2
+   ||
+   || 作    者 ：               完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：
+   ||-------------------------------------------------------------------------*/
+   PROCEDURE prc_UpdateSubjInfo(  prm_group_id          IN   NUMBER         --集团
+                                      ,prm_hos_id            IN   NUMBER         --医院
+                                      ,prm_copy_code         IN   VARCHAR2       --账套
+                                      ,prm_acc_year          IN   VARCHAR2       --年度
+                                      ,prm_subj_code         IN   VARCHAR2       --科目编码
+                                      ,prm_AppCode           Out  Number         --执行代码
+                                      ,prm_ErrTxt            Out  Varchar2       --错误信息
+                                     );
+   
+  /*-------------------------------------------------------------------------
+   || 函数名称 ：fun_get_MatBillNo
+   || 功能描述 ：提取物流单据号
+   || 参数描述 ：参数标识          名称             输入/输出    类型
+   ||            -------------------------------------------------------------
+   ||            prm_group_id      集团               IN           NUMBER
+   ||            prm_hos_id        医院               IN           NUMBER
+   ||            prm_copy_code     账套               IN           NUMBER
+   ||            prm_year          年度               IN           VARCHAR2    
+   ||            prm_month         月份               IN           VARCHAR2
+   ||            prm_day           天                 IN           VARCHAR2
+   ||            prm_store_id      仓库ID             IN           NUMBER
+   ||            prm_prefixe       单号前缀           IN           VARCHAR2
+   ||            prm_bus_type      业务类型           IN           VARCHAR2
+   ||            prm_table_code    表名               IN           VARCHAR2
+   || 
+   || 返 回 值 ：                   单据号            OUT          VARCHAR2       
+   ||   
+   || 作    者 ：           完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：           修改日期：
+   ||-------------------------------------------------------------------------*/
+   FUNCTION fun_get_MatBillNo(  prm_group_id          IN  NUMBER    --集团
+                               ,prm_hos_id            IN  NUMBER    --医院
+                               ,prm_copy_code         IN  VARCHAR2  --账套
+                               ,prm_year              IN  VARCHAR2  --年度                                    
+                               ,prm_month             IN  Varchar2  --月份
+                               ,prm_day               IN  Varchar2  --天
+                               ,prm_store_id          IN  NUMBER    --仓库ID
+                               ,prm_prefixe           IN  Varchar2  --单号前缀
+                               ,prm_bus_type          IN  Varchar2  --业务类型
+                               ,prm_table_code        IN  Varchar2  --表名                              
+                              ) RETURN VARCHAR2;                                
+
+   /*-------------------------------------------------------------------------
+   || 函数名称 ：fun_parseNumber
+   || 功能描述 ：字符串转数值型
+   || 参数描述 ：参数标识          名称             输入/输出    类型
+   ||            -------------------------------------------------------------
+   ||            in_value          输入字符串       IN           VARCHAR2
+   ||            
+   ||
+   || 返 回 值 ：                  数值型           OUT          NUMBER
+   ||
+   || 作    者 ：           完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：           修改日期：
+   ||-------------------------------------------------------------------------*/
+   FUNCTION fun_parseNumber(
+                            in_value         IN  VARCHAR2   --字符串
+    )RETURN NUMBER;
+    
+   /*-------------------------------------------------------------------------
+   || 函数名称 ：fun_parseNumberRound
+   || 功能描述 ：字符串转数值型
+   || 参数描述 ：参数标识          名称             输入/输出    类型
+   ||            -------------------------------------------------------------
+   ||            in_value          输入字符串       IN           VARCHAR2
+   ||            in_round          小数点保留位数   IN           NUMBER
+   ||
+   || 返 回 值 ：                  数值型           OUT          NUMBER
+   ||
+   || 作    者 ：           完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：           修改日期：
+   ||-------------------------------------------------------------------------*/
+   FUNCTION fun_parseNumberRound(
+                            in_value         IN  VARCHAR2   --字符串
+                           ,in_round         IN  NUMBER     --小数点保留位数
+    )RETURN NUMBER;
+
+   /*-------------------------------------------------------------------------
+   || 函数名称 ：fun_existsNumber
+   || 功能描述 ：字符串转数值型
+   || 参数描述 ：参数标识          名称             输入/输出    类型
+   ||            -------------------------------------------------------------
+   ||            in_value          输入字符串       IN           VARCHAR2
+   ||
+   ||
+   || 返 回 值 ：                  数值型           OUT          VARCHAR2
+   ||
+   || 作    者 ：           完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：           修改日期：
+   ||-----------------------------------------------------------------a--------*/
+   FUNCTION fun_existsNumber(
+                            in_value         IN  VARCHAR2   --字符串
+    )RETURN VARCHAR2;
+    
+    
+   /*-------------------------------------------------------------------------
+   || 函数名称 ：fun_split
+   || 功能描述 ：根据指定字符分割JSON串
+   || 参数描述 ：参数标识          名称             输入/输出    类型
+   ||            -------------------------------------------------------------
+   ||            p_str             输入字符串       IN           VARCHAR2
+   ||            p_delimiter       分隔符   IN       VARCHAR2
+   ||
+   || 返 回 值 ：                  数值型           OUT          NUMBER
+   ||
+   || 作    者 ：           完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：           修改日期：
+   ||-------------------------------------------------------------------------*/
+   
+   FUNCTION fun_split(p_str       IN VARCHAR2,
+                      p_delimiter IN VARCHAR2)RETURN ty_tbl_str_split;
+    
+    /*-------------------------------------------------------------------------
+   || 函数名称 ：fun_parsejson
+   || 功能描述 ： 解析JSON字符串
+   || 参数描述 ：参数标识          名称             输入/输出    类型
+   ||            -------------------------------------------------------------
+   ||            p_jsonstr         json字符串       IN           VARCHAR2
+   ||            p_jsonstr         键                              IN           VARCHAR2
+   ||
+   || 返 回 值 ：                  数值型           OUT          NUMBER
+   ||
+   || 作    者 ：           完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：           修改日期：
+   ||-------------------------------------------------------------------------*/
+   FUNCTION fun_parsejson(p_jsonstr varchar2,
+                          p_key varchar2) RETURN VARCHAR2;
+   
+   
+   /*-------------------------------------------------------------------------
+   || 函数名称 ：fun_ReplaceFunStr
+   || 功能描述 ：根据传入的字符串将函数全部替换为值，当计算出错时返回原串
+   || 参数描述 ：参数标识           名称        输入/输出  类型
+   ||            -------------------------------------------------------------
+   ||            prm_group_id       集团             IN           NUMBER
+   ||            prm_hos_id         医院             IN           NUMBER
+   ||            prm_copy_code      账套             IN           VARCHAR2
+   ||            prm_mod_code       模块编码         IN           VARCHAR2
+   ||            prm_InputStr       输入字符串       IN           VARCHAR2
+   || 返 回 值 ：                   字符串           OUT          VARCHAR2
+   ||
+   || 作    者 ：               完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：
+   ||-------------------------------------------------------------------------*/
+   FUNCTION fun_ReplaceFunStr( prm_group_id          IN   NUMBER         --集团
+                              ,prm_hos_id            IN   NUMBER         --医院
+                              ,prm_copy_code         IN   VARCHAR2       --账套
+                              ,prm_mod_code          IN   VARCHAR2       --模块编码
+                              ,prm_InputStr          IN   VARCHAR2       --输入字符串
+                              )  RETURN VARCHAR2 ; 
+                                            /*-------------------------------------------------------------------------
+   || 函数名称 ：fun_ReplaceFunStr_HR(人力专用)
+   || 功能描述 ：根据传入的字符串将函数全部替换为值，当计算出错时返回原串
+   || 参数描述 ：参数标识           名称        输入/输出  类型
+   ||            -------------------------------------------------------------
+   ||            prm_group_id       集团             IN           NUMBER
+   ||            prm_hos_id         医院             IN           NUMBER
+   ||            prm_mod_code       模块编码         IN           VARCHAR2
+   ||            prm_InputStr       输入字符串       IN           VARCHAR2
+   || 返 回 值 ：                   字符串           OUT          VARCHAR2
+   ||
+   || 作    者 ：               完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：
+   ||-------------------------------------------------------------------------*/
+   FUNCTION fun_ReplaceFunStr_HR( prm_group_id          IN   NUMBER         --集团
+                              ,prm_hos_id            IN   NUMBER         --医院
+                              ,prm_mod_code          IN   VARCHAR2       --模块编码
+                              ,prm_InputStr          IN   VARCHAR2       --输入字符串
+                              )  RETURN VARCHAR2 ; 
+   /*-------------------------------------------------------------------------
+   || 过程名称 ： prc_UpdateBudgIncomeSubjALL
+   || 功能描述 ：根据传入的参数 预算收入科目 更新科目全称、拼音码、五笔码 ,修改在上级编码中存在科目为非末级
+   || 参数描述 ：参数标识           名称        输入/输出  类型
+   ||            -------------------------------------------------------------
+   ||            prm_group_id       集团             IN           NUMBER
+   ||            prm_hos_id         医院             IN           NUMBER
+   ||            prm_copy_code      账套             IN           VARCHAR2
+   ||            prm_acc_year       年度             IN           VARCHAR2
+   ||            prm_AppCode        业务处理标志     OUT          Number
+   ||            prm_ErrTxt         返回信息         OUT          Varchar2
+   ||
+   || 作    者 ：姚青松    完成日期 ：2020-01-08
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：
+   ||-------------------------------------------------------------------------*/                             
+   PROCEDURE prc_UpdateBudgIncomeSubjALL( prm_group_id          IN   NUMBER         --集团
+                                    ,prm_hos_id            IN   NUMBER         --医院
+                                    ,prm_copy_code         IN   VARCHAR2       --账套
+                                    ,prm_acc_year          IN   VARCHAR2       --年度
+                                    ,prm_AppCode           Out  Number         --执行代码
+                                    ,prm_ErrTxt            Out  Varchar2       --错误信息
+                                   ); 
+    /*-------------------------------------------------------------------------
+   || 过程名称 ： prc_UpdateBudgCostSubjALL
+   || 功能描述 ：根据传入的参数 预算支出科目 更新科目全称、拼音码、五笔码 ,修改在上级编码中存在科目为非末级
+   || 参数描述 ：参数标识           名称        输入/输出  类型
+   ||            -------------------------------------------------------------
+   ||            prm_group_id       集团             IN           NUMBER
+   ||            prm_hos_id         医院             IN           NUMBER
+   ||            prm_copy_code      账套             IN           VARCHAR2
+   ||            prm_acc_year       年度             IN           VARCHAR2
+   ||            prm_AppCode        业务处理标志     OUT          Number
+   ||            prm_ErrTxt         返回信息         OUT          Varchar2
+   ||
+   || 作    者 ：姚青松    完成日期 ：2020-01-08
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：
+   ||-------------------------------------------------------------------------*/                                  
+    PROCEDURE prc_UpdateBudgCostSubjALL( prm_group_id          IN   NUMBER         --集团
+                                    ,prm_hos_id            IN   NUMBER         --医院
+                                    ,prm_copy_code         IN   VARCHAR2       --账套
+                                    ,prm_acc_year          IN   VARCHAR2       --年度
+                                    ,prm_AppCode           Out  Number         --执行代码
+                                    ,prm_ErrTxt            Out  Varchar2       --错误信息
+                                   );         
+END PKG_COMM;
+		
+        
+	]]></sql>
+	
+	<sql id="pkg_body_com" type="proc"><![CDATA[
+	create or replace package body PKG_COMM AS
+
+   /*-------------------------------------------------------------------------*/
+   /* 私有全局常量声明                                                        */
+   /*-------------------------------------------------------------------------*/
+
+   /*-------------------------------------------------------------------------
+   || 函数名称 ：fun_cal_num
+   || 功能描述 ：计算要拆分字符串数量
+   || 参数描述 ：参数标识          名称             输入/输出    类型
+   ||            -------------------------------------------------------------
+   ||            prm_InputStr        字符串           IN           VARCHAR2
+   ||            prm_Split           分割符           IN           VARCHAR2
+   ||
+   || 返 回 值 ：                    总数量           OUT           NUMBER
+   ||
+   || 作    者 ：           完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：           修改日期：
+   ||-------------------------------------------------------------------------*/
+   FUNCTION fun_cal_num( prm_InputStr IN VARCHAR2 --字符串
+                        ,prm_split    IN Varchar2 --分割符
+                       ) RETURN NUMBER
+
+     IS
+        v_i_ret integer;
+     begin
+
+        v_i_ret :=0;
+
+        select  length(prm_InputStr)-length(REPLACE(prm_InputStr, prm_split, ''))
+           into v_i_ret
+        from dual;
+
+        return v_i_ret;
+
+     END fun_cal_num;
+   /*-------------------------------------------------------------------------
+   || 过程名称 ：prc_SplitChar
+   || 功能描述 ：拆分字符串数量A|B|C，1：A 2:B  3:C
+   || 参数描述 ：参数标识          名称             输入/输出    类型
+   ||            -------------------------------------------------------------
+   ||            prm_InputStr        字符串           IN           VARCHAR2
+   ||            prm_Split           分割符           IN           VARCHAR2
+   ||            prm_pos             位置             IN           VARCHAR2
+   ||            prm_str             返回字符串       OUT          VARCHAR2
+   ||            prm_AppCode        业务处理标志     OUT          Number
+   ||            prm_ErrTxt         返回信息         OUT          Varchar2
+   ||
+   ||
+   || 作    者 ：           完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：           修改日期：
+   ||-------------------------------------------------------------------------*/
+    PROCEDURE prc_SplitChar( prm_inputstr   IN   Varchar2
+                             ,prm_split      IN   Varchar2
+                             ,prm_pos        IN   Number
+                             ,prm_str        Out  Varchar2
+                             ,prm_AppCode    Out  Number
+                             ,prm_DataBuffer Out  Varchar2
+                            )
+
+    Is
+    /*------变量定义---------------*/
+    ll_FindPos        Number;
+    ll_StartPos       Number;
+    ls_colValue       Varchar(1024);
+    li_i              Number;
+
+    str_inputstr      Varchar2(1024);
+    str_split         Varchar2(5);
+    n_pos             Number;
+    Begin
+       ll_StartPos := 1;
+       li_i := 0;
+       prm_AppCode := def_OK;
+       str_inputstr := prm_inputstr;
+       str_split := prm_split;
+       n_pos := prm_pos;
+       Loop
+         --拆分带有特定分割符的字符串
+         If ll_FindPos = 0 Then
+            Exit;
+         End If;
+         ll_FindPos := Instr ( str_inputstr , str_split, ll_StartPos );
+
+         IF ll_FindPos = 0 THEN  --没有找到
+            ls_colvalue := substr ( str_inputstr, ll_StartPos );
+         ELSE --找到
+            li_i := li_i + 1;
+            ls_colvalue := substr ( str_inputstr , ll_StartPos , ll_FindPos - ll_StartPos );
+            ll_StartPos := ll_FindPos + 1;
+         END IF;
+
+          If li_i = n_pos Then
+            prm_str := ls_ColValue;
+            Return  ;
+         End if;
+
+      End LOOP ;
+
+      prm_AppCode := def_ERR;
+      prm_DataBuffer := '分割字符串时,没有找到要分割的字符串！';
+      Return ;
+
+    EXCEPTION
+      WHEN OTHERS THEN
+         prm_AppCode := def_ERR;
+         prm_DataBuffer := '分割字符串出错！'||SQLERRM;
+    End prc_SplitChar;
+
+    /*-------------------------------------------------------------------------
+   || 过程名称 ：prc_ReplaceChar
+   || 功能描述 ：拆分字符串数量A|B|C|，1：A 2:B  3:C
+   || 参数描述 ：参数标识          名称             输入/输出    类型
+   ||            -------------------------------------------------------------
+   ||            prm_InputStr        字符串           IN           VARCHAR2
+   ||            prm_Split           分割符           IN           VARCHAR2
+   ||            prm_pos             位置             IN           VARCHAR2
+   ||            prm_str             要替换的串       IN           VARCHAR2
+   ||            prm_OutPutStr       返回字符串       OUT          VARCHAR2
+   ||            prm_AppCode        业务处理标志      OUT          Number
+   ||            prm_ErrTxt         返回信息          OUT          Varchar2
+   ||
+   ||
+   || 作    者 ：           完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：           修改日期：
+   ||-------------------------------------------------------------------------*/
+    PROCEDURE prc_ReplaceChar(  prm_inputstr   IN   Varchar2
+                               ,prm_split      IN   Varchar2
+                               ,prm_pos        IN   Number
+                               ,prm_str        IN   Varchar2
+                               ,prm_OutputStr  Out  Varchar2
+                               ,prm_AppCode    Out  Number
+                               ,prm_DataBuffer Out  Varchar2
+                            )
+
+    Is
+    /*------变量定义---------------*/
+    ll_FindPos        Number;
+    ll_StartPos       Number;
+    ls_colValue       Varchar(1024);
+    li_i              Number;
+
+    str_inputstr      Varchar2(1024);
+    str_FrontStr      Varchar2(1024);
+    str_LaterStr      Varchar2(1024);
+    str_split         Varchar2(5);
+    n_pos             Number;
+    Begin
+       ll_StartPos := 1;
+       li_i := 0;
+       prm_AppCode := def_OK;
+       str_inputstr := prm_inputstr;
+       str_FrontStr := '' ;
+       str_LaterStr := '' ;
+       str_split := prm_split;
+       n_pos := prm_pos;
+       Loop
+         --拆分带有特定分割符的字符串
+         If ll_FindPos = 0 Then
+            Exit;
+         End If;
+         ll_FindPos := Instr ( str_inputstr , str_split, ll_StartPos );
+
+         IF ll_FindPos = 0 THEN  --没有找到
+            ls_colvalue := substr ( str_inputstr, ll_StartPos );
+         ELSE --找到
+            li_i := li_i + 1;
+            ls_colvalue  := substr ( str_inputstr , ll_StartPos , ll_FindPos - ll_StartPos );
+            str_FrontStr := substr ( str_inputstr , 1 , ll_FindPos- length(ls_colvalue)-1 );
+            str_LaterStr := substr ( str_inputstr , ll_FindPos , length(str_inputstr)- ll_FindPos +1 );
+            ll_StartPos  := ll_FindPos + 1;
+         END IF;
+
+          If li_i = n_pos Then
+            prm_OutputStr := str_FrontStr || prm_str ||  str_LaterStr;
+            Return  ;
+         End if;
+
+      End LOOP ;
+
+      prm_AppCode := def_ERR;
+      prm_DataBuffer := '分割字符串时,没有找到要分割的字符串！';
+      Return ;
+
+    EXCEPTION
+      WHEN OTHERS THEN
+         prm_AppCode := def_ERR;
+         prm_DataBuffer := '分割字符串出错！'||SQLERRM;
+    End prc_ReplaceChar;
+    
+   /*-------------------------------------------------------------------------
+   || 函数名称 ：fun_GetSpellCode
+   || 功能描述 ：获取拼音码
+   || 参数描述 ：参数标识          名称             输入/输出    类型
+   ||            -------------------------------------------------------------
+   ||            prm_InputStr        字符串           IN           VARCHAR2
+   ||
+   || 返 回 值 ：                    拼音码           OUT           VARCHAR2
+   ||
+   || 作    者 ：           完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：           修改日期：
+   ||-------------------------------------------------------------------------*/
+    function fun_GetSpellCode( prm_InputStr in varchar2
+                             )    return varchar2
+
+    IS
+      prm_SpellCode varchar2(500) ;
+      v_word        varchar2(2)   ;
+      v_spell_code  varchar2(1)   ;
+      v_size        number(1) := 1;
+    BEGIN
+
+      IF prm_InputStr IS NULL THEN
+        RETURN '';
+      END IF;
+
+      prm_SpellCode := '';
+
+      for i in 1 .. lengthb(prm_InputStr) loop
+        if v_size = 2 then
+          v_word := substrb(prm_InputStr, i - 1, v_size);
+          begin
+            select PIN_YIN
+              into v_spell_code
+              from sys_in_code
+             where IN_CODE = v_word
+               AND rownum = 1;
+
+          exception
+            when no_data_found then
+              v_size := 1;
+              goto end_loop;
+
+          end;
+
+          prm_SpellCode := prm_SpellCode || v_spell_code;
+          v_size        := 1;
+        else
+          v_word := substrb(prm_InputStr, i, v_size);
+          if ascii(v_word) >= 128 or ascii(v_word) <= 33 then
+            v_size := 2;
+            goto end_loop;
+          elsif (ascii(v_word) >= 48 and ascii(v_word) <= 57) or
+                (ascii(v_word) >= 65 and ascii(v_word) <= 90) or
+                (ascii(v_word) >= 97 and ascii(v_word) <= 122) then
+            prm_SpellCode := prm_SpellCode || v_word;
+          end if;
+        end if;
+        <<end_loop>>
+        null;
+      end loop;
+      return(UPPER(prm_SpellCode));
+    end fun_GetSpellCode;
+
+   /*-------------------------------------------------------------------------
+   || 函数名称 ：fun_GetWbxCode
+   || 功能描述 ：获取拼音码
+   || 参数描述 ：参数标识          名称             输入/输出    类型
+   ||            -------------------------------------------------------------
+   ||            prm_InputStr        字符串           IN           VARCHAR2
+   ||
+   || 返 回 值 ：                    五笔码           OUT           VARCHAR2
+   ||
+   || 作    者 ：           完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：           修改日期：
+   ||-------------------------------------------------------------------------*/
+   function fun_GetWbxCode(prm_InputStr in varchar2
+                          )return varchar2
+   IS
+      prm_WbxCode varchar2(500) ;
+      v_word      varchar2(2)   ;
+      v_wbx_code  varchar2(1)   ;
+      v_size      number(1) := 1;
+
+   BEGIN
+
+      IF prm_InputStr IS NULL THEN
+        RETURN '';
+      END IF;
+
+      prm_WbxCode := '';
+
+      for i in 1 .. lengthb(prm_InputStr) loop
+        if v_size = 2 then
+          v_word := substrb(prm_InputStr, i - 1, v_size);
+          begin
+            select WU_BI
+              into v_wbx_code
+              from sys_in_code
+             where IN_CODE = v_word
+               AND rownum = 1;
+
+          exception
+            when no_data_found then
+              v_size := 1;
+              goto end_loop;
+
+          end;
+
+          prm_WbxCode := prm_WbxCode || v_wbx_code;
+          v_size      := 1;
+        else
+          v_word := substrb(prm_InputStr, i, v_size);
+          if ascii(v_word) >= 128 or ascii(v_word) <= 33 then
+            v_size := 2;
+            goto end_loop;
+          elsif (ascii(v_word) >= 48 and ascii(v_word) <= 57) or
+                (ascii(v_word) >= 65 and ascii(v_word) <= 90) or
+                (ascii(v_word) >= 97 and ascii(v_word) <= 122) then
+            prm_WbxCode := prm_WbxCode || v_word;
+          end if;
+        end if;
+        <<end_loop>>
+        null;
+      end loop;
+      return(UPPER(prm_WbxCode));
+   END fun_GetWbxCode;
+
+   /*-------------------------------------------------------------------------
+   || 过程名称 ：prc_UpdateSubjInfoSigle
+   || 功能描述 ：根据传入的科目编码更新科目全称、拼音码、五笔码
+   || 参数描述 ：参数标识           名称        输入/输出  类型
+   ||            -------------------------------------------------------------
+   ||            prm_group_id       集团             IN           NUMBER
+   ||            prm_hos_id         医院             IN           NUMBER
+   ||            prm_copy_code      账套             IN           VARCHAR2
+   ||            prm_acc_year       年度             IN           VARCHAR2
+   ||            prm_subj_code      科目编码         IN           Number
+   ||            prm_AppCode        业务处理标志     OUT          Number
+   ||            prm_ErrTxt         返回信息         OUT          Varchar2
+   ||
+   || 作    者 ：               完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：
+   ||-------------------------------------------------------------------------*/
+   PROCEDURE prc_UpdateSubjInfoSigle(  prm_group_id          IN   NUMBER         --集团
+                                      ,prm_hos_id            IN   NUMBER         --医院
+                                      ,prm_copy_code         IN   VARCHAR2       --账套
+                                      ,prm_acc_year          IN   VARCHAR2       --年度
+                                      ,prm_subj_code         IN   VARCHAR2       --科目编码
+                                      ,prm_AppCode           Out  Number         --执行代码
+                                      ,prm_ErrTxt            Out  Varchar2       --错误信息
+                                     )
+
+   IS
+      /*------变量定义---------------*/
+      v_subj_code             acc_subj.subj_code%type;
+      v_subj_name             acc_subj.subj_name%type;
+      v_super_code            acc_subj.super_code%type;
+      v_spell_code            acc_subj.spell_code%type;
+      v_wbx_code              acc_subj.wbx_code%type;
+      v_level                 acc_subj.subj_level%type;   --层次
+      v_level_start            acc_subj.subj_level%type;   --层次
+      v_super_subj_name_all   acc_subj.subj_name_all%type;
+      v_super_spell_code      acc_subj.spell_code%type;
+      v_super_wbx_code        acc_subj.wbx_code%type;
+      v_super_spell_sub       acc_subj.spell_code%type;
+      v_super_wbx_sub         acc_subj.wbx_code%type;
+      v_count                 integer    := 0 ;
+      v_pos                   number(18) := 2 ;
+      --定义科目游标
+      CURSOR cur_acc_subj  ( prm_group_id          IN   NUMBER         --集团
+                            ,prm_hos_id            IN   NUMBER         --医院
+                            ,prm_copy_code         IN   VARCHAR2       --账套
+                            ,prm_acc_year          IN   VARCHAR2       --开始年度
+                            ,prm_subj_code         IN   VARCHAR2       --科目编码
+                            ,prm_subj_level        IN   integer        --层级
+                           )
+       IS
+        SELECT subj_code, subj_name,super_code
+          FROM acc_subj
+         WHERE group_id   = prm_group_id
+           and hos_id     = prm_hos_id
+           AND copy_code  = prm_copy_code
+           AND acc_year   = prm_acc_year
+           AND subj_code  like prm_subj_code || '%'
+           AND SUBJ_LEVEL = prm_subj_level
+         ORDER BY subj_code;
+   BEGIN
+
+      prm_AppCode := def_OK;
+      v_level_start := 1 ;
+      v_level := 1 ;
+
+     select max(SUBJ_LEVEL)
+       into v_level
+       from acc_subj
+      WHERE group_id  = prm_group_id
+        and hos_id    = prm_hos_id
+        AND copy_code = prm_copy_code
+        AND acc_year  = prm_acc_year
+        AND subj_code like prm_subj_code || '%';
+
+
+     select SUBJ_LEVEL
+       into v_level_start
+       from acc_subj
+      WHERE group_id  = prm_group_id
+        and hos_id    = prm_hos_id
+        AND copy_code = prm_copy_code
+        AND acc_year  = prm_acc_year
+        AND subj_code = prm_subj_code ;
+
+     for i in v_level_start..v_level loop
+         open cur_acc_subj(   prm_group_id
+                            , prm_hos_id
+                            , prm_copy_code
+                            , prm_acc_year
+                            , prm_subj_code
+                            , i
+                           );
+           LOOP
+              FETCH cur_acc_subj INTO v_subj_code,v_subj_name,v_super_code;    --提取游标
+
+              IF cur_acc_subj%NOTFOUND THEN
+                 if cur_acc_subj%isopen then
+                    CLOSE cur_acc_subj;
+                 end if;
+                 goto next_i;
+              END IF;
+
+              if UPPER(v_super_code) = 'TOP' then
+                  update acc_subj
+                     set subj_name_all = subj_name
+                        ,spell_code = '{'||fun_GetSpellCode(subj_name)
+                        ,wbx_code   = '{'||fun_GetWbxCode(subj_name)
+                   where group_id   = prm_group_id
+                     and hos_id     = prm_hos_id
+                     AND copy_code  = prm_copy_code
+                     AND acc_year   = prm_acc_year
+                     AND subj_code  = v_subj_code;
+              else
+                  select subj_name_all, spell_code, wbx_code
+                    into v_super_subj_name_all,
+                         v_super_spell_code,
+                         v_super_wbx_code
+                    from acc_subj
+                   where group_id = prm_group_id
+                     and hos_id = prm_hos_id
+                     AND copy_code = prm_copy_code
+                     AND acc_year  = prm_acc_year
+                     AND subj_code = v_super_code;
+
+                   if i = 2 then
+                        v_spell_code := v_spell_code || v_super_spell_code || fun_GetSpellCode(v_subj_name);
+                        v_wbx_code   := v_wbx_code || v_super_wbx_code || fun_GetWbxCode(v_subj_name);
+                   else
+                       --获取字符串工资项总数
+                       v_count := fun_cal_num(v_super_spell_code,'{');
+
+                       while (v_count > 0 )  LOOP
+
+                          --拆分拼音码字符串
+                          prc_SplitChar( v_super_spell_code ||'{'   ,
+                                        '{'                         ,
+                                        v_pos                       ,
+                                        v_super_spell_sub           ,
+                                        prm_AppCode                 ,
+                                        prm_ErrTxt
+                                        );
+
+                          --拆分拼音码字符串失败
+                          if prm_AppCode = -1 then
+                             if cur_acc_subj%isopen then
+                                CLOSE cur_acc_subj;
+                             end if;
+                             return;
+                          end if;
+
+
+                          --拆分五笔码字符串
+                          prc_SplitChar( v_super_wbx_code||'{'  ,
+                                        '{'                     ,
+                                        v_pos                   ,
+                                        v_super_wbx_sub         ,
+                                        prm_AppCode             ,
+                                        prm_ErrTxt
+                                        );
+
+                          --拆分字符串失败
+                          if prm_AppCode = -1 then
+                             if cur_acc_subj%isopen then
+                                CLOSE cur_acc_subj;
+                             end if;
+                             return;
+                          end if;
+
+                          v_spell_code := v_spell_code || '{'||v_super_spell_sub || fun_GetSpellCode(v_subj_name);
+                          v_wbx_code := v_wbx_code || '{'||v_super_wbx_sub || fun_GetWbxCode(v_subj_name);
+
+                          v_pos   :=  v_pos   + 1;
+                          v_count :=  v_count - 1;
+                          v_super_spell_sub := '';
+                          v_super_wbx_sub   := '';
+
+                      end loop;
+                      v_count :=  0 ;
+                      v_pos   :=  2 ;
+
+                   end if;
+
+                  update acc_subj
+                     set subj_name_all = v_super_subj_name_all || '-' || subj_name
+                        ,spell_code = '{'||fun_GetSpellCode(subj_name)||v_spell_code
+                        ,wbx_code   = '{'||fun_GetWbxCode(subj_name)  ||v_wbx_code
+                   where group_id   = prm_group_id
+                     and hos_id     = prm_hos_id
+                     AND copy_code  = prm_copy_code
+                     AND acc_year   = prm_acc_year
+                     AND subj_code  = v_subj_code;
+
+                  v_spell_code := '';
+                  v_wbx_code   := '';
+              end if;
+        end loop;
+        <<next_i>>
+           null;
+        if cur_acc_subj%isopen then
+           CLOSE cur_acc_subj;
+        end if;
+     end loop;
+   EXCEPTION
+      WHEN NO_DATA_FOUND then
+         NULL;
+      WHEN OTHERS THEN
+         prm_AppCode := def_ERR;
+         prm_ErrTxt := '更新科目全称及拼音码时失败！'||SQLERRM;
+   END prc_UpdateSubjInfoSigle;
+
+   /*-------------------------------------------------------------------------
+   || 过程名称 ：prc_UpdateSubjInfoSigle
+   || 功能描述 ：根据传入的科目编码更新科目全称、拼音码、五笔码
+   || 参数描述 ：参数标识           名称        输入/输出  类型
+   ||            -------------------------------------------------------------
+   ||            prm_group_id       集团             IN           NUMBER
+   ||            prm_hos_id         医院             IN           NUMBER
+   ||            prm_copy_code      账套             IN           VARCHAR2
+   ||            prm_acc_year       年度             IN           VARCHAR2
+   ||            prm_subj_code      科目编码         IN           Number
+   ||            prm_AppCode        业务处理标志     OUT          Number
+   ||            prm_ErrTxt         返回信息         OUT          Varchar2
+   ||
+   || 作    者 ：               完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：
+   ||-------------------------------------------------------------------------*/
+   PROCEDURE prc_UpdateSubjInfoALL(  prm_group_id          IN   NUMBER         --集团
+                                    ,prm_hos_id            IN   NUMBER         --医院
+                                    ,prm_copy_code         IN   VARCHAR2       --账套
+                                    ,prm_acc_year          IN   VARCHAR2       --年度
+                                    ,prm_AppCode           Out  Number         --执行代码
+                                    ,prm_ErrTxt            Out  Varchar2       --错误信息
+                                   )
+   IS
+     /*------变量定义---------------*/
+      v_subj_code             acc_subj.subj_code%type;
+      v_subj_name             acc_subj.subj_name%type;
+      v_super_code            acc_subj.super_code%type;
+      v_spell_code            acc_subj.spell_code%type;
+      v_wbx_code              acc_subj.wbx_code%type;
+      v_level                 acc_subj.subj_level%type;   --层次
+      v_super_subj_name_all   acc_subj.subj_name_all%type;
+      v_super_spell_code      acc_subj.spell_code%type;
+      v_super_wbx_code        acc_subj.wbx_code%type;
+      v_super_spell_sub       acc_subj.spell_code%type;
+      v_super_wbx_sub         acc_subj.wbx_code%type;
+      v_count                 integer    := 0 ;
+      v_pos                   number(18) := 2 ;
+      --定义科目游标
+      CURSOR cur_acc_subj  ( prm_group_id          IN   NUMBER         --集团
+                            ,prm_hos_id            IN   NUMBER         --医院
+                            ,prm_copy_code         IN   VARCHAR2       --账套
+                            ,prm_acc_year          IN   VARCHAR2       --开始年度
+                            ,prm_subj_level        IN   integer        --层级
+                           )
+       IS
+        SELECT subj_code, subj_name,super_code
+          FROM acc_subj
+         WHERE group_id   = prm_group_id
+           and hos_id     = prm_hos_id
+           AND copy_code  = prm_copy_code
+           AND acc_year   = prm_acc_year
+           AND SUBJ_LEVEL = prm_subj_level
+         ORDER BY subj_code;
+   BEGIN
+
+      prm_AppCode := def_OK;
+
+     --如果是第一层，则直接更新
+     update acc_subj
+       set subj_name_all = subj_name
+          ,spell_code = '{'||fun_GetSpellCode(subj_name)
+          ,wbx_code   = '{'||fun_GetWbxCode(subj_name)
+     where group_id   = prm_group_id
+       and hos_id     = prm_hos_id
+       AND copy_code  = prm_copy_code
+       AND acc_year   = prm_acc_year
+       AND SUBJ_LEVEL  = 1;
+
+     select max(SUBJ_LEVEL)
+       into v_level
+       from acc_subj
+      WHERE group_id  = prm_group_id
+        and hos_id    = prm_hos_id
+        AND copy_code = prm_copy_code
+        AND acc_year  = prm_acc_year;
+
+     for i in 2..v_level loop
+         open cur_acc_subj(   prm_group_id
+                            , prm_hos_id
+                            , prm_copy_code
+                            , prm_acc_year
+                            , i
+                           );
+           LOOP
+              FETCH cur_acc_subj INTO v_subj_code,v_subj_name,v_super_code;    --提取游标
+
+              IF cur_acc_subj%NOTFOUND THEN
+                 if cur_acc_subj%isopen then
+                    CLOSE cur_acc_subj;
+                 end if;
+                 goto next_i;
+              END IF;
+
+              if UPPER(v_super_code) = 'TOP' then
+                  update acc_subj
+                     set subj_name_all = subj_name
+                        ,spell_code = '{'||fun_GetSpellCode(subj_name)
+                        ,wbx_code   = '{'||fun_GetWbxCode(subj_name)
+                   where group_id   = prm_group_id
+                     and hos_id     = prm_hos_id
+                     AND copy_code  = prm_copy_code
+                     AND acc_year   = prm_acc_year
+                     AND subj_code  = v_subj_code;
+              else
+                  select subj_name_all, spell_code, wbx_code
+                    into v_super_subj_name_all,
+                         v_super_spell_code,
+                         v_super_wbx_code
+                    from acc_subj
+                   where group_id = prm_group_id
+                     and hos_id = prm_hos_id
+                     AND copy_code = prm_copy_code
+                     AND acc_year  = prm_acc_year
+                     AND subj_code = v_super_code;
+
+                   if i = 2 then
+                        v_spell_code := v_spell_code || v_super_spell_code || fun_GetSpellCode(v_subj_name);
+                        v_wbx_code   := v_wbx_code || v_super_wbx_code || fun_GetWbxCode(v_subj_name);
+                   else
+                       --获取字符串工资项总数
+                       v_count := fun_cal_num(v_super_spell_code,'{');
+
+                       while (v_count > 0 )  LOOP
+
+                          --拆分拼音码字符串
+                          prc_SplitChar( v_super_spell_code ||'{'   ,
+                                        '{'                         ,
+                                        v_pos                       ,
+                                        v_super_spell_sub           ,
+                                        prm_AppCode                 ,
+                                        prm_ErrTxt
+                                        );
+
+                          --拆分拼音码字符串失败
+                          if prm_AppCode = -1 then
+                             if cur_acc_subj%isopen then
+                                CLOSE cur_acc_subj;
+                             end if;
+                             return;
+                          end if;
+
+
+                          --拆分五笔码字符串
+                          prc_SplitChar( v_super_wbx_code||'{'  ,
+                                        '{'                     ,
+                                        v_pos                   ,
+                                        v_super_wbx_sub         ,
+                                        prm_AppCode             ,
+                                        prm_ErrTxt
+                                        );
+
+                          --拆分字符串失败
+                          if prm_AppCode = -1 then
+                             if cur_acc_subj%isopen then
+                                CLOSE cur_acc_subj;
+                             end if;
+                             return;
+                          end if;
+
+                          v_spell_code := v_spell_code || '{'||v_super_spell_sub || fun_GetSpellCode(v_subj_name);
+                          v_wbx_code := v_wbx_code || '{'||v_super_wbx_sub || fun_GetWbxCode(v_subj_name);
+
+                          v_pos   :=  v_pos   + 1;
+                          v_count :=  v_count - 1;
+                          v_super_spell_sub := '';
+                          v_super_wbx_sub   := '';
+
+                      end loop;
+                      v_count :=  0 ;
+                      v_pos   :=  2 ;
+
+                   end if;
+
+                  update acc_subj
+                     set subj_name_all = v_super_subj_name_all || '-' || subj_name
+                        ,spell_code = '{'||fun_GetSpellCode(subj_name)||v_spell_code
+                        ,wbx_code   = '{'||fun_GetWbxCode(subj_name)  ||v_wbx_code
+                   where group_id   = prm_group_id
+                     and hos_id     = prm_hos_id
+                     AND copy_code  = prm_copy_code
+                     AND acc_year   = prm_acc_year
+                     AND subj_code  = v_subj_code;
+
+                  v_spell_code := '';
+                  v_wbx_code   := '';
+              end if;
+        end loop;
+        <<next_i>>
+           null;
+        if cur_acc_subj%isopen then
+           CLOSE cur_acc_subj;
+        end if;
+     end loop;
+   EXCEPTION
+      WHEN NO_DATA_FOUND then
+         NULL;
+      WHEN OTHERS THEN
+         prm_AppCode := def_ERR;
+         prm_ErrTxt := '更新科目全称及拼音码时失败！'||SQLERRM;
+   END prc_UpdateSubjInfoALL;
+   /*-------------------------------------------------------------------------
+   || 过程名称 ： prc_UpdateBudgIncomeSubjALL
+   || 功能描述 ：根据传入的参数 更新科目全称、拼音码、五笔码 ,修改在上级编码中存在科目为非末级
+   || 参数描述 ：参数标识           名称        输入/输出  类型
+   ||            -------------------------------------------------------------
+   ||            prm_group_id       集团             IN           NUMBER
+   ||            prm_hos_id         医院             IN           NUMBER
+   ||            prm_copy_code      账套             IN           VARCHAR2
+   ||            prm_acc_year       年度             IN           VARCHAR2
+   ||            prm_AppCode        业务处理标志     OUT          Number
+   ||            prm_ErrTxt         返回信息         OUT          Varchar2
+   ||
+   || 作    者 ：姚青松    完成日期 ：2020-01-08
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：
+   ||-------------------------------------------------------------------------*/
+   PROCEDURE prc_UpdateBudgIncomeSubjALL(  prm_group_id          IN   NUMBER         --集团
+                                    ,prm_hos_id            IN   NUMBER         --医院
+                                    ,prm_copy_code         IN   VARCHAR2       --账套
+                                    ,prm_acc_year          IN   VARCHAR2       --年度
+                                    ,prm_AppCode           Out  Number         --执行代码
+                                    ,prm_ErrTxt            Out  Varchar2       --错误信息
+                                   )
+   IS
+     /*------变量定义---------------*/
+     
+      v_subj_code             budg_income_subj.subj_code%type;
+      v_subj_name             budg_income_subj.subj_name%type;
+      v_super_code            budg_income_subj.super_code%type;
+      v_spell_code            budg_income_subj.spell_code%type;
+      v_wbx_code              budg_income_subj.wbx_code%type;
+      v_level                 budg_income_subj.subj_level%type;   --层次
+      v_super_subj_name_all   budg_income_subj.subj_name_all%type;
+      v_super_spell_code      budg_income_subj.spell_code%type;
+      v_super_wbx_code        budg_income_subj.wbx_code%type;
+      v_super_spell_sub       budg_income_subj.spell_code%type;
+      v_super_wbx_sub         budg_income_subj.wbx_code%type;
+      v_count                 integer    := 0 ;
+      v_pos                   number(18) := 2 ;
+      --定义科目游标
+      CURSOR cur_budg_income_subj  ( prm_group_id          IN   NUMBER         --集团
+                            ,prm_hos_id            IN   NUMBER         --医院
+                            ,prm_copy_code         IN   VARCHAR2       --账套
+                            ,prm_acc_year          IN   VARCHAR2       --开始年度
+                            ,prm_subj_level        IN   integer        --层级
+                           )
+       IS
+        SELECT subj_code, subj_name,super_code
+          FROM budg_income_subj
+         WHERE group_id   = prm_group_id
+           and hos_id     = prm_hos_id
+           AND copy_code  = prm_copy_code
+           AND budg_year   = prm_acc_year
+           AND SUBJ_LEVEL = prm_subj_level
+         ORDER BY subj_code;
+   BEGIN
+
+      prm_AppCode := def_OK;
+      
+      update budg_income_subj set is_last =0
+      where group_id   = prm_group_id
+       and hos_id     = prm_hos_id
+       AND copy_code  = prm_copy_code
+       AND budg_year  = prm_acc_year
+       and subj_code in (
+           select super_code from budg_income_subj where group_id   = prm_group_id
+             and hos_id     = prm_hos_id
+             AND copy_code  = prm_copy_code
+             AND budg_year  = prm_acc_year 
+       );
+     --如果是第一层，则直接更新
+    
+     update budg_income_subj
+       set subj_name_all = subj_name
+          ,spell_code = '{'||fun_GetSpellCode(subj_name)
+          ,wbx_code   = '{'||fun_GetWbxCode(subj_name)
+     where group_id   = prm_group_id
+       and hos_id     = prm_hos_id
+       AND copy_code  = prm_copy_code
+       AND budg_year  = prm_acc_year
+       AND SUBJ_LEVEL  = 1;
+
+     select max(SUBJ_LEVEL)
+       into v_level
+       from budg_income_subj
+      WHERE group_id  = prm_group_id
+        and hos_id    = prm_hos_id
+        AND copy_code = prm_copy_code
+        AND budg_year  = prm_acc_year;
+
+     for i in 2..v_level loop
+         open cur_budg_income_subj(   prm_group_id
+                            , prm_hos_id
+                            , prm_copy_code
+                            , prm_acc_year
+                            , i
+                           );
+           LOOP
+              FETCH cur_budg_income_subj INTO v_subj_code,v_subj_name,v_super_code;    --提取游标
+
+              IF cur_budg_income_subj%NOTFOUND THEN
+                 if cur_budg_income_subj%isopen then
+                    CLOSE cur_budg_income_subj;
+                 end if;
+                 goto next_i;
+              END IF;
+
+              if UPPER(v_super_code) = 'TOP' then
+                  update budg_income_subj
+                     set subj_name_all = subj_name
+                        ,spell_code = '{'||fun_GetSpellCode(subj_name)
+                        ,wbx_code   = '{'||fun_GetWbxCode(subj_name)
+                   where group_id   = prm_group_id
+                     and hos_id     = prm_hos_id
+                     AND copy_code  = prm_copy_code
+                     AND budg_year   = prm_acc_year
+                     AND subj_code  = v_subj_code;
+              else
+                  select subj_name_all, spell_code, wbx_code
+                    into v_super_subj_name_all,
+                         v_super_spell_code,
+                         v_super_wbx_code
+                    from budg_income_subj
+                   where group_id = prm_group_id
+                     and hos_id = prm_hos_id
+                     AND copy_code = prm_copy_code
+                     AND budg_year  = prm_acc_year
+                     AND subj_code = v_super_code;
+
+                   if i = 2 then
+                        v_spell_code := v_spell_code || v_super_spell_code || fun_GetSpellCode(v_subj_name);
+                        v_wbx_code   := v_wbx_code || v_super_wbx_code || fun_GetWbxCode(v_subj_name);
+                   else
+                       --获取字符串工资项总数
+                       v_count := fun_cal_num(v_super_spell_code,'{');
+
+                       while (v_count > 0 )  LOOP
+
+                          --拆分拼音码字符串
+                          prc_SplitChar( v_super_spell_code ||'{'   ,
+                                        '{'                         ,
+                                        v_pos                       ,
+                                        v_super_spell_sub           ,
+                                        prm_AppCode                 ,
+                                        prm_ErrTxt
+                                        );
+
+                          --拆分拼音码字符串失败
+                          if prm_AppCode = -1 then
+                             if cur_budg_income_subj%isopen then
+                                CLOSE cur_budg_income_subj;
+                             end if;
+                             return;
+                          end if;
+
+
+                          --拆分五笔码字符串
+                          prc_SplitChar( v_super_wbx_code||'{'  ,
+                                        '{'                     ,
+                                        v_pos                   ,
+                                        v_super_wbx_sub         ,
+                                        prm_AppCode             ,
+                                        prm_ErrTxt
+                                        );
+
+                          --拆分字符串失败
+                          if prm_AppCode = -1 then
+                             if cur_budg_income_subj%isopen then
+                                CLOSE cur_budg_income_subj;
+                             end if;
+                             return;
+                          end if;
+
+                          v_spell_code := v_spell_code || '{'||v_super_spell_sub || fun_GetSpellCode(v_subj_name);
+                          v_wbx_code := v_wbx_code || '{'||v_super_wbx_sub || fun_GetWbxCode(v_subj_name);
+
+                          v_pos   :=  v_pos   + 1;
+                          v_count :=  v_count - 1;
+                          v_super_spell_sub := '';
+                          v_super_wbx_sub   := '';
+
+                      end loop;
+                      v_count :=  0 ;
+                      v_pos   :=  2 ;
+
+                   end if;
+
+                  update budg_income_subj
+                     set subj_name_all = v_super_subj_name_all || '-' || subj_name
+                        ,spell_code = '{'||fun_GetSpellCode(subj_name)||v_spell_code
+                        ,wbx_code   = '{'||fun_GetWbxCode(subj_name)  ||v_wbx_code
+                   where group_id   = prm_group_id
+                     and hos_id     = prm_hos_id
+                     AND copy_code  = prm_copy_code
+                     AND budg_year  = prm_acc_year
+                     AND subj_code  = v_subj_code;
+
+                  v_spell_code := '';
+                  v_wbx_code   := '';
+              end if;
+        end loop;
+        <<next_i>>
+           null;
+        if cur_budg_income_subj%isopen then
+           CLOSE cur_budg_income_subj;
+        end if;
+     end loop;
+   EXCEPTION
+      WHEN NO_DATA_FOUND then
+         NULL;
+      WHEN OTHERS THEN
+         prm_AppCode := def_ERR;
+         prm_ErrTxt := '更新科目全称及拼音码时失败！'||SQLERRM;
+   END prc_UpdateBudgIncomeSubjALL;
+   /*-------------------------------------------------------------------------
+   || 过程名称 ： prc_UpdateBudgCostSubjALL
+   || 功能描述 ：根据传入的参数 预算支出科目 更新科目全称、拼音码、五笔码 ,修改在上级编码中存在科目为非末级
+   || 参数描述 ：参数标识           名称        输入/输出  类型
+   ||            -------------------------------------------------------------
+   ||            prm_group_id       集团             IN           NUMBER
+   ||            prm_hos_id         医院             IN           NUMBER
+   ||            prm_copy_code      账套             IN           VARCHAR2
+   ||            prm_acc_year       年度             IN           VARCHAR2
+   ||            prm_AppCode        业务处理标志     OUT          Number
+   ||            prm_ErrTxt         返回信息         OUT          Varchar2
+   ||
+   || 作    者 ：姚青松    完成日期 ：2020-01-08
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：
+   ||-------------------------------------------------------------------------*/ 
+   PROCEDURE prc_UpdateBudgCostSubjALL(  prm_group_id          IN   NUMBER         --集团
+                                    ,prm_hos_id            IN   NUMBER         --医院
+                                    ,prm_copy_code         IN   VARCHAR2       --账套
+                                    ,prm_acc_year          IN   VARCHAR2       --年度
+                                    ,prm_AppCode           Out  Number         --执行代码
+                                    ,prm_ErrTxt            Out  Varchar2       --错误信息
+                                   )
+   IS
+     /*------变量定义---------------*/
+     
+      v_subj_code             budg_cost_subj.subj_code%type;
+      v_subj_name             budg_cost_subj.subj_name%type;
+      v_super_code            budg_cost_subj.super_code%type;
+      v_spell_code            budg_cost_subj.spell_code%type;
+      v_wbx_code              budg_cost_subj.wbx_code%type;
+      v_level                 budg_cost_subj.subj_level%type;   --层次
+      v_super_subj_name_all   budg_cost_subj.subj_name_all%type;
+      v_super_spell_code      budg_cost_subj.spell_code%type;
+      v_super_wbx_code        budg_cost_subj.wbx_code%type;
+      v_super_spell_sub       budg_cost_subj.spell_code%type;
+      v_super_wbx_sub         budg_cost_subj.wbx_code%type;
+      v_count                 integer    := 0 ;
+      v_pos                   number(18) := 2 ;
+      --定义科目游标
+      CURSOR cur_budg_cost_subj  ( prm_group_id          IN   NUMBER         --集团
+                            ,prm_hos_id            IN   NUMBER         --医院
+                            ,prm_copy_code         IN   VARCHAR2       --账套
+                            ,prm_acc_year          IN   VARCHAR2       --开始年度
+                            ,prm_subj_level        IN   integer        --层级
+                           )
+       IS
+        SELECT subj_code, subj_name,super_code
+          FROM budg_cost_subj
+         WHERE group_id   = prm_group_id
+           and hos_id     = prm_hos_id
+           AND copy_code  = prm_copy_code
+           AND budg_year   = prm_acc_year
+           AND SUBJ_LEVEL = prm_subj_level
+         ORDER BY subj_code;
+   BEGIN
+
+      prm_AppCode := def_OK;
+      
+      update budg_cost_subj set is_last =0
+      where group_id   = prm_group_id
+       and hos_id     = prm_hos_id
+       AND copy_code  = prm_copy_code
+       AND budg_year  = prm_acc_year
+       and subj_code in (
+           select super_code from budg_cost_subj where group_id   = prm_group_id
+             and hos_id     = prm_hos_id
+             AND copy_code  = prm_copy_code
+             AND budg_year  = prm_acc_year 
+       );
+     --如果是第一层，则直接更新
+    
+     update budg_cost_subj
+       set subj_name_all = subj_name
+          ,spell_code = '{'||fun_GetSpellCode(subj_name)
+          ,wbx_code   = '{'||fun_GetWbxCode(subj_name)
+     where group_id   = prm_group_id
+       and hos_id     = prm_hos_id
+       AND copy_code  = prm_copy_code
+       AND budg_year  = prm_acc_year
+       AND SUBJ_LEVEL  = 1;
+
+     select max(SUBJ_LEVEL)
+       into v_level
+       from budg_cost_subj
+      WHERE group_id  = prm_group_id
+        and hos_id    = prm_hos_id
+        AND copy_code = prm_copy_code
+        AND budg_year  = prm_acc_year;
+
+     for i in 2..v_level loop
+         open cur_budg_cost_subj(   prm_group_id
+                            , prm_hos_id
+                            , prm_copy_code
+                            , prm_acc_year
+                            , i
+                           );
+           LOOP
+              FETCH cur_budg_cost_subj INTO v_subj_code,v_subj_name,v_super_code;    --提取游标
+
+              IF cur_budg_cost_subj%NOTFOUND THEN
+                 if cur_budg_cost_subj%isopen then
+                    CLOSE cur_budg_cost_subj;
+                 end if;
+                 goto next_i;
+              END IF;
+
+              if UPPER(v_super_code) = 'TOP' then
+                  update budg_cost_subj
+                     set subj_name_all = subj_name
+                        ,spell_code = '{'||fun_GetSpellCode(subj_name)
+                        ,wbx_code   = '{'||fun_GetWbxCode(subj_name)
+                   where group_id   = prm_group_id
+                     and hos_id     = prm_hos_id
+                     AND copy_code  = prm_copy_code
+                     AND budg_year   = prm_acc_year
+                     AND subj_code  = v_subj_code;
+              else
+                  select subj_name_all, spell_code, wbx_code
+                    into v_super_subj_name_all,
+                         v_super_spell_code,
+                         v_super_wbx_code
+                    from budg_cost_subj
+                   where group_id = prm_group_id
+                     and hos_id = prm_hos_id
+                     AND copy_code = prm_copy_code
+                     AND budg_year  = prm_acc_year
+                     AND subj_code = v_super_code;
+
+                   if i = 2 then
+                        v_spell_code := v_spell_code || v_super_spell_code || fun_GetSpellCode(v_subj_name);
+                        v_wbx_code   := v_wbx_code || v_super_wbx_code || fun_GetWbxCode(v_subj_name);
+                   else
+                       --获取字符串工资项总数
+                       v_count := fun_cal_num(v_super_spell_code,'{');
+
+                       while (v_count > 0 )  LOOP
+
+                          --拆分拼音码字符串
+                          prc_SplitChar( v_super_spell_code ||'{'   ,
+                                        '{'                         ,
+                                        v_pos                       ,
+                                        v_super_spell_sub           ,
+                                        prm_AppCode                 ,
+                                        prm_ErrTxt
+                                        );
+
+                          --拆分拼音码字符串失败
+                          if prm_AppCode = -1 then
+                             if cur_budg_cost_subj%isopen then
+                                CLOSE cur_budg_cost_subj;
+                             end if;
+                             return;
+                          end if;
+
+
+                          --拆分五笔码字符串
+                          prc_SplitChar( v_super_wbx_code||'{'  ,
+                                        '{'                     ,
+                                        v_pos                   ,
+                                        v_super_wbx_sub         ,
+                                        prm_AppCode             ,
+                                        prm_ErrTxt
+                                        );
+
+                          --拆分字符串失败
+                          if prm_AppCode = -1 then
+                             if cur_budg_cost_subj%isopen then
+                                CLOSE cur_budg_cost_subj;
+                             end if;
+                             return;
+                          end if;
+
+                          v_spell_code := v_spell_code || '{'||v_super_spell_sub || fun_GetSpellCode(v_subj_name);
+                          v_wbx_code := v_wbx_code || '{'||v_super_wbx_sub || fun_GetWbxCode(v_subj_name);
+
+                          v_pos   :=  v_pos   + 1;
+                          v_count :=  v_count - 1;
+                          v_super_spell_sub := '';
+                          v_super_wbx_sub   := '';
+
+                      end loop;
+                      v_count :=  0 ;
+                      v_pos   :=  2 ;
+
+                   end if;
+
+                  update budg_cost_subj
+                     set subj_name_all = v_super_subj_name_all || '-' || subj_name
+                        ,spell_code = '{'||fun_GetSpellCode(subj_name)||v_spell_code
+                        ,wbx_code   = '{'||fun_GetWbxCode(subj_name)  ||v_wbx_code
+                   where group_id   = prm_group_id
+                     and hos_id     = prm_hos_id
+                     AND copy_code  = prm_copy_code
+                     AND budg_year  = prm_acc_year
+                     AND subj_code  = v_subj_code;
+
+                  v_spell_code := '';
+                  v_wbx_code   := '';
+              end if;
+        end loop;
+        <<next_i>>
+           null;
+        if cur_budg_cost_subj%isopen then
+           CLOSE cur_budg_cost_subj;
+        end if;
+     end loop;
+   EXCEPTION
+      WHEN NO_DATA_FOUND then
+         NULL;
+      WHEN OTHERS THEN
+         prm_AppCode := def_ERR;
+         prm_ErrTxt := '更新科目全称及拼音码时失败！'||SQLERRM;
+   END prc_UpdateBudgCostSubjALL;
+    /*-------------------------------------------------------------------------
+   || 过程名称 ：prc_UpdateSubjInfo
+   || 功能描述 ：根据传入的科目编码更新子级科目全称、拼音码、五笔码
+   || 参数描述 ：参数标识           名称        输入/输出  类型
+   ||            -------------------------------------------------------------
+   ||            prm_group_id       集团             IN           NUMBER
+   ||            prm_hos_id         医院             IN           NUMBER
+   ||            prm_copy_code      账套             IN           VARCHAR2
+   ||            prm_acc_year       年度             IN           VARCHAR2
+   ||            prm_subj_code      科目编码         IN           Number
+   ||            prm_AppCode        业务处理标志     OUT          Number
+   ||            prm_ErrTxt         返回信息         OUT          Varchar2
+   ||
+   || 作    者 ：               完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：
+   ||-------------------------------------------------------------------------*/
+   PROCEDURE prc_UpdateSubjInfo(  prm_group_id          IN   NUMBER         --集团
+                                      ,prm_hos_id            IN   NUMBER         --医院
+                                      ,prm_copy_code         IN   VARCHAR2       --账套
+                                      ,prm_acc_year          IN   VARCHAR2       --年度
+                                      ,prm_subj_code         IN   VARCHAR2       --科目编码
+                                      ,prm_AppCode           Out  Number         --执行代码
+                                      ,prm_ErrTxt            Out  Varchar2       --错误信息
+                                     )
+
+   IS
+      /*------变量定义---------------*/
+      v_subj_code             acc_subj.subj_code%type;
+      v_subj_name             acc_subj.subj_name%type;
+      v_super_code            acc_subj.super_code%type;
+      v_spell_code            acc_subj.spell_code%type;
+      v_wbx_code              acc_subj.wbx_code%type;
+      v_level                 acc_subj.subj_level%type;   --层次
+      v_level_start            acc_subj.subj_level%type;   --层次
+      v_super_subj_name_all   acc_subj.subj_name_all%type;
+      v_super_spell_code      acc_subj.spell_code%type;
+      v_super_wbx_code        acc_subj.wbx_code%type;
+      v_super_spell_sub       acc_subj.spell_code%type;
+      v_super_wbx_sub         acc_subj.wbx_code%type;
+      v_count                 integer    := 0 ;
+      v_pos                   number(18) := 2 ;
+      --定义科目游标
+      CURSOR cur_acc_subj  ( prm_group_id          IN   NUMBER         --集团
+                            ,prm_hos_id            IN   NUMBER         --医院
+                            ,prm_copy_code         IN   VARCHAR2       --账套
+                            ,prm_acc_year          IN   VARCHAR2       --开始年度
+                            ,prm_subj_code         IN   VARCHAR2       --科目编码
+                            ,prm_subj_level        IN   integer        --层级
+                           )
+       IS
+        SELECT subj_code, subj_name,super_code
+          FROM acc_subj
+         WHERE group_id   = prm_group_id
+           and hos_id     = prm_hos_id
+           AND copy_code  = prm_copy_code
+           AND acc_year   = prm_acc_year
+           AND subj_code  like prm_subj_code || '%'
+           AND SUBJ_LEVEL = prm_subj_level
+         ORDER BY subj_code;
+   BEGIN
+
+      prm_AppCode := def_OK;
+      v_level_start := 1 ;
+      v_level := 1 ;
+
+     select max(SUBJ_LEVEL)
+       into v_level
+       from acc_subj
+      WHERE group_id  = prm_group_id
+        and hos_id    = prm_hos_id
+        AND copy_code = prm_copy_code
+        AND acc_year  = prm_acc_year
+        AND subj_code like prm_subj_code || '%';
+
+     for i in 1..v_level loop
+         open cur_acc_subj(   prm_group_id
+                            , prm_hos_id
+                            , prm_copy_code
+                            , prm_acc_year
+                            , prm_subj_code
+                            , i
+                           );
+           LOOP
+              FETCH cur_acc_subj INTO v_subj_code,v_subj_name,v_super_code;    --提取游标
+
+              IF cur_acc_subj%NOTFOUND THEN
+                 if cur_acc_subj%isopen then
+                    CLOSE cur_acc_subj;
+                 end if;
+                 goto next_i;
+              END IF;
+
+              if UPPER(v_super_code) = 'TOP' then
+                  update acc_subj
+                     set subj_name_all = subj_name
+                        ,spell_code = '{'||fun_GetSpellCode(subj_name)
+                        ,wbx_code   = '{'||fun_GetWbxCode(subj_name)
+                   where group_id   = prm_group_id
+                     and hos_id     = prm_hos_id
+                     AND copy_code  = prm_copy_code
+                     AND acc_year   = prm_acc_year
+                     AND subj_code  = v_subj_code;
+              else
+                  select subj_name_all, spell_code, wbx_code
+                    into v_super_subj_name_all,
+                         v_super_spell_code,
+                         v_super_wbx_code
+                    from acc_subj
+                   where group_id = prm_group_id
+                     and hos_id = prm_hos_id
+                     AND copy_code = prm_copy_code
+                     AND acc_year  = prm_acc_year
+                     AND subj_code = v_super_code;
+
+                   if i = 2 then
+                        v_spell_code := v_spell_code || v_super_spell_code || fun_GetSpellCode(v_subj_name);
+                        v_wbx_code   := v_wbx_code || v_super_wbx_code || fun_GetWbxCode(v_subj_name);
+                   else
+                       --获取字符串工资项总数
+                       v_count := fun_cal_num(v_super_spell_code,'{');
+
+                       while (v_count > 0 )  LOOP
+
+                          --拆分拼音码字符串
+                          prc_SplitChar( v_super_spell_code ||'{'   ,
+                                        '{'                         ,
+                                        v_pos                       ,
+                                        v_super_spell_sub           ,
+                                        prm_AppCode                 ,
+                                        prm_ErrTxt
+                                        );
+
+                          --拆分拼音码字符串失败
+                          if prm_AppCode = -1 then
+                             if cur_acc_subj%isopen then
+                                CLOSE cur_acc_subj;
+                             end if;
+                             return;
+                          end if;
+
+
+                          --拆分五笔码字符串
+                          prc_SplitChar( v_super_wbx_code||'{'  ,
+                                        '{'                     ,
+                                        v_pos                   ,
+                                        v_super_wbx_sub         ,
+                                        prm_AppCode             ,
+                                        prm_ErrTxt
+                                        );
+
+                          --拆分字符串失败
+                          if prm_AppCode = -1 then
+                             if cur_acc_subj%isopen then
+                                CLOSE cur_acc_subj;
+                             end if;
+                             return;
+                          end if;
+
+                          v_spell_code := v_spell_code || '{'||v_super_spell_sub || fun_GetSpellCode(v_subj_name);
+                          v_wbx_code := v_wbx_code || '{'||v_super_wbx_sub || fun_GetWbxCode(v_subj_name);
+
+                          v_pos   :=  v_pos   + 1;
+                          v_count :=  v_count - 1;
+                          v_super_spell_sub := '';
+                          v_super_wbx_sub   := '';
+
+                      end loop;
+                      v_count :=  0 ;
+                      v_pos   :=  2 ;
+
+                   end if;
+
+                  update acc_subj
+                     set subj_name_all = v_super_subj_name_all || '-' || subj_name
+                        ,spell_code = '{'||fun_GetSpellCode(subj_name)||v_spell_code
+                        ,wbx_code   = '{'||fun_GetWbxCode(subj_name)  ||v_wbx_code
+                   where group_id   = prm_group_id
+                     and hos_id     = prm_hos_id
+                     AND copy_code  = prm_copy_code
+                     AND acc_year   = prm_acc_year
+                     AND subj_code  = v_subj_code;
+
+                  v_spell_code := '';
+                  v_wbx_code   := '';
+              end if;
+        end loop;
+        <<next_i>>
+           null;
+        if cur_acc_subj%isopen then
+           CLOSE cur_acc_subj;
+        end if;
+     end loop;
+   EXCEPTION
+      WHEN NO_DATA_FOUND then
+         NULL;
+      WHEN OTHERS THEN
+         prm_AppCode := def_ERR;
+         prm_ErrTxt := '更新科目全称及拼音码时失败！'||SQLERRM;
+   END prc_UpdateSubjInfo;
+   
+   /*-------------------------------------------------------------------------
+   || 函数名称 ：fun_get_MatBillNo
+   || 功能描述 ：提取物流单据号
+   || 参数描述 ：参数标识          名称             输入/输出    类型
+   ||            -------------------------------------------------------------
+   ||            prm_group_id      集团               IN           NUMBER
+   ||            prm_hos_id        医院               IN           NUMBER
+   ||            prm_copy_code     账套               IN           NUMBER
+   ||            prm_year          年度               IN           VARCHAR2    
+   ||            prm_month         月份               IN           VARCHAR2
+   ||            prm_day           天                 IN           VARCHAR2
+   ||            prm_store_id      仓库ID             IN           NUMBER
+   ||            prm_prefixe       单号前缀           IN           VARCHAR2
+   ||            prm_bus_type      业务类型           IN           VARCHAR2
+   ||            prm_table_code    表名               IN           VARCHAR2
+   || 
+   || 返 回 值 ：                   单据号            OUT          VARCHAR2       
+   ||   
+   || 作    者 ：           完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：           修改日期：
+   ||-------------------------------------------------------------------------*/
+   FUNCTION fun_get_MatBillNo(  prm_group_id          IN  NUMBER    --集团
+                               ,prm_hos_id            IN  NUMBER    --医院
+                               ,prm_copy_code         IN  VARCHAR2  --账套
+                               ,prm_year              IN  VARCHAR2  --年度                                    
+                               ,prm_month             IN  Varchar2  --月份
+                               ,prm_day               IN  Varchar2  --天
+                               ,prm_store_id          IN  NUMBER    --仓库ID
+                               ,prm_prefixe           IN  Varchar2  --单号前缀
+                               ,prm_bus_type          IN  Varchar2  --业务类型
+                               ,prm_table_code        IN  Varchar2  --表名                              
+                              ) RETURN VARCHAR2
+
+   IS
+      --变量定义
+      v_alias            mat_store.alias%type        ; --仓库简称
+      v_type_flag        mat_bus_type.type_flag%type ; --业务类型简称
+      n_bill_no          MAT_NO_MANAGE.Max_No%type   ; --最大号
+      str_retBillNo      varchar2(100)               ; --单据号
+      str_year           VARCHAR2(4)                 ; --年度                                    
+      str_month          Varchar2(2)                 ; --月份
+      str_day            Varchar2(2)                 ; --天           
+      v_exist_row        number                      ; --异常处理
+   BEGIN
+      --初始化
+      v_alias       := '' ;
+      v_exist_row   :=  0 ;
+      str_retBillNo := '' ;
+      str_year      := '' ; --年度                                    
+      str_month     := '' ; --月份
+      str_day       := '' ; --天        
+      
+      --1、提取仓库简称  
+      SELECT count(1)
+        into v_exist_row
+        FROM mat_store
+      WHERE group_id = prm_group_id
+        and hos_id   = prm_hos_id
+        and store_id = prm_store_id ;  
+       
+      if v_exist_row > 0 then     
+        SELECT alias
+          into v_alias
+          FROM mat_store
+         WHERE group_id = prm_group_id
+           and hos_id   = prm_hos_id
+           and store_id = prm_store_id
+           ;
+        str_retBillNo := str_retBillNo || v_alias || '-' ;  
+      else
+        v_alias := '' ;      
+      end if;      
+     
+      v_exist_row := 0 ;
+          
+      --2、提取业务类型简称
+      SELECT count(1)
+       into v_exist_row
+       FROM mat_bus_type
+      WHERE bus_type_code = prm_bus_type ; 
+      
+      if v_exist_row > 0 then 
+        SELECT type_flag
+          into v_type_flag
+          FROM mat_bus_type
+         WHERE bus_type_code = prm_bus_type ;
+         
+         str_retBillNo := str_retBillNo || v_type_flag ;  
+      else
+         v_type_flag := 0;
+      end if;   
+        
+       v_exist_row := 0 ;
+          
+      --3、提取最大单据号    
+      
+      select count(1)
+        into v_exist_row
+        from MAT_NO_MANAGE
+       where group_id    = prm_group_id
+         AND hos_id      = prm_hos_id
+         AND copy_code   = prm_copy_code
+         AND ((nvl(prm_year,'空') != '空' and year = prm_year) or
+              nvl(prm_year,'空') = '空' 
+             ) 
+         AND ((nvl(prm_month,'空') != '空' and month = prm_month) or
+              nvl(prm_month,'空')  = '空' 
+             )     
+         AND ((nvl(prm_day,'空') != '空' and day = prm_day) or
+              nvl(prm_day,'空')  = '空' 
+             )         
+         AND table_code  = prm_table_code
+         AND ((nvl(prm_prefixe,'空') != '空' and prefixe = prm_prefixe) or
+              nvl(prm_prefixe,'空')  = '空' 
+             )
+         AND ((nvl(v_type_flag,'空') != '空' and bus_type = v_type_flag) or
+              nvl(v_type_flag,'空')  = '空' 
+             ) 
+        AND ((nvl(v_alias,'空') != '空' and store_alias = v_alias) or
+             nvl(v_alias,'空')  = '空' 
+            )     
+         ;  
+         
+       if v_exist_row > 0 then  
+          select min(max_no)
+            into n_bill_no
+            from MAT_NO_MANAGE
+            where group_id    = prm_group_id
+             AND hos_id      = prm_hos_id
+             AND copy_code   = prm_copy_code
+             AND ((nvl(prm_year,'空') != '空' and year = prm_year) or
+                  nvl(prm_year,'空') = '空' 
+                 ) 
+             AND ((nvl(prm_month,'空') != '空' and month = prm_month) or
+                  nvl(prm_month,'空')  = '空' 
+                 )     
+             AND ((nvl(prm_day,'空') != '空' and day = prm_day) or
+                  nvl(prm_day,'空')  = '空' 
+                 )         
+             AND table_code  = prm_table_code
+             AND ((nvl(prm_prefixe,'空') != '空' and prefixe = prm_prefixe) or
+                  nvl(prm_prefixe,'空')  = '空' 
+                 )
+             AND ((nvl(v_type_flag,'空') != '空' and bus_type = v_type_flag) or
+                  nvl(v_type_flag,'空')  = '空' 
+                 ) 
+            AND ((nvl(v_alias,'空') != '空' and store_alias = v_alias) or
+                 nvl(v_alias,'空')  = '空' 
+                )  
+             ;
+            n_bill_no := n_bill_no + 1;  
+                    
+            --4.1、存在更新最大号
+            update MAT_NO_MANAGE
+               set max_no = nvl(max_no,0) + 1
+            where group_id   = prm_group_id
+             AND hos_id      = prm_hos_id
+             AND copy_code   = prm_copy_code
+             AND ((nvl(prm_year,'空') != '空' and year = prm_year) or
+                  nvl(prm_year,'空') = '空' 
+                 ) 
+             AND ((nvl(prm_month,'空') != '空' and month = prm_month) or
+                  nvl(prm_month,'空')  = '空' 
+                 )     
+             AND ((nvl(prm_day,'空') != '空' and day = prm_day) or
+                  nvl(prm_day,'空')  = '空' 
+                 )         
+             AND table_code  = prm_table_code
+             AND ((nvl(prm_prefixe,'空') != '空' and prefixe = prm_prefixe) or
+                  nvl(prm_prefixe,'空')  = '空' 
+                 )
+             AND ((nvl(v_type_flag,'空') != '空' and bus_type = v_type_flag) or
+                  nvl(v_type_flag,'空')  = '空' 
+                 ) 
+            AND ((nvl(v_alias,'空') != '空' and store_alias = v_alias) or
+                 nvl(v_alias,'空')  = '空' 
+                )  
+             ;      
+        else    
+            n_bill_no := 1 ; 
+            --4.1、不存在插入新单号信息
+            INSERT INTO MAT_NO_MANAGE(
+              GROUP_ID, HOS_ID, COPY_CODE, TABLE_CODE, PREFIXE, YEAR, MONTH, 
+              DAY, STORE_ALIAS, BUS_TYPE, MAX_NO
+            )
+            VALUES(
+              prm_group_id, prm_hos_id, prm_copy_code, prm_table_code, prm_prefixe, 
+              prm_year, prm_month, prm_day, v_alias, v_type_flag, n_bill_no
+            );
+        end if;       
+     
+     select decode(nvl(prm_year,'空'),'空','',substr(prm_year,-2))
+       into str_year
+      from dual;
+     
+     select decode(nvl(prm_month,'空'),'空','',prm_month)
+       into str_month
+      from dual;
+     
+     select decode(nvl(prm_day,'空'),'空','',prm_day)
+       into str_day
+      from dual;    
+         
+     --5、计算并生成单据号 
+     str_retBillNo := str_retBillNo       
+                   || str_year
+                   || str_month
+                   || str_day
+                   || substr('0000'||n_bill_no,-4)
+                    ;   
+                             
+     return  str_retBillNo;
+     
+     EXCEPTION
+        WHEN NO_DATA_FOUND then
+           NULL;  
+        WHEN OTHERS THEN         
+           NULL;              
+   END fun_get_MatBillNo;
+
+   /*-------------------------------------------------------------------------
+   || 函数名称 ：fun_parseNumber
+   || 功能描述 ：字符串转数值型
+   || 参数描述 ：参数标识          名称             输入/输出    类型
+   ||            -------------------------------------------------------------
+   ||            in_value          输入字符串       IN           VARCHAR2
+   ||            
+   ||
+   || 返 回 值 ：                  数值型           OUT          NUMBER
+   ||
+   || 作    者 ：           完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：           修改日期：
+   ||-------------------------------------------------------------------------*/
+   FUNCTION fun_parseNumber(
+                            in_value         IN  VARCHAR2   --字符串
+    )RETURN NUMBER
+    IS
+    
+      Result NUMBER;
+    begin
+    
+    Result := TO_NUMBER(in_value);
+    return Result;
+    EXCEPTION WHEN others THEN
+    begin
+        return -1;
+    end;
+      
+    end fun_parseNumber;
+    
+   /*-------------------------------------------------------------------------
+   || 函数名称 ：fun_parseNumberRound
+   || 功能描述 ：字符串转数值型
+   || 参数描述 ：参数标识          名称             输入/输出    类型
+   ||            -------------------------------------------------------------
+   ||            in_value          输入字符串       IN           VARCHAR2
+   ||            in_round          小数点保留位数   IN           NUMBER
+   ||
+   || 返 回 值 ：                  数值型           OUT          NUMBER
+   ||
+   || 作    者 ：           完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：           修改日期：
+   ||-------------------------------------------------------------------------*/
+   FUNCTION fun_parseNumberRound(
+                            in_value         IN  VARCHAR2   --字符串
+                           ,in_round         IN  NUMBER     --小数点保留位数
+    )RETURN NUMBER
+    IS
+    
+      Result NUMBER;
+    begin
+    
+    Result := ROUND(TO_NUMBER(in_value),in_round);
+    return Result;
+    EXCEPTION WHEN others THEN
+    begin
+        return -1;
+    end;
+      
+    end fun_parseNumberRound;
+
+   /*-------------------------------------------------------------------------
+   || 函数名称 ：fun_existsNumber
+   || 功能描述 ：字符串转数值型
+   || 参数描述 ：参数标识          名称             输入/输出    类型
+   ||            -------------------------------------------------------------
+   ||            in_value          输入字符串       IN           VARCHAR2
+   ||            
+   ||
+   || 返 回 值 ：                  数值型           OUT          VARCHAR2
+   ||
+   || 作    者 ：           完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：           修改日期：
+   ||-------------------------------------------------------------------------*/
+   FUNCTION fun_existsNumber(
+                            in_value         IN  VARCHAR2   --字符串
+    )RETURN VARCHAR2
+    IS
+    
+      Result NUMBER;
+    begin
+    
+    Result := TO_NUMBER(in_value);
+    return TO_CHAR(Result);
+    EXCEPTION WHEN others THEN
+    begin
+        return 'ZZZZZZ';
+    end;
+      
+    end fun_existsNumber;
+
+
+
+	/*-------------------------------------------------------------------------
+	   || 函数名称 ：fun_split
+	   || 功能描述 ：拆分字符串为表变量
+	   || 参数描述 ：参数标识          名称             输入/输出    类型
+	   ||            -------------------------------------------------------------
+	   ||            p_str             输入字符串       IN           VARCHAR2
+	   ||            p_delimiter       分隔符   IN       VARCHAR2
+	   ||
+	   || 返 回 值 ：                  数值型           OUT          NUMBER
+	   ||
+	   || 作    者 ：           完成日期 ：
+	   ||-------------------------------------------------------------------------
+	   || 修改记录 ：           修改日期：
+	   ||-------------------------------------------------------------------------*/
+	
+	   FUNCTION fun_split( p_str       IN VARCHAR2,
+	                       p_delimiter IN VARCHAR2
+	                      ) RETURN ty_tbl_str_split
+	   IS
+	      j         INT := 0;
+	      i         INT := 1;
+	      len       INT := 0;
+	      len1      INT := 0;
+	      str       VARCHAR2(4000);
+	      str_split ty_tbl_str_split;
+	      --str_split ty_tbl_str_split := ty_tbl_str_split();
+	BEGIN
+	      len  := LENGTH(p_str);
+	      len1 := LENGTH(p_delimiter);
+	
+	
+	      WHILE j < len LOOP
+	        j := INSTR(p_str, p_delimiter, i);
+	
+	
+	        IF j = 0 THEN
+	          j   := len;
+	          str := SUBSTR(p_str, i);
+	          --str_split.EXTEND;
+	          str_split(str_split.COUNT()+1).strValue := str ;--ty_row_str_split(strValue => str);
+	
+	
+	          IF i >= len THEN
+	            EXIT;
+	          END IF;
+	        ELSE
+	          str := SUBSTR(p_str, i, j - i);
+	          i   := j + len1;
+	          --str_split.EXTEND;
+	          --str_split(str_split.COUNT) := ty_row_str_split(strValue => str);
+	          str_split(str_split.COUNT()+1).strValue := str ;
+	        END IF;
+	      END LOOP;
+	
+	
+	      RETURN str_split;
+	END fun_split;
+	
+	    /*-------------------------------------------------------------------------
+	   || 函数名称 ：fun_parsejson
+	   || 功能描述 ： 解析JSON字符串
+	   || 参数描述 ：参数标识          名称             输入/输出    类型
+	   ||            -------------------------------------------------------------
+	   ||            p_jsonstr         json字符串       IN           VARCHAR2
+	   ||            p_jsonstr         键                              IN           VARCHAR2
+	   ||
+	   || 返 回 值 ：                  数值型           OUT          NUMBER
+	   ||
+	   || 作    者 ：           完成日期 ：
+	   ||-------------------------------------------------------------------------
+	   || 修改记录 ：           修改日期：
+	   ||-------------------------------------------------------------------------*/
+	   FUNCTION fun_parsejson(p_jsonstr varchar2,
+	                          p_key varchar2)
+	  RETURN VARCHAR2
+	  IS
+	    rtnVal VARCHAR2(50);
+	    i NUMBER(2);
+	    jsonkey VARCHAR2(50);
+	    jsonvalue VARCHAR2(50);
+	    json VARCHAR2(1000);
+	    str_split ty_tbl_str_split;
+	    str_split_sub ty_tbl_str_split;
+	  BEGIN
+	    IF p_jsonstr IS NOT NULL THEN
+	       json := REPLACE(p_jsonstr,'{','') ;
+	       json := REPLACE(json,'}','') ;
+	       json := replace(json,'"','') ;
+	       str_split := fun_split(json, ',');
+	       --FOR temprow IN(SELECT strvalue AS VALUE FROM TABLE(fun_split(json, ','))) LOOP
+	       FOR m in 1..str_split.count() loop
+	          IF str_split(m).strvalue IS NOT NULL THEN
+	             i := 0;
+	             jsonkey := '';
+	             jsonvalue := '';
+	             str_split_sub.delete;
+	             str_split_sub := fun_split(str_split(m).strvalue,':') ;
+	             --FOR tem2 IN(SELECT strvalue AS VALUE FROM TABLE(fun_split(temprow.value, ':'))) LOOP
+	             for n in 1..str_split_sub.count() loop
+	                 IF i = 0 THEN
+	                    jsonkey := str_split_sub(n).strvalue;--tem2.VALUE;
+	                 END IF;
+	                 IF i = 1 THEN
+	                    jsonvalue := str_split_sub(n).strvalue;--tem2.VALUE;
+	                 END IF;
+	
+	                 i := i + 1;
+	             END LOOP;
+	
+	             IF(jsonkey = p_key) THEN
+	                 rtnVal := jsonvalue;
+	             END if;
+	          END IF;
+	       END LOOP;
+	    END IF;
+	
+	    RETURN rtnVal;
+	  END fun_parsejson;
+	  
+   /*-------------------------------------------------------------------------
+   || 函数名称 ：fun_ReplaceFunStr
+   || 功能描述 ：根据传入的字符串将函数全部替换为值，当计算出错时返回原串
+   || 参数描述 ：参数标识           名称        输入/输出  类型
+   ||            -------------------------------------------------------------
+   ||            prm_group_id       集团             IN           NUMBER
+   ||            prm_hos_id         医院             IN           NUMBER
+   ||            prm_copy_code      账套             IN           VARCHAR2
+   ||            prm_mod_code       模块编码         IN           VARCHAR2
+   ||            prm_InputStr       输入字符串       IN           VARCHAR2
+   || 返 回 值 ：                   字符串           OUT          VARCHAR2
+   ||
+   || 作    者 ：               完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：
+   ||-------------------------------------------------------------------------*/
+   FUNCTION fun_ReplaceFunStr( prm_group_id          IN   NUMBER         --集团
+                              ,prm_hos_id            IN   NUMBER         --医院
+                              ,prm_copy_code         IN   VARCHAR2       --账套
+                              ,prm_mod_code          IN   VARCHAR2       --模块编码
+                              ,prm_InputStr          IN   VARCHAR2       --输入字符串
+                              )
+   RETURN VARCHAR2
+   IS
+     v_bef_str  varchar2(4000);
+     v_aft_str  varchar2(4000);
+     v_str_ori  varchar2(4000);
+     v_tem_str  varchar2(4000);
+     v_cal_str  varchar2(4000);
+     v_fun_name varchar2(4000);
+     v_fun_value varchar2(4000);
+     v_pos_beg  integer;
+     v_pos_end  integer;
+   BEGIN
+      v_str_ori  :=  prm_InputStr;
+
+      for rec in( select ELE_CODE
+                    from REP_DEFINE_ELE
+                   where group_id  = prm_group_id
+                     and hos_ID    = prm_hos_id
+                     and copy_code = prm_copy_code
+                     and (   (prm_mod_code = 'ALL' )
+                          or (prm_mod_code <> 'ALL' and  mod_code  = prm_mod_code)
+                         )
+
+                 ) LOOP
+
+        --获取函数名
+        v_fun_name :=  Upper(rec.ele_code);
+
+
+        LOOP
+          v_pos_beg :=   0 ;
+          v_pos_end :=   0 ;
+
+          --查询找函数名称
+          select instr(v_str_ori,v_fun_name||'(')
+            into v_pos_beg
+           from dual;
+
+          --未找到要替换的函数名，退出循环
+          if v_pos_beg = 0 then
+             exit;
+          end if ;
+
+
+          v_bef_str := substr(v_str_ori,1,v_pos_beg-1);
+          v_tem_str := substr(v_str_ori,v_pos_beg,length(v_str_ori)- v_pos_beg+1);
+
+          --获取函数计算串
+          select instr(v_tem_str,''')')
+            into v_pos_end
+           from dual;
+
+          v_cal_str :=  substr(v_tem_str,1,v_pos_end+1);
+
+          --计算函数计算
+          execute immediate 'select' || CHR(32) ||v_cal_str || CHR(32)||'from dual' into v_fun_value ;
+
+          v_aft_str :=  substr(v_tem_str,v_pos_end+2,length(v_tem_str)- v_pos_end);
+
+          v_str_ori := replace(v_str_ori,v_cal_str,to_char(v_fun_value));
+        END LOOP;
+      END LOOP;
+      return v_str_ori;
+
+   EXCEPTION
+      WHEN OTHERS THEN
+         return prm_InputStr;
+   END fun_ReplaceFunStr;
+   
+   /*-------------------------------------------------------------------------
+   || 函数名称 ：fun_ReplaceFunStr_HR(人力专用)
+   || 功能描述 ：根据传入的字符串将函数全部替换为值，当计算出错时返回原串
+   || 参数描述 ：参数标识           名称        输入/输出  类型
+   ||            -------------------------------------------------------------
+   ||            prm_group_id       集团             IN           NUMBER
+   ||            prm_hos_id         医院             IN           NUMBER
+   ||            prm_mod_code       模块编码         IN           VARCHAR2
+   ||            prm_InputStr       输入字符串       IN           VARCHAR2
+   || 返 回 值 ：                   字符串           OUT          VARCHAR2
+   ||
+   || 作    者 ：               完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：
+   ||-------------------------------------------------------------------------*/
+     FUNCTION fun_ReplaceFunStr_HR( prm_group_id          IN   NUMBER         --集团
+                              ,prm_hos_id            IN   NUMBER         --医院
+                              ,prm_mod_code          IN   VARCHAR2       --模块编码
+                              ,prm_InputStr          IN   VARCHAR2       --输入字符串
+                              )
+   RETURN VARCHAR2
+   IS
+     v_bef_str  varchar2(4000);
+     v_aft_str  varchar2(4000);
+     v_str_ori  varchar2(4000);
+     v_tem_str  varchar2(4000);
+     v_cal_str  varchar2(4000);
+     v_fun_name varchar2(4000);
+     v_fun_value varchar2(4000);
+     v_pos_beg  integer;
+     v_pos_end  integer;
+   BEGIN
+      v_str_ori  :=  prm_InputStr;
+
+      for rec in( select ELE_CODE
+                    from REP_DEFINE_ELE
+                   where group_id  = prm_group_id
+                     and hos_ID    = prm_hos_id
+                
+                     and (   (prm_mod_code = 'ALL' )
+                          or (prm_mod_code <> 'ALL' and  mod_code  = prm_mod_code)
+                         )
+
+                 ) LOOP
+
+        --获取函数名
+        v_fun_name :=  Upper(rec.ele_code);
+
+
+        LOOP
+          v_pos_beg :=   0 ;
+          v_pos_end :=   0 ;
+
+          --查询找函数名称
+          select instr(v_str_ori,v_fun_name||'(')
+            into v_pos_beg
+           from dual;
+
+          --未找到要替换的函数名，退出循环
+          if v_pos_beg = 0 then
+             exit;
+          end if ;
+
+
+          v_bef_str := substr(v_str_ori,1,v_pos_beg-1);
+          v_tem_str := substr(v_str_ori,v_pos_beg,length(v_str_ori)- v_pos_beg+1);
+
+          --获取函数计算串
+          select instr(v_tem_str,''')')
+            into v_pos_end
+           from dual;
+
+          v_cal_str :=  substr(v_tem_str,1,v_pos_end+1);
+
+          --计算函数计算
+          execute immediate 'select' || CHR(32) ||v_cal_str || CHR(32)||'from dual' into v_fun_value ;
+
+          v_aft_str :=  substr(v_tem_str,v_pos_end+2,length(v_tem_str)- v_pos_end);
+
+          v_str_ori := replace(v_str_ori,v_cal_str,to_char(v_fun_value));
+        END LOOP;
+      END LOOP;
+      return v_str_ori;
+
+   EXCEPTION
+      WHEN OTHERS THEN
+         return prm_InputStr;
+   END fun_ReplaceFunStr_HR;
+end PKG_COMM;
+            
+            ]]></sql>
+
+</root>
+            

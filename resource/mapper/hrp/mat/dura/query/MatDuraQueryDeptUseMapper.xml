@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.mat.dao.dura.query.MatDuraQueryDeptUseMapper">
+	<select id="queryMatDuraQueryDeptUse" parameterType="java.util.Map"  resultType="java.util.Map">
+	SELECT hdd.dept_code, hdd.dept_name, mid.inv_code, mid.inv_name, mid.inv_model, hu.unit_name, 
+      base_data.price, base_data.begin_amount, base_data.begin_money, base_data.in_amount, base_data.in_money, 
+      base_data.out_amount, base_data.out_money, base_data.end_amount, base_data.end_money 
+      from 
+      ( 
+       select nvl(begin_data.dept_id,occur_data.dept_id) dept_id,
+              nvl(begin_data.inv_id,occur_data.inv_id) inv_id,
+              nvl(begin_data.price,occur_data.price) price,
+              nvl(begin_data.begin_amount,0) begin_amount,
+              nvl(begin_data.begin_money,0) begin_money,
+              nvl(occur_data.in_amount,0) in_amount,
+              nvl(occur_data.in_money,0) in_money,
+              nvl(occur_data.out_amount,0) out_amount,
+              nvl(occur_data.out_money,0) out_money,
+              nvl(begin_data.begin_amount,0) + nvl(occur_data.in_amount,0) -  nvl(occur_data.out_amount,0) end_amount,
+              nvl(begin_data.begin_money,0) + nvl(occur_data.in_money,0) -  nvl(occur_data.out_money,0) end_money
+           from 
+           (
+           select dept_id,inv_id,price,sum(mdss.begin_amount) begin_amount,sum(mdss.begin_money) begin_money
+           from mat_dura_dept_surplus mdss
+           where mdss.group_id = #{group_id,jdbcType=INTEGER} 
+             AND mdss.hos_id = #{hos_id,jdbcType=INTEGER} 
+             AND mdss.copy_code = #{copy_code,jdbcType=VARCHAR} 
+             and mdss.year || mdss.month = #{b_year_month,jdbcType=VARCHAR}
+             group by dept_id,inv_id,price
+           ) begin_data
+           full join (
+           select dept_id,inv_id,price,sum(mdss.in_amount) in_amount,sum(mdss.in_money) in_money,sum(mdss.out_amount) out_amount,sum(mdss.out_money) out_money
+           from mat_dura_dept_surplus mdss
+           where mdss.group_id = #{group_id,jdbcType=INTEGER} 
+             AND mdss.hos_id = #{hos_id,jdbcType=INTEGER} 
+             AND mdss.copy_code = #{copy_code,jdbcType=VARCHAR} 
+             
+             and mdss.year || mdss.month between #{b_year_month,jdbcType=VARCHAR} and #{e_year_month,jdbcType=VARCHAR}
+             group by dept_id,inv_id,price
+           ) occur_data 
+          on begin_data.dept_id = occur_data.dept_id
+          and begin_data.inv_id = occur_data.inv_id
+          and begin_data.price = occur_data.price
+       ) base_data
+        LEFT JOIN hos_dept_dict hdd
+          ON  hdd.group_id =#{group_id,jdbcType=INTEGER} 
+          AND hdd.hos_id = #{hos_id,jdbcType=INTEGER} 
+          AND base_data.dept_id = hdd.dept_id 
+          AND hdd.is_stop = 0 
+        LEFT JOIN mat_inv_dict mid 
+          ON  mid.group_id =#{group_id,jdbcType=INTEGER} 
+          AND mid.hos_id = #{hos_id,jdbcType=INTEGER}     
+          AND mid.copy_code = #{copy_code,jdbcType=VARCHAR} 
+          AND base_data.inv_id = mid.inv_id 
+          AND mid.is_stop = 0
+        LEFT JOIN hos_unit hu 
+          ON mid.group_id = hu.group_id 
+          AND mid.hos_id = hu.hos_id 
+          AND mid.unit_code = hu.unit_code 
+        LEFT JOIN hos_fac_dict hfd 
+          ON mid.group_id = hfd.group_id 
+          AND mid.hos_id = hfd.hos_id 
+          AND mid.fac_id = hfd.fac_id 
+          AND mid.fac_no = hfd.fac_no 
+        where 1=1
+          <if test="dept_id != null and dept_id != ''">
+            AND base_data.dept_id = #{dept_id,jdbcType=INTEGER} 
+          </if>
+          <if test="dept_id == null or dept_id == ''">
+            AND exists( 
+              SELECT 1 from v_user_data_perm 
+              WHERE group_id = #{group_id,jdbcType=INTEGER} 
+                AND hos_id = #{hos_id,jdbcType=INTEGER} 
+                AND table_code = 'HOS_DEPT_DICT' 
+                AND user_id = #{user_id,jdbcType=INTEGER} 
+                AND is_read = 1 and is_write = 1 
+                AND perm_code = base_data.dept_id 
+            )
+          </if>
+          <if test="inv_code != null and inv_code != ''">
+            AND (
+              mid.inv_code like '%' || #{inv_code,jdbcType=VARCHAR} || '%'
+              OR
+              mid.inv_name like '%' || #{inv_code,jdbcType=VARCHAR} || '%'
+              OR
+              mid.spell_code like '%' || #{inv_code,jdbcType=VARCHAR} || '%'
+              OR
+              mid.wbx_code like '%' || #{inv_code,jdbcType=VARCHAR} || '%'
+              OR
+              mid.inv_model like '%' || #{inv_code,jdbcType=VARCHAR} || '%'
+              OR
+              mid.alias like '%' || #{inv_code,jdbcType=VARCHAR} || '%'
+              OR
+              mid.alias_spell like '%' || #{inv_code,jdbcType=VARCHAR} || '%'
+            )
+          </if>
+          <if test="mat_type_id != null and mat_type_id != ''">
+            and mid.mat_type_id in (
+                select mtd.mat_type_id from mat_type_dict mtd
+                    join (
+                        select mat_type_code from mat_type_dict 
+                        where mat_type_id =#{mat_type_id,jdbcType=INTEGER} 
+                        and group_id = #{group_id,jdbcType=INTEGER} 
+                        AND hos_id = #{hos_id,jdbcType=INTEGER} 
+                        and copy_code = #{copy_code,jdbcType=VARCHAR} 
+                    ) code_data on mtd.mat_type_code like code_data.mat_type_code||'%'
+                    where mtd.group_id = #{group_id,jdbcType=INTEGER} 
+                    AND mtd.hos_id = #{hos_id,jdbcType=INTEGER} 
+                    and mtd.copy_code = #{copy_code,jdbcType=VARCHAR}  
+                    and mtd.is_last=1            
+            )        
+        </if>
+	</select>
+</mapper>
+

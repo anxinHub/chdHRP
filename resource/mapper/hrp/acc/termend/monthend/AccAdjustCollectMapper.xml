@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.acc.dao.termend.monthend.AccAdjustCollectMapper">
+	
+	<resultMap id="accCurRate" type="com.chd.hrp.acc.entity.AccCurRate">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="acc_year" column="acc_year" />
+		<result property="acc_month" column="acc_month" />
+		<result property="cur_code" column="cur_code" />
+		<result property="cur_name" column="cur_name" />
+		<result property="start_rate" column="start_rate" />
+		<result property="avg_rate" column="avg_rate" />
+		<result property="end_rate" column="end_rate" />
+	</resultMap>
+	
+	<select id="addAccAdjustCollectVouch" statementType="CALLABLE" parameterType="java.util.Map" resultType="String"> 
+		<![CDATA[
+			{call acc_monthend_adjustcollect(#{group_id,jdbcType=INTEGER}, #{hos_id,jdbcType=INTEGER}, 
+				#{copy_code,jdbcType=VARCHAR}, #{user_id,jdbcType=INTEGER}, #{acc_year,jdbcType=VARCHAR}, 
+				#{acc_month,jdbcType=VARCHAR}, #{cur_code,jdbcType=VARCHAR}, #{start_rate,jdbcType=FLOAT}, 
+				#{avg_rate,jdbcType=FLOAT}, #{end_rate,jdbcType=FLOAT}, #{summary,jdbcType=VARCHAR}, 
+				#{vouch_type_code,jdbcType=VARCHAR}, #{subj_code,jdbcType=INTEGER}, #{vouch_id,jdbcType=INTEGER}, 
+				#{vouch_no,jdbcType=VARCHAR}, #{msg, mode=OUT, jdbcType=VARCHAR})}
+		]]>
+	</select>
+	
+	<select id="existsAccAdjustCollectCurRateByCode" parameterType="java.util.Map" resultType="java.lang.Integer">
+		SELECT count(1) FROM acc_cur_rate
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND acc_year = #{acc_year,jdbcType=VARCHAR}
+			AND acc_month = #{acc_month,jdbcType=VARCHAR}
+			AND cur_code = #{cur_code,jdbcType=VARCHAR}
+	</select>
+	
+	<insert id="addAccAdjustCollectCurRate" parameterType="java.util.Map">
+		INSERT INTO acc_cur_rate(group_id, hos_id, copy_code, acc_year, acc_month, cur_code, start_rate, avg_rate, end_rate)
+		VALUES(
+			#{group_id,jdbcType=INTEGER},
+			#{hos_id,jdbcType=INTEGER},
+			#{copy_code,jdbcType=VARCHAR},
+			#{acc_year,jdbcType=VARCHAR},
+			#{acc_month,jdbcType=VARCHAR},
+			#{cur_code,jdbcType=VARCHAR},
+			#{start_rate,jdbcType=NUMERIC},
+			#{avg_rate,jdbcType=NUMERIC},
+			#{end_rate,jdbcType=NUMERIC}
+		)
+	</insert>
+	
+	<update id="updateAccAdjustCollectCurRate" parameterType="java.util.Map">
+		UPDATE acc_cur_rate 
+		SET start_rate = #{start_rate,jdbcType=NUMERIC},
+			avg_rate = #{avg_rate,jdbcType=NUMERIC},
+			end_rate = #{end_rate,jdbcType=NUMERIC}
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND acc_year = #{acc_year,jdbcType=VARCHAR}
+			AND acc_month = #{acc_month,jdbcType=VARCHAR}
+			AND cur_code = #{cur_code,jdbcType=VARCHAR}
+	</update>
+	
+	<select id="queryAccAdjustCollectCurRateByCode" parameterType="java.util.Map"
+		resultMap="accCurRate">
+		select a.group_id, a.hos_id, a.copy_code, a.acc_year, a.acc_month, a.cur_code, b.cur_name, 
+			case when c.start_rate is null then a.start_rate else c.start_rate end as start_rate, 
+			case when c.avg_rate is null then a.avg_rate else c.avg_rate end as avg_rate, 
+			case when c.end_rate is null then a.end_rate else c.end_rate end as end_rate
+		from acc_cur_rate a
+		left join acc_cur b
+			on a.group_id = b.group_id 
+			and a.hos_id = b.hos_id  
+			and a.copy_code = b.copy_code 
+			and a.cur_code = b.cur_code 
+			and a.acc_year = b.acc_year
+		<if test="acc_year_before != null and acc_year_before != ''">
+			left join acc_cur_rate c
+				on a.group_id = c.group_id 
+				and a.hos_id = c.hos_id  
+				and a.copy_code = c.copy_code 
+				and a.cur_code = c.cur_code 
+				and c.acc_year = #{acc_year}
+				and c.acc_month = #{acc_month}
+		</if>
+		WHERE a.group_id = #{group_id}
+			AND a.hos_id = #{hos_id}
+			AND a.copy_code = #{copy_code}
+			AND a.acc_year = #{acc_year_before}
+			AND a.acc_month = #{acc_month_before}
+			AND a.cur_code = #{cur_code}
+	</select>	
+	
+	<select id="queryCurSubjMoneyList" parameterType="java.util.Map" resultType="java.util.TreeMap">
+		select a.subj_code, b.subj_name_all as subj_name, b.subj_dire, b.is_check, b.is_cash, b.subj_nature_code,  
+			nvl(sum(
+				case
+					when d.cur_plan = 0 then a.end_os - a.end_os * c.end_rate
+					else a.end_os - a.end_os / c.end_rate
+				end
+			), 0) money
+		from acc_leder a
+		inner join acc_subj b
+			on a.group_id = b.group_id and a.hos_id = b.hos_id 
+			and a.copy_code = b.copy_code and a.acc_year = b.acc_year 
+			and a.subj_code = b.subj_code and b.is_remit = 1
+		inner join acc_cur_rate c
+			on a.group_id = c.group_id and a.hos_id = c.hos_id 
+			and a.copy_code = c.copy_code and b.cur_code = c.cur_code 
+			and <![CDATA[(c.end_rate <> 0 and c.start_rate <> c.end_rate)]]>
+			and c.cur_code = #{cur_code,jdbcType=VARCHAR}
+		inner join acc_cur d
+			on a.group_id = d.group_id and a.hos_id = d.hos_id 
+			and a.copy_code = d.copy_code and a.acc_year = d.acc_year
+			and b.cur_code = d.cur_code and b.is_stop = 0
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER}
+			and a.hos_id = #{hos_id,jdbcType=INTEGER}
+			and a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			and a.acc_year = #{acc_year,jdbcType=VARCHAR}
+			and a.acc_month = #{acc_month,jdbcType=VARCHAR}
+		group by a.subj_code, b.subj_name_all, b.subj_dire, b.is_check, b.is_cash, b.subj_nature_code
+	</select>	
+	
+	<select id="queryCurSubjCheckMoneyListByCode" parameterType="java.util.Map" resultType="java.util.TreeMap">
+		select a.subj_code, 
+			nvl(sum(
+				case
+					when d.cur_plan = 0 then a.end_os - a.end_os * c.end_rate
+					else a.end_os - a.end_os / c.end_rate
+				end
+			), 0) money, ${checkColumn}
+		from acc_leder_check a
+		inner join acc_subj b
+			on a.group_id = b.group_id and a.hos_id = b.hos_id 
+			and a.copy_code = b.copy_code and a.acc_year = b.acc_year 
+			and a.subj_code = b.subj_code and b.is_remit = 1
+		inner join acc_cur_rate c
+			on a.group_id = c.group_id and a.hos_id = c.hos_id 
+			and a.copy_code = c.copy_code and b.cur_code = c.cur_code 
+			and <![CDATA[(c.end_rate <> 0 and c.start_rate <> c.end_rate)]]>
+			and c.cur_code = #{cur_code,jdbcType=VARCHAR}
+		inner join acc_cur d
+			on a.group_id = d.group_id and a.hos_id = d.hos_id 
+			and a.copy_code = d.copy_code and a.acc_year = d.acc_year
+			and b.cur_code = d.cur_code and b.is_stop = 0
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER}
+			and a.hos_id = #{hos_id,jdbcType=INTEGER}
+			and a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			and a.acc_year = #{acc_year,jdbcType=VARCHAR}
+			and a.acc_month = #{acc_month,jdbcType=VARCHAR}
+			and a.subj_code = ${subj_code,jdbcType=INTEGER}
+		group by a.subj_code, ${checkColumn}
+	</select>	
+</mapper>
+

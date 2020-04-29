@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.hr.dao.attendancemanagement.leave.HrAttdentVacalBalanceMapper">
+
+	<!-- 批量增加 -->
+	<insert id="addBatch" parameterType="java.util.Map">
+		insert into hr_attend_vacal_balance ( 
+			group_id,hos_id,attend_year,emp_id,attend_code, limit, add_valid_amt, add_invalid_amt, dec_amt, del_amt, bala_amt
+		)
+		select a.group_id,a.hos_id,#{attend_year,jdbcType=VARCHAR} attend_year,a.emp_id,b.attend_code, 
+			case b.attend_ed_is when 0 then 0 else case b.control_type when 0 then max_ed else 0 end end, 
+			0 add_valid_amt,0 add_invalid_amt,0 dec_amt,0 del_amt,0 bala_amt
+		from hos_emp a
+		left join hr_attend_item b on a.group_id=b.group_id and a.hos_id=b.hos_id 
+		where a.group_id = #{group_id,jdbcType=INTEGER}  
+			and a.hos_id = #{hos_id,jdbcType=INTEGER}
+			<if test="dept_id != null">
+				and a.dept_id = #{dept_id,jdbcType=INTEGER} 
+			</if>
+		    and b.is_stop = 0 
+			and b.is_jx = 0 
+			and a.is_attend = 1 
+			and b.attend_types = '03'
+			and b.attend_ed_is = 1
+			and not exists (
+				select c.group_id,c.hos_id,c.attend_year,c.emp_id,c.attend_code
+				from hr_attend_vacal_balance c
+				where c.group_id = #{group_id,jdbcType=INTEGER} 
+					and c.hos_id = #{hos_id,jdbcType=INTEGER} 
+					and c.attend_year = #{attend_year,jdbcType=VARCHAR}
+					and c.emp_id = a.emp_id
+					and c.attend_code = b.attend_code
+			)
+		order by a.emp_id,b.attend_code 
+	</insert>
+	<insert id="add" parameterType="java.util.Map">
+		insert into hr_attend_vacal_balance ( 
+			group_id,hos_id,attend_year,emp_id,attend_code,limit,add_valid_amt,add_invalid_amt,dec_amt,del_amt,bala_amt
+		)values(
+			#{group_id},#{hos_id},#{attend_year},#{emp_id},#{attend_code},#{limit},0,0,0,0,#{bala_amt}
+		)
+	</insert>
+	<!-- 批量添加 -->
+	<insert id="addBatchBalance" parameterType="java.util.List" >
+		<foreach collection="list" item="item" index="index" open="begin" close=";end;" separator=";" >
+			insert into hr_attend_vacal_balance(
+				group_id,hos_id,attend_year,emp_id,attend_code
+				<if test="item.limit != null">
+					,limit
+				</if>
+				<if test="item.add_valid_amt != null">
+					,add_valid_amt
+				</if>
+				<if test="item.add_invalid_amt != null">
+					,add_invalid_amt
+				</if>
+				<if test="item.dec_amt != null">
+					,dec_amt
+				</if>
+				<if test="item.del_amt != null">
+					,del_amt
+				</if>
+				<if test="item.bala_amt != null">
+					,bala_amt
+				</if>
+			) values (
+				#{map.group_id,jdbcType=INTEGER},
+				#{map.hos_id,jdbcType=INTEGER},
+				#{map.attend_year,jdbcType=VARCHAR},
+				#{item.emp_id,jdbcType=INTEGER},
+				#{item.attend_code,jdbcType=VARCHAR}
+				<if test="item.limit != null">
+					,#{item.limit,jdbcType=INTEGER}
+				</if>
+				<if test="item.add_valid_amt != null">
+					,#{item.add_valid_amt,jdbcType=INTEGER}
+				</if>
+				<if test="item.add_invalid_amt != null">
+					,#{item.add_invalid_amt,jdbcType=INTEGER}
+				</if>
+				<if test="item.dec_amt != null">
+					,#{item.dec_amt,jdbcType=INTEGER}
+				</if>
+				<if test="item.del_amt != null">
+					,#{item.del_amt,jdbcType=INTEGER}
+				</if>
+				<if test="item.bala_amt != null">
+					,#{item.bala_amt,jdbcType=INTEGER}
+				</if>
+			)
+		</foreach>
+	</insert>
+	
+	<!-- 批量修改 -->
+	<update id="updateBatch" parameterType="java.util.List">
+		<foreach collection="list" item="item" index="index" open="begin" close=";end;" separator=";" >
+			update hr_attend_vacal_balance <!--set   attend_code = #{item.attend_code} -->
+				<trim prefix="set" prefixOverrides=",">
+					<if test=" item.limit != null">
+						,limit = #{item.limit}
+					</if>
+					<if test=" item.add_valid_amt != null">
+						,add_valid_amt = #{item.add_valid_amt}
+					</if>
+					<if test=" item.add_invalid_amt != null">
+						,add_invalid_amt = #{item.add_invalid_amt}
+					</if>
+					<if test=" item.dec_amt != null">
+						,dec_amt = #{item.dec_amt}
+					</if>
+					<if test=" item.del_amt != null">
+						,del_amt = #{item.del_amt}
+					</if>
+					<if test=" item.bala_amt != null">
+						,bala_amt = #{item.bala_amt}
+					</if>
+				</trim>
+			where group_id = #{map.group_id}
+				AND hos_id = #{map.hos_id}
+				AND attend_year = #{map.attend_year}
+				AND emp_id = #{item.emp_id}
+				AND attend_code = #{item.attend_code}
+		</foreach>
+	</update>
+	
+	<!-- 根据休假项目批量修改 -->
+	<update id="updateLimitByItem" parameterType="java.util.Map">
+			update hr_attend_vacal_balance 
+			set  limit = #{limit}
+			where group_id = #{group_id}
+				AND hos_id = #{hos_id}
+				AND attend_year = #{attend_year}
+				AND attend_code = #{attend_code}
+	</update>
+	
+	<!-- 修改 --> 
+	<update id="update" parameterType="java.util.Map">
+		update hr_attend_vacal_balance 
+		<set >
+		<if test=" limit != null">
+			limit =#{limit,jdbcType=DOUBLE},
+		</if>
+		<if test=" add_valid_amt != null">
+			add_valid_amt = add_valid_amt + #{add_valid_amt,jdbcType=DOUBLE},
+		</if>
+		<if test=" add_invalid_amt != null">
+			add_invalid_amt = add_invalid_amt + #{add_invalid_amt,jdbcType=DOUBLE},
+		</if>
+		<if test=" dec_amt != null">
+			dec_amt = dec_amt + #{dec_amt,jdbcType=DOUBLE},
+		</if>
+		<if test=" del_amt != null">
+				del_amt = #{del_amt,jdbcType=DOUBLE},
+		</if>
+		<if test=" bala_amt != null">
+			bala_amt = bala_amt + #{bala_amt,jdbcType=DOUBLE},
+		</if>
+		</set>
+		<where>
+			group_id = #{group_id}
+			AND hos_id = #{hos_id}
+			AND attend_year = #{attend_year}
+			<if test="emp_id != null">
+				and  emp_id = #{emp_id}
+			</if>
+			<if test="empIds != null">
+				and  emp_id in (${empIds})
+			</if>
+			AND attend_code = #{attend_code}
+		</where>
+	</update>
+	
+	<!-- 查询 -->
+	<select id="queryHrAttdentVacalBal" parameterType="java.util.Map" resultType="java.util.Map">
+		select a.group_id,a.hos_id,a.attend_year,a.emp_id,b.emp_code,b.emp_name,
+			a.limit,a.add_valid_amt,a.add_invalid_amt,a.dec_amt,a.del_amt,a.bala_amt
+		from hr_attend_vacal_balance a
+		left join hos_emp b on a.group_id=b.group_id and a.hos_id=b.hos_id and a.emp_id=b.emp_id and b.is_attend = 1
+		where a.group_id = #{group_id}
+			and a.hos_id = #{hos_id}
+			and a.attend_year = #{attend_year}
+			<if test="emp_id != null">
+				and  a.emp_id = #{emp_id}
+			</if>
+			<if test="attend_code != null">
+				and  a.attend_code = #{attend_code}
+			</if>
+			and b.is_attend = 1
+		order by b.emp_code
+	</select>
+</mapper>

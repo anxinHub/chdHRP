@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.med.dao.storage.query.MedOutDeptMapper">
+	<resultMap id="medStorageQueryMedOutDeptMap" type="java.util.Map">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="dept_code" column="dept_code" />
+		<result property="dept_name" column="dept_name" />
+		<result property="inv_code" column="inv_code" />
+		<result property="inv_name" column="inv_name" />
+		<result property="inv_model" column="inv_model" />
+		<result property="med_type_code" column="med_type_code" />
+		<result property="amount" column="amount" />
+		<result property="amount_money" column="amount_money" />
+	</resultMap>
+ 
+
+
+	<select id="queryMedStorageQueryMedOutDept" parameterType="java.util.Map"
+		resultMap="medStorageQueryMedOutDeptMap">
+		with temp as
+		(
+		select
+		mom.dept_id,mom.dept_no,
+		decode(mid.inv_code,'','0', mid.inv_code) inv_code,
+		mid.inv_name,mid.inv_model,
+		sum(mod.amount) amount,sum(mod.amount_money) amount_money
+		from med_out_detail mod
+		left join med_out_main mom on mod.group_id = mom.group_id
+		and mod.hos_id = mom.hos_id and mod.copy_code = mom.copy_code
+		and mod.out_id = mom.out_id
+		left join med_inv_dict mid on mid.group_id = mod.group_id
+		and mid.hos_id = mod.hos_id and mid.inv_id = mod.inv_id
+		and mid.inv_no = mod.inv_no
+		left join med_bus_type mbt on mom.bus_type_code = mbt.bus_type_code 
+		  LEFT JOIN med_type_dict mtd 
+		  	ON mtd.group_id = mid.group_id
+		    AND mtd.hos_id = mid.hos_id
+		    AND mtd.copy_code = mid.copy_code
+		    AND mtd.med_type_id = mid.med_type_id
+		    AND mtd.med_type_no = mid.med_type_no 
+		<where>
+				<!--由于专购品在med_bus_type中sel_flag没有进行维护  导致选择专购品查询不到数据 -->
+			 (mbt.sel_flag = 'out' or mbt.sel_flag is null)
+		    <!-- mbt.sel_flag = 'out' --> 
+		    <!-- 2017/03/21注释掉此处,增加如下业务类型条件 -->
+			<!-- and mom.bus_type_code = '3' -->
+			<if test="bus_type_code != null and bus_type_code != '' ">
+				and mom.bus_type_code in ${bus_type_code}
+			</if>
+			<if test="bus_type_code == null or bus_type_code == '' ">
+				and mom.bus_type_code in (3, 21, 9,11,13,23,49,50)
+			</if>
+			<if test="group_id != null and group_id != ''">
+				and mom.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and mom.hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				and mom.copy_code = #{copy_code}
+			</if>
+			<if test="begin_confirm_date != null and begin_confirm_date != '' and end_confirm_date != null and end_confirm_date != ''">
+		     AND  mom.confirm_date  between to_date(#{begin_confirm_date},'yyyy-MM-dd') and to_date(#{end_confirm_date},'yyyy-MM-dd')
+		    </if>
+			<if test="store_id != null and store_id != '' and store_id != '00'">
+				and mom.store_id = #{store_id}
+			</if>
+			<if test="store_no != null and store_no != '' and store_id != '00' ">
+				and mom.store_no= #{store_no}
+			</if>
+		<!-- 	<if test="med_type_id != null and med_type_id != ''">
+				and mid.med_type_id= #{med_type_id}
+			</if> -->
+			<if test="med_type_code != null and med_type_code != ''">
+				and mtd.med_type_code like '${med_type_code}%'
+			</if>
+		<!-- 	<if test="med_type_no != null and med_type_no != ''">
+				and mid.med_type_no= #{med_type_no}
+			</if> -->
+			<if test="begin_out_date != null and begin_out_date != '' and end_out_date != null and end_out_date != ''">
+		     AND  mom.out_date  between to_date(#{begin_out_date},'yyyy-MM-dd') and to_date(#{end_out_date},'yyyy-MM-dd')
+		    </if>
+		    <if test="dept_id != null and dept_id != '' and dept_id != '00'">
+				and mom.dept_id= #{dept_id}
+			</if>
+			<if test="dept_no != null and dept_no != '' and dept_id != '00'">
+				and mom.dept_no= #{dept_no}
+			</if>
+			
+			<if test="inv_msg != null and inv_msg != '' ">
+			<!-- 	and (
+					mid.inv_code like '%${inv_msg}%' 
+					or 
+					mid.inv_name like '%${inv_msg}%'
+					or
+					mid.spell_code like '%${inv_msg}%' 
+					or 
+					mid.wbx_code like '%${inv_msg}%'
+				) -->
+				AND (
+							 mid.inv_code like '%${inv_msg}%'
+							or upper(mid.inv_name) like '%${inv_msg}%'
+							or upper(mid.inv_model) like '%${inv_msg}%'
+							or upper(mid.spell_code) like '%${inv_msg}%'
+							or upper(mid.wbx_code) like '%${inv_msg}%'
+							or upper(mid.bid_code) like '%${inv_msg}%'
+							or lower(mid.spell_code) like '%${inv_msg}%'
+							or lower(mid.bid_code) like '%${inv_msg}%'
+							or lower(mid.wbx_code) like '%${inv_msg}%'
+							or lower(mid.inv_name) like '%${inv_msg}%'
+						
+					)
+				
+			</if>
+			
+			<!-- <if test="inv_id != null and inv_id != ''">
+				and mod.inv_id = #{inv_id}
+			</if>
+			<if test="inv_no != null and inv_no != ''">
+				and mod.inv_no= #{inv_no}
+			</if> -->
+			<if test="is_charge != null and is_charge != ''">
+				and mid.is_charge= #{is_charge}
+			</if>
+			<if test="state != null and state != ''">
+				and mom.state in ${state}
+			</if>
+			
+			<if test="dept_id == '00' ">
+				and to_char(mom.dept_id) in ( select perm_code from v_user_data_perm
+				where group_id = ${group_id}
+				and hos_id = ${hos_id} and user_id = ${user_id} and table_code =
+				'HOS_DEPT_DICT'
+				and is_read = 1 and is_write = 1)
+			</if>
+			<if test="store_id == '00' ">
+				and to_char(mom.store_id) in (select perm_code from v_user_data_perm
+				where group_id = ${group_id}
+				and hos_id = ${hos_id} and user_id = ${user_id} and table_code =
+				'HOS_STORE_DICT'
+				and is_read = 1 and is_write = 1 )
+			</if>
+			<if test="inv_model != null and inv_model != ''">
+					     	AND (
+							mid.inv_model like '%${inv_model}%'
+							or upper(mid.inv_name) like '%${inv_model}%'
+							or upper(mid.inv_model) like '%${inv_model}%'
+							or upper(mid.spell_code) like '%${inv_model}%'
+							or upper(mid.wbx_code) like '%${inv_model}%'
+							or upper(mid.bid_code) like '%${inv_model}%'
+							or lower(mid.spell_code) like '%${inv_model}%'
+							or lower(mid.bid_code) like '%${inv_model}%'
+							or lower(mid.wbx_code) like '%${inv_model}%'
+							or lower(mid.inv_name) like '%${inv_model}%'
+						
+					)
+			</if> 
+			
+			<!-- 2017/03/17 -->
+			and mom.dept_id is not null
+		</where>
+		group by grouping sets
+		((mom.dept_id,mom.dept_no,mid.inv_code,mid.inv_name,mid.inv_model),mom.dept_id)
+		), temp1 as (
+		select dept_id,dept_no,inv_code,inv_name,inv_model,amount,amount_money from
+		temp
+		union all
+		select null,null,null,null,null,sum(amount),sum(amount_money) from temp
+		where inv_code != '0'
+		), temp2 as (select
+		(select a.dept_code from hos_dept_dict a where a.dept_id = temp1.dept_id and
+		a.is_stop = '0') dept_code,
+		(select a.dept_name from hos_dept_dict a where a.dept_id = temp1.dept_id and
+		a.is_stop = '0') dept_name,
+		decode(inv_code,'0','小计',inv_code) inv_code,inv_name,inv_model,amount,amount_money from temp1
+		) select decode(dept_code,'','合计',dept_code) dept_code,
+		dept_name,inv_code,inv_name,inv_model,amount,amount_money from temp2
+	</select>
+
+
+</mapper>
+

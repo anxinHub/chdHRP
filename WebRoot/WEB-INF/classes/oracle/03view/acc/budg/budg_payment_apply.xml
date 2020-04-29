@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+	<sql id="v_budg_payment_apply" type="view" desc="报销申请主表视图"><![CDATA[
+		CREATE OR REPLACE VIEW V_BUDG_PAYMENT_APPLY AS
+		SELECT 
+			A.GROUP_ID,  --集团ID
+			A.HOS_ID,    --医院ID
+			A.COPY_CODE, --账套编码
+			A.APPLY_CODE AS BUSINESS_ID,--报销单号
+			A.APPLY_CODE AS BUSINESS_NO,--报销单号
+			A.APPLY_DATE,--申请日期
+			A.DEPT_ID,   --科室ID
+			A.DEPT_NO,   --科室变更ID
+			HDD.DEPT_CODE,--科室编码
+			HDD.DEPT_NAME,--科室名称
+			A.PROJ_ID,  --项目ID
+			A.PROJ_NO,  --项目变更ID
+			HPD.PROJ_CODE,--项目编码
+			HPD.PROJ_NAME,--项目名称
+			A.EMP_ID,    --报销人ID
+			A.EMP_NO,    --报销人变更ID
+			HED.EMP_CODE,--报销人编码
+			HED.EMP_NAME,--报销人姓名
+			A.PAYMENT_AMOUNT AS AMOUNT_MONEY, --报销金额
+			A.REMARK AS BRIEF,  --备注
+			A.MAKER,  --制单人ID
+			U1.USER_NAME MAKER_NAME, --制单人名称
+			A.MAKE_DATE, --编制日期
+			A.CHECKER, --审核人ID
+			U2.USER_NAME CHECKER_NAME, --审核人
+			A.CHECK_DATE, --审核日期
+			A.PAYER AS CONFIRMER,    --确认人ID
+			U3.USER_NAME AS CONFIRMER_NAME,    --确认人
+			A.PAY_DATE AS BUSI_DATE, --业务日期
+			A.STATE,       --状态
+			BSD.VALUE_NAME STATE_NAME,--状态名称
+			A.PAY_WAY AS SUB_TYPE_ID, --支付方式
+			APY.PAY_NAME , --支付方式名称
+			A.PHONE, --联系电话
+			A.CARD_NO,  --卡号
+			A.OFFSET_AMOUNT, --预借金额
+			A.PAY_AMOUNT, --支付金额
+      		ATTR.OUT_CODE   --科室支出性质  
+		FROM BUDG_PAYMENT_APPLY A
+		LEFT JOIN HOS_DEPT_DICT HDD --科室 
+		ON
+			A.GROUP_ID = HDD.GROUP_ID
+			AND A.HOS_ID = HDD.HOS_ID
+			AND A.DEPT_ID = HDD.DEPT_ID
+	    	AND A.DEPT_NO=HDD.DEPT_NO
+		LEFT JOIN ACC_DEPT_ATTR ATTR  --科室属性
+        ON 
+	        HDD.DEPT_ID=ATTR.DEPT_ID 
+	        AND HDD.GROUP_ID=ATTR.GROUP_ID 
+	        AND HDD.HOS_ID=ATTR.HOS_ID
+		LEFT JOIN HOS_PROJ_DICT HPD  --项目
+		ON
+			A.GROUP_ID = HPD.GROUP_ID
+			AND A.HOS_ID = HPD.HOS_ID
+			AND A.PROJ_ID = HPD.PROJ_ID
+	    	AND A.PROJ_NO = HPD.PROJ_NO
+		LEFT JOIN HOS_EMP_DICT HED  --报销人
+		ON
+			A.GROUP_ID = HED.GROUP_ID
+			AND A.HOS_ID = HED.HOS_ID
+			AND A.EMP_ID = HED.EMP_ID
+	    	AND A.EMP_NO = HED.EMP_NO
+		LEFT JOIN SYS_USER U1   --制单人
+		ON
+			A.GROUP_ID = U1.GROUP_ID
+			AND A.HOS_ID = U1.HOS_ID
+			AND A.MAKER = U1.USER_ID
+		LEFT JOIN SYS_USER U2   --审核人
+		ON
+			A.GROUP_ID = U2.GROUP_ID
+			AND A.HOS_ID = U2.HOS_ID
+			AND A.CHECKER = U2.USER_ID
+		LEFT JOIN SYS_USER U3   --付款人
+		ON
+			A.GROUP_ID = U3.GROUP_ID
+			AND A.HOS_ID = U3.HOS_ID
+			AND A.PAYER = U3.USER_ID
+		LEFT JOIN ACC_PAY_TYPE APY --支付方式
+		ON
+			A.GROUP_ID = APY.GROUP_ID
+			AND A.HOS_ID = APY.HOS_ID
+			AND A.COPY_CODE = APY.COPY_CODE
+			AND A.PAY_WAY = APY.PAY_CODE
+		LEFT JOIN BUDG_SYS_DICT BSD --状态字典
+		ON
+			A.STATE = BSD.VALUE_CODE
+			AND BSD.F_CODE = 'BORROW_STATE'
+		WHERE A.STATE = '04'
+	]]></sql>
+	
+	<sql id="v_budg_payment_apply_det" type="view" desc="报销申请明细表视图"><![CDATA[
+		CREATE OR REPLACE VIEW V_BUDG_PAYMENT_APPLY_DET AS
+		SELECT 
+			A.GROUP_ID, --集团ID
+			A.HOS_ID,   --医院ID
+			A.COPY_CODE,--账套编码
+			A.APPLY_CODE AS BUSINESS_ID,--报销单号
+			A.APPLY_CODE AS BUSINESS_NO,--报销单号
+			A.PAYMENT_ITEM_ID||'-'||A.SOURCE_ID AS DETAIL_ID,--明细ID
+			A.SOURCE_ID,   --资金来源ID
+			B.SOURCE_CODE, --资金来源编码
+			B.SOURCE_NAME, --资金来源名称
+        	B.SOURCE_ATTR ,--资金来源性质
+			A.PAYMENT_ITEM_ID AS SUB_TYPE_ID,--支出项目ID
+			A.PAYMENT_ITEM_NO,   --支出项目变更ID
+			C.PAYMENT_ITEM_CODE, --支出项目编码
+			C.PAYMENT_ITEM_NAME, --支出项目名称
+			A.PAYMENT_AMOUNT AS AMOUNT_MONEY, --报销金额
+			nvl(A.OFFSET_AMOUNT,0.00) AS OFFSET_AMOUNT,  --预借金额
+			nvl(A.PAY_AMOUNT,0.00) AS PAY_AMOUNT    --支付金额
+		FROM 
+			BUDG_PAYMENT_APPLY_DET A 
+		LEFT JOIN HOS_SOURCE B 
+		ON
+			A.GROUP_ID = B.GROUP_ID
+			AND A.HOS_ID = B.HOS_ID
+			AND A.SOURCE_ID = B.SOURCE_ID
+		LEFT JOIN BUDG_PAYMENT_ITEM_DICT C 
+		ON
+			A.GROUP_ID = C.GROUP_ID
+			AND A.HOS_ID = C.HOS_ID
+			AND A.COPY_CODE = C.COPY_CODE
+			AND A.PAYMENT_ITEM_ID = C.PAYMENT_ITEM_ID
+			AND A.PAYMENT_ITEM_NO = C.PAYMENT_ITEM_NO
+			AND C.IS_FRESH = 1
+	]]></sql>
+</root>	

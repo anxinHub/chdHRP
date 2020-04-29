@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+
+	<sql id="mat_final_inverse_month" type="proc"><![CDATA[
+	CREATE OR REPLACE PROCEDURE MAT_FINAL_INVERSE_MONTH
+
+	  /*期末统一反结账*/
+	  (
+	    p_group_id numeric,  --集团ID
+	    p_hos_id numeric,  --医院ID
+	    p_copy_code varchar2,  --帐套编码
+	    p_year varchar2,  --当前年份
+	    p_month varchar2,  --当前月份
+	    p_last_year varchar2,  --反结账年份
+	    p_last_month varchar2,  --反结账月份
+	    p_before_year varchar2,  --上一期间年份
+	    p_before_month varchar2,  --上一期间月份
+	    p_user_id nvarchar2,  --当前操作用户
+	    msg OUT nvarchar2  --返回值格式："msg":"···","state":"true/false","year":"···"
+	  )
+	  IS
+	    mat_flag numeric;  --判断状态依据
+	    sys_date date;  --当前系统时间(用于更新结账时间)
+	    num NUMBER;
+	    before_year varchar2(10);  --上一期间年份
+	    before_month varchar2(10);  --上一期间月份
+	  BEGIN
+	
+	    sys_date := sysdate;
+	
+	     /*常备材料批结余表*/
+	     update mat_batch_balance 
+	     set mat_batch_balance.end_amount=0,
+	         mat_batch_balance.end_money=0,
+	         mat_batch_balance.end_sale_money=0,
+	         mat_batch_balance.begin_amount=0,
+	         mat_batch_balance.begin_money=0,
+	         mat_batch_balance.begin_sale_money=0,
+	         mat_batch_balance.y_in_amount=nvl(mat_batch_balance.in_amount,0),
+	         mat_batch_balance.y_in_money =nvl(mat_batch_balance.in_money,0),
+	         mat_batch_balance.y_in_sale_money =nvl(mat_batch_balance.in_sale_money,0),
+	         mat_batch_balance.y_out_amount=nvl(mat_batch_balance.out_amount,0),
+	         mat_batch_balance.y_out_money=nvl(mat_batch_balance.out_money,0),
+	         mat_batch_balance.y_out_sale_money=nvl(mat_batch_balance.out_sale_money,0)      
+	      where 
+	            mat_batch_balance.group_id=p_group_id
+	        and mat_batch_balance.hos_id=p_hos_id
+	        and mat_batch_balance.copy_code=p_copy_code
+	        and mat_batch_balance.year=p_year 
+	        and mat_batch_balance.month=p_month
+	        and exists(
+	          --当前期间大于库房启用年月的库房才可以反结
+	          select 1 from mat_store_start
+	          where group_id = p_group_id
+	            and hos_id = p_hos_id
+	            and copy_code = p_copy_code
+	            and store_id = mat_batch_balance.store_id
+	            and start_year || start_month < p_year || p_month
+	        ); 
+	        
+	     /*常备材料结余表*/   
+	     update mat_inv_balance 
+	     set mat_inv_balance.end_amount=0,
+	         mat_inv_balance.end_money=0,
+	         mat_inv_balance.end_sale_money=0,
+	         mat_inv_balance.begin_amount=0,
+	         mat_inv_balance.begin_money=0,
+	         mat_inv_balance.begin_sale_money=0,
+	         mat_inv_balance.y_in_amount=nvl(mat_inv_balance.in_amount,0),
+	         mat_inv_balance.y_in_money =nvl(mat_inv_balance.in_money,0),
+	         mat_inv_balance.y_in_sale_money =nvl(mat_inv_balance.in_sale_money,0),
+	         mat_inv_balance.y_out_amount=nvl(mat_inv_balance.out_amount,0),
+	         mat_inv_balance.y_out_money=nvl(mat_inv_balance.out_money,0),
+	         mat_inv_balance.y_out_sale_money=nvl(mat_inv_balance.out_sale_money,0)      
+	      where 
+	            mat_inv_balance.group_id=p_group_id
+	        and mat_inv_balance.hos_id=p_hos_id
+	        and mat_inv_balance.copy_code=p_copy_code
+	        and mat_inv_balance.year=p_year 
+	        and mat_inv_balance.month=p_month
+	        and exists(
+	          --当前期间大于库房启用年月的库房才可以反结
+	          select 1 from mat_store_start
+	          where group_id = p_group_id
+	            and hos_id = p_hos_id
+	            and copy_code = p_copy_code
+	            and store_id = mat_inv_balance.store_id
+	            and start_year || start_month < p_year || p_month
+	        ); 
+	        
+	     /*代销材料批结余表*/   
+	     update mat_affi_batch 
+	     set mat_affi_batch.end_amount=0,
+	         mat_affi_batch.end_money=0,
+	         mat_affi_batch.end_sale_money=0,
+	         mat_affi_batch.begin_amount=0,
+	         mat_affi_batch.begin_money=0,
+	         mat_affi_batch.begin_sale_money=0,
+	         mat_affi_batch.y_in_amount=nvl(mat_affi_batch.in_amount,0),
+	         mat_affi_batch.y_in_money =nvl(mat_affi_batch.in_money,0),
+	         mat_affi_batch.y_in_sale_money =nvl(mat_affi_batch.in_sale_money,0),
+	         mat_affi_batch.y_out_amount=nvl(mat_affi_batch.out_amount,0),
+	         mat_affi_batch.y_out_money=nvl(mat_affi_batch.out_money,0),
+	         mat_affi_batch.y_out_sale_money=nvl(mat_affi_batch.out_sale_money,0)      
+	      where 
+	            mat_affi_batch.group_id=p_group_id
+	        and mat_affi_batch.hos_id=p_hos_id
+	        and mat_affi_batch.copy_code=p_copy_code
+	        and mat_affi_batch.year=p_year 
+	        and mat_affi_batch.month=p_month
+	        and exists(
+	          --当前期间大于库房启用年月的库房才可以反结
+	          select 1 from mat_store_start
+	          where group_id = p_group_id
+	            and hos_id = p_hos_id
+	            and copy_code = p_copy_code
+	            and store_id = mat_affi_batch.store_id
+	            and start_year || start_month < p_year || p_month
+	        ); 
+	        
+	       /*代销材料结余表*/  
+	     update mat_affi_balance 
+	     set mat_affi_balance.end_amount=0,
+	         mat_affi_balance.end_money=0,
+	         mat_affi_balance.end_sale_money=0,
+	         mat_affi_balance.begin_amount=0,
+	         mat_affi_balance.begin_money=0,
+	         mat_affi_balance.begin_sale_money=0,
+	         mat_affi_balance.y_in_amount=nvl(mat_affi_balance.in_amount,0),
+	         mat_affi_balance.y_in_money =nvl(mat_affi_balance.in_money,0),
+	         mat_affi_balance.y_in_sale_money =nvl(mat_affi_balance.in_sale_money,0),
+	         mat_affi_balance.y_out_amount=nvl(mat_affi_balance.out_amount,0),
+	         mat_affi_balance.y_out_money=nvl(mat_affi_balance.out_money,0),
+	         mat_affi_balance.y_out_sale_money=nvl(mat_affi_balance.out_sale_money,0)    
+	      where 
+	            mat_affi_balance.group_id=p_group_id
+	        and mat_affi_balance.hos_id=p_hos_id
+	        and mat_affi_balance.copy_code=p_copy_code
+	        and mat_affi_balance.year=p_year 
+	        and mat_affi_balance.month=p_month
+	        and exists(
+	          --当前期间大于库房启用年月的库房才可以反结
+	          select 1 from mat_store_start
+	          where group_id = p_group_id
+	            and hos_id = p_hos_id
+	            and copy_code = p_copy_code
+	            and store_id = mat_affi_balance.store_id
+	            and start_year || start_month < p_year || p_month
+	        ); 
+	        
+	      /*更新物流库房结账状态*/
+	      update mat_termend_store
+	      set
+	        is_account = 0,
+	        oper = p_user_id,
+	        oper_date = sys_date
+	      where group_id = p_group_id
+	        and hos_id = p_hos_id
+	        and copy_code = p_copy_code
+	        and year = p_last_year
+	        and month = p_last_month;
+	        
+	      /*更新结账状态*/
+	      update acc_year_month set mat_flag=0,mat_date=sys_date,mat_user=p_user_id  
+	      where group_id=p_group_id 
+	            and hos_id=p_hos_id 
+	            and copy_code=p_copy_code 
+	            and acc_year=p_last_year 
+	            and acc_month=p_last_month
+	            ;
+	            
+	      /*返回上个期间*/
+	       before_year:=p_before_year;
+	       before_month:=p_before_month; 
+	               
+	      select count(1) into num
+	      from acc_year_month 
+	      where group_id=p_group_id 
+	        and hos_id=p_hos_id 
+	        and copy_code=p_copy_code 
+	        and acc_year=p_before_year 
+	        and acc_month=p_before_month
+	        and acc_year||acc_month >=(
+	          select 
+	            start_year||start_month 
+	          from sys_mod_start
+	           where group_id = p_group_id
+	                AND hos_id = p_hos_id
+	                AND copy_code = p_copy_code
+	                and mod_code = '04'
+	        );  
+	        
+	      if num = 0 then
+	         before_year:='';
+	         before_month:='';
+	       end if;
+	         
+	
+	    /*返回信息*/
+	    msg := '{"msg":"操作成功","state":"true","year":"'||p_last_year||'","month":"'||p_last_month||'","last_year":"'||before_year||'","last_month":"'||before_month||'"}';
+	  END MAT_FINAL_INVERSE_MONTH;
+	
+	]]></sql>
+	
+</root>
+

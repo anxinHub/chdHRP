@@ -1,0 +1,223 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.sys.dao.CopyMapper">
+
+	<resultMap id="copy" type="com.chd.hrp.sys.entity.Copy">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="copy_name" column="copy_name" />
+		<result property="is_stop" column="is_stop" />
+		<result property="nature_code" column="nature_code" />
+		<result property="nature_name" column="nature_name" />
+		<result property="note" column="note" />
+	</resultMap>
+
+	<insert id="addCopy" useGeneratedKeys="true">
+
+		INSERT INTO HOS_COPY (
+		group_id
+		,
+		hos_id
+		,
+		copy_code
+		,
+		copy_name
+		,
+		is_stop
+		,
+		nature_code
+		,
+		note
+
+		) VALUES (
+		#{group_id} ,
+		#{hos_id} ,
+		#{copy_code} ,
+		#{copy_name} ,
+		#{is_stop} ,
+		#{nature_code} ,
+		#{note}
+		)
+
+	</insert>
+	<insert id="addBatchCopy" parameterType="java.util.List">
+
+		INSERT INTO HOS_COPY (
+		group_id
+		,
+		hos_id
+		,
+		copy_code
+		,
+		copy_name
+		,
+		is_stop
+		,
+		nature_code
+		,
+		note
+
+		)
+		<foreach collection="list" item="item" index="index"
+			separator=" union all ">
+			select
+			#{item.group_id} ,
+			#{item.hos_id} ,
+			#{item.copy_code} ,
+			#{item.copy_name} ,
+			#{item.is_stop} ,
+			#{item.nature_code} ,
+			#{item.note}
+			from dual
+		</foreach>
+
+	</insert>
+
+	<update id="updateCopy" parameterType="java.util.Map">
+
+		UPDATE hos_copy SET
+		copy_name = #{copy_name}
+		,
+		is_stop = #{is_stop}
+		,
+		nature_code = #{nature_code}
+		,
+		note = #{note}
+
+		WHERE
+		group_id = #{group_id}
+		and
+		hos_id = #{hos_id}
+		and
+		copy_code = #{copy_code}
+
+
+	</update>
+	<update id="updateBatchCopy" parameterType="java.util.List">
+
+		<foreach collection="list" item="item" index="index" open="begin"
+			close="end;" separator=";">
+			UPDATE hos_copy SET
+			copy_name = #{copy_name}
+			,
+			is_stop = #{is_stop}
+			,
+			nature_code = #{nature_code}
+			,
+			note = #{note}
+
+			WHERE
+			group_id = #{item.group_id}
+			and
+			hos_id = #{item.hos_id}
+			and
+			copy_code = #{item.copy_code}
+
+		</foreach>
+	</update>
+
+	<delete id="deleteCopy" parameterType="java.util.Map">
+
+		DELETE FROM hos_copy WHERE
+		group_id = #{group_id} and
+		hos_id = #{hos_id} and
+		copy_code = #{copy_code}
+
+	</delete>
+	<delete id="deleteBatchCopy" parameterType="java.util.List">
+		DELETE FROM hos_copy WHERE
+		<foreach collection="list" index="index" item="item" open="("
+			separator="or" close=")">
+			group_id = #{item.group_id}
+			and
+			hos_id = #{item.hos_id}
+			and
+			copy_code = #{item.copy_code}
+
+		</foreach>
+
+
+	</delete>
+
+	<select id="queryCopyByCode" resultType="com.chd.hrp.sys.entity.Copy"
+		parameterType="string">
+
+		SELECT
+		group_id,
+		hos_id,
+		copy_code,
+		copy_name,
+		is_stop,
+		a.nature_code,
+		nature_name,
+		note
+		FROM hos_copy a
+		inner join DIC_HOS_NATURE b on a.nature_code=b.nature_code
+		WHERE
+		group_id = #{group_id} and
+		hos_id = #{hos_id} and
+		copy_code = #{copy_code}
+
+	</select>
+	<select id="queryCopy" parameterType="java.util.Map" resultMap="copy">
+
+		SELECT
+		group_id,
+		hos_id,
+		copy_code,
+		copy_name,
+		is_stop,
+		nature_code,
+		note
+		FROM HOS_COPY
+		<where>
+			<if test="group_id != null and group_id != ''">
+				AND group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != '' and copy_code != '%%'">
+				AND copy_code like #{copy_code}
+			</if>
+			<if test="copy_name != null and copy_name != '' and copy_name != '%%'">
+				AND copy_name like #{copy_name}
+			</if>
+			<if test="is_stop != null and is_stop != ''">
+				AND is_stop = #{is_stop}
+			</if>
+			<if test="nature_code != null and nature_code != ''">
+				AND nature_code = #{nature_code}
+			</if>
+			<if test="note != null and note != ''">
+				AND note = #{note}
+			</if>
+		</where>
+		order by group_id asc
+	</select>
+	<!-- 查询有权限的模块信息 -->
+	<select id="queryCopyByPerm" parameterType="java.util.Map" resultMap="copy">
+		SELECT m.group_id, m.hos_id, m.copy_code, m.copy_name, m.is_stop, m.nature_code, m.note
+		FROM HOS_COPY m
+		WHERE EXISTS (
+		select 1 from v_user_perm up 
+		where  up.group_id = #{group_id} AND up.hos_id = #{hos_id} and up.user_id=#{user_id}
+		and m.group_id=up.group_id and m.hos_id=up.hos_id and m.copy_code=up.copy_code
+		)
+		<if test="copy_code != null and copy_code != ''">
+	      AND m.copy_code = #{copy_code}
+	    </if>
+	    order by m.copy_code
+	</select>
+	
+	<!-- 登录查询有权限的账套、模块信息 -->
+	<select id="queryCopyModByPerm" parameterType="java.util.Map" resultType="java.util.Map">
+      select distinct up.copy_code "copy_code",c.copy_name "copy_name",up.mod_code "mod_code",c.nature_code "nature_code"
+      from v_user_perm up 
+      inner join hos_copy c on up.group_id=c.group_id and up.hos_id=c.hos_id and up.copy_code=c.copy_code
+      where  up.group_id = #{group_id} AND up.hos_id = #{hos_id} and up.user_id=#{user_id}
+      order by up.copy_code,up.mod_code
+	</select>
+</mapper>
+

@@ -1,0 +1,809 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.cost.dao.CostCollectionMapper">
+  
+	<resultMap id="costDeptDriData" type="com.chd.hrp.cost.entity.CostDeptDriData">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="acc_year" column="acc_year" />
+		<result property="acc_month" column="acc_month" />
+		<result property="dept_id" column="dept_id" />
+		<result property="dept_no" column="dept_no" />
+		<result property="dept_code" column="dept_code" />
+		<result property="dept_name" column="dept_name" />
+		<result property="cost_item_id" column="cost_item_id" />
+		<result property="cost_item_no" column="cost_item_no" />
+		<result property="cost_item_code" column="cost_item_code" />
+		<result property="cost_item_name" column="cost_item_name" />
+		<result property="source_id" column="source_id" />
+		<result property="source_code" column="source_code" />
+		<result property="source_name" column="source_name" />
+		<result property="dir_amount" column="dir_amount" />
+		<result property="dept_level" column="dept_level" />
+		<result property="item_grade" column="item_grade" />
+	</resultMap>
+
+	<resultMap id="map" type="java.util.Map">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="acc_year" column="acc_year" />
+		<result property="acc_month" column="acc_month" />
+		<result property="dept_id" column="dept_id" />
+		<result property="dept_no" column="dept_no" />
+		<result property="dept_code" column="dept_code" />
+		<result property="dept_name" column="dept_name" />
+		<result property="cost_item_id" column="cost_item_id" />
+		<result property="cost_item_no" column="cost_item_no" />
+		<result property="cost_item_code" column="cost_item_code" />
+		<result property="cost_item_name" column="cost_item_name" />
+		<result property="source_id" column="source_id" />
+		<result property="source_code" column="source_code" />
+		<result property="source_name" column="source_name" />
+		<result property="dir_amount" column="dir_amount" />
+	</resultMap>
+	<select id="queryCostCollection" parameterType="java.util.Map"
+		resultMap="costDeptDriData">
+		with temp as
+		(
+				SELECT
+				cddd.group_id,
+				cddd.hos_id,
+				cddd.copy_code,
+				acc_year,
+				acc_month,
+				cddd.dept_id,
+				cddd.dept_no,
+				hdd.dept_code,
+				hdd.dept_name,
+				hdd.dept_level,
+				cidn.item_grade,
+				cddd.cost_item_id,
+				cddd.cost_item_no,
+				cidn.cost_item_code,
+				cidn.cost_item_name,
+				cddd.source_id,
+				hd.source_code,
+				hd.source_name,
+				dir_amount
+				FROM cost_dept_dri_data cddd
+				left join hos_dept_dict hdd
+				on cddd.group_id = hdd.group_id
+				and cddd.hos_id = hdd.hos_id
+				and cddd.dept_id = hdd.dept_id
+				and cddd.dept_no = hdd.dept_no
+				left join cost_item_dict_no cidn 
+				on cidn.group_id = cddd.group_id
+				and cidn.hos_id = cddd.hos_id
+				and cidn.copy_code = cddd.copy_code 
+				and cidn.cost_item_id = cddd.cost_item_id
+				and cidn.cost_item_no = cddd.cost_item_no
+				left join hos_source hd
+				on hd.group_id = cddd.group_id
+				and hd.hos_id = cddd.hos_id 
+				and hd.source_id = cddd.source_id
+		<where>
+				    cddd.group_id = #{group_id}
+				and cddd.hos_id = #{hos_id}
+				and cddd.copy_code = #{copy_code}
+			<if test=" year_month != null and year_month != '' and e_year_month != null and e_year_month != ''">
+                and cddd.acc_year ||''|| cddd.acc_month between #{year_month} and  #{e_year_month}
+            </if>
+			<if test="dept_code != null and dept_code != ''">
+				and hdd.dept_code like #{dept_code}||'%'
+			</if>
+			
+			<if test="cost_item_code != null and cost_item_code != ''">
+				and cidn.cost_item_code like #{cost_item_code}||'%'
+			</if>
+			<if test="source_id != null and source_id != ''">
+				and cddd.source_id = #{source_id}
+			</if>
+		</where>
+	)select group_id,hos_id,copy_code,acc_year,acc_month,dept_id,dept_no,dept_code,dept_name,dept_level,
+		 item_grade,cost_item_id,cost_item_no,cost_item_code,cost_item_name,source_id,source_code,source_name,dir_amount from temp
+   union all
+   select  null,null, null,'总','计' ,null, null, null, null, null, null, null, null, null, null, null, null, null,sum(dir_amount) from temp
+   order by group_id,hos_id,copy_code,acc_year,acc_month,dept_code,cost_item_code
+    
+	</select>
+    <select id="queryCostCollectionPrint" parameterType="java.util.Map"	resultType="java.util.Map">
+		with temp as
+		(
+		SELECT
+		cddd.group_id,cddd.hos_id,cddd.copy_code,acc_year,acc_month,cddd.dept_id,cddd.dept_no,
+		hdd.dept_code,hdd.dept_name,hdd.dept_level,cidn.item_grade ,cddd.cost_item_id,cddd.cost_item_no,cidn.cost_item_code,
+		cidn.cost_item_name,cddd.source_id,hd.source_code,hd.source_name,dir_amount
+		FROM cost_dept_dri_data cddd
+		left join hos_dept_dict hdd on
+		cddd.group_id = hdd.group_id and
+		cddd.hos_id = hdd.hos_id
+		and
+		cddd.dept_id = hdd.dept_id and cddd.dept_no = hdd.dept_no
+		left join
+		cost_item_dict_no cidn on cidn.group_id = cddd.group_id and
+		cidn.hos_id = cddd.hos_id
+		and cidn.copy_code = cddd.copy_code and
+		cidn.cost_item_id =
+		cddd.cost_item_id and cidn.cost_item_no =
+		cddd.cost_item_no
+		left join hos_source hd on hd.group_id =
+		cddd.group_id and hd.hos_id =
+		cddd.hos_id and hd.source_id =
+		cddd.source_id
+		<where>
+			<if test="group_id != null and group_id != ''">
+				and cddd.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND cddd.hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				AND cddd.copy_code = #{copy_code}
+			</if>
+			<if test=" year_month != null and year_month != '' and e_year_month != null and e_year_month != ''">
+                  AND cddd.acc_year ||''|| cddd.acc_month between #{year_month} and  #{e_year_month}
+            </if>
+<!-- 			<if test="acc_year != null and acc_year != ''"> -->
+<!-- 				and cddd.acc_year = #{acc_year} -->
+<!-- 			</if> -->
+<!-- 			<if test="acc_month != null and acc_month != ''"> -->
+<!-- 				AND cddd.acc_month = #{acc_month} -->
+<!-- 			</if> -->
+			<if test="dept_id != null and dept_id != ''">
+				AND cddd.dept_id = #{dept_id}
+			</if>
+			
+			<if test="cost_item_id != null and cost_item_id != ''">
+				AND cddd.cost_item_id = #{cost_item_id}
+			</if>
+			
+			<if test="source_id != null and source_id != ''">
+				AND cddd.source_id = #{source_id}
+			</if>
+		</where>
+	)select group_id,hos_id,copy_code,acc_year,acc_month,dept_id,dept_no,dept_code,dept_name,dept_level,
+		 item_grade,cost_item_id,cost_item_no,cost_item_code,cost_item_name,source_id,source_code,source_name,dir_amount from temp
+   union all
+   select  null,null, null,'总','计' ,null, null, null, null, null, null, null, null, null, null, null, null, null,sum(dir_amount) from temp
+    
+	</select>
+    
+
+	<select id="queryCostCollectionBusiAcc" parameterType="java.util.Map"
+		resultMap="map">
+
+		SELECT
+		t.group_id, t.hos_id, t.copy_code, t.acc_year,
+		t.acc_month,t.dept_id,t.dept_no
+		, t.dept_code, t.dept_name,
+		t.cost_item_id,t.cost_item_no,t.cost_item_code, t.cost_item_name,
+		t.busi_data_source_code, t.busi_data_source_name,
+		t.source_id,t.source_code,t.source_name,
+		SUM(t.amount) AS dir_amount
+		FROM (
+		SELECT
+		coav.group_id,coav.hos_id,coav.copy_code,coav.acc_year,coav.acc_month,
+		coav.dept_id,coav.dept_no,hdd.dept_code,hdd.dept_name,coav.cost_item_id,
+		coav.cost_item_no,cido.cost_item_code,cido.cost_item_name,cbsd.busi_data_source_code,
+		cbsd.busi_data_source_name,
+		decode(hs.source_id,null,1,hs.source_id) source_id, 
+		decode(hs.source_code,null,'001',hs.source_code) source_code,
+		decode(hs.source_name,null,'自筹资金',hs.source_name) source_name, 
+		case nvl(coav.amount,0) when 0 then 0 else coav.amount end  amount
+		FROM
+		cost_out_acct_vouch coav
+		LEFT JOIN cost_item_dict_no cido
+		ON
+		coav.group_id = cido.group_id and coav.hos_id = cido.hos_id
+		and
+		coav.copy_code = cido.copy_code and coav.cost_item_id =
+		cido.cost_item_id
+		AND coav.cost_item_no = cido.cost_item_no
+		left join
+		hos_dept_dict hdd on coav.group_id = hdd.group_id and
+		coav.hos_id =
+		hdd.hos_id
+		and hdd.dept_id = coav.dept_id and hdd.dept_no =
+		coav.dept_no
+		LEFT JOIN cost_busi_sourec_dict cbsd ON
+		cbsd.busi_data_source_code =cido.busi_data_source
+		and cbsd.busi_data_source_type = '2'
+		LEFT JOIN hos_source
+		hs on cido.group_id = hs.group_id and cido.hos_id =
+		hs.hos_id and
+		hs.source_id = coav.source_id
+		<where>
+				coav.group_id = #{group_id}
+				AND coav.hos_id = #{hos_id}
+				AND coav.copy_code = #{copy_code}
+			<if test="acc_year != null and acc_year != ''">
+				AND coav.acc_year = #{acc_year}
+			</if>
+			<if test="acc_month != null and acc_month != ''">
+				AND coav.acc_month = #{acc_month}
+			</if>
+			<if test="dept_id != null and dept_id != ''">
+				AND coav.dept_id = #{dept_id}
+			</if>
+			
+			<if test="cost_item_id != null and cost_item_id != ''">
+				AND coav.cost_item_id = #{cost_item_id}
+			</if>
+			
+			<if test="source_id != null and source_id != ''">
+				AND hs.source_id = #{source_id}
+			</if>
+			 AND cbsd.busi_data_source_code = '01' 
+			 and hdd.is_stop = 0
+		</where>
+		)t
+		GROUP BY t.group_id, t.hos_id, t.copy_code, t.acc_year, t.acc_month,
+		t.dept_id,t.dept_no,t.dept_code, t.dept_name,
+		t.cost_item_id,t.cost_item_no, t.cost_item_code,
+		t.cost_item_name,t.source_id,t.source_code,t.source_name,
+		t.busi_data_source_code, t.busi_data_source_name
+
+	</select>
+
+
+	<select id="queryCostCollectionBusiTran" parameterType="java.util.Map"
+		resultMap="map">
+
+		select
+		cewd.group_id,cewd.hos_id,cewd.copy_code,cewd.acc_year,cewd.acc_month,
+		dept_id,dept_no, cidn.cost_item_id,cidn.cost_item_no, 1
+		source_id,sum(a_amount) dir_amount
+		from
+		(select
+		group_id,hos_id,copy_code,acc_year,acc_month,
+		dept_id,dept_no,emp_id,emp_no,emp_kind_code,LOWER(wage) wage, a_amount
+		from cost_emp_wage_detail unpivot
+		(a_amount for wage in (
+		   ${wageString}
+		))
+		) cewd
+		left join
+		cost_wage_detail_map cwdm
+		on cwdm.wage_column = cewd.wage
+		LEFT JOIN
+		cost_wage_cost_rela cwct
+		on cwdm.wage_code = cwct.wage_item_code
+		and
+		cwct.group_id = cewd.group_id and cwct.hos_id = cewd.hos_id
+		and cwct.copy_code = cwct.copy_code and
+		cwct.acc_year = cewd.acc_year and cwct.acc_month = cewd.acc_month
+		left join
+		cost_item_dict_no cidn
+		on cidn.group_id = cwct.group_id and cidn.hos_id
+		= cwct.hos_id
+		and cidn.copy_code = cwct.copy_code
+		and cidn.cost_item_id
+		= cwct.cost_item_id and
+		cidn.cost_item_no = cwct.cost_item_no
+		<where>
+			<if test="group_id != null and group_id != ''">
+				cewd.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND cewd.hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				AND cewd.copy_code = #{copy_code}
+			</if>
+			<if test="acc_year != null and acc_year != ''">
+				AND cewd.acc_year = #{acc_year}
+			</if>
+			<if test="acc_month != null and acc_month != ''">
+				AND cewd.acc_month = #{acc_month}
+			</if>
+			 AND cidn.busi_data_source = '02' 
+		</where>
+		group by
+		cewd.group_id,cewd.hos_id,cewd.copy_code,cewd.acc_year,cewd.acc_month,
+		dept_id,dept_no, cidn.cost_item_id,cidn.cost_item_no
+		union all
+		select
+		cebd.group_id,cebd.hos_id,cebd.copy_code,cebd.acc_year,cebd.acc_month,
+		dept_id,dept_no,cidn.cost_item_id,cidn.cost_item_no, 1
+		source_id,sum(a_amount) dir_amount
+		from
+		(select group_id,hos_id,copy_code,acc_year,acc_month,
+		dept_id,dept_no,emp_id,emp_no,emp_kind_code,LOWER(bonus) bonus,
+		a_amount
+		from cost_emp_bonus_detail unpivot
+		(a_amount for bonus in (
+		    ${bonusString}
+		))
+		)cebd
+		left join cost_bonus_detail_map cbdm
+		on cbdm.bonus_column = cebd.bonus
+		left join cost_bonus_cost_rela cbcr
+		on cbcr.bonus_item_code = cbdm.bonus_code
+		and cbcr.group_id = cebd.group_id and cbcr.hos_id = cebd.hos_id
+		and cbcr.copy_code = cebd.copy_code and
+		cbcr.acc_year = cebd.acc_year and cbcr.acc_month = cebd.acc_month
+		left join cost_item_dict_no cidn
+		on cidn.group_id = cbcr.group_id and cidn.hos_id = cbcr.hos_id
+		and cidn.copy_code = cbcr.copy_code
+		and cidn.cost_item_id = cbcr.cost_item_id and
+		cidn.cost_item_no = cbcr.cost_item_no
+		<where>
+			<if test="group_id != null and group_id != ''">
+				cebd.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND cebd.hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				AND cebd.copy_code = #{copy_code}
+			</if>
+			<if test="acc_year != null and acc_year != ''">
+				AND cebd.acc_year = #{acc_year}
+			</if>
+			<if test="acc_month != null and acc_month != ''">
+				AND cebd.acc_month = #{acc_month}
+			</if>
+			AND cidn.is_stop = '0' and cidn.busi_data_source = '02'
+		</where>
+		group by
+		cebd.group_id,cebd.hos_id,cebd.copy_code,cebd.acc_year,cebd.acc_month,
+		dept_id,dept_no, cidn.cost_item_id,cidn.cost_item_no
+		union all
+		SELECT cmd.group_id,cmd.hos_id,cmd.copy_code,cmd.acc_year,cmd.acc_month,
+		cmd.dept_id,cmd.dept_no,cmcr.cost_item_id,cmcr.cost_item_no,
+		hs.source_id,SUM(cmd.amount) dir_amount
+		from cost_material_detail cmd
+		left join cost_mate_cost_rela cmcr on cmd.group_id = cmcr.group_id
+		and cmd.hos_id = cmcr.hos_id and cmd.copy_code = cmcr.copy_code
+		and cmd.acc_year = cmcr.acc_year and cmd.acc_month = cmcr.acc_month
+		left join cost_item_dict_no cidn on cidn.group_id = cmcr.group_id
+		and cidn.hos_id = cmcr.hos_id and cidn.copy_code = cmcr.copy_code
+		and cidn.cost_item_id = cmcr.cost_item_id and cidn.cost_item_no =
+		cmcr.cost_item_no
+		left join hos_dept_dict hdd on hdd.group_id = cmd.group_id and hdd.hos_id
+		= cmd.hos_id
+		and hdd.dept_no = cmd.dept_no and hdd.dept_id = cmd.dept_id
+		left join cost_busi_sourec_dict cbsd on cbsd.busi_data_source_code =
+		cidn.busi_data_source
+		LEFT JOIN hos_source hs on cmd.group_id = hs.group_id and cmd.hos_id =
+		hs.hos_id and cmd.source_id = hs.source_id
+		<where>
+			<if test="group_id != null and group_id != ''">
+				cmd.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND cmd.hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				AND cmd.copy_code = #{copy_code}
+			</if>
+
+			<if test="acc_year != null and acc_year != ''">
+				AND cmd.acc_year = #{acc_year}
+			</if>
+			<if test="acc_month != null and acc_month != ''">
+				AND cmd.acc_month = #{acc_month}
+			</if>
+			AND cidn.is_stop = '0' AND cbsd.busi_data_source_code = '03' 
+		</where>
+		GROUP BY cmd.group_id,cmd.hos_id,cmd.copy_code,cmd.acc_year,cmd.acc_month,
+		cmd.dept_id,cmd.dept_no,cmcr.cost_item_id,cmcr.cost_item_no,
+		hs.source_id
+		union all
+		SELECT
+		cdd.group_id,cdd.hos_id,cdd.copy_code,cdd.acc_year,cdd.acc_month,
+		cdd.dept_id,cdd.dept_no,cdd.cost_item_id,cdd.cost_item_no,hs.source_id,
+		sum(cdd.amount) dir_amount
+		FROM
+		cost_drug_detail cdd
+		LEFT JOIN cost_item_dict_no cidn
+		ON cdd.group_id =
+		cidn.group_id and cdd.hos_id = cidn.hos_id
+		and cdd.copy_code =
+		cidn.copy_code and cdd.cost_item_id =
+		cidn.cost_item_id
+		AND
+		cdd.cost_item_no = cidn.cost_item_no
+		left join hos_dept_dict hdd on
+		cdd.group_id = hdd.group_id and cdd.hos_id
+		= hdd.hos_id
+		and hdd.dept_id
+		= cdd.dept_id and hdd.dept_no = cdd.dept_no
+		LEFT JOIN
+		cost_busi_sourec_dict cbsd ON cbsd.busi_data_source_code =
+		cidn.busi_data_source
+		LEFT JOIN hos_source hs on cdd.group_id =
+		hs.group_id and cdd.hos_id =
+		hs.hos_id and cdd.source_id = hs.source_id
+		<where>
+			<if test="group_id != null and group_id != ''">
+				cdd.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND cdd.hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				AND cdd.copy_code = #{copy_code}
+			</if>
+			<if test="acc_year != null and acc_year != ''">
+				AND cdd.acc_year = #{acc_year}
+			</if>
+			<if test="acc_month != null and acc_month != ''">
+				AND cdd.acc_month = #{acc_month}
+			</if>
+			
+			AND cidn.IS_STOP = 0 AND cbsd.busi_data_source_code = '07' 
+		</where>
+		group by cdd.group_id,cdd.hos_id,cdd.copy_code,cdd.acc_year,cdd.acc_month,
+		cdd.dept_id,cdd.dept_no,cdd.cost_item_id,cdd.cost_item_no,hs.source_id
+		union all
+		SELECT
+		cfd.group_id,cfd.hos_id,cfd.copy_code,cfd.acc_year,cfd.acc_month,
+		cfd.dept_id,cfd.dept_no,cfcr.cost_item_id,cfcr.cost_item_no,
+		hs.source_id,sum(cfd.depre_amount) dir_amount
+		FROM
+		cost_fasset_detail cfd
+		LEFT JOIN cost_fasset_arrt cfa
+		on cfd.group_id =
+		cfa.group_id and cfd.hos_id = cfa.hos_id
+		and cfd.copy_code =
+		cfa.copy_code and cfd.asset_id = cfa.asset_id
+		left join
+		cost_fasset_type_arrt cfta on cfta.group_id = cfa.group_id
+		and
+		cfta.hos_id = cfa.hos_id and cfta.copy_code = cfa.copy_code
+		and
+		cfta.asset_type_id = cfa.asset_type_id
+		left join cost_fasset_cost_rela
+		cfcr on cfcr.group_id = cfta.group_id
+		and cfcr.hos_id = cfta.hos_id and
+		cfcr.copy_code = cfta.copy_code
+		and cfcr.asset_type_id =
+		cfta.asset_type_id
+		left join cost_item_dict_no cidn on cidn.group_id =
+		cfcr.group_id
+		and cidn.hos_id = cfcr.hos_id and cidn.copy_code =
+		cfcr.copy_code
+		and cidn.cost_item_id = cfcr.cost_item_id and
+		cidn.cost_item_no =
+		cfcr.cost_item_no
+		left join hos_dept_dict hdd on
+		hdd.group_id = cfd.group_id and hdd.hos_id
+		= cfd.hos_id
+		and hdd.dept_no
+		= cfd.dept_no and hdd.dept_id = cfd.dept_id
+		left join
+		cost_busi_sourec_dict cbsd on cbsd.busi_data_source_code =
+		cidn.busi_data_source
+		LEFT JOIN hos_source hs on cfd.group_id =
+		hs.group_id and cfd.hos_id =
+		hs.hos_id and cfd.source_id = hs.source_id
+		<where>
+			<if test="group_id != null and group_id != ''">
+				cfd.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND cfd.hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				AND cfd.copy_code = #{copy_code}
+			</if>
+			<if test="acc_year != null and acc_year != ''">
+				AND cfd.acc_year = #{acc_year}
+			</if>
+			<if test="acc_month != null and acc_month != ''">
+				AND cfd.acc_month = #{acc_month}
+			</if>
+			AND cidn.is_stop = '0' AND cbsd.busi_data_source_code = '04' 
+		</where>
+		group by cfd.group_id,cfd.hos_id,cfd.copy_code,cfd.acc_year,cfd.acc_month,
+		cfd.dept_id,cfd.dept_no,cfcr.cost_item_id,cfcr.cost_item_no,cidn.cost_item_code,
+		hs.source_id
+		union all
+		SELECT
+		cid.group_id,cid.hos_id,cid.copy_code,cid.acc_year,cid.acc_month,
+		cid.dept_id,cid.dept_no,cfcr.cost_item_id,cfcr.cost_item_no,
+		hs.source_id,sum(cid.depre_amount) dir_amount
+		FROM
+		cost_iasset_detail cid
+		LEFT JOIN cost_iasset_arrt cia
+		on cid.group_id =
+		cia.group_id and cid.hos_id = cia.hos_id
+		and cid.copy_code =
+		cia.copy_code and cid.asset_id = cia.asset_id
+		left join
+		cost_iasset_type_arrt cita on cita.group_id = cia.group_id
+		and
+		cita.hos_id = cia.hos_id and cita.copy_code = cia.copy_code
+		and
+		cita.asset_type_id = cia.asset_type_id
+		left join cost_iasset_cost_rela
+		cfcr on cfcr.group_id = cita.group_id
+		and cfcr.hos_id = cita.hos_id and
+		cfcr.copy_code = cita.copy_code
+		and cfcr.asset_type_id =
+		cita.asset_type_id
+		left join cost_item_dict_no cidn on cidn.group_id =
+		cfcr.group_id
+		and cidn.hos_id = cfcr.hos_id and cidn.copy_code =
+		cfcr.copy_code
+		and cidn.cost_item_id = cfcr.cost_item_id and
+		cidn.cost_item_no =
+		cfcr.cost_item_no
+		left join hos_dept_dict hdd on
+		hdd.group_id = cid.group_id and hdd.hos_id
+		= cid.hos_id
+		and hdd.dept_no
+		= cid.dept_no and hdd.dept_id = cid.dept_id
+		left join
+		cost_busi_sourec_dict cbsd on cbsd.busi_data_source_code =
+		cidn.busi_data_source
+		LEFT JOIN hos_source hs on cid.group_id =
+		hs.group_id and cid.hos_id =
+		hs.hos_id and cid.source_id = hs.source_id
+		<where>
+			<if test="group_id != null and group_id != ''">
+				cid.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND cid.hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				AND cid.copy_code = #{copy_code}
+			</if>
+			<if test="acc_year != null and acc_year != ''">
+				AND cid.acc_year = #{acc_year}
+			</if>
+			<if test="acc_month != null and acc_month != ''">
+				AND cid.acc_month = #{acc_month}
+			</if>
+			AND cidn.is_stop = '0' AND cbsd.busi_data_source_code = '05' 
+		</where>
+		group by cid.group_id,cid.hos_id,cid.copy_code,cid.acc_year,cid.acc_month,
+		cid.dept_id,cid.dept_no,cfcr.cost_item_id,cfcr.cost_item_no,
+		hs.source_id
+		
+		union all
+		
+			SELECT
+		crd.group_id,crd.hos_id,crd.copy_code,crd.acc_year,crd.acc_month,
+		crd.dept_id,crd.dept_no,crd.cost_item_id,crd.cost_item_no,
+		hs.source_id,sum(crd.amount) dir_amount
+		FROM
+		cost_risk_detail crd
+		LEFT JOIN cost_item_dict_no cidn
+		ON crd.group_id =
+		cidn.group_id and crd.hos_id = cidn.hos_id
+		and crd.copy_code =
+		cidn.copy_code and crd.cost_item_id =
+		cidn.cost_item_id
+		AND
+		crd.cost_item_no = cidn.cost_item_no
+		left join hos_dept_dict hdd on
+		crd.group_id = hdd.group_id and crd.hos_id
+		= hdd.hos_id
+		and hdd.dept_id
+		= crd.dept_id and hdd.dept_no = crd.dept_no
+		LEFT JOIN
+		cost_busi_sourec_dict cbsd ON cbsd.busi_data_source_code =
+		cidn.busi_data_source
+		LEFT JOIN hos_source hs on crd.group_id =
+		hs.group_id and crd.hos_id =
+		hs.hos_id and crd.source_id = hs.source_id
+		<where>
+			<if test="group_id != null and group_id != ''">
+				crd.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND crd.hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				AND crd.copy_code = #{copy_code}
+			</if>
+			<if test="acc_year != null and acc_year != ''">
+				AND crd.acc_year = #{acc_year}
+			</if>
+			<if test="acc_month != null and acc_month != ''">
+				AND crd.acc_month = #{acc_month}
+			</if>
+			AND cidn.IS_STOP = 0 AND cbsd.busi_data_source_code = '06' 
+		</where>
+		group by 
+		crd.group_id,crd.hos_id,crd.copy_code,crd.acc_year,crd.acc_month,
+		crd.dept_id,crd.dept_no,crd.cost_item_id,crd.cost_item_no,
+		hs.source_id
+		union all
+		
+		SELECT
+		cod.group_id,cod.hos_id,cod.copy_code,cod.acc_year,cod.acc_month,
+		cod.dept_id,cod.dept_no,cod.cost_item_id,cod.cost_item_no,
+		hs.source_id,sum(cod.amount) dir_amount
+		FROM
+		cost_ohter_detail cod
+		LEFT JOIN cost_item_dict_no cidn
+		ON cod.group_id =
+		cidn.group_id and cod.hos_id = cidn.hos_id
+		and cod.copy_code =
+		cidn.copy_code and cod.cost_item_id =
+		cidn.cost_item_id
+		AND
+		cod.cost_item_no = cidn.cost_item_no
+		left join hos_dept_dict hdd on
+		cod.group_id = hdd.group_id and cod.hos_id
+		= hdd.hos_id
+		and hdd.dept_id
+		= cod.dept_id and hdd.dept_no = cod.dept_no
+		LEFT JOIN
+		cost_busi_sourec_dict cbsd ON cbsd.busi_data_source_code =
+		cidn.busi_data_source
+		LEFT JOIN hos_source hs on cod.group_id =
+		hs.group_id and cod.hos_id =
+		hs.hos_id and cod.source_id = hs.source_id
+		<where>
+			<if test="group_id != null and group_id != ''">
+				cod.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND cod.hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				AND cod.copy_code = #{copy_code}
+			</if>
+			<if test="acc_year != null and acc_year != ''">
+				AND cod.acc_year = #{acc_year}
+			</if>
+			<if test="acc_month != null and acc_month != ''">
+				AND cod.acc_month = #{acc_month}
+			</if>
+			AND cidn.IS_STOP = 0 AND cbsd.busi_data_source_code = '08' 
+		</where>
+		group by cod.group_id,cod.hos_id,cod.copy_code,cod.acc_year,cod.acc_month,
+		cod.dept_id,cod.dept_no,cod.cost_item_id,cod.cost_item_no,
+		hs.source_id
+	</select>
+	
+	
+	
+	<select id = "queryCostCollectionWage" parameterType="java.util.Map"
+		resultType="java.lang.String">
+	
+	
+	     select to_char(wm_concat(column_name)) wage from user_tab_columns where table_name='COST_EMP_WAGE_DETAIL' AND column_name LIKE  'WAGE%'
+	
+	
+	</select>
+	
+	
+		
+	<select id = "queryCostCollectionBonus" parameterType="java.util.Map"
+		resultType="java.lang.String">
+	
+	
+	      select  to_char(wm_concat(column_name)) bonus from user_tab_columns where table_name='COST_EMP_BONUS_DETAIL' AND column_name LIKE  'BONUS%'
+	
+	
+	</select>
+	
+	<select id="queryCostCollectionPrmHead" parameterType="java.util.Map" resultType="java.util.Map">
+	       select cidn.group_id,
+				  cidn.hos_id,
+				  cidn.copy_code,
+				  cidn.cost_item_id,
+				  cidn.cost_item_no,
+				  cidn.cost_item_code,
+				  cidn.cost_item_name,
+				  cidn.is_last,
+				  cidn.item_grade
+		from cost_item_dict_no cidn
+		where cidn.group_id = #{group_id}
+		and cidn.hos_id = #{hos_id}
+		and cidn.copy_code = #{copy_code}
+		<if test="item_grade != null and item_grade != ''">
+		 and  cidn.item_grade = #{item_grade}
+		</if>
+		<if test="item_grade == null or item_grade == ''">
+		 and  cidn.is_last = 1
+		</if>
+		order by cidn.group_id,cidn.hos_id,cidn.copy_code,cidn.cost_item_code
+	</select>
+	
+	<select id="queryCostCollectionPrm" parameterType="java.util.Map"
+		resultType="java.util.Map">
+		with temp as
+		(
+				select
+				  cddd.group_id,
+				  cddd.hos_id,
+				  cddd.copy_code,
+				  cddd.dept_id,
+				  cddd.dept_no,
+				  hdd.dept_code,
+				  hdd.dept_name,
+				  hdd.dept_level,
+				  cddd.cost_item_id,
+				  cddd.cost_item_no,
+				  cidn.cost_item_code,
+				  cidn.cost_item_name,
+				  cddd.source_id,
+				  hd.source_code,
+				  hd.source_name,
+				  dir_amount
+				FROM cost_dept_dri_data cddd
+				left join hos_dept_dict hdd
+				on cddd.group_id = hdd.group_id
+			    and cddd.hos_id = hdd.hos_id
+				and cddd.dept_id = hdd.dept_id
+			    and cddd.dept_no = hdd.dept_no
+				left join cost_item_dict_no cidn 
+				on cidn.group_id = cddd.group_id
+				and cidn.hos_id = cddd.hos_id
+				and cidn.copy_code = cddd.copy_code
+				and cidn.cost_item_id = cddd.cost_item_id
+			    and cidn.cost_item_no = cddd.cost_item_no
+				left join hos_source hd 
+				on hd.group_id = cddd.group_id
+				and hd.hos_id = cddd.hos_id 
+				and hd.source_id = cddd.source_id
+		<where>
+				and cddd.group_id = #{group_id}
+				and cddd.hos_id = #{hos_id}
+				and cddd.copy_code = #{copy_code}
+			<if test=" year_month != null and year_month != '' and e_year_month != null and e_year_month != ''">
+                and cddd.acc_year ||''|| cddd.acc_month between #{year_month} and  #{e_year_month}
+            </if>
+			<if test="dept_code != null and dept_code != ''">
+				and hdd.dept_code like #{dept_code}||'%'
+			</if>
+			   and hdd.is_stop = 0 and cidn.is_stop = 0  
+			   and to_char(hdd.dept_id) in (
+				select b.perm_code
+				from v_user_data_perm b
+				where b.group_id = #{group_id}
+					and b.hos_id = #{hos_id}
+					and b.user_id = #{user_id}
+					and b.table_code = 'HOS_DEPT_DICT'
+					and (b.is_write = 1
+						or b.is_read = 1)
+			)
+		</where>
+		   
+	)select group_id,hos_id,copy_code,dept_id,dept_no,dept_code,dept_name,dept_level
+	 <foreach collection="prm" item="item" index="index" separator="  " >
+				  <!-- , sum(decode(cost_item_code, '${item.COST_ITEM_CODE}', dir_amount, null)) as c_${item.COST_ITEM_CODE} -->
+		 ,sum(decode(INSTR(cost_item_code,'${item.COST_ITEM_CODE}'),1, dir_amount, 0)) as c_${item.COST_ITEM_CODE}  
+	 </foreach>
+	  <if test="prm.size() > 0">
+	     ,
+	 </if>
+	  <foreach collection="prm" item="item" index="index" separator="+" >
+		 sum(decode(INSTR(cost_item_code,'${item.COST_ITEM_CODE}'),1, dir_amount, 0)) 
+	 </foreach> 
+	  <if test="prm.size() > 0">
+	      total
+	 </if>
+	
+		from temp 
+		group by group_id,hos_id,copy_code,dept_id,dept_no,dept_code,dept_name,dept_level
+	   union all
+	   select  null,null, null,null, null, '合计', null, null
+	 <foreach collection="prm" item="item" index="index" separator="  " >
+				  <!-- , sum(decode(cost_item_code, '${item.COST_ITEM_CODE}', dir_amount, null)) as c_${item.COST_ITEM_CODE} -->
+		,sum(decode(INSTR(cost_item_code,'${item.COST_ITEM_CODE}'),1, dir_amount, 0)) as c_${item.COST_ITEM_CODE}
+	 </foreach> 
+	 <if test="prm.size() > 0">
+	     ,
+	 </if>
+	  <foreach collection="prm" item="item" index="index" separator="+" >
+		 sum(decode(INSTR(cost_item_code,'${item.COST_ITEM_CODE}'),1, dir_amount, 0))  
+	 </foreach> 
+	 <if test="prm.size() > 0">
+	      total
+	 </if>
+
+	 from temp
+	   	order by  group_id,hos_id,copy_code,dept_code
+	</select>
+</mapper>
+

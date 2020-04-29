@@ -1,0 +1,284 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.budg.dao.business.purchase.BugetMapper">
+	
+	<resultMap id="buget" type="com.chd.hrp.budg.entity.Buget">
+	<result property="ass_type_id" column="ass_type_id"/>
+	<result property="ass_type_name" column="ass_type_name"/>
+	<result property="group_id" column="group_id"/>
+	<result property="hos_id" column="hos_id"/>
+	<result property="copy_code" column="copy_code"/>
+	<result property="budg_year" column="budg_year"/>
+	<result property="month" column="month"/>
+	<result property="source_id" column="source_id"/>
+	<result property="source_code" column="source_code"/>
+	<result property="source_name" column="source_name"/>
+	<result property="year_plan_amount" column="year_plan_amount"/>
+	<result property="add_plan_amount" column="add_plan_amount"/>
+	<result property="pur_budg" column="pur_budg"/>
+	</resultMap>
+	<resultMap id="bugetMap" type="java.util.Map">
+	<result property="ass_type_id" column="ass_type_id"/>
+	<result property="ass_type_name" column="ass_type_name"/>
+	<result property="group_id" column="group_id"/>
+	<result property="hos_id" column="hos_id"/>
+	<result property="copy_code" column="copy_code"/>
+	<result property="budg_year" column="budg_year"/>
+	<result property="month" column="month"/>
+	<result property="source_id" column="source_id"/>
+	<result property="source_code" column="source_code"/>
+	<result property="source_name" column="source_name"/>
+	<result property="year_plan_amount" column="year_plan_amount"/>
+	<result property="add_plan_amount" column="add_plan_amount"/>
+	<result property="pur_budg" column="pur_budg"/>
+	</resultMap>
+	<insert id="add" useGeneratedKeys="true" >
+	
+		INSERT INTO BUDG_ASSET_PURCHASE (
+			group_id,
+			hos_id,
+			copy_code,
+			budg_year,
+			month,
+			source_id,
+			ass_type_id,
+			year_plan_amount,
+			add_plan_amount,
+			pur_budg,
+		) VALUES (
+			#{group_id,jdbcType=INTEGER}
+			,
+			#{hos_id,jdbcType=INTEGER}
+			,
+			#{copy_code,jdbcType=VARCHAR}
+			,
+			#{budg_year,jdbcType=VARCHAR}
+			,
+			#{month,jdbcType=VARCHAR}
+			,
+			#{source_id,jdbcType=INTEGER}
+			,
+			#{ass_type_id,jdbcType=INTEGER}
+			,
+			#{year_plan_amount,jdbcType=INTEGER}
+			,
+			#{add_plan_amount,jdbcType=INTEGER}
+			,
+			#{pur_budg,jdbcType=INTEGER}
+		)
+	
+	</insert>
+	<insert id="addBatch" parameterType="java.util.List" >
+	
+		INSERT INTO BUDG_ASSET_PURCHASE (
+			group_id,
+			hos_id,
+			copy_code,
+			budg_year,
+			month,
+			source_id,
+			ass_type_id,
+			year_plan_amount,
+			add_plan_amount,
+			pur_budg
+		)
+		<foreach collection="list" item="item" index="index" separator=" union all " >
+			select 		
+			#{item.group_id,jdbcType=INTEGER},
+			#{item.hos_id,jdbcType=INTEGER},
+			#{item.copy_code,jdbcType=VARCHAR},
+			#{item.budg_year,jdbcType=VARCHAR},
+			#{item.month,jdbcType=VARCHAR},
+			#{item.source_id,jdbcType=INTEGER},
+			#{item.ass_type_id,jdbcType=INTEGER},
+			#{item.year_plan_amount,jdbcType=INTEGER},
+			#{item.add_plan_amount,jdbcType=INTEGER},
+			#{item.pur_budg,jdbcType=INTEGER}			
+		    from dual
+		</foreach>
+	</insert>
+	
+	<update id="update" parameterType="java.util.Map">
+	</update>
+	
+	<update id="updateBatch" parameterType="java.util.List">
+	</update>
+	
+	<delete id="deleteBatch" parameterType="java.util.List">
+		DELETE FROM BUDG_ASSET_PURCHASE 
+		WHERE
+			<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+				group_id = #{item.group_id,jdbcType=INTEGER}
+				AND hos_id = #{item.hos_id,jdbcType=INTEGER}
+				AND copy_code = #{item.copy_code,jdbcType=VARCHAR}
+				AND budg_year = #{item.budg_year,jdbcType=VARCHAR}
+				AND source_id = #{item.source_id,jdbcType=INTEGER}
+				AND ass_type_id = #{item.ass_type_id,jdbcType=INTEGER}
+			</foreach>
+	</delete>
+	
+	<select id="query" parameterType="java.util.Map" resultMap="bugetMap" >
+		select group_id,hos_id, copy_code, '合计' budg_year,null month,null source_id,null ass_type_id, 
+		  nvl(sum(year_plan_amount),0) year_plan_amount ,  nvl(sum(add_plan_amount),0) add_plan_amount , nvl(sum(pur_budg),0) pur_budg ,null source_name, null ass_type_name
+		 from BUDG_ASSET_PURCHASE 
+		 where 
+			group_id = #{group_id,jdbcType=INTEGER}
+		    AND hos_id = #{hos_id,jdbcType=INTEGER}
+		    AND copy_code = #{copy_code,jdbcType=VARCHAR}
+		    <if test="budg_year != null and budg_year != ''">
+			AND budg_year = #{budg_year,jdbcType=VARCHAR}
+		    </if>
+		    <if test="source_id != null and source_id != ''">
+			AND source_id = #{source_id,jdbcType=INTEGER}
+		    </if>
+		    <if test="ass_type_id != null and ass_type_id != ''">
+			AND ass_type_id = #{ass_type_id,jdbcType=INTEGER}
+		    </if>
+		     group by  group_id,hos_id, copy_code, budg_year
+		union all     
+		select 
+			p.group_id, 
+			p.hos_id, 
+			p.copy_code, 
+			p.budg_year,
+			p.month,
+			p.source_id, 
+			p.ass_type_id, 
+			p.year_plan_amount, 
+			p.add_plan_amount, 
+			p.pur_budg,
+			o.source_name,
+			i.ass_type_name
+	    from BUDG_ASSET_PURCHASE p
+		LEFT JOIN HOS_SOURCE o 
+		ON p.group_id = o.group_id 
+		   and p.hos_id = o.hos_id 
+		   and p.source_id = o.source_id 
+		   and o.is_stop=0
+		LEFT JOIN ass_type_dict i 
+		ON p.group_id = i.group_id
+		   and p.hos_id = i.hos_id
+		   and p.copy_code = i.copy_code
+		   and p.ass_type_id = i.ass_type_id
+		   and i.is_stop = 0
+      where 
+		   p.group_id = #{group_id,jdbcType=INTEGER}
+		   AND p.hos_id = #{hos_id,jdbcType=INTEGER}
+		   AND p.copy_code = #{copy_code,jdbcType=VARCHAR}
+		   <if test="budg_year != null and budg_year != ''">
+			AND p.budg_year = #{budg_year,jdbcType=VARCHAR}
+		   </if>
+		   <if test="source_id != null and source_id != ''">
+			AND p.source_id = #{source_id,jdbcType=INTEGER}
+		   </if>
+		   <if test="ass_type_id != null and ass_type_id != ''">
+			AND p.ass_type_id = #{ass_type_id,jdbcType=INTEGER}
+		   </if>
+	</select>
+	
+	<!-- 	删除所生成年份数据   生成功能使用  勿动 -->
+	<delete id="delete" parameterType="java.util.Map">
+		DELETE FROM BUDG_ASSET_PURCHASE 
+		WHERE   
+			group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND budg_year = #{budg_year,jdbcType=VARCHAR}
+	</delete>
+	<!-- 生成 -->
+	<select id="copyBuget" parameterType="java.util.Map" resultMap="bugetMap">
+		with temp as (
+		  select apd.group_id ,apd.hos_id, apd.copy_code,apdd.plan_id,apdd.plan_detail_id,apdd.plan_no,apdd.ass_id,
+			apdd.ass_no,apd.plan_year, case when apdd.need_date is null then '06' else to_char(apdd.need_date,'mm') end month,
+			sum(apdd.advice_price*apdd.plan_amount) year_plan_amount
+		  from ass_plan_dept apd
+		  left join ass_plan_dept_detail apdd
+		    on apd.group_id = apdd.group_id
+		   and apd.hos_id = apdd.hos_id
+		   and apd.copy_code = apdd.copy_code
+		   and apd.plan_id = apdd.plan_id
+		   and apd.plan_no = apdd.plan_no
+		 where 
+		 	apd.group_id = #{group_id,jdbcType=INTEGER}
+			AND apd.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND apd.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND apd.plan_year = #{budg_year,jdbcType=VARCHAR}
+		    AND apd.is_add = 0
+		    AND apd.state = 1
+		group by apd.group_id ,apd.hos_id, apd.copy_code,apdd.plan_id,apdd.plan_detail_id,apdd.plan_no,apdd.ass_id,
+		apdd.ass_no,apd.plan_year,apdd.need_date,apd.is_add),
+		
+		 temp2 as (select apd.group_id ,apd.hos_id, apd.copy_code,apdd.plan_id,apdd.plan_detail_id,apdd.plan_no,apdd.ass_id,apdd.ass_no, 
+		apd.plan_year, case when apdd.need_date is null then '06' else to_char(apdd.need_date,'mm') end month,
+		sum(apdd.advice_price*apdd.plan_amount) add_plan_amount
+		
+		  from ass_plan_dept apd
+		  left join ass_plan_dept_detail apdd
+		    on apd.group_id = apdd.group_id
+		   and apd.hos_id = apdd.hos_id
+		   and apd.copy_code = apdd.copy_code
+		   and apd.plan_id = apdd.plan_id
+		   and apd.plan_no = apdd.plan_no
+		 where 
+		 	apd.group_id = #{group_id,jdbcType=INTEGER}
+			AND apd.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND apd.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND apd.plan_year = #{budg_year,jdbcType=VARCHAR}
+		    AND apd.is_add = 1
+		    AND apd.state = 1
+		group by apd.group_id ,apd.hos_id, apd.copy_code,apdd.plan_id,apdd.plan_detail_id,apdd.plan_no,apdd.ass_id,
+		apdd.ass_no,apd.plan_year,apdd.need_date,apd.is_add)
+		
+		select 
+			t1.group_id ,t1.hos_id, 
+			t1.copy_code,
+			t1.plan_year budg_year, 
+			t1.month,
+			apr.source_id,
+			b.ass_type_id,
+			sum(nvl(t1.year_PLAN_AMOUNT,0)) year_plan_amount, 
+			sum(nvl(t2.add_plan_amount,0)) add_plan_amount ,
+			sum(nvl(t1.year_plan_amount,0)) + sum(nvl(t2.add_plan_amount,0)) pur_budg
+		FROM temp t1 
+		LEFT JOIN temp2 t2 
+		ON 
+			t1.group_id = t2.group_id 
+			and t1.hos_id = t2.hos_id 
+			and t1.copy_code = t2.copy_code 
+			and t1.plan_id = t2.plan_id
+			and t1.plan_detail_id = t2.plan_detail_id 
+			and t1.plan_no = t2.plan_no 
+			and t1.ass_id = t2.ass_id 
+			and t1.ass_no = t2.ass_no 
+			and t1.plan_year = t2.plan_year 
+			and t1.month = t2.month
+		 LEFT JOIN ass_plan_resource apr
+		 ON 
+		    t1.group_id = apr.group_id
+		    and t1.hos_id = apr.hos_id
+		    and t1.copy_code = apr.copy_code
+		    and t1.plan_id = apr.plan_id
+		    and t1.plan_detail_id = apr.plan_detail_id
+		    and t1.plan_no = apr.plan_no
+		 LEFT JOIN ass_no_dict a
+		 ON 
+		 	t1.group_id = a.group_id 
+		  	and t1.hos_id = a.hos_id
+		  	and t1.copy_code = a.copy_code
+		  	and t1.ass_id = a.ass_id
+		  	and t1.ass_no = a.ass_no
+		 LEFT JOIN ass_type_dict b
+		 ON 
+		 	a.group_id = b.group_id
+		  	and a.hos_id = b.hos_id
+		  	and a.copy_code = b.copy_code
+		  	and a.ass_type_id = b.ass_type_id
+		 where 
+	    	t1.group_id = #{group_id,jdbcType=INTEGER}
+			AND t1.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND t1.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND t1.plan_year = #{budg_year,jdbcType=VARCHAR}
+		group by t1.group_id ,t1.hos_id, t1.copy_code,t1.plan_year, t1.month,apr.source_id,b.ass_type_id
+	</select>
+</mapper>
+

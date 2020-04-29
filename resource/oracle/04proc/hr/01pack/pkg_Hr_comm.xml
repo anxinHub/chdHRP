@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+	<sql id="pkg_com" type="proc"><![CDATA[
+		CREATE OR REPLACE PACKAGE PKG_HR_COMM AS
+
+   /*-------------------------------------------------------------------------*/
+   /* 变量声明区                                                              */
+   /*-------------------------------------------------------------------------*/
+   def_OK                    CONSTANT NUMBER      := 0;            -- 成功
+   def_ERR                   CONSTANT NUMBER      := -1 ;          -- 系统错误
+   def_WARNING               CONSTANT NUMBER      := 100;          -- 系统警告
+
+    TYPE ty_row_str_split IS RECORD (strValue VARCHAR2 (4000));
+    
+    TYPE ty_tbl_str_split IS TABLE OF ty_row_str_split INDEX BY BINARY_INTEGER;
+
+
+    /* 
+   || 函数名称 ：fun_ReplaceFunStr_HR(人力专用)
+   || 功能描述 ：根据传入的字符串将函数全部替换为值，当计算出错时返回原串
+   || 参数描述 ：参数标识           名称        输入/输出  类型
+   ||            -------------------------------------------------------------
+   ||            prm_group_id       集团             IN           NUMBER
+   ||            prm_hos_id         医院             IN           NUMBER
+   ||            prm_mod_code       模块编码         IN           VARCHAR2
+   ||            prm_InputStr       输入字符串       IN           VARCHAR2
+   || 返 回 值 ：                   字符串           OUT          VARCHAR2
+   ||
+   || 作    者 ：               完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：
+   ||-------------------------------------------------------------------------*/
+   FUNCTION fun_ReplaceFunStr_HR( prm_group_id          IN   NUMBER         --集团
+                              ,prm_hos_id            IN   NUMBER         --医院
+                              ,prm_mod_code          IN   VARCHAR2       --模块编码
+                              ,prm_InputStr          IN   VARCHAR2       --输入字符串
+                              )  RETURN VARCHAR2 ;              
+END PKG_HR_COMM;
+		
+	]]></sql>
+	
+	<sql id="pkg_body_com" type="proc"><![CDATA[
+	create or replace package body PKG_HR_COMM AS
+
+   /*-------------------------------------------------------------------------*/
+   /* 私有全局常量声明                                                        */
+   /*-------------------------------------------------------------------------*/
+
+   /*-------------------------------------------------------------------------
+   || 函数名称 ：fun_cal_num
+   || 功能描述 ：计算要拆分字符串数量
+   || 参数描述 ：参数标识          名称             输入/输出    类型
+   ||            -------------------------------------------------------------
+   ||            prm_InputStr        字符串           IN           VARCHAR2
+   ||            prm_Split           分割符           IN           VARCHAR2
+   ||
+   || 返 回 值 ：                    总数量           OUT           NUMBER
+   ||
+   || 作    者 ：           完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：           修改日期：
+   ||-------------------------------------------------------------------------*/
+
+   
+   /*-------------------------------------------------------------------------
+   || 函数名称 ：fun_ReplaceFunStr_HR(人力专用)
+   || 功能描述 ：根据传入的字符串将函数全部替换为值，当计算出错时返回原串
+   || 参数描述 ：参数标识           名称        输入/输出  类型
+   ||            -------------------------------------------------------------
+   ||            prm_group_id       集团             IN           NUMBER
+   ||            prm_hos_id         医院             IN           NUMBER
+   ||            prm_mod_code       模块编码         IN           VARCHAR2
+   ||            prm_InputStr       输入字符串       IN           VARCHAR2
+   || 返 回 值 ：                   字符串           OUT          VARCHAR2
+   ||
+   || 作    者 ：               完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：
+   ||-------------------------------------------------------------------------*/
+     FUNCTION fun_ReplaceFunStr_HR( prm_group_id          IN   NUMBER         --集团
+                              ,prm_hos_id            IN   NUMBER         --医院
+                              ,prm_mod_code          IN   VARCHAR2       --模块编码
+                              ,prm_InputStr          IN   VARCHAR2       --输入字符串
+                              )
+   RETURN VARCHAR2
+   IS
+     v_bef_str  varchar2(4000);
+     v_aft_str  varchar2(4000);
+     v_str_ori  varchar2(4000);
+     v_tem_str  varchar2(4000);
+     v_cal_str  varchar2(4000);
+     v_fun_name varchar2(4000);
+     v_fun_value varchar2(4000);
+     v_pos_beg  integer;
+     v_pos_end  integer;
+   BEGIN
+      v_str_ori  :=  prm_InputStr;
+
+      for rec in( select ELE_CODE
+                    from REP_DEFINE_ELE
+                   where group_id  = prm_group_id
+                     and hos_ID    = prm_hos_id
+                
+                     and (   (prm_mod_code = 'ALL' )
+                          or (prm_mod_code <> 'ALL' and  mod_code  = prm_mod_code)
+                         )
+
+                 ) LOOP
+
+        --获取函数名
+        v_fun_name :=  Upper(rec.ele_code);
+
+
+        LOOP
+          v_pos_beg :=   0 ;
+          v_pos_end :=   0 ;
+
+          --查询找函数名称
+          select instr(v_str_ori,v_fun_name||'(')
+            into v_pos_beg
+           from dual;
+
+          --未找到要替换的函数名，退出循环
+          if v_pos_beg = 0 then
+             exit;
+          end if ;
+
+
+          v_bef_str := substr(v_str_ori,1,v_pos_beg-1);
+          v_tem_str := substr(v_str_ori,v_pos_beg,length(v_str_ori)- v_pos_beg+1);
+
+          --获取函数计算串
+          select instr(v_tem_str,''')')
+            into v_pos_end
+           from dual;
+
+          v_cal_str :=  substr(v_tem_str,1,v_pos_end+1);
+
+          --计算函数计算
+          execute immediate 'select' || CHR(32) ||v_cal_str || CHR(32)||'from dual' into v_fun_value ;
+
+          v_aft_str :=  substr(v_tem_str,v_pos_end+2,length(v_tem_str)- v_pos_end);
+
+          v_str_ori := replace(v_str_ori,v_cal_str,to_char(v_fun_value));
+        END LOOP;
+      END LOOP;
+      return v_str_ori;
+
+   EXCEPTION
+      WHEN OTHERS THEN
+         return prm_InputStr;
+   END fun_ReplaceFunStr_HR;
+end PKG_HR_COMM;
+            
+            ]]></sql>
+
+</root>
+            

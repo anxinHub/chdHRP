@@ -1,0 +1,220 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.htc.dao.task.readydata.deptcost.HtcTaskProjectCostDeptCostMapper">
+ 
+	<resultMap id="htcTaskProjectCostDept" type="com.chd.hrp.htc.entity.task.readydata.deptcost.HtcTaskProjectCostDeptCost">
+		 <result property="group_id" column="group_id" />
+		 <result property="hos_id" column="hos_id" />
+		 <result property="copy_code" column="copy_code" />
+		 <result property="acc_year" column="acc_year" />
+		 <result property="acc_month" column="acc_month" />
+		 <result property="plan_code" column="plan_code" />
+		 <result property="plan_name" column="plan_name" />
+		 <result property="proj_dept_id" column="proj_dept_id" />
+		 <result property="proj_dept_no" column="proj_dept_no" />
+		 <result property="proj_dept_code" column="proj_dept_code" />
+		 <result property="proj_dept_name" column="proj_dept_name" />
+		 <result property="cost_item_id" column="cost_item_id" />
+		 <result property="cost_item_no" column="cost_item_no" />
+		 <result property="cost_item_code" column="cost_item_code" />
+		 <result property="cost_item_name" column="cost_item_name" />
+		 <result property="tot_amount" column="tot_amount" />
+		 <result property="prime_amount" column="prime_amount" />
+		 <result property="pub_amount" column="pub_amount" />
+		 <result property="man_amount" column="man_amount" />
+		 <result property="ass_amount" column="ass_amount" />
+		 <result property="source_id" column="source_id" />
+		 <result property="source_code" column="source_code" />
+		 <result property="source_name" column="source_name" />
+	</resultMap>
+	
+	<insert id="disposeHtcTaskProjectCostDeptCost" parameterType="java.util.Map">
+	           begin 
+		
+				     delete htc_dept_cost
+				       where group_id = #{group_id}
+				       and hos_id = #{hos_id}
+				       and copy_code = #{copy_code}
+				       and acc_year = #{acc_year}
+				       and plan_code = #{plan_code};
+				       
+						 insert into htc_dept_cost
+							(group_id,
+							 hos_id,
+							 copy_code,
+							 acc_year,
+							 acc_month,
+							 plan_code,
+							 proj_dept_id,
+							 proj_dept_no,
+							 cost_item_id,
+							 cost_item_no,
+							 tot_amount,
+							 prime_amount,
+							 pub_amount,
+							 man_amount,
+							 ass_amount,
+							 source_id) 
+					 with proj_dept as
+								(select  
+										hps.group_id, 
+										hps.hos_id,
+										hps.copy_code,
+										hps.plan_code,
+										hdr.dept_id, 
+										hpdd.proj_dept_id,
+										hpdd.proj_dept_no,
+										hps.start_month,
+										hps.end_month
+									from htc_plan_set hps
+									left join htc_plan_dept hpd
+										on hps.group_id = hpd.group_id
+									 and hps.hos_id = hpd.hos_id
+									 and hps.copy_code = hpd.copy_code
+									 and hps.acc_year = hpd.acc_year
+									 and hps.plan_code = hpd.plan_code
+									left join htc_dept_rela hdr
+										on hdr.group_id = hps.group_id
+									 and hdr.hos_id = hps.hos_id
+									 and hdr.copy_code = hps.copy_code
+									 and hdr.acc_year = hps.acc_year
+									 and hdr.plan_code = hps.plan_code
+									 and hdr.proj_dept_id = hpd.proj_dept_id
+									left join htc_proj_dept_dict hpdd
+										on hdr.group_id = hpdd.group_id
+									 and hdr.hos_id = hpdd.hos_id
+									 and hdr.copy_code = hpdd.copy_code
+									 and hdr.proj_dept_id = hpdd.proj_dept_id
+								 where hps.group_id = #{group_id}
+									 and hps.hos_id = #{hos_id}
+									 and hps.copy_code = #{copy_code}
+									 and hps.acc_year = #{acc_year}
+									 and hps.plan_code = #{plan_code}
+									 and hpdd.is_disable = 0
+								)
+										select 
+											hdcd.group_id,
+											hdcd.hos_id,
+											hdcd.copy_code,
+											hdcd.acc_year,
+											hdcd.acc_month,
+											pd.plan_code,
+											pd.proj_dept_id,
+											pd.proj_dept_no,
+											hdcd.cost_item_id,
+											hdcd.cost_item_no,
+											sum(hdcd.tot_amount) tot_amount,
+											sum(hdcd.prime_amount)prime_amount,
+											sum(hdcd.pub_amount) pub_amount,
+											sum(hdcd.man_amount) man_amount,
+											sum(hdcd.ass_amount) ass_amount,
+											hdcd.source_id
+										from htc_dept_cost_data  hdcd
+										inner join proj_dept pd
+										on hdcd.group_id = pd.group_id
+										and hdcd.hos_id = pd.hos_id
+										and hdcd.copy_code = pd.copy_code
+										and hdcd.dept_id = pd.dept_id
+										where hdcd.group_id = #{group_id}
+										and hdcd.hos_id = #{hos_id}
+										and hdcd.copy_code = #{copy_code}
+										and hdcd.acc_year = #{acc_year}
+										and hdcd.acc_month between  pd.start_month and pd.end_month
+								group by  hdcd.group_id,
+													hdcd.hos_id,
+													hdcd.copy_code,
+													hdcd.acc_year,
+													hdcd.acc_month,
+													pd.plan_code,
+													pd.proj_dept_id,
+													pd.proj_dept_no,
+													hdcd.cost_item_id,
+													hdcd.cost_item_no,
+													hdcd.source_id;
+					end;
+	  
+	</insert>
+	
+	<select id = "queryHtcTaskProjectCostDeptCost" parameterType="java.util.Map" resultMap="htcTaskProjectCostDept">
+	              select   hdc.group_id,
+					       hdc.hos_id,
+					       hdc.copy_code,
+					       decode(grouping(hdc.acc_year), 1, '合', hdc.acc_year) acc_year,
+		                   decode(grouping(hdc.acc_month), 1, '计', hdc.acc_month) acc_month,
+					       hdc.plan_code,
+						   hps.plan_name,
+					       hdc.proj_dept_id,
+					       hdc.proj_dept_no,
+					       hpdd.proj_dept_code,
+			               hpdd.proj_dept_name,
+					       hdc.cost_item_id,
+					       hdc.cost_item_no,
+						   cidn.cost_item_code,
+						   cidn.cost_item_name,
+					       sum(hdc.tot_amount) tot_amount,
+					       sum(hdc.prime_amount) prime_amount,
+					       sum(hdc.pub_amount) pub_amount,
+					       sum(hdc.man_amount) man_amount,
+					       sum(hdc.ass_amount) ass_amount,
+					       hdc.source_id,
+						   hs.source_code,
+						   hs.source_name
+					  from htc_dept_cost hdc
+						left join htc_plan_set hps
+						on hdc.group_id = hps.group_id
+						and hdc.hos_id = hps.hos_id
+						and hdc.copy_code = hps.copy_code
+						and hdc.acc_year = hps.acc_year
+						and hdc.plan_code = hps.plan_code
+						left join htc_proj_dept_dict hpdd
+						on hpdd.group_id = hdc.group_id
+						and hpdd.hos_id = hdc.hos_id
+						and hpdd.copy_code = hdc.copy_code
+						and hpdd.proj_dept_id = hdc.proj_dept_id
+						left join cost_item_dict_no cidn
+					  on cidn.group_id = hdc.group_id
+						and cidn.hos_id = hdc.hos_id
+						and cidn.copy_code = hdc.copy_code
+						and cidn.cost_item_id = hdc.cost_item_id
+						left join hos_source hs
+						on hs.group_id = hdc.group_id
+						and hs.hos_id = hdc.hos_id
+						and hs.source_id = hdc.source_id
+						where hdc.group_id = #{group_id}
+						and hpdd.is_disable = 0
+						and cidn.is_stop = 0
+						and hdc.acc_year || hdc.acc_month between #{start_month} and #{end_month}
+						<if test="proj_dept_id != null and proj_dept_id != ''">
+                           and hdc.proj_dept_id = #{proj_dept_id}
+			            </if>
+			            <if test="cost_item_id != null and cost_item_id != ''">
+			                and hdc.cost_item_id = #{cost_item_id}
+			             </if>
+						group by rollup((hdc.group_id,
+					       hdc.hos_id,
+					       hdc.copy_code,
+					       hdc.acc_year,
+					       hdc.acc_month,
+					       hdc.plan_code,
+						   hps.plan_name,
+					       hdc.proj_dept_id,
+					       hdc.proj_dept_no,
+					       hpdd.proj_dept_code,
+			               hpdd.proj_dept_name,
+					       hdc.cost_item_id,
+					       hdc.cost_item_no,
+						   cidn.cost_item_code,
+						   cidn.cost_item_name,
+						   hdc.source_id,
+						   hs.source_code,
+						   hs.source_name))
+			  order by     hdc.group_id,
+					       hdc.hos_id,
+					       hdc.copy_code,
+					       hdc.acc_year,
+					       hdc.acc_month,
+					       hdc.plan_code,
+					       hpdd.proj_dept_code
+	</select>
+</mapper>
+

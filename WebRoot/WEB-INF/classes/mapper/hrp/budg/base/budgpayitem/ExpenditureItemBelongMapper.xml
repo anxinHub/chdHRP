@@ -1,0 +1,340 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.budg.dao.base.budgpayitem.ExpenditureItemBelongMapper">
+	
+	<resultMap id="ExpenditureItemBelongMap" type="java.util.Map">
+	
+	<result property="duty_dept_code" column="duty_dept_code"/>
+	<result property="duty_dept_name" column="duty_dept_name"/>
+	<result property="payment_item_code" column="payment_item_code"/>
+	<result property="payment_item_name" column="payment_item_name"/>
+	<result property="dept_code" column="dept_code"/>
+	<result property="dept_name" column="dept_name"/>
+	
+	<result property="dept_id" column="dept_id"/>
+	<result property="payment_item_id" column="payment_item_id"/>
+	<result property="duty_dept_id" column="duty_dept_id"/>
+
+	</resultMap>
+	
+	
+	<resultMap id="DutyDeptMap" type="java.util.Map">
+	<result property="id" column="id"/>
+	<result property="text" column="text"/>
+	</resultMap>
+	
+	
+	<resultMap id="queryAllDeptDataMap" type="java.util.Map">
+	<result property="dept_no" column="dept_no"/>
+	<result property="dept_id" column="dept_id"/>
+	<result property="dept_code" column="dept_code"/>
+	<result property="dept_name" column="dept_name"/>
+	</resultMap>
+	
+	
+	<resultMap id="queryAllPayment_itemDataMap" type="java.util.Map">
+	<result property="payment_item_no" column="payment_item_no"/>
+	<result property="payment_item_id" column="payment_item_id"/>
+	<result property="payment_item_code" column="payment_item_code"/>
+	<result property="payment_item_name" column="payment_item_name"/>
+	</resultMap>
+	
+	<resultMap id="queryByCodeMap" type="java.util.Map">
+	<result property="id" column="id"/>
+	<result property="text" column="text"/>
+	<result property="id2" column="id2"/>
+	<result property="text2" column="text2"/>
+	</resultMap>
+	
+	
+	<resultMap id="queryAddtMap" type="java.util.Map">
+	<result property="type_name" column="type_name"/>
+	<result property="dept_code" column="dept_code"/>
+	<result property="dept_name" column="dept_name"/>
+	<result property="kind_name" column="kind_name"/>
+	<result property="natur_name" column="natur_name"/>
+	<result property="out_name" column="out_name"/>
+	<result property="ischeck" column="ischeck"/>
+	<result property="isdisable" column="isdisable"/>
+	<result property="dept_id" column="dept_id"/>
+	</resultMap>
+
+	<select id="querydata" parameterType="java.util.Map" resultMap="ExpenditureItemBelongMap" >
+		select hs2.dept_code duty_dept_code,
+		       hs2.dept_name duty_dept_name，
+		       bpi.payment_item_code,
+		       bpi.payment_item_name,
+		       hs.dept_code,
+		       hs.dept_name,
+		       
+		       hs.dept_id,
+		       bpi.payment_item_id,
+		       bds.duty_dept_id
+		  from BUDG_DUTY_SET bds
+		  join HOS_DEPT hs
+		    on hs.dept_id = bds.dept_id
+		   and hs.group_id = bds.group_id
+		   and hs.hos_id = hs.hos_id
+		  join HOS_DEPT hs2
+		    on hs2.dept_id = bds.duty_dept_id
+		   and hs2.group_id = bds.group_id
+		   and hs2.hos_id = hs.hos_id
+		  join budg_payment_item bpi
+		    on bpi.payment_item_id = bds.payment_item_id
+		   and bpi.group_id = bds.group_id
+		   and bpi.hos_id = bds.hos_id
+		   and bpi.copy_code = bds.copy_code
+		
+		 where bds.group_id = #{group_id}
+		   and bds.hos_id = #{hos_id}
+		   and bds.copy_code = #{copy_code}
+		   <if test="payment_item_id != null and payment_item_id !=''">
+		   and bds.payment_item_id = #{payment_item_id}
+		   </if>
+		   <if test="duty_dept_id != null and duty_dept_id != ''">
+		   and bds.duty_dept_id = #{duty_dept_id}
+		   </if>
+	</select>
+	
+	<select id="queryDutyDept" parameterType="java.util.Map" resultMap="DutyDeptMap" >
+		SELECT dept_id id, dept_code || ' ' || dept_name text
+		  FROM HOS_DEPT
+		 where group_id = #{group_id}
+		   AND hos_id = #{hos_id}
+		<if test="key != null and key != ''">
+         AND ( dept_code like '${key}%' or
+           dept_name like '%${key}%' or 
+           dept_id like '%${key}%' or 
+           spell_code like '%${key}%' or
+           wbx_code like '%${key}%' )
+		 </if>
+		  and is_stop = 0
+		 order by dept_code
+	</select>
+	
+	<select id="queryPaymentItem" parameterType="java.util.Map" resultMap="DutyDeptMap" >
+		SELECT payment_item_id id, payment_item_code || ' ' || payment_item_name text
+	    from budg_payment_item_dict a
+	    where group_id = #{group_id} and hos_id = #{hos_id} and copy_code = #{copy_code}
+	      and is_fresh = 1 and is_last = 1
+	      and IS_LAST = 1
+	      <if test="key != null and key != ''">
+	        and (
+	        payment_item_code like '${key}%' or
+	        payment_item_name like '%${key}%' or
+	        spell_code like '%${key}%' or
+	        wbx_code like '%${key}%'
+	        )
+	      </if>
+	      <if test="is_read != null and is_read != ''">
+	        and exists(
+	          select 1 from v_user_data_perm p 
+	          where p.table_code='BUDG_PAYMENT_ITEM_DICT' and p.group_id=a.group_id and p.hos_id=a.hos_id and p.copy_code=a.copy_code 
+	          and p.perm_code=a.payment_item_id and p.is_read=1 and p.user_id=#{user_id}
+	            )
+	      </if>
+	      <if test="is_write != null and is_write != ''">
+	        and exists(
+	          select 1 from v_user_data_perm p 
+	          where p.table_code='BUDG_PAYMENT_ITEM_DICT' and p.group_id=a.group_id and p.hos_id=a.hos_id and p.copy_code=a.copy_code 
+	          and p.perm_code=a.payment_item_id and p.is_write=1 and p.user_id=#{user_id}
+	            )
+	      </if>  
+	    order by payment_item_code
+	
+	
+	</select>
+	
+	
+	<select id="queryAddData" parameterType="java.util.Map" resultMap="queryAddtMap" >
+		select tot.type_name,
+		       tot.dept_code,
+		       tot.dept_name,
+		       tot.kind_name,
+		       tot.natur_name,
+		       tot.out_name,
+		       case when tot.check1 = tot.check2 then 'true' end ischeck,
+		       case when tot.check1 is not null and tot.check2 is null  then 'true' end isdisable,
+		  	   tot.dept_id
+		  from (select adt.type_name,
+		               hd.dept_code,
+		               hd.dept_name,
+		               hdk.kind_name,
+		               adn.natur_name,
+		               ado.out_name,
+		               bds.duty_dept_id check1, --真实归档科室
+		               (select bds.duty_dept_id
+		                  from BUDG_DUTY_SET
+		                 where group_id = hd.group_id
+		                   and hos_id = hd.hos_id
+		                   and copy_code = #{copy_code}
+		                   and dept_id = hd.dept_id
+		                   and bds.payment_item_id = #{payment_item_id}
+		                   and bds.duty_dept_id = #{duty_dept_id}) check2, --在归口科室确定与支出项目确定的情况下
+		               hd.dept_id
+		          from HOS_DEPT hd
+		          join ACC_DEPT_ATTR ada
+		            on ada.group_id = hd.group_id
+		           and ada.hos_id = hd.hos_id
+		           and ada.dept_id = hd.dept_id
+		          join ACC_DEPT_TYPE adt
+		            on ada.type_code = adt.type_code
+		          join HOS_DEPT_KIND hdk
+		            on hd.group_id = hdk.group_id
+		           and hd.hos_id = hdk.hos_id
+		           and hd.kind_code = hdk.kind_code
+		          join ACC_DEPT_NATUR adn
+		            on ada.natur_code = adn.natur_code
+		          join ACC_DEPT_OUT ado
+		            on ado.out_code = ada.out_code
+		          left join BUDG_DUTY_SET bds
+		            on bds.group_id = hd.group_id
+		           and bds.hos_id = hd.hos_id
+		           and bds.copy_code = #{copy_code}
+		              
+		           and bds.dept_id = hd.dept_id
+		         where hd.group_id = #{group_id}
+		           and hd.hos_id = #{hos_id}
+		           and hd.is_last = 1 --末级科目
+		           and hd.is_stop = 0
+		           <if test="acc_dept_type !=null and acc_dept_type != ''">
+		           		and adt.type_code = #{acc_dept_type}
+		           </if>
+		           <if test="hos_dept_kind !=null and hos_dept_kind != ''">
+		           		and hdk.kind_code = #{hos_dept_kind}
+		           </if>
+		           <if test="acc_dept_natur !=null and acc_dept_natur != ''">
+		           		and adn.natur_code = #{acc_dept_natur}
+		           </if>
+		           <if test="acc_dept_out !=null and acc_dept_out != ''">
+		           		and ado.out_code = #{acc_dept_out}
+		           </if>
+		         order by hd.dept_code) tot
+
+	
+	</select>
+	
+	<insert id="addExpenditureItemBelongData" parameterType="java.util.List">
+		insert into budg_duty_set 
+		(group_id,hos_id,copy_code,dept_id,payment_item_id,duty_dept_id) 
+		<foreach collection="list" item="item" index="index" separator=" union all " >
+			select 		
+			#{item.group_id,jdbcType=INTEGER},
+			#{item.hos_id,jdbcType=INTEGER},
+			#{item.copy_code,jdbcType=VARCHAR},
+			#{item.dept_id,jdbcType=INTEGER},
+			#{item.payment_item_id,jdbcType=VARCHAR},
+			#{item.duty_dept_id,jdbcType=INTEGER}
+		    from dual
+		</foreach>
+	</insert>
+	
+	<delete id="delete" parameterType="java.util.Map" >
+		DELETE FROM budg_duty_set  
+		where
+			 group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND duty_dept_id = #{duty_dept_id,jdbcType=VARCHAR}
+			AND payment_item_id = #{payment_item_id,jdbcType=VARCHAR}
+	</delete>
+	
+	<delete id="deleteBatch" parameterType="java.util.List" >
+		DELETE FROM budg_duty_set  
+		where
+		<foreach collection="list" index="index" item="item" open ="("  separator="or" close=")" >
+		
+			group_id = #{item.group_id,jdbcType=INTEGER}
+			AND hos_id = #{item.hos_id,jdbcType=INTEGER}
+			AND copy_code = #{item.copy_code,jdbcType=VARCHAR}
+			AND dept_id = #{item.dept_id,jdbcType=INTEGER}
+			AND payment_item_id = #{item.payment_item_id,jdbcType=INTEGER}
+			<if test="item.deleteFlag != '1' ">
+			AND duty_dept_id = #{item.duty_dept_id,jdbcType=INTEGER}
+			</if>
+		</foreach>
+		 
+	</delete>
+	
+	<select id="queryByCode"  parameterType="java.util.Map" resultMap="queryByCodeMap" >
+		select 
+		( select dept_id from HOS_DEPT where group_id = #{group_id} and hos_id = #{hos_id} and dept_id = #{duty_dept_id} ) id,
+		( select dept_code || ' '|| dept_name from HOS_DEPT where group_id = #{group_id} and hos_id = #{hos_id} and dept_id = #{duty_dept_id}  ) text,
+		( select payment_item_id from budg_payment_item where  group_id = #{group_id} and hos_id = #{hos_id} and  copy_code= #{copy_code} and payment_item_id = #{payment_item_id} ) id2,
+		( select payment_item_code || ' '|| payment_item_name from budg_payment_item where group_id = #{group_id} and hos_id = #{hos_id} and  copy_code= #{copy_code} and payment_item_id = #{payment_item_id} ) text2
+		from dual 
+	</select>
+	
+	<select id="queryAllDeptData" resultMap="queryAllDeptDataMap" >
+		select dept_no,
+		       dept_id,
+		       dept_code,
+		       dept_name
+		       
+		from hos_dept_dict 
+		where group_id = #{group_id}
+		  and hos_id = #{hos_id}
+		  and is_disable = 0 
+		  and is_stop = 0
+		
+	</select>
+	
+	
+	<select id="queryAllPayment_itemData" resultMap="queryAllPayment_itemDataMap" >
+		select payment_item_no,
+		       payment_item_id,
+		       payment_item_code,
+		       payment_item_name
+		from budg_payment_item_dict a
+		where group_id = #{group_id}
+		  and hos_id = #{hos_id}
+		  and copy_code = #{copy_code}
+		  and is_fresh = 1
+		  and is_last = 1
+		  and IS_LAST = 1
+		
+	</select>
+	
+	
+	<insert id="addBatchImport" parameterType="java.util.Map">
+		INSERT INTO budg_duty_set (
+		group_id,hos_id,copy_code,dept_id,payment_item_id,duty_dept_id
+		)
+		
+		<foreach collection="listPro" item="item" index="index" separator=" union all ">
+			select
+				#{item.group_id,jdbcType=INTEGER},
+				#{item.hos_id,jdbcType=INTEGER},
+				#{item.copy_code,jdbcType=VARCHAR} ,
+				#{item.dept_id,jdbcType=INTEGER} ,
+				#{item.payment_item_id,jdbcType=INTEGER} ,
+				#{item.duty_dept_id,jdbcType=INTEGER}
+			from dual
+		</foreach>
+	</insert>
+	
+	<delete id="deleteAll" parameterType="java.util.Map" > 
+	
+	 <foreach collection="listPro" index="index" item="item" open="begin" close=";end;" separator=";">
+			delete from budg_duty_set 
+			<where>
+			 	<if test="item.group_id != null and item.group_id != ''">
+					and group_id = #{item.group_id}
+				</if> 
+				<if test="item.hos_id != null and item.hos_id != ''">
+				 	and hos_id = #{item.hos_id}
+				</if>
+				<if test="item.copy_code != null and item.copy_code != ''">
+					and  copy_code  = #{item.copy_code}
+				</if>
+				<if test="item.dept_id != null and item.dept_id != ''">
+					and  dept_id  = #{item.dept_id}
+				</if>
+				<if test="item.payment_item_id != null and item.payment_item_id != ''">
+					and  payment_item_id = #{item.payment_item_id}
+				</if>
+			</where>
+	 </foreach>
+	</delete>
+</mapper>
+

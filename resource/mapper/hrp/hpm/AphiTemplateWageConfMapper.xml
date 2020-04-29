@@ -1,0 +1,322 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.hpm.dao.AphiTemplateWageConfMapper">
+
+	<resultMap id="aphiTemplateWageConfDetailMap" type="java.util.Map">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="is_grant" column="is_grant"/>
+		<result property="wage_code" column="wage_code"/>
+		<result property="wage_item" column="wage_item"/>
+		<result property="emp_item" column="emp_item"/>
+		<result property="wageItem_name" column="wageItem_name"/>
+		<result property="empItem_name" column="empItem_name"/>
+	</resultMap>
+	
+	
+	<!-- 查询所有 配置明细数据 -->
+	<select id="queryAphiTemplateWageConfDetail" parameterType="java.util.Map" resultMap="aphiTemplateWageConfDetailMap">
+		SELECT 
+	      atwcd.group_id, 
+	      atwcd.hos_id, 
+	      atwcd.copy_code, 
+	      atwcd.wage_code,
+	      atwcd.wage_item,
+	      atwcd.emp_item,
+	      awt.item_name as wageItem_name,
+	      aei.item_name as empItem_name
+	    FROM APHI_TEMPLATE_WAGE_CONF_DETAIL atwcd
+	    LEFT JOIN ACC_WAGE_ITEM awt
+	    ON
+	         atwcd.group_id = awt.group_id
+	         and atwcd.hos_id = awt.hos_id
+	         and atwcd.copy_code = awt.copy_code
+	         and atwcd.wage_code = awt.wage_code
+	         and atwcd.wage_item = awt.column_item
+	         and awt.is_stop = 0
+	         and awt.acc_year = #{acc_year,jdbcType=VARCHAR}
+	    LEFT JOIN APHI_ITEM aei   
+	    ON
+	         atwcd.group_id = aei.group_id
+	         and atwcd.hos_id = aei.hos_id
+	         and atwcd.copy_code = aei.copy_code
+	         and atwcd.emp_item = aei.item_code
+	         and aei.is_stop = 0
+		WHERE
+			atwcd.group_id = #{group_id,jdbcType=INTEGER}
+			AND atwcd.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND atwcd.copy_code = #{copy_code,jdbcType=VARCHAR}
+			<if test="wage_code != null and wage_code != '' ">
+				AND atwcd.wage_code = #{wage_code,jdbcType=VARCHAR}
+			</if>
+	</select>
+	
+	<!-- 查询所有 配置明细数据 -->
+	<select id="queryAphiTemplateWageConfForGrant" parameterType="java.util.Map" resultMap="aphiTemplateWageConfDetailMap">
+		select a.group_id,a.hos_id,a.copy_code,a.is_grant,a.wage_code,b.wage_item,b.emp_item from aphi_template_wage_conf a
+		left join APHI_TEMPLATE_WAGE_CONF_DETAIL b
+		on a.group_id = b.group_id
+		and a.group_id = b.group_id
+		and a.hos_id = b.hos_id
+		and a.wage_code = b.wage_code
+		WHERE
+			a.group_id = #{group_id}
+			AND a.hos_id = #{hos_id}
+			AND a.copy_code = #{copy_code}
+			and a.is_grant = 1
+			<if test="item_code != null and item_code != ''">
+			
+				and emp_item = #{item_code}
+			</if>
+			<if test="list !=null and list.size >0">
+	     	 	AND 
+	     	 	<foreach collection="list" index="index" item="item"  open="(" separator="OR" close=")">
+				<if test="item.item_codes != null and item.item_codes != ''">
+					 emp_item = #{item.item_codes}  
+				</if>
+			</foreach>
+	     	 </if>
+	</select>
+	
+	<!-- 查询主表数据 -->
+	<select id="queryAphiTemplateWageConf" parameterType="java.util.Map" resultMap="aphiTemplateWageConfDetailMap">
+		SELECT
+			group_id,
+			hos_id,
+			copy_code,
+			is_grant,
+			wage_code
+		FROM APHI_TEMPLATE_WAGE_CONF
+		WHERE
+			group_id = #{group_id}
+			and hos_id = #{hos_id}
+			and copy_code = #{copy_code}
+			<if test="wage_code != null  and wage_code != ''">
+				and wage_code = #{wage_code,jdbcType=VARCHAR}
+ 			</if>
+	</select>
+	
+	<!-- 添加主表 -->
+	<update id="addAphiTemplateWageConf" parameterType="java.util.Map">
+		INSERT INTO APHI_TEMPLATE_WAGE_CONF(
+			group_id,
+			hos_id,
+			copy_code,
+			is_grant,
+			wage_code
+		)
+		VALUES(
+			#{group_id},
+			#{hos_id},
+			#{copy_code},
+			#{is_grant},
+			#{wage_code}
+		)
+			
+	</update>
+	
+	<!-- 修改主表 -->
+	<update id="updateAphiTemplateWageConf" parameterType="java.util.Map">
+		UPDATE APHI_TEMPLATE_WAGE_CONF
+		SET
+			is_grant = #{is_grant}
+			<!--,wage_code = #{wage_code} 修改之前-->
+		WHERE
+			group_id = #{group_id} AND
+			hos_id = #{hos_id} AND
+			copy_code = #{copy_code}
+			and wage_code = #{wage_code} <!-- 修改之后cjc -->
+	</update>
+	
+	<!-- 批量添加配置明细 -->
+	<insert id="addBatchAphiTemplateWageConfDetail" parameterType="java.util.List">
+		
+		INSERT INTO APHI_TEMPLATE_WAGE_CONF_DETAIL(
+	  		group_id,        
+	  		hos_id,         
+	  		copy_code,           
+	  		wage_code,            
+	  		wage_item,            
+	  		emp_item      
+		)
+		<foreach collection="list" item="item" index="index" separator=" union all ">
+			SELECT
+				#{item.group_id}, 
+				#{item.hos_id}, 
+				#{item.copy_code}, 
+				#{item.wage_code}, 
+				#{item.wage_item}, 
+				#{item.emp_item}
+			FROM DUAL
+		</foreach>
+	
+	</insert>
+	
+	<!-- 清空 工资与奖金项目配置明细-->
+	<delete id="deleteAphiTemplateWageConfDetailAll" parameterType="java.util.Map">
+			DELETE FROM APHI_TEMPLATE_WAGE_CONF_DETAIL
+			WHERE
+				group_id = #{group_id} AND
+				hos_id = #{hos_id} AND
+				copy_code = #{copy_code}
+				and wage_code = #{wage_code}
+	</delete>
+	
+	<!-- 查询工资项目 -->
+	<select id="queryWageItem" parameterType="java.util.Map" resultType="java.util.TreeMap">
+		SELECT
+		distinct column_item wage_item_code,
+		item_name wage_item_name
+		FROM ACC_WAGE_ITEM
+		<where>
+			<if test="is_stop != null  and is_stop != ''">
+				and is_stop = #{is_stop}
+			</if>
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null  and copy_code != ''">
+				and copy_code = #{copy_code}
+			</if>
+			<if test="wage_code != null  and wage_code != ''">
+				and wage_code = #{wage_code}
+			</if>
+			<if test="item_code != null  and item_code != ''">
+				and item_code = #{item_code}
+			</if>
+			<if test="item_cal != null  and item_cal != ''">
+				and item_cal = #{item_cal}
+			</if>
+			<if test="acc_year != null  and acc_year != ''">
+				and acc_year = #{acc_year}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+				item_code like '${key}%' or
+				item_name like '%${key}%' or
+				spell_code like '%${key}%'or
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by wage_item_code
+	</select>
+	<select id="queryWage" parameterType="java.util.Map" resultType="java.util.TreeMap">
+		SELECT
+		wage_code wage_code,
+		wage_name wage_name
+		FROM acc_wage
+		<where>
+
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null  and copy_code != ''">
+				and copy_code = #{copy_code}
+			</if>
+			<if test="wage_code != null  and wage_code != ''">
+				and wage_code = #{wage_code}
+			</if>
+		</where>
+		order by wage_code
+	</select>
+	
+	
+	<!-- 删除从表数据 -->
+	<delete id="deleteAphiTemplateWageConfDetailMain" parameterType="java.util.List">
+		DELETE FROM APHI_TEMPLATE_WAGE_CONF_DETAIL WHERE
+			<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+				group_id = #{item.group_id}
+				 and 
+				hos_id = #{item.hos_id}
+				 and 
+				copy_code = #{item.copy_code}
+				<if test="item.wage_code != null and item.wage_code != ''">
+				AND wage_code = #{item.wage_code}
+				</if>
+				<if test="item.emp_item != null and item.emp_item != ''">
+				AND emp_item = #{item.emp_item}
+				</if>
+			</foreach>
+	
+	</delete>
+	
+	<!-- 删除主表数据 -->
+	<delete id="deleteAphiTemplateWageMain" parameterType="java.util.List">
+		DELETE FROM APHI_TEMPLATE_WAGE_CONF WHERE
+			<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+				group_id = #{item.group_id}
+				 and 
+				hos_id = #{item.hos_id}
+				 and 
+				copy_code = #{item.copy_code}
+				<if test="item.wage_code != null and item.wage_code != ''">
+				AND wage_code = #{item.wage_code}
+				</if>
+			</foreach>
+	
+	</delete>
+	
+	<!-- 查询明细表数据 ,用于删除用-->
+	<select id="queryWageDetailList" parameterType="java.util.List" resultType="int">
+		select count(1) from APHI_TEMPLATE_WAGE_CONF_DETAIL a WHERE
+		<foreach collection="list" item="item" index="index" open="(" separator="or" close=")">
+				group_id = #{item.group_id}
+				 and 
+				hos_id = #{item.hos_id}
+				 and 
+				copy_code = #{item.copy_code}
+				<if test="item.wage_code != null and item.wage_code != ''">
+				AND wage_code = #{item.wage_code} 
+				</if>
+		
+		</foreach>
+	
+	</select>
+	
+	
+	<select id="queryWageEmp" parameterType="java.util.Map" resultMap="aphiTemplateWageConfDetailMap" >
+	
+	select distinct awe.wage_code,aebd.group_id,aebd.hos_id,aebd.copy_code from APHI_EMP_BONUS_DATA aebd
+		 left join ACC_WAGE_EMP awe on 
+		  aebd.group_id = awe.group_id
+		  and aebd.hos_id = awe.hos_id
+		  and aebd.copy_code = awe.copy_code
+		  and aebd.emp_id = awe.emp_id
+		  and aebd.emp_no = awe.emp_no 
+		  left join Aphi_Template_Wage_Conf_Detail atwcd
+ 		  on awe.group_id = atwcd.group_id and awe.hos_id = atwcd.hos_id and awe.copy_code = atwcd.copy_code and awe.wage_code = atwcd.wage_code
+		  where 
+		  		aebd.group_id = #{group_id,jdbcType=INTEGER}
+		  		and aebd.hos_id = #{hos_id,jdbcType=INTEGER}
+		  		and aebd.copy_code =  #{copy_code,jdbcType=VARCHAR}
+				 and  awe.wage_code in  (${wage_code})
+				 <if test="item_code != null  and item_code !=''">
+				 	 and aebd.item_code in  (${item_code})
+				 </if>
+ 				<if test="item_codes != null  and item_codes !=''">
+				 	 and aebd.item_code =  #{item_codes,jdbcType=VARCHAR}
+				 </if>
+				 <if test="dept_id != null  and dept_id !=''">
+				 	 and aebd.dept_id =  #{dept_id,jdbcType=INTEGER}
+				 </if>
+				<if test="list !=null and list.size >0">
+	     	 	AND 
+	     	 	<foreach collection="list" index="index" item="item"  open="(" separator="OR" close=")">
+				
+				<if test="item.item_codes != null and item.item_codes != ''">
+					aebd.item_code = #{item.item_codes}  
+				</if>
+			</foreach>
+	     	 </if>
+				
+	</select>
+</mapper>
+

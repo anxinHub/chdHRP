@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+
+	<sql id="v_mat_pact_protocol" type="view" desc="物流合同协议入库发票付款金额"><![CDATA[
+		CREATE OR REPLACE VIEW V_MAT_PACT_PROTOCOL AS
+		select base_proto.group_id,base_proto.hos_id,base_proto.copy_code,base_proto.protocol_code,  
+            sum(base_in.amount_money) in_money,--入库金额
+            sum(base_bill.bill_money) bill_money,--开票金额
+            sum(base_pay.pay_money) pay_money,--付款金额
+            sum(base_pre_pay.pre_pay_money) pre_pay_money --预付款金额  
+        from 
+        (
+        select mpm.group_id,mpm.hos_id,mpm.copy_code,mpm.pact_code protocol_code,mpd.subject_id inv_id
+         from pact_main_fkxy mpm 
+         left join pact_det_fkxy mpd on mpm.pact_code =mpd.pact_code and mpm.group_id =mpd.group_id and mpm.hos_id =mpd.hos_id and mpm.copy_code =mpd.copy_code
+        ) base_proto
+        left join 
+        (
+        select  mim.group_id,mim.hos_id,mim.copy_code,mid.inv_id,mim.protocol_code,sum(mid.amount_money) amount_money
+         from mat_in_main mim
+         left join mat_in_detail mid on mim.in_id =mid.in_id and mim.group_id =mid.group_id and mim.hos_id =mid.hos_id and mim.copy_code =mid.copy_code
+         where mim.state =3 and mim.protocol_code is not null
+         group by mim.group_id,mim.hos_id,mim.copy_code,mid.inv_id,mim.protocol_code
+        ) base_in on base_proto.group_id =base_in.group_id 
+          and base_proto.hos_id =base_in.hos_id 
+          and base_proto.copy_code =base_in.copy_code 
+          and base_proto.protocol_code =base_in.protocol_code
+          and base_proto.inv_id =base_in.inv_id
+        left join 
+        (
+         select mbm.group_id,mbm.hos_id,mbm.copy_code,mim.protocol_code,mid.inv_id,sum(mbd.bill_money) bill_money 
+         from mat_bill_main mbm 
+         left join mat_bill_detail mbd on mbm.bill_id =mbd.bill_id and mbm.group_id =mbd.group_id and mbm.hos_id =mbd.hos_id and mbm.copy_code =mbd.copy_code
+         left join mat_in_detail mid on mbd.group_id=mid.group_id and mbd.hos_id= mid.hos_id and mbd.copy_code =mid.copy_code and mbd.in_id=mid.in_id and mbd.in_detail_id =mid.in_detail_id
+         left join mat_in_main mim on mim.group_id=mid.group_id and mim.hos_id= mid.hos_id and mim.copy_code =mid.copy_code and mim.in_id=mid.in_id 
+         where mbm.state =2 and mim.protocol_code is not null
+         group by mbm.group_id,mbm.hos_id,mbm.copy_code,mim.protocol_code,mid.inv_id
+        ) base_bill on base_proto.group_id =base_bill.group_id 
+          and base_proto.hos_id =base_bill.hos_id 
+          and base_proto.copy_code =base_bill.copy_code 
+          and base_proto.protocol_code =base_bill.protocol_code
+          and base_proto.inv_id =base_bill.inv_id
+        left join 
+        (
+         select mpm.group_id,mpm.hos_id,mpm.copy_code,mim.protocol_code,mid.inv_id,sum(mpd.pay_money) pay_money
+         from mat_pay_main mpm 
+         left join mat_pay_detail mpd on mpm.group_id =mpd.group_id and mpm.hos_id=mpd.hos_id and mpm.copy_code=mpd.copy_code and mpm.pay_id =mpd.pay_id
+         left join mat_bill_detail mbd on mbd.group_id =mpd.group_id and mbd.hos_id=mpd.hos_id and mbd.copy_code=mpd.copy_code and mbd.bill_id =mpd.bill_id and mbd.bill_detail_id =mpd.bill_detail_id
+         left join mat_in_detail mid on mbd.group_id=mid.group_id and mbd.hos_id= mid.hos_id and mbd.copy_code =mid.copy_code and mbd.in_id=mid.in_id and mbd.in_detail_id =mid.in_detail_id
+         left join mat_in_main mim on mim.group_id=mid.group_id and mim.hos_id= mid.hos_id and mim.copy_code =mid.copy_code and mim.in_id=mid.in_id
+         where mpm.state =2 and mim.protocol_code is not null
+         group by mpm.group_id,mpm.hos_id,mpm.copy_code,mim.protocol_code,mid.inv_id
+        ) base_pay on base_proto.group_id =base_pay.group_id 
+          and base_proto.hos_id =base_pay.hos_id 
+          and base_proto.copy_code =base_pay.copy_code 
+          and base_proto.protocol_code =base_pay.protocol_code
+          and base_proto.inv_id =base_pay.inv_id
+        left join 
+        (
+         select mpm.group_id,mpm.hos_id,mpm.copy_code,mim.protocol_code,mid.inv_id,sum(mpd.pre_pay_money) pre_pay_money
+         from mat_pre_pay_main mpm
+         left join mat_pre_pay_detail mpd on mpm.group_id =mpd.group_id and mpm.hos_id=mpd.hos_id and mpm.copy_code=mpd.copy_code and mpm.pre_pay_id =mpd.pre_pay_id
+         left join mat_in_detail mid on mpd.group_id=mid.group_id and mpd.hos_id= mid.hos_id and mpd.copy_code =mid.copy_code and mpd.in_id=mid.in_id and mpd.in_detail_id =mid.in_detail_id
+         left join mat_in_main mim on mim.group_id=mid.group_id and mim.hos_id= mid.hos_id and mim.copy_code =mid.copy_code and mim.in_id=mid.in_id
+         where mpm.state =2 and mim.protocol_code is not null
+         group by mpm.group_id,mpm.hos_id,mpm.copy_code,mim.protocol_code,mid.inv_id
+        ) base_pre_pay on base_proto.group_id =base_pre_pay.group_id 
+          and base_proto.hos_id =base_pre_pay.hos_id 
+          and base_proto.copy_code =base_pre_pay.copy_code 
+          and base_proto.protocol_code =base_pre_pay.protocol_code
+          and base_proto.inv_id =base_pre_pay.inv_id
+        group by base_proto.group_id,base_proto.hos_id,base_proto.copy_code,base_proto.protocol_code
+	]]></sql>
+	
+	<sql id="v_mat_pact_protocol_detail" type="view" desc="物流合同协议入库发票付款金额材料明细"><![CDATA[
+		CREATE OR REPLACE VIEW V_MAT_PACT_PROTOCOL_DETAIL AS
+		select base_proto.group_id,base_proto.hos_id,base_proto.copy_code,base_proto.protocol_code, base_proto.inv_id, mid.inv_code ,mid.inv_name,mid.inv_model,
+        sum(base_in.amount_money) in_money,--入库金额
+        sum(base_bill.bill_money) bill_money,--开票金额
+        sum(base_pay.pay_money) pay_money,--付款金额
+        sum(base_pre_pay.pre_pay_money) pre_pay_money --预付款金额
+       
+        from 
+        (
+        select mpm.group_id,mpm.hos_id,mpm.copy_code,mpm.pact_code protocol_code,mpd.subject_id inv_id
+         from pact_main_fkxy mpm 
+         left join pact_det_fkxy mpd on mpm.pact_code =mpd.pact_code and mpm.group_id =mpd.group_id and mpm.hos_id =mpd.hos_id and mpm.copy_code =mpd.copy_code
+        ) base_proto
+        left join 
+        (
+        select  mim.group_id,mim.hos_id,mim.copy_code,mid.inv_id,mim.protocol_code,sum(mid.amount_money) amount_money
+         from mat_in_main mim
+         left join mat_in_detail mid on mim.in_id =mid.in_id and mim.group_id =mid.group_id and mim.hos_id =mid.hos_id and mim.copy_code =mid.copy_code
+         where mim.state =3 and mim.protocol_code is not null
+         group by mim.group_id,mim.hos_id,mim.copy_code,mid.inv_id,mim.protocol_code
+        ) base_in on base_proto.group_id =base_in.group_id 
+          and base_proto.hos_id =base_in.hos_id 
+          and base_proto.copy_code =base_in.copy_code 
+          and base_proto.protocol_code =base_in.protocol_code
+          and base_proto.inv_id =base_in.inv_id
+        left join 
+        (
+         select mbm.group_id,mbm.hos_id,mbm.copy_code,mim.protocol_code,mid.inv_id,sum(mbd.bill_money) bill_money 
+         from mat_bill_main mbm 
+         left join mat_bill_detail mbd on mbm.bill_id =mbd.bill_id and mbm.group_id =mbd.group_id and mbm.hos_id =mbd.hos_id and mbm.copy_code =mbd.copy_code
+         left join mat_in_detail mid on mbd.group_id=mid.group_id and mbd.hos_id= mid.hos_id and mbd.copy_code =mid.copy_code and mbd.in_id=mid.in_id and mbd.in_detail_id =mid.in_detail_id
+         left join mat_in_main mim on mim.group_id=mid.group_id and mim.hos_id= mid.hos_id and mim.copy_code =mid.copy_code and mim.in_id=mid.in_id 
+         where mbm.state =2 and mim.protocol_code is not null
+         group by mbm.group_id,mbm.hos_id,mbm.copy_code,mim.protocol_code,mid.inv_id
+        ) base_bill on base_proto.group_id =base_bill.group_id 
+          and base_proto.hos_id =base_bill.hos_id 
+          and base_proto.copy_code =base_bill.copy_code 
+          and base_proto.protocol_code =base_bill.protocol_code
+          and base_proto.inv_id =base_bill.inv_id
+        left join 
+        (
+         select mpm.group_id,mpm.hos_id,mpm.copy_code,mim.protocol_code,mid.inv_id,sum(mpd.pay_money) pay_money
+         from mat_pay_main mpm 
+         left join mat_pay_detail mpd on mpm.group_id =mpd.group_id and mpm.hos_id=mpd.hos_id and mpm.copy_code=mpd.copy_code and mpm.pay_id =mpd.pay_id
+         left join mat_bill_detail mbd on mbd.group_id =mpd.group_id and mbd.hos_id=mpd.hos_id and mbd.copy_code=mpd.copy_code and mbd.bill_id =mpd.bill_id and mbd.bill_detail_id =mpd.bill_detail_id
+         left join mat_in_detail mid on mbd.group_id=mid.group_id and mbd.hos_id= mid.hos_id and mbd.copy_code =mid.copy_code and mbd.in_id=mid.in_id and mbd.in_detail_id =mid.in_detail_id
+         left join mat_in_main mim on mim.group_id=mid.group_id and mim.hos_id= mid.hos_id and mim.copy_code =mid.copy_code and mim.in_id=mid.in_id
+         where mpm.state =2 and mim.protocol_code is not null
+         group by mpm.group_id,mpm.hos_id,mpm.copy_code,mim.protocol_code,mid.inv_id
+        ) base_pay on base_proto.group_id =base_pay.group_id 
+          and base_proto.hos_id =base_pay.hos_id 
+          and base_proto.copy_code =base_pay.copy_code 
+          and base_proto.protocol_code =base_pay.protocol_code
+          and base_proto.inv_id =base_pay.inv_id
+        left join 
+        (
+         select mpm.group_id,mpm.hos_id,mpm.copy_code,mim.protocol_code,mid.inv_id,sum(mpd.pre_pay_money) pre_pay_money
+         from mat_pre_pay_main mpm
+         left join mat_pre_pay_detail mpd on mpm.group_id =mpd.group_id and mpm.hos_id=mpd.hos_id and mpm.copy_code=mpd.copy_code and mpm.pre_pay_id =mpd.pre_pay_id
+         left join mat_in_detail mid on mpd.group_id=mid.group_id and mpd.hos_id= mid.hos_id and mpd.copy_code =mid.copy_code and mpd.in_id=mid.in_id and mpd.in_detail_id =mid.in_detail_id
+         left join mat_in_main mim on mim.group_id=mid.group_id and mim.hos_id= mid.hos_id and mim.copy_code =mid.copy_code and mim.in_id=mid.in_id
+         where mpm.state =2 and mim.protocol_code is not null
+         group by mpm.group_id,mpm.hos_id,mpm.copy_code,mim.protocol_code,mid.inv_id
+        ) base_pre_pay on base_proto.group_id =base_pre_pay.group_id 
+          and base_proto.hos_id =base_pre_pay.hos_id 
+          and base_proto.copy_code =base_pre_pay.copy_code 
+          and base_proto.protocol_code =base_pre_pay.protocol_code
+          and base_proto.inv_id =base_pre_pay.inv_id
+        left join mat_inv_dict mid on base_proto.group_id =mid.group_id 
+          and base_proto.hos_id =mid.hos_id 
+          and base_proto.copy_code =mid.copy_code 
+          and base_proto.inv_id =mid.inv_id
+          and mid.is_stop=0
+        group by base_proto.group_id,base_proto.hos_id,base_proto.copy_code,base_proto.protocol_code,base_proto.inv_id,mid.inv_code ,mid.inv_name,mid.inv_model
+	]]></sql>
+</root>
+

@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper
+	namespace="com.chd.hrp.pac.dao.fkxy.logistics.PactLogisticsProtocolMapper">
+	<resultMap id="result" type="java.util.Map">
+		<result property="pact_code" column="pact_code" />
+		<result property="pact_name" column="pact_name" />
+		<result property="sign_date" column="sign_date" />
+		<result property="end_date" column="end_date" />
+		<result property="sup_name" column="sup_name" />
+		<result property="dept_name" column="dept_name" />
+		<result property="amount" column="amount" />
+		<result property="price" column="price" />
+		<result property="bill_money" column="bill_money" />
+		<result property="payable_money" column="payable_money" />
+		<result property="coupon_money" column="coupon_money" />
+		<result property="payed_money" column="payed_money" />
+		<result property="nopay_money" column="nopay_money" />
+		<result property="store_name" column="store_name" />
+		<result property="in_date" column="in_date" />
+		<result property="inv_id" column="inv_id" />
+		<result property="inv_no" column="inv_no" />
+		<result property="inv_name" column="inv_name" />
+		<result property="inv_model" column="inv_model" />
+		<result property="mat_type_name" column="mat_type_name" />
+		<result property="amount_money" column="amount_money" />
+		<result property="pact_money" column="pact_money" />
+		<result property="prepay_money" column="prepay_money" />
+		<result property="pay_money" column="pay_money" />
+		<result property="billnopay_money" column="billnopay_money" />
+		<result property="bill_no" column="bill_no" />
+		<result property="sup_id" column="sup_id" />
+		<result property="pay_no" column="pay_no" />
+		<result property="in_id" column="in_id" />
+		<result property="in_detail_id" column="in_detail_id" />
+		<result property="bill_id" column="bill_id" />
+		<result property="bill_detail_id" column="bill_detail_id" />
+		<result property="exeAnalysis" column="exeAnalysis" />
+	</resultMap>
+
+	<select id="queryPactProtocalSummaryFKXY" parameterType="java.util.Map" resultMap="result">
+	    SELECT pmf.PACT_CODE,pmf.pact_name,pmf.SIGN_DATE,pmf.END_DATE,pmf.SUP_NO,hsd.sup_name,sum(mid.amount_money) as amount_money,sum(NVL(mbd.bill_money, 0)) as bill_money,sum(NVL(mid.amount_money, 0)) - sum(NVL(mbd.bill_money, 0)) as nopay_money
+	    ,sum(NVL(pmf.pact_money, 0)) as pact_money,sum(NVL(mppd.pre_pay_money, 0)) as prepay_money,sum(NVL(mpd.pay_money, 0)) as pay_money,sum(NVL(mbd.bill_money,0)) - sum(NVL(mppd.pre_pay_money, 0)) - sum(NVL(mpd.pay_money, 0)) as billnopay_money
+	    ,decode(sum(NVL(pmf.pact_money, 0))/sum(mid.amount_money),0,null,sum(NVL(pmf.pact_money, 0))/sum(mid.amount_money)) as exeAnalysis
+		FROM PACT_MAIN_FKXY pmf
+		LEFT JOIN HOS_SUP_dict hsd on pmf.group_id = hsd.group_id and pmf.hos_id = hsd.hos_id and pmf.sup_id = hsd.sup_id
+		LEFT JOIN MAT_IN_MAIN mim on pmf.group_id = mim.group_id and pmf.hos_id = mim.hos_id and pmf.copy_code = mim.copy_code and mim.protocol_code = pmf.pact_code  and mim.in_date BETWEEN pmf.sign_date and pmf.end_date
+		LEFT JOIN MAT_IN_DETAIL mid on pmf.group_id = mid.group_id and pmf.hos_id = mid.hos_id and pmf.copy_code = mid.copy_code and mim.in_id = mid.in_id and mim.in_no = mid.in_no
+		inner JOIN PACT_DET_FKXY pdf on pmf.group_id = pdf.group_id and pmf.hos_id = pdf.hos_id and pmf.copy_code = pdf.copy_code and pmf.pact_code = pdf.pact_code and pdf.subject_id = mid.inv_id and pdf.subject_no = mid.inv_no
+		LEFT JOIN MAT_INV_DICT midc on pmf.group_id = midc.group_id and pmf.hos_id = midc.hos_id and pmf.copy_code = midc.copy_code and mid.inv_id = midc.inv_id and mid.inv_no = midc.inv_no
+		LEFT JOIN MAT_BILL_MAIN mbm on pmf.group_id = mbm.group_id and pmf.hos_id  = mbm.hos_id and pmf.copy_code = mbm.copy_code and pmf.sup_id = mbm.sup_id  AND mbm.STATE = 2
+		LEFT JOIN MAT_BILL_DETAIL mbd on pmf.group_id = mbd.group_id and pmf.hos_id = mbd.hos_id and pmf.copy_code = mbd.copy_code and mbm.bill_id = mbd.bill_id and mbm.bill_no = mbd.bill_no and mid.in_id = mbd.in_id and mid.in_detail_id = mbd.in_detail_id
+		LEFT JOIN MAT_PRE_PAY_MAIN mppm on pmf.group_id = mppm.group_id and pmf.hos_id = mppm.hos_id and pmf.copy_code = mppm.copy_code and pmf.sup_id = mppm.sup_id and mppm.state = 2
+    	LEFT JOIN MAT_PRE_PAY_DETAIL mppd on pmf.group_id = mppd.group_id and pmf.hos_id = mppd.hos_id and pmf.copy_code = mppd.copy_code and mppm.pre_pay_id = mppd.pre_pay_id and mppm.pre_pay_no = mppd.pre_pay_no and mid.in_id = mppd.in_id and mid.in_detail_id = mppd.in_detail_id
+    	LEFT JOIN MAT_PAY_MAIN mpm on pmf.group_id = mpm.group_id and pmf.hos_id = mpm.hos_id and pmf.copy_code = mpm.copy_code and pmf.sup_id = mpm.sup_id and pmf.sup_no = mpm.sup_no and mpm.state = 2
+    	LEFT JOIN MAT_PAY_DETAIL mpd on pmf.group_id = mpd.group_id and pmf.hos_id = mpd.hos_id and pmf.copy_code = mpd.copy_code and mpm.pay_id = mpd.pay_id and mpm.pay_bill_no = mpd.pay_bill_no and mbd.bill_id = mpd.bill_id and mbd.bill_detail_id = mpd.bill_detail_id
+		<where>
+			pmf.group_id = #{group_id}
+			and pmf.hos_id = #{hos_id}
+			and pmf.copy_code = #{copy_code}
+			<if test="pact_type_code != null and pact_type_code != ''">
+				and pmf.pact_type_code = #{pact_type_code,jdbcType=VARCHAR}
+			</if>
+			<if test="sup_id != null and sup_id != ''">
+				and pmf.sup_id = #{sup_id,jdbcType=NUMERIC}
+			</if>
+			<if test="sup_no != null and sup_no != ''">
+				and pmf.sup_no = #{sup_no,jdbcType=NUMERIC}
+			</if>
+			<if test="dept_id != null and dept_id != ''">
+				and pmf.dept_id = #{dept_id,jdbcType=NUMERIC}
+			</if>
+			<if test="dept_no != null and dept_no != ''">
+				and pmf.dept_no = #{dept_no,jdbcType=NUMERIC}
+			</if>
+			<if test="pact_code != null and pact_code != ''">
+				and pmf.pact_code like upper(#{pact_code})||'%'
+			</if>
+			<if test="pact_name != null and pact_name != ''">
+				and pmf.pact_name like '%'||#{pact_name}||'%'
+			</if>
+			<if test="start_date != null and start_date != '' and end_date != null and end_date != ''">
+				and pmf.sign_date BETWEEN to_date(#{start_date,jdbcType=TIMESTAMP},'yyyy-MM-dd') AND to_date(#{end_date,jdbcType=TIMESTAMP},'yyyy-MM-dd')
+			</if>
+		</where>
+		GROUP BY pmf.PACT_CODE,pmf.pact_name,pmf.SIGN_DATE,pmf.END_DATE,pmf.SUP_NO,hsd.sup_name
+	</select>
+	
+	<select id="queryPactProtocolDetailFKXY" parameterType="java.util.Map" resultMap="result">
+		SELECT pmf.PACT_CODE,pmf.pact_name,pmf.SIGN_DATE,pmf.END_DATE,pmf.SUP_NO,hsd.sup_name,mid.inv_no,mid.inv_id,midc.inv_name,midc.inv_model,pdf.price,mid.amount,mid.amount_money,mim.in_date,NVL(mbd.bill_money, 0) as bill_money,NVL(mid.amount_money, 0) - NVL(mbd.bill_money, 0) as nopay_money,
+		NVL(mppd.pre_pay_money, 0) as prepay_money,NVL(mpd.pay_money, 0) as pay_money,(NVL(mbd.bill_money,0) - NVL(mppd.pre_pay_money, 0) - NVL(mpd.pay_money, 0)) as billnopay_money,
+		mbd.bill_id as bill_id,mbd.bill_detail_id as bill_detail_id,mbd.bill_no as bill_no,hsd.sup_id as sup_id,mpd.PAY_BILL_NO as pay_no,mid.in_id as in_id,mid.in_detail_id as in_detail_id
+		FROM PACT_MAIN_FKXY pmf
+		LEFT JOIN HOS_SUP_dict hsd on pmf.group_id = hsd.group_id and pmf.hos_id = hsd.hos_id and pmf.sup_id = hsd.sup_id
+		LEFT JOIN MAT_IN_MAIN mim on pmf.group_id = mim.group_id and pmf.hos_id = mim.hos_id and pmf.copy_code = mim.copy_code and mim.protocol_code = pmf.pact_code and mim.in_date BETWEEN pmf.sign_date and pmf.end_date
+		LEFT JOIN MAT_IN_DETAIL mid on pmf.group_id = mid.group_id and pmf.hos_id = mid.hos_id and pmf.copy_code = mid.copy_code and mim.in_id = mid.in_id and mim.in_no = mid.in_no
+		inner JOIN PACT_DET_FKXY pdf on pmf.group_id = pdf.group_id and pmf.hos_id = pdf.hos_id and pmf.copy_code = pdf.copy_code and pmf.pact_code = pdf.pact_code and pdf.subject_id = mid.inv_id and pdf.subject_no = mid.inv_no
+		LEFT JOIN MAT_INV_DICT midc on pmf.group_id = midc.group_id and pmf.hos_id = midc.hos_id and pmf.copy_code = midc.copy_code and mid.inv_id = midc.inv_id and mid.inv_no = midc.inv_no
+		LEFT JOIN MAT_BILL_MAIN mbm on pmf.group_id = mbm.group_id and pmf.hos_id  = mbm.hos_id and pmf.copy_code = mbm.copy_code and pmf.sup_id = mbm.sup_id  AND mbm.STATE = 2
+		LEFT JOIN MAT_BILL_DETAIL mbd on pmf.group_id = mbd.group_id and pmf.hos_id = mbd.hos_id and pmf.copy_code = mbd.copy_code and mbm.bill_id = mbd.bill_id and mbm.bill_no = mbd.bill_no and mid.in_id = mbd.in_id and mid.in_detail_id = mbd.in_detail_id
+		LEFT JOIN MAT_PRE_PAY_MAIN mppm on pmf.group_id = mppm.group_id and pmf.hos_id = mppm.hos_id and pmf.copy_code = mppm.copy_code and pmf.sup_id = mppm.sup_id and mppm.state = 2
+    	LEFT JOIN MAT_PRE_PAY_DETAIL mppd on pmf.group_id = mppd.group_id and pmf.hos_id = mppd.hos_id and pmf.copy_code = mppd.copy_code and mppm.pre_pay_id = mppd.pre_pay_id and mppm.pre_pay_no = mppd.pre_pay_no and mid.in_id = mppd.in_id and mid.in_detail_id = mppd.in_detail_id
+    	LEFT JOIN MAT_PAY_MAIN mpm on pmf.group_id = mpm.group_id and pmf.hos_id = mpm.hos_id and pmf.copy_code = mpm.copy_code and pmf.sup_id = mpm.sup_id and pmf.sup_no = mpm.sup_no and mpm.state = 2
+    	LEFT JOIN MAT_PAY_DETAIL mpd on pmf.group_id = mpd.group_id and pmf.hos_id = mpd.hos_id and pmf.copy_code = mpd.copy_code and mpm.pay_id = mpd.pay_id and mpm.pay_bill_no = mpd.pay_bill_no and mbd.bill_id = mpd.bill_id and mbd.bill_detail_id = mpd.bill_detail_id
+		<where>
+			pmf.group_id = #{group_id}
+			and pmf.hos_id = #{hos_id}
+			and pmf.copy_code = #{copy_code}
+			<if test="pact_type_code != null and pact_type_code != ''">
+				and pmf.pact_type_code = #{pact_type_code,jdbcType=VARCHAR}
+			</if>
+			<if test="sup_id != null and sup_id != ''">
+				and pmf.sup_id = #{sup_id,jdbcType=NUMERIC}
+			</if>
+			<if test="sup_no != null and sup_no != ''">
+				and pmf.sup_no = #{sup_no,jdbcType=NUMERIC}
+			</if>
+			<if test="dept_id != null and dept_id != ''">
+				and pmf.dept_id = #{dept_id,jdbcType=NUMERIC}
+			</if>
+			<if test="dept_no != null and dept_no != ''">
+				and pmf.dept_no = #{dept_no,jdbcType=NUMERIC}
+			</if>
+			<if test="pact_code != null and pact_code != ''">
+				and pmf.pact_code like upper(#{pact_code})||'%'
+			</if>
+			<if test="pact_name != null and pact_name != ''">
+				and pmf.pact_name like '%'||#{pact_name}||'%'
+			</if>
+			<if test="inv_name != null and inv_name != ''">
+				and midc.inv_name like '%'||#{inv_name}||'%'
+			</if>
+			<if test="start_date != null and start_date != '' and end_date != null and end_date != ''">
+				and pmf.sign_date BETWEEN to_date(#{start_date,jdbcType=TIMESTAMP},'yyyy-MM-dd') AND to_date(#{end_date,jdbcType=TIMESTAMP},'yyyy-MM-dd')
+			</if>
+			<if test="mat_store != null and mat_store!= ''"> 
+				and mim.store_id = #{mat_store}
+			</if>
+			<if test="inv_category != null and inv_category != ''"> 
+				and midc.inv_model = #{inv_category}
+			</if>
+			<if test="inv_spetype != null and inv_spetype != ''"> 
+				and midc.inv_model like '%'||#{inv_spetype}||'%'
+			</if>
+		</where>
+	</select>
+</mapper>

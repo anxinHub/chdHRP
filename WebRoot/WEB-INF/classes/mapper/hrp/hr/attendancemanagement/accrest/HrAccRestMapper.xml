@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.hr.dao.attendancemanagement.accrest.HrAccRestMapper">
+<resultMap type="java.util.Map" id="hrAccRest">
+	    <result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="emp_id" column="emp_id" />
+		<result property="emp_name" column="emp_name" />
+		<result property="dept_name" column="dept_name" />
+		<result property="dept_id" column="dept_id" />
+		<result property="attend_xjapply_code" column="attend_xjapply_code" /> 
+		<result property="file_type" column="file_type" />
+		<result property="file_type_code" column="file_type_code"/>
+		<result property="attend_month" column="attend_month"/>
+		<result property="attend_xjdays" column="attend_xjdays"/>
+		<result property="attend_xjcheckdate" column="attend_xjcheckdate"/>
+		<result property="attend_xxjdays" column="attend_xxjdays"/>
+		
+	</resultMap>
+	
+	<select id="query" parameterType="java.util.Map" resultMap="hrAccRest">
+	select *
+from (
+   select hx.group_id, hx.hos_id, hx.attend_xjapply_code as attend_xjapply_code, '减少' as file_type, 1 as file_type_code
+    , he.emp_name, hd.dept_name, hx.emp_id
+    , to_char(hx.ATTEND_XJBEGDATE, 'mm') as ATTEND_month, hx.ATTEND_XJDAYS as ATTEND_XJDAYS ,
+    case
+		when nvl(HXX.ATTEND_XXJDAYS,0) = 0 then hx.ATTEND_XJDAYS 
+		else HXX.ATTEND_XXJDAYS
+		end as ATTEND_XXJDAYS
+    
+    
+    , hx.ATTEND_XJREG_DATE as Attend_Xjcheckdate, to_char(hx.check_date, 'yyyy-mm') as reg_date
+  from HR_ATTEND_XJAPPLY hx
+  left join HR_ATTEND_XXJAPPLY HXX on hx.attend_xjapply_code=hxx.attend_xjapply_code
+  and hx.group_id=hxx.group_id
+  and hx.hos_id=hxx.hos_id
+  left join hos_emp he on he.emp_id = hx.emp_id
+  and he.group_id = hx.group_id
+  and he.hos_id = hx.hos_id 
+  and he.is_attend = 1
+   <if test="dept_source == 1">
+  left join hr_dept hd on he.dept_id = hd.dept_id
+  and he.group_id = hd.group_id
+  and he.hos_id = hd.hos_id 
+  </if>
+  <if test="dept_source == 2">
+  left join hos_dept hd on he.dept_id = hd.dept_id
+  and he.group_id = hd.group_id
+  and he.hos_id = hd.hos_id 
+  </if>
+  left join sys_user he1 on he1.user_id = hx.ATTEND_XJLOGINER
+  and he1.group_id = hx.group_id
+  and he1.hos_id = hx.hos_id 
+  left join sys_user he2 on he2.user_id = hx.CHECKER
+  and he2.group_id = hx.group_id
+  and he2.hos_id = hx.hos_id 
+  left join sys_user he3 on he3.user_id = hx.confirmer
+  and he3.group_id = hx.group_id
+  and he3.hos_id = hx.hos_id 
+    left join HR_ATTEND_ITEM ha on ha.attend_code = hx.attend_code
+  and ha.group_id = hx.group_id
+  and ha.hos_id = hx.hos_id 
+  where hx.group_id =#{group_id}
+    and hx.hos_id = #{hos_id}
+    and hx.ATTEND_XJSTATE &gt;= 1
+  and hx.ATTEND_XJSTATE != 4
+   and ha.is_jx='1'
+   and he.is_attend = 1
+  union
+   select hao.group_id, hao.hos_id, hao.OVERTIME_CODE as attend_xjapply_code, '增加' as file_type, 2 as file_type_code
+    , he.emp_name, hd.dept_name, hao.emp_id
+    , to_char(hao.OVERTIME_DATE, 'mm') as ATTEND_month, hao.DAYS as ATTEND_XJDAYS,hao.DAYS
+    , hao.CHECK_DATE as Attend_Xjcheckdate, to_char(hao.check_date, 'yyyy-mm') as reg_date
+  from HR_ATTEND_OVERTIME hao
+  left join hos_emp he on hao.emp_id = he.emp_id
+  and hao.group_id = he.group_id
+  and hao.hos_id = he.hos_id 
+  and he.is_attend = 1
+<if test="dept_source == 1">
+  left join hr_dept_dict hd on he.dept_id = hd.dept_id
+  and he.group_id = hd.group_id
+  and he.hos_id = hd.hos_id 
+  </if>
+  <if test="dept_source == 2">
+  left join hos_dept_dict hd on he.dept_id = hd.dept_id
+  and he.group_id = hd.group_id
+  and he.hos_id = hd.hos_id 
+  </if>
+  left join HR_ATTEND_ITEM hai on hao.attend_code = hai.attend_code
+  and hao.group_id = hai.group_id
+  and hao.hos_id = hai.hos_id
+  and hai.attend_types = '2' 
+  left join sys_user sy on hao.OPER = sy.user_id
+  and hao.group_id = sy.group_id
+  and hao.hos_id = sy.hos_id 
+    left join sys_user sy1 on hao.CHECKER = sy1.user_id
+  and hao.group_id = sy1.group_id
+  and hao.hos_id = sy1.hos_id 
+  where hao.STATE &gt;= 1
+  <!-- and hai.is_jx='1' -->
+AND hao.group_id = #{group_id}
+AND hao.hos_id = #{hos_id}
+and he.is_attend = 1
+)
+ <where>
+	
+				<if test="emp_id != null and emp_id != ''">
+				AND emp_id = #{emp_id}
+			</if>
+			<if test="emp_select != null and emp_select != ''">
+				AND emp_id = #{emp_select}
+			</if>
+				<if test="reg_date != null and reg_date != ''">
+				AND reg_date = #{reg_date}
+			</if>
+			<if test="file_type_code != null and file_type_code != ''">
+			AND file_type_code = #{file_type_code}
+			</if>
+		</where>
+		order by attend_xjapply_code
+	
+	</select>
+	</mapper>

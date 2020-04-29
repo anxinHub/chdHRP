@@ -1,0 +1,257 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+
+	<sql id="v_mat_tran_in_main" type="view" desc="物流调拨入库主表视图"><![CDATA[
+	CREATE OR REPLACE VIEW v_mat_tran_in_main AS
+	SELECT 
+      MIM.GROUP_ID,  --集团ID
+      MIM.HOS_ID,    --医院ID
+      MIM.COPY_CODE, --账套编码
+      MIM.IN_ID AS BUSINESS_ID,     --入库单ID
+      MIM.IN_NO AS BUSINESS_NO,     --入库单号
+      MTM.TRAN_NO , --调拨单号
+      MIM.YEAR,      --年份
+      MIM.MONTH,     --月份
+      MIM.BUS_TYPE_CODE,--业务类型
+      MBT.BUS_TYPE_NAME,--业务类型名称
+      MTM.OUT_HOS_ID ,--调出单位ID
+      HIDO.HOS_NO AS OUT_HOS_NO, --调出单位NO
+      HIDO.HOS_CODE AS OUT_HOS_CODE,--调出单位编码
+      HIDO.HOS_NAME AS OUT_HOS_NAME,--调出单位名称
+      MTM.OUT_STORE_ID,--调出仓库ID
+      HSTO.STORE_NO AS OUT_STORE_NO,  --调出仓库变更ID
+      HSTO.STORE_CODE  AS OUT_STORE_CODE, --调出仓库编码
+      HSTO.STORE_NAME  AS OUT_STORE_NAME, --调出仓库名称
+      MTM.IN_HOS_ID,--调入单位ID
+      HIDI.HOS_NO AS IN_HOS_NO , --调入单位NO
+      HIDI.HOS_CODE AS IN_HOS_CODE,--调入单位编码
+      HIDI.HOS_NAME AS IN_HOS_NAME,--调入单位名称
+      MTM.IN_STORE_ID,  --调入仓库ID
+      HSTI.STORE_NO AS IN_STORE_NO,  --调入仓库变更ID
+      HSTI.STORE_CODE AS IN_STORE_CODE,    --调入仓库编码
+      HSTI.STORE_NAME AS IN_STORE_NAME,    --调入仓库名称
+      MIM.BRIEF,    --摘要
+      MIM.MAKER,    --制单人ID
+      SM.USER_NAME AS MAKER_NAME, --制单人名称
+      MIM.IN_DATE AS MAKE_DATE,    --编制日期
+      MIM.CHECKER,    --审核人ID
+      SC.USER_NAME AS CHECKER_NAME,    --审核人
+      MIM.CHECK_DATE,    --审核日期
+      MIM.CONFIRMER,    --入库确认人ID
+      SF.USER_NAME  AS CONFIRMER_NAME,    --入库确认人
+      MIM.CONFIRM_DATE AS BUSI_DATE,    --业务日期
+      HS.SOURCE_ID,    --资金来源ID
+      HS.SOURCE_CODE,    --资金来源编码
+      HS.SOURCE_NAME,    --资金来源名称
+      HSN.NATURE_CODE AS SOURCE_NATURE_CODE, --资金来源属性
+      HSN.NATURE_NAME AS SOURCE_NATURE_NAME, --资金来源性质名称
+      BILL.BILL_NO,  --发票号
+      MIM.STATE       --状态
+   FROM MAT_IN_MAIN MIM  --入库单表
+   JOIN MAT_TRAN_RELA MTR  --调拨单对应关系
+   ON 
+      MIM.GROUP_ID=MTR.GROUP_ID
+      AND MIM.HOS_ID=MTR.HOS_ID
+      AND MIM.COPY_CODE=MTR.COPY_CODE
+      AND MIM.IN_ID=MTR.IN_ID
+   JOIN MAT_TRAN_MAIN MTM   --调拨单
+   ON 
+      MTR.GROUP_ID=MTM.GROUP_ID
+      AND MTR.GROUP_ID=MTM.HOS_ID
+      AND MTR.COPY_CODE=MTM.COPY_CODE
+      AND MTR.TRAN_ID=MTM.TRAN_ID
+   LEFT JOIN HOS_INFO_DICT HIDO  --调出单位
+   ON
+      MTM.GROUP_ID=HIDO.GROUP_ID
+      AND MTM.OUT_HOS_ID=HIDO.HOS_ID
+      AND HIDO.IS_STOP=0
+   LEFT JOIN HOS_INFO_DICT HIDI  --调入单位
+   ON
+      MTM.GROUP_ID=HIDI.GROUP_ID
+      AND MTM.IN_HOS_ID=HIDI.HOS_ID
+      AND HIDI.IS_STOP=0
+   JOIN MAT_BUS_TYPE MBT  --业务类型
+   ON 
+      MIM.BUS_TYPE_CODE=MBT.BUS_TYPE_CODE
+   LEFT JOIN HOS_STORE_DICT HSTO--调出仓库
+   ON 
+      MTM.GROUP_ID=HSTO.GROUP_ID
+      AND MTM.HOS_ID=HSTO.HOS_ID
+      AND MTM.OUT_STORE_ID=HSTO.STORE_ID
+      AND MTM.OUT_STORE_NO=HSTO.STORE_NO
+   LEFT JOIN HOS_STORE_DICT HSTI--调入仓库
+   ON 
+      MTM.GROUP_ID=HSTI.GROUP_ID
+      AND MTM.HOS_ID=HSTI.HOS_ID
+      AND MTM.IN_STORE_ID=HSTI.STORE_ID
+      AND MTM.IN_STORE_NO=HSTI.STORE_NO
+   LEFT JOIN SYS_USER SM  --制单人
+   ON 
+      MIM.GROUP_ID=SM.GROUP_ID
+      AND MIM.HOS_ID=SM.HOS_ID
+      AND MIM.COPY_CODE=SM.COPY_CODE
+      AND MIM.MAKER=SM.USER_ID
+   LEFT JOIN SYS_USER SC   --审核人
+   ON 
+      MIM.GROUP_ID=SC.GROUP_ID
+      AND MIM.HOS_ID=SC.HOS_ID
+      AND MIM.COPY_CODE=SC.COPY_CODE
+      AND MIM.CHECKER=SC.USER_ID
+   LEFT JOIN SYS_USER SF   --确认人
+   ON 
+      MIM.GROUP_ID=SF.GROUP_ID
+      AND MIM.HOS_ID=SF.HOS_ID
+      AND MIM.COPY_CODE=SF.COPY_CODE
+      AND MIM.CONFIRMER=SF.USER_ID
+   LEFT JOIN MAT_IN_RESOURCE MIR    --资金来源表
+   ON 
+      MIM.GROUP_ID=MIR.GROUP_ID 
+      AND MIM.HOS_ID=MIR.HOS_ID
+      AND MIM.COPY_CODE=MIR.COPY_CODE
+      AND MIM.IN_ID=MIR.IN_ID
+   LEFT JOIN HOS_SOURCE HS       --资金来源字典表
+   ON 
+      MIR.GROUP_ID=HS.GROUP_ID
+      AND MIR.HOS_ID=HS.HOS_ID
+      AND MIR.SOURCE_ID=HS.SOURCE_ID
+   LEFT JOIN HOS_SOURCE_NATURE HSN   --资金来源属性表
+   ON 
+      HS.SOURCE_ATTR=HSN.NATURE_CODE
+   LEFT JOIN                        --发票
+        ( 
+          SELECT GROUP_ID,HOS_ID,COPY_CODE,IN_ID,WM_CONCAT(TO_CHAR(BILL_NO))  BILL_NO
+          FROM 
+             (SELECT DISTINCT MBD.GROUP_ID,MBD.HOS_ID,MBD.COPY_CODE,MBD.IN_ID,MBD.BILL_NO 
+             FROM MAT_BILL_DETAIL  MBD
+             ) RS
+          GROUP BY GROUP_ID,HOS_ID,COPY_CODE,IN_ID  
+         ) BILL
+   ON 
+       MIM.IN_ID=BILL.IN_ID
+       AND MIM.GROUP_ID=BILL.GROUP_ID
+       AND MIM.HOS_ID=BILL.HOS_ID
+       AND MIM.COPY_CODE=BILL.COPY_CODE  
+   WHERE MIM.STATE=3 
+ 
+	]]></sql>
+	<sql id="v_mat_tran_out_main" type="view" desc="物流调拨出库主表视图"><![CDATA[
+	  CREATE OR REPLACE VIEW v_mat_tran_out_main AS
+	  SELECT 
+	      MOM.GROUP_ID,  --集团ID
+	      MOM.HOS_ID,    --医院ID
+	      MOM.COPY_CODE, --账套编码
+	      MOM.OUT_ID AS BUSINESS_ID,     --出库单ID
+	      MOM.OUT_NO AS BUSINESS_NO,     --出库单号
+	      MTM.TRAN_NO , --调拨单号
+	      MOM.YEAR,      --年份
+	      MOM.MONTH,     --月份
+	      MOM.BUS_TYPE_CODE,--业务类型
+	      MBT.BUS_TYPE_NAME,--业务类型名称
+	      MTM.OUT_HOS_ID ,--调出单位ID
+	      HIDO.HOS_NO AS OUT_HOS_NO, --调出单位NO
+	      HIDO.HOS_CODE AS OUT_HOS_CODE,--调出单位编码
+	      HIDO.HOS_NAME AS OUT_HOS_NAME,--调出单位名称
+	      MTM.OUT_STORE_ID,--调出仓库ID
+	      HSTO.STORE_NO AS OUT_STORE_NO,  --调出仓库变更ID
+	      HSTO.STORE_CODE  AS OUT_STORE_CODE, --调出仓库编码
+	      HSTO.STORE_NAME  AS OUT_STORE_NAME, --调出仓库名称
+	      MTM.IN_HOS_ID,--调入单位ID
+	      HIDI.HOS_NO AS IN_HOS_NO , --调入单位NO
+	      HIDI.HOS_CODE AS IN_HOS_CODE,--调入单位编码
+	      HIDI.HOS_NAME AS IN_HOS_NAME,--调入单位名称
+	      MTM.IN_STORE_ID,  --调入仓库ID
+	      HSTI.STORE_NO AS IN_STORE_NO,  --调入仓库变更ID
+	      HSTI.STORE_CODE AS IN_STORE_CODE,    --调入仓库编码
+	      HSTI.STORE_NAME AS IN_STORE_NAME,    --调入仓库名称
+	      MOM.BRIEF,    --摘要
+	      MOM.MAKER,    --制单人ID
+	      SM.USER_NAME AS MAKER_NAME, --制单人名称
+	      MOM.OUT_DATE AS MAKE_DATE,    --编制日期
+	      MOM.CHECKER,    --审核人ID
+	      SC.USER_NAME AS CHECKER_NAME,    --审核人
+	      MOM.CHECK_DATE,    --审核日期
+	      MOM.CONFIRMER,    --入库确认人ID
+	      SF.USER_NAME  AS CONFIRMER_NAME,    --入库确认人
+	      MOM.CONFIRM_DATE AS BUSI_DATE,    --业务日期
+	      HS.SOURCE_ID,    --资金来源ID
+	      HS.SOURCE_CODE,    --资金来源编码
+	      HS.SOURCE_NAME,    --资金来源名称
+	      HSN.NATURE_CODE AS SOURCE_NATURE_CODE, --资金来源属性
+	      HSN.NATURE_NAME AS SOURCE_NATURE_NAME, --资金来源性质名称
+	      MOM.STATE       --状态
+	   FROM MAT_OUT_MAIN MOM  --出库单表
+	   JOIN MAT_TRAN_RELA MTR  --调拨单对应关系
+	   ON 
+	      MOM.GROUP_ID=MTR.GROUP_ID
+	      AND MOM.HOS_ID=MTR.HOS_ID
+	      AND MOM.COPY_CODE=MTR.COPY_CODE
+	      AND MOM.OUT_ID=MTR.OUT_ID
+	   JOIN MAT_TRAN_MAIN MTM   --调拨单
+	   ON 
+	      MTR.GROUP_ID=MTM.GROUP_ID
+	      AND MTR.GROUP_ID=MTM.HOS_ID
+	      AND MTR.COPY_CODE=MTM.COPY_CODE
+	      AND MTR.TRAN_ID=MTM.TRAN_ID
+	   LEFT JOIN HOS_INFO_DICT HIDO  --调出单位
+	   ON
+	      MTM.GROUP_ID=HIDO.GROUP_ID
+	      AND MTM.OUT_HOS_ID=HIDO.HOS_ID
+	      AND HIDO.IS_STOP=0
+	   LEFT JOIN HOS_INFO_DICT HIDI  --调入单位
+	   ON
+	      MTM.GROUP_ID=HIDI.GROUP_ID
+	      AND MTM.IN_HOS_ID=HIDI.HOS_ID
+	      AND HIDI.IS_STOP=0
+	   JOIN MAT_BUS_TYPE MBT  --业务类型
+	   ON 
+	      MOM.BUS_TYPE_CODE=MBT.BUS_TYPE_CODE
+	   LEFT JOIN HOS_STORE_DICT HSTO--调出仓库
+	   ON 
+	      MTM.GROUP_ID=HSTO.GROUP_ID
+	      AND MTM.HOS_ID=HSTO.HOS_ID
+	      AND MTM.OUT_STORE_ID=HSTO.STORE_ID
+	      AND MTM.OUT_STORE_NO=HSTO.STORE_NO
+	   LEFT JOIN HOS_STORE_DICT HSTI--调入仓库
+	   ON 
+	      MTM.GROUP_ID=HSTI.GROUP_ID
+	      AND MTM.HOS_ID=HSTI.HOS_ID
+	      AND MTM.IN_STORE_ID=HSTI.STORE_ID
+	      AND MTM.IN_STORE_NO=HSTI.STORE_NO
+	   LEFT JOIN SYS_USER SM  --制单人
+	   ON 
+	      MOM.GROUP_ID=SM.GROUP_ID
+	      AND MOM.HOS_ID=SM.HOS_ID
+	      AND MOM.COPY_CODE=SM.COPY_CODE
+	      AND MOM.MAKER=SM.USER_ID
+	   LEFT JOIN SYS_USER SC   --审核人
+	   ON 
+	      MOM.GROUP_ID=SC.GROUP_ID
+	      AND MOM.HOS_ID=SC.HOS_ID
+	      AND MOM.COPY_CODE=SC.COPY_CODE
+	      AND MOM.CHECKER=SC.USER_ID
+	   LEFT JOIN SYS_USER SF   --确认人
+	   ON 
+	      MOM.GROUP_ID=SF.GROUP_ID
+	      AND MOM.HOS_ID=SF.HOS_ID
+	      AND MOM.COPY_CODE=SF.COPY_CODE
+	      AND MOM.CONFIRMER=SF.USER_ID
+	   LEFT JOIN MAT_OUT_RESOURCE MIR    --资金来源表
+	   ON 
+	      MOM.GROUP_ID=MIR.GROUP_ID 
+	      AND MOM.HOS_ID=MIR.HOS_ID
+	      AND MOM.COPY_CODE=MIR.COPY_CODE
+	      AND MOM.OUT_ID=MIR.OUT_ID
+	   LEFT JOIN HOS_SOURCE HS       --资金来源字典表
+	   ON 
+	      MIR.GROUP_ID=HS.GROUP_ID
+	      AND MIR.HOS_ID=HS.HOS_ID
+	      AND MIR.SOURCE_ID=HS.SOURCE_ID
+	   LEFT JOIN HOS_SOURCE_NATURE HSN   --资金来源属性表
+	   ON 
+	      HS.SOURCE_ATTR=HSN.NATURE_CODE 
+	   WHERE MOM.STATE=3 
+ 
+	]]></sql>
+	
+</root>
+

@@ -1,0 +1,385 @@
+﻿/** 
+ * @Description:
+ * @Copyright: Copyright (c) 2015-9-16 下午9:54:34
+ * @Company: 杭州亦童科技有限公司
+ * @网站：www.s-chd.com
+ */
+ 
+package com.chd.hrp.ass.entity.check.inassets;
+
+import java.io.Serializable;
+/**
+ * 
+ * @Description:
+ * 051101 仓库盘点单明细_医用设备
+ * @Table:
+ * ASS_CHECK_S_DETAIL_INASSETS
+ * @Author: bell
+ * @email:  bell@e-tonggroup.com
+ * @Version: 1.0
+ */
+ 
+
+
+public class AssCheckSdetailInassets implements Serializable {
+
+	
+	private static final long serialVersionUID = 5454155825314635342L;
+
+	/**
+	 * 集团ID
+	 */
+	private Long group_id;
+	
+	/**
+	 * 医院ID
+	 */
+	private Long hos_id;
+	
+	/**
+	 * 账套编码
+	 */
+	private String copy_code;
+	
+	/**
+	 * 任务单号
+	 */
+	private String check_plan_no;
+	
+	/**
+	 * 盘点单号
+	 */
+	private String check_no;
+	
+	/**
+	 * 仓库编码ID
+	 */
+	private Long store_id;
+	
+	/**
+	 * 仓库编码NO
+	 */
+	private Long store_no;
+	
+	/**
+	 * 卡片编码
+	 */
+	private String ass_card_no;
+	
+	/**
+	 * 资产ID
+	 */
+	private Long ass_id;
+	
+	/**
+	 * 资产变更ID
+	 */
+	private Long ass_no;
+	
+	/**
+	 * 账面数量
+	 */
+	private Integer acc_amount;
+	
+	/**
+	 * 盘点数量
+	 */
+	private Integer check_amount;
+	
+	/**
+	 * 盈亏数量
+	 */
+	private Integer pl_amount;
+	
+	/**
+	 * 盈亏原因
+	 */
+	private String pl_reason;
+	
+	private String ass_type_name;
+	private String ass_name;
+	private String ass_ori_card_no;
+	private String bar_code;
+	private String store_name;
+	
+  
+    public String getAss_type_name() {
+    	return ass_type_name;
+    }
+
+	
+    public void setAss_type_name(String ass_type_name) {
+    	this.ass_type_name = ass_type_name;
+    }
+
+	
+    public String getAss_name() {
+    	return ass_name;
+    }
+
+	
+    public void setAss_name(String ass_name) {
+    	this.ass_name = ass_name;
+    }
+
+	
+    public String getAss_ori_card_no() {
+    	return ass_ori_card_no;
+    }
+
+	
+    public void setAss_ori_card_no(String ass_ori_card_no) {
+    	this.ass_ori_card_no = ass_ori_card_no;
+    }
+
+	
+    public String getStore_name() {
+    	return store_name;
+    }
+
+	
+    public void setStore_name(String store_name) {
+    	this.store_name = store_name;
+    }
+/**
+	 * 导入验证信息
+	 */
+	private String error_type;
+	
+	/**
+	* 设置 集团ID
+	* @param value 
+	*/
+	public void setGroup_id(Long value) {
+		this.group_id = value;
+	}
+	
+	/**
+	* 获取 集团ID
+	* @return Long
+	*/
+	public Long getGroup_id() {
+		return this.group_id;
+	}
+	/**
+	* 设置 医院ID
+	* @param value 
+	*/
+	public void setHos_id(Long value) {
+		this.hos_id = value;
+	}
+	
+	/**
+	* 获取 医院ID
+	* @return Long
+	*/
+	public Long getHos_id() {
+		return this.hos_id;
+	}
+	/**
+	* 设置 账套编码
+	* @param value 
+	*/
+	public void setCopy_code(String value) {
+		this.copy_code = value;
+	}
+	
+	/**
+	* 获取 账套编码
+	* @return String
+	*/
+	public String getCopy_code() {
+		return this.copy_code;
+	}
+	/**
+	* 设置 任务单号
+	* @param value 
+	*/
+	public void setCheck_plan_no(String value) {
+		this.check_plan_no = value;
+	}
+	
+	/**
+	* 获取 任务单号
+	* @return String
+	*/
+	public String getCheck_plan_no() {
+		return this.check_plan_no;
+	}
+	/**
+	* 设置 盘点单号
+	* @param value 
+	*/
+	public void setCheck_no(String value) {
+		this.check_no = value;
+	}
+	
+	/**
+	* 获取 盘点单号
+	* @return String
+	*/
+	public String getCheck_no() {
+		return this.check_no;
+	}
+	/**
+	* 设置 仓库编码ID
+	* @param value 
+	*/
+	public void setStore_id(Long value) {
+		this.store_id = value;
+	}
+	
+	/**
+	* 获取 仓库编码ID
+	* @return Long
+	*/
+	public Long getStore_id() {
+		return this.store_id;
+	}
+	/**
+	* 设置 仓库编码NO
+	* @param value 
+	*/
+	public void setStore_no(Long value) {
+		this.store_no = value;
+	}
+	
+	/**
+	* 获取 仓库编码NO
+	* @return Long
+	*/
+	public Long getStore_no() {
+		return this.store_no;
+	}
+	/**
+	* 设置 卡片编码
+	* @param value 
+	*/
+	public void setAss_card_no(String value) {
+		this.ass_card_no = value;
+	}
+	
+	/**
+	* 获取 卡片编码
+	* @return String
+	*/
+	public String getAss_card_no() {
+		return this.ass_card_no;
+	}
+	/**
+	* 设置 资产ID
+	* @param value 
+	*/
+	public void setAss_id(Long value) {
+		this.ass_id = value;
+	}
+	
+	/**
+	* 获取 资产ID
+	* @return Long
+	*/
+	public Long getAss_id() {
+		return this.ass_id;
+	}
+	/**
+	* 设置 资产变更ID
+	* @param value 
+	*/
+	public void setAss_no(Long value) {
+		this.ass_no = value;
+	}
+	
+	/**
+	* 获取 资产变更ID
+	* @return Long
+	*/
+	public Long getAss_no() {
+		return this.ass_no;
+	}
+	/**
+	* 设置 账面数量
+	* @param value 
+	*/
+	public void setAcc_amount(Integer value) {
+		this.acc_amount = value;
+	}
+	
+	/**
+	* 获取 账面数量
+	* @return Integer
+	*/
+	public Integer getAcc_amount() {
+		return this.acc_amount;
+	}
+	/**
+	* 设置 盘点数量
+	* @param value 
+	*/
+	public void setCheck_amount(Integer value) {
+		this.check_amount = value;
+	}
+	
+	/**
+	* 获取 盘点数量
+	* @return Integer
+	*/
+	public Integer getCheck_amount() {
+		return this.check_amount;
+	}
+	/**
+	* 设置 盈亏数量
+	* @param value 
+	*/
+	public void setPl_amount(Integer value) {
+		this.pl_amount = value;
+	}
+	
+	/**
+	* 获取 盈亏数量
+	* @return Integer
+	*/
+	public Integer getPl_amount() {
+		return this.pl_amount;
+	}
+	/**
+	* 设置 盈亏原因
+	* @param value 
+	*/
+	public void setPl_reason(String value) {
+		this.pl_reason = value;
+	}
+	
+	/**
+	* 获取 盈亏原因
+	* @return String
+	*/
+	public String getPl_reason() {
+		return this.pl_reason;
+	}
+	
+	/**
+	 * 设置 导入验证信息
+	 */
+	public void setError_type(String error_type) {
+		this.error_type = error_type;
+	}
+	/**
+	 * 获取 导入验证信息
+	 */
+	public String getError_type() {
+		return error_type;
+	}
+
+
+	
+    public String getBar_code() {
+    	return bar_code;
+    }
+
+
+	
+    public void setBar_code(String bar_code) {
+    	this.bar_code = bar_code;
+    }
+	
+}

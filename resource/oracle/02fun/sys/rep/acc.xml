@@ -1,0 +1,3736 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+
+	<sql id="rf_acc_ncye" type="fun" desc="取年初数"><![CDATA[
+	   /*-------------------------------------------------------------------------
+   || 函数名称 ：RF_ACC_NCYE
+   || 功能描述 ：取科目年初余额
+   || 参数描述 ：参数标识          名称             输入/输出    类型
+   ||            -------------------------------------------------------------
+   ||            prm_group_id       集团             IN           NUMBER
+   ||            prm_hos_id         医院             IN           NUMBER
+   ||            prm_copy_code      账套             IN           VARCHAR2
+   ||            prm_acc_year       年度             IN           VARCHAR2
+   ||            prm_cur            币种:RMB/USB     IN           VARCHAR2
+   ||            prm_subj_code      会计科目         IN           VARCHAR2
+   ||
+   || 返 回 值 ：                   借方发生额       OUT          NUMBER
+   ||
+   || 作    者 ：           完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：           修改日期：
+   ||-------------------------------------------------------------------------*/
+   CREATE OR REPLACE FUNCTION RF_ACC_NCYE( prm_group_id       IN    NUMBER        --集团
+                                          ,prm_hos_id         IN    NUMBER        --医院
+                                          ,prm_copy_code      IN    VARCHAR2      --帐套
+                                          ,prm_acc_year       IN    VARCHAR2      --年度
+                                          ,prm_cur            IN    VARCHAR2      --币种  RMB/USB
+                                          ,prm_subj_code      IN    VARCHAR2      --科目编码                                        
+                                         ) RETURN NUMBER
+  IS
+    n_ret  NUMBER(19,6);
+   
+  BEGIN
+    --初始化变量
+    n_ret      :=  0 ;
+    
+    if prm_cur = 'RMB' then    --币种为RMB
+        select nvl(sum(t1.end_os), 0)
+          into n_ret
+          from acc_leder t1
+         where t1.group_id  = prm_group_id
+           and t1.hos_id    = prm_hos_id
+           and t1.copy_code = prm_copy_code
+           and t1.acc_year  = prm_acc_year
+           and t1.acc_month = '00'
+           and t1.subj_code like prm_subj_code || '%';      
+    else  --币种为外币
+        select nvl(sum(t1.end_os_w), 0)
+          into n_ret
+          from acc_leder t1
+         where t1.group_id  = prm_group_id
+           and t1.hos_id    = prm_hos_id
+           and t1.copy_code = prm_copy_code
+           and t1.acc_year  = prm_acc_year
+           and t1.acc_month = '00'
+           and t1.subj_code like prm_subj_code || '%';   
+    end if;    
+   
+    return n_ret;
+  
+  EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+         return 0;
+      WHEN OTHERS THEN        
+         return 0; 
+  END RF_ACC_NCYE;
+	]]></sql>
+	
+	<sql id="rf_acc_qmye" type="fun" desc="取期末余额"><![CDATA[
+	   /*-------------------------------------------------------------------------
+   || 函数名称 ：RF_ACC_QMYE
+   || 功能描述 ：取期末余额
+   || 参数描述 ：参数标识          名称             输入/输出    类型
+   ||            -------------------------------------------------------------
+   ||            prm_group_id       集团             IN           NUMBER
+   ||            prm_hos_id         医院             IN           NUMBER
+   ||            prm_copy_code      账套             IN           VARCHAR2
+   ||            prm_acc_year       年度             IN           VARCHAR2
+   ||            prm_acc_month      月份             IN           VARCHAR2             
+   ||            prm_subj_code      会计科目         IN           VARCHAR2
+   ||			 prm_cur            币种:RMB/USB     IN           VARCHAR2
+   ||            prm_con_acc        是否包含未记账   IN           NUMBER
+   ||
+   || 返 回 值 ：                   借方发生额       OUT          NUMBER
+   ||
+   || 作    者 ：           完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：           修改日期：
+   ||-------------------------------------------------------------------------*/
+   CREATE OR REPLACE FUNCTION RF_ACC_QMYE( prm_group_id       IN    NUMBER        --集团
+                                          ,prm_hos_id         IN    NUMBER        --医院
+                                          ,prm_copy_code      IN    VARCHAR2      --帐套
+                                          ,prm_acc_year       IN    VARCHAR2      --年度
+                                          ,prm_acc_month      IN    VARCHAR2      --月份
+                                          ,prm_subj_code      IN    VARCHAR2      --科目编码
+                                          ,prm_cur            IN    VARCHAR2      --币种  RMB/USB
+                                          ,prm_con_acc        IN    NUMBER        --是否包括未记账 0:不包含未记账  1:包含未记账
+                                         ) RETURN NUMBER
+  IS
+    n_init_money      NUMBER(19,6);  --初始余额
+    n_period_money    NUMBER(19,6);  --累计发生额
+    n_count           integer:= 0 ;
+    n_ret             NUMBER(19,6);
+    n_dire            acc_subj.subj_dire%type;
+    n_3302            NUMBER(19,6);
+    n_8701            NUMBER(19,6);
+
+  BEGIN
+    --初始化变量
+    n_init_money   :=  0 ;
+    n_period_money :=  0 ;
+    n_ret          :=  0 ;
+    n_dire         :=  0 ; -- 0:借方 ,1:贷方
+    n_3302         :=  0 ;
+    n_8701         :=  0 ;
+    
+   --默认为上级科目余额与下级科目余额方向一致
+   select nvl(subj_dire,0)   --没有维护默认借方
+     into n_dire
+     from acc_subj
+    where group_id  = prm_group_id
+      and hos_id    = prm_hos_id
+      and copy_code = prm_copy_code
+      and acc_year  = prm_acc_year
+      and subj_code = prm_subj_code;
+    
+    if prm_con_acc = 0 then      --从帐表中获取
+      if prm_cur = 'RMB' then    --币种为RMB
+          select nvl(sum(t1.end_os), 0)
+            into n_ret
+            from acc_leder t1          
+           where t1.group_id  = prm_group_id
+             and t1.hos_id    = prm_hos_id
+             and t1.copy_code = prm_copy_code
+             and t1.acc_year  = prm_acc_year
+             and (
+				(prm_acc_month<14 and t1.acc_month = prm_acc_month)
+				or (prm_acc_month='14' and t1.acc_month ='03')
+				or (prm_acc_month='15' and t1.acc_month = '06')
+				or (prm_acc_month='16' and t1.acc_month = '09')
+				or (prm_acc_month='17' and t1.acc_month = '12')
+				or (prm_acc_month='18' and t1.acc_month = '06')
+				or (prm_acc_month='19' and t1.acc_month = '12')
+				or (prm_acc_month='20' and t1.acc_month = '12')
+			 )
+             and t1.subj_code like prm_subj_code || '%';
+      else  --币种为外币
+          select nvl(sum(t1.end_os_w), 0)
+            into n_ret
+            from acc_leder t1          
+           where t1.group_id  = prm_group_id
+             and t1.hos_id    = prm_hos_id
+             and t1.copy_code = prm_copy_code
+             and t1.acc_year  = prm_acc_year
+             and (
+				(prm_acc_month<14 and t1.acc_month = prm_acc_month)
+				or (prm_acc_month='14' and t1.acc_month ='03')
+				or (prm_acc_month='15' and t1.acc_month = '06')
+				or (prm_acc_month='16' and t1.acc_month = '09')
+				or (prm_acc_month='17' and t1.acc_month = '12')
+				or (prm_acc_month='18' and t1.acc_month = '06')
+				or (prm_acc_month='19' and t1.acc_month = '12')
+				or (prm_acc_month='20' and t1.acc_month = '12')
+			 )
+             and t1.subj_code like prm_subj_code || '%';
+      end if;
+    else    --从凭证中获取
+
+       
+
+      if prm_cur = 'RMB' then    --币种为RMB
+
+         select count(1)
+           into n_count
+           from acc_leder t1        
+         where t1.group_id  = prm_group_id
+           and t1.hos_id    = prm_hos_id
+           and t1.copy_code = prm_copy_code
+           and t1.acc_year  = prm_acc_year
+           and t1.acc_month = '00'
+           and t1.subj_code like prm_subj_code || '%';
+
+         if n_count > 0 then
+           --获取初始账年初余额
+           select nvl(sum(t1.end_os), 0)
+              into n_init_money
+              from acc_leder t1           
+             where t1.group_id  = prm_group_id
+               and t1.hos_id    = prm_hos_id
+               and t1.copy_code = prm_copy_code
+               and t1.acc_year  = prm_acc_year
+               and t1.acc_month = '00'
+               and t1.subj_code like prm_subj_code || '%';
+         end if;
+
+         if n_dire = 0  then  --余额方向为借方时：年初余额+借方发生-贷方发生
+             select nvl(sum(t1.DEBIT), 0) - nvl(sum(t1.credit), 0)
+               into n_period_money
+               from acc_vouch_detail t1
+               left join acc_vouch t2
+                 on t1.vouch_id  = t2.vouch_id
+                and t1.group_id  = t2.group_id
+                and t1.hos_id    = t2.hos_id
+                and t1.copy_code = t2.copy_code
+                and t1.acc_year  = t2.acc_year              
+             where t1.group_id   = prm_group_id
+              and t1.hos_id      = prm_hos_id
+              and t1.copy_code   = prm_copy_code
+              and t1.acc_year    = prm_acc_year
+              and t2.acc_month  <= prm_acc_month
+              and t2.STATE       >  0              -- -1草稿，0作废，1新建，2出纳签字，3审核，99记账
+              and t1.subj_code like  prm_subj_code || '%';
+
+         else  --余额方向为贷方时：年初余额+贷方发生-借方发生
+
+             select nvl(sum(t1.credit), 0) - nvl(sum(t1.DEBIT), 0)
+               into n_period_money
+               from acc_vouch_detail t1
+               left join acc_vouch t2
+                 on t1.vouch_id  = t2.vouch_id
+                and t1.group_id  = t2.group_id
+                and t1.hos_id    = t2.hos_id
+                and t1.copy_code = t2.copy_code
+                and t1.acc_year  = t2.acc_year              
+             where t1.group_id   = prm_group_id
+              and t1.hos_id      = prm_hos_id
+              and t1.copy_code   = prm_copy_code
+              and t1.acc_year    = prm_acc_year
+              and t2.acc_month  <= prm_acc_month
+              and t2.STATE       >  0              -- -1草稿，0作废，1新建，2出纳签字，3审核，99记账
+              and t1.subj_code like  prm_subj_code || '%';
+
+         end if;
+
+          n_ret := n_init_money + n_period_money;
+
+      else
+         select count(1)
+           into n_count
+           from acc_leder t1         
+         where t1.group_id  = prm_group_id
+           and t1.hos_id    = prm_hos_id
+           and t1.copy_code = prm_copy_code
+           and t1.acc_year  = prm_acc_year
+           and t1.acc_month = '00'
+           and t1.subj_code like prm_subj_code || '%';
+
+         if n_count > 0 then
+           --获取初始账累计借方发生额
+           select nvl(sum(t1.sum_od_w), 0)
+              into n_init_money
+              from acc_leder t1            
+             where t1.group_id  = prm_group_id
+               and t1.hos_id    = prm_hos_id
+               and t1.copy_code = prm_copy_code
+               and t1.acc_year  = prm_acc_year
+               and t1.acc_month = '00'
+               and t1.subj_code like prm_subj_code || '%';
+          end if;
+         if n_dire = 0  then  --余额方向为借方时：年初余额+借方发生-贷方发生
+             select nvl(sum(t1.DEBIT_W), 0) - nvl(sum(t1.credit_W), 0)
+               into n_period_money
+               from acc_vouch_detail t1
+               left join acc_vouch t2
+                 on t1.vouch_id  = t2.vouch_id
+                and t1.group_id  = t2.group_id
+                and t1.hos_id    = t2.hos_id
+                and t1.copy_code = t2.copy_code
+                and t1.acc_year  = t2.acc_year              
+             where t1.group_id   = prm_group_id
+              and t1.hos_id      = prm_hos_id
+              and t1.copy_code   = prm_copy_code
+              and t1.acc_year    = prm_acc_year
+              and t2.acc_month  <= prm_acc_month
+              and t2.STATE       >  0              ---1草稿，0作废，1新建，2出纳签字，3审核，99记账
+              and t1.subj_code like  prm_subj_code || '%';
+         else
+             select nvl(sum(t1.credit_W), 0) - nvl(sum(t1.DEBIT_W), 0)
+               into n_period_money
+               from acc_vouch_detail t1
+               left join acc_vouch t2
+                 on t1.vouch_id  = t2.vouch_id
+                and t1.group_id  = t2.group_id
+                and t1.hos_id    = t2.hos_id
+                and t1.copy_code = t2.copy_code
+                and t1.acc_year  = t2.acc_year              
+             where t1.group_id   = prm_group_id
+              and t1.hos_id      = prm_hos_id
+              and t1.copy_code   = prm_copy_code
+              and t1.acc_year    = prm_acc_year
+              and t2.acc_month  <= prm_acc_month
+              and t2.STATE       >  0              ---1草稿，0作废，1新建，2出纳签字，3审核，99记账
+              and t1.subj_code like  prm_subj_code || '%';
+         end if;
+         n_ret := n_init_money + n_period_money ;
+      end if;
+    end if;
+    if substr(prm_subj_code,1,4) = '3301' then       
+        BEGIN
+          select nvl(t1.credit, 0) - nvl(t1.debit, 0)
+            into n_3302
+            from acc_vouch_detail t1
+            left join acc_vouch t2
+              on t1.vouch_id = t2.vouch_id
+             and t1.group_id = t2.group_id
+             and t1.hos_id = t2.hos_id
+             and t1.copy_code = t2.copy_code
+             and t1.acc_year = t2.acc_year           
+           where t1.group_id = prm_group_id
+             and t1.hos_id = prm_hos_id
+             and t1.copy_code = prm_copy_code
+             and t2.acc_year = prm_acc_year
+             and t2.acc_month = prm_acc_month
+             and t2.STATE > 0
+             AND t1.subj_code like prm_subj_code || '%'
+             and t2.vouch_id in (select t1.vouch_id
+                                   from acc_vouch_detail t1
+                                   left join acc_vouch t2
+                                     on t1.vouch_id = t2.vouch_id
+                                    and t1.group_id = t2.group_id
+                                    and t1.hos_id = t2.hos_id
+                                    and t1.copy_code = t2.copy_code
+                                    and t1.acc_year = t2.acc_year                                  
+                                  where t1.group_id = prm_group_id
+                                    and t1.hos_id = prm_hos_id
+                                    and t1.copy_code = prm_copy_code
+                                    and t2.acc_year = prm_acc_year
+                                    and t2.acc_month = prm_acc_month
+                                    and t2.STATE > 0
+                                    AND t1.subj_code like '3302%');
+
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+               n_3302 := 0;
+        end;
+    end if;
+    
+    if n_dire = 0 then 
+      return n_ret - n_3302;
+    else
+      return n_ret + n_3302;
+    end if;
+
+  EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+         return 0;
+      WHEN OTHERS THEN
+         return 0;
+  END RF_ACC_QMYE;
+	]]></sql>
+	
+	
+	<sql id="rf_acc_qcye" type="fun" desc="取期初余额"><![CDATA[
+	   /*-------------------------------------------------------------------------
+   || 函数名称 ：RF_ACC_QCYE
+   || 功能描述 ：取期初余额
+   || 参数描述 ：参数标识          名称             输入/输出    类型
+   ||            -------------------------------------------------------------
+   ||            prm_group_id       集团             IN           NUMBER
+   ||            prm_hos_id         医院             IN           NUMBER
+   ||            prm_copy_code      账套             IN           VARCHAR2
+   ||            prm_acc_year       年度             IN           VARCHAR2
+   ||            prm_acc_month      月份             IN           VARCHAR2
+   ||            prm_cur            币种:RMB/USB     IN           VARCHAR2
+   ||            prm_subj_code      会计科目         IN           VARCHAR2
+   ||            prm_con_acc        是否包含未记账   IN           NUMBER
+   ||
+   || 返 回 值 ：                   借方发生额       OUT          NUMBER
+   ||
+   || 作    者 ：           完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：           修改日期：
+   ||-------------------------------------------------------------------------*/
+   CREATE OR REPLACE FUNCTION RF_ACC_QCYE( prm_group_id       IN    NUMBER        --集团
+                                          ,prm_hos_id         IN    NUMBER        --医院
+                                          ,prm_copy_code      IN    VARCHAR2      --帐套
+                                          ,prm_acc_year       IN    VARCHAR2      --年度
+                                          ,prm_acc_month      IN    VARCHAR2      --月份
+                                          ,prm_cur            IN    VARCHAR2      --币种  RMB/USB
+                                          ,prm_subj_code      IN    VARCHAR2      --科目编码
+                                          ,prm_con_acc        IN    NUMBER        --是否包括未记账 0:不包含未记账  1:包含未记账
+                                         ) RETURN NUMBER
+  IS
+    n_init_money      NUMBER(19,6);  --初始余额
+    n_period_money    NUMBER(19,6);  --累计发生额
+    n_count           integer:= 0 ;
+    n_ret             NUMBER(19,6);
+    n_dire            acc_subj.subj_dire%type;
+   
+  BEGIN
+    --初始化变量
+    n_init_money   :=  0 ;
+    n_period_money :=  0 ;
+    n_ret          :=  0 ;
+    n_dire         :=  0 ; -- 0:借方 ,1:贷方
+    
+    if prm_con_acc = 0 then      --从帐表中获取        
+      if prm_cur = 'RMB' then    --币种为RMB
+          select nvl(sum(t1.bal_os), 0)
+            into n_ret
+            from acc_leder t1          
+           where t1.group_id  = prm_group_id
+             and t1.hos_id    = prm_hos_id
+             and t1.copy_code = prm_copy_code
+             and t1.acc_year  = prm_acc_year
+             and t1.acc_month = prm_acc_month
+             and t1.subj_code like prm_subj_code || '%';      
+      else  --币种为外币
+          select nvl(sum(t1.bal_os_w), 0)
+            into n_ret
+            from acc_leder t1         
+           where t1.group_id  = prm_group_id
+             and t1.hos_id    = prm_hos_id
+             and t1.copy_code = prm_copy_code
+             and t1.acc_year  = prm_acc_year
+             and t1.acc_month = prm_acc_month
+             and t1.subj_code like prm_subj_code || '%';   
+      end if;    
+    else    --从凭证中获取
+      
+       --默认为上级科目余额与下级科目余额方向一致
+       select nvl(subj_dire,0)   --没有维护默认借方
+         into n_dire
+         from acc_subj
+        where group_id  = prm_group_id
+          and hos_id    = prm_hos_id
+          and copy_code = prm_copy_code
+          and acc_year  = prm_acc_year
+          and subj_code = prm_subj_code;
+      
+      if prm_cur = 'RMB' then    --币种为RMB
+        
+         select count(1)
+           into n_count
+           from acc_leder t1         
+         where t1.group_id  = prm_group_id
+           and t1.hos_id    = prm_hos_id
+           and t1.copy_code = prm_copy_code
+           and t1.acc_year  = prm_acc_year
+           and t1.acc_month = '00'
+           and t1.subj_code like prm_subj_code || '%';  
+         
+         if n_count > 0 then 
+           --获取初始账年初余额
+           select nvl(sum(t1.end_os), 0)
+              into n_init_money
+              from acc_leder t1           
+             where t1.group_id  = prm_group_id
+               and t1.hos_id    = prm_hos_id
+               and t1.copy_code = prm_copy_code
+               and t1.acc_year  = prm_acc_year
+               and t1.acc_month = '00'
+               and t1.subj_code like prm_subj_code || '%';     
+         end if;   
+             
+         if n_dire = 0  then  --余额方向为借方时：年初余额+借方发生-贷方发生   
+             select nvl(sum(t1.DEBIT), 0) - nvl(sum(t1.credit), 0)
+               into n_period_money
+               from acc_vouch_detail t1
+               left join acc_vouch t2
+                 on t1.vouch_id  = t2.vouch_id
+                and t1.group_id  = t2.group_id
+                and t1.hos_id    = t2.hos_id
+                and t1.copy_code = t2.copy_code
+                and t1.acc_year  = t2.acc_year             
+             where t1.group_id   = prm_group_id
+              and t1.hos_id      = prm_hos_id
+              and t1.copy_code   = prm_copy_code
+              and t1.acc_year    = prm_acc_year
+              and t2.acc_month   < prm_acc_month
+              and t2.STATE       >  0              -- -1草稿，0作废，1新建，2出纳签字，3审核，99记账 
+              and t1.subj_code like  prm_subj_code || '%'; 
+              
+         else  --余额方向为贷方时：年初余额+贷方发生-借方发生
+           
+             select nvl(sum(t1.credit), 0) - nvl(sum(t1.DEBIT), 0)
+               into n_period_money
+               from acc_vouch_detail t1
+               left join acc_vouch t2
+                 on t1.vouch_id  = t2.vouch_id
+                and t1.group_id  = t2.group_id
+                and t1.hos_id    = t2.hos_id
+                and t1.copy_code = t2.copy_code
+                and t1.acc_year  = t2.acc_year              
+             where t1.group_id   = prm_group_id
+              and t1.hos_id      = prm_hos_id
+              and t1.copy_code   = prm_copy_code
+              and t1.acc_year    = prm_acc_year
+              and t2.acc_month   < prm_acc_month
+              and t2.STATE       >  0              -- -1草稿，0作废，1新建，2出纳签字，3审核，99记账 
+              and t1.subj_code like  prm_subj_code || '%'; 
+         
+         end if;     
+          
+          n_ret := n_init_money + n_period_money; 
+          
+      else
+         select count(1)
+           into n_count
+           from acc_leder t1         
+         where t1.group_id  = prm_group_id
+           and t1.hos_id    = prm_hos_id
+           and t1.copy_code = prm_copy_code
+           and t1.acc_year  = prm_acc_year
+           and t1.acc_month = '00'
+           and t1.subj_code like prm_subj_code || '%';  
+         
+         if n_count > 0 then 
+           --获取初始账累计借方发生额
+           select nvl(sum(t1.sum_od_w), 0)
+              into n_init_money
+              from acc_leder t1            
+             where t1.group_id  = prm_group_id
+               and t1.hos_id    = prm_hos_id
+               and t1.copy_code = prm_copy_code
+               and t1.acc_year  = prm_acc_year
+               and t1.acc_month = '00'
+               and t1.subj_code like prm_subj_code || '%';       
+          end if;     
+         if n_dire = 0  then  --余额方向为借方时：年初余额+借方发生-贷方发生   
+             select nvl(sum(t1.DEBIT_W), 0) - nvl(sum(t1.credit_W), 0)
+               into n_period_money
+               from acc_vouch_detail t1
+               left join acc_vouch t2
+                 on t1.vouch_id  = t2.vouch_id
+                and t1.group_id  = t2.group_id
+                and t1.hos_id    = t2.hos_id
+                and t1.copy_code = t2.copy_code
+                and t1.acc_year  = t2.acc_year             
+             where t1.group_id   = prm_group_id
+              and t1.hos_id      = prm_hos_id
+              and t1.copy_code   = prm_copy_code
+              and t1.acc_year    = prm_acc_year
+              and t2.acc_month   < prm_acc_month
+              and t2.STATE       >  0              ---1草稿，0作废，1新建，2出纳签字，3审核，99记账 
+              and t1.subj_code like  prm_subj_code || '%'; 
+         else
+             select nvl(sum(t1.credit_W), 0) - nvl(sum(t1.DEBIT_W), 0)
+               into n_period_money
+               from acc_vouch_detail t1
+               left join acc_vouch t2
+                 on t1.vouch_id  = t2.vouch_id
+                and t1.group_id  = t2.group_id
+                and t1.hos_id    = t2.hos_id
+                and t1.copy_code = t2.copy_code
+                and t1.acc_year  = t2.acc_year              
+             where t1.group_id   = prm_group_id
+              and t1.hos_id      = prm_hos_id
+              and t1.copy_code   = prm_copy_code
+              and t1.acc_year    = prm_acc_year
+              and t2.acc_month   < prm_acc_month
+              and t2.STATE       >  0              ---1草稿，0作废，1新建，2出纳签字，3审核，99记账 
+              and t1.subj_code like  prm_subj_code || '%';    
+         end if; 
+         n_ret := n_init_money + n_period_money ; 
+      end if;
+    end if;
+    
+    return n_ret;
+  
+  EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+         return 0;
+      WHEN OTHERS THEN        
+         return 0; 
+  END RF_ACC_QCYE;
+	]]></sql>
+	
+	<sql id="rf_acc_bqxjll" type="fun" desc="取本期现金流量金额"><![CDATA[
+		   /*-------------------------------------------------------------------------
+   || 函数名称 ：RF_ACC_BQXJLL
+   || 功能描述 ：取本期现金流量金额
+   || 参数描述 ：参数标识          名称             输入/输出    类型
+   ||            -------------------------------------------------------------
+   ||            prm_group_id       集团             IN           NUMBER
+   ||            prm_hos_id         医院             IN           NUMBER
+   ||            prm_copy_code      账套             IN           VARCHAR2
+   ||            prm_acc_year       年度             IN           VARCHAR2
+   ||            prm_acc_month      月份             IN           VARCHAR2   
+   ||            prm_cash_item      会计科目         IN           VARCHAR2
+   ||            prm_con_acc        是否包含未记账   IN           NUMBER
+   ||
+   || 返 回 值 ：                   借方发生额       OUT          NUMBER
+   ||
+   || 作    者 ：           完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：           修改日期：
+   ||-------------------------------------------------------------------------*/
+   CREATE OR REPLACE FUNCTION RF_ACC_BQXJLL( prm_group_id       IN    NUMBER        --集团
+                                            ,prm_hos_id         IN    NUMBER        --医院
+                                            ,prm_copy_code      IN    VARCHAR2      --帐套
+                                            ,prm_acc_year       IN    VARCHAR2      --年度
+                                            ,prm_acc_month      IN    VARCHAR2      --月份                                         
+                                            ,prm_cash_item      IN    VARCHAR2      --科目编码
+                                            ,prm_con_acc        IN    NUMBER        --是否包括未记账 0:不包含未记账  1:包含未记账
+                                           ) RETURN NUMBER
+  IS
+    n_ret  NUMBER(19,6);
+   
+  BEGIN
+    --初始化变量
+    n_ret      :=  0 ;
+    
+    if prm_con_acc = 0 then      --从帐表中获取        
+       select nvl(sum(t1.cash_money), 0)
+         into n_ret
+        from acc_cash_flow t1        
+       inner join acc_vouch_detail t2
+          on t1.vouch_id=t2.vouch_id
+         and t1.vouch_detail_id = t2.vouch_detail_id
+         and t1.group_id        = t2.group_id
+         and t1.hos_id          = t2.hos_id
+         and t1.copy_code       = t2.copy_code
+        left join acc_vouch t3
+          on t2.vouch_id   = t3.vouch_id
+         and t2.group_id   = t3.group_id
+         and t2.hos_id     = t3.hos_id
+         and t2.copy_code  = t3.copy_code
+         and t2.acc_year   = t3.acc_year
+        left join acc_cash_item t4
+          on t1.group_id   = t4.group_id
+         and t1.hos_id     = t4.hos_id
+         and t1.copy_code  = t4.copy_code
+         and t1.cash_item_id  = t4.cash_item_id
+      where t1.group_id       = prm_group_id
+        and t1.hos_id         = prm_hos_id
+        and t1.copy_code      = prm_copy_code
+        and t2.acc_year       = prm_acc_year
+        and t3.acc_month      = prm_acc_month
+        and t3.state          = 99                -- -1草稿，0作废，1新建，2出纳签字，3审核，99记账 
+        and t4.cash_item_code = prm_cash_item;      
+     
+    else    --从凭证中获取     
+       select nvl(sum(t1.cash_money), 0)
+         into n_ret
+        from acc_cash_flow t1        
+       inner join acc_vouch_detail t2
+          on t1.vouch_id=t2.vouch_id
+         and t1.vouch_detail_id = t2.vouch_detail_id
+         and t1.group_id        = t2.group_id
+         and t1.hos_id          = t2.hos_id
+         and t1.copy_code       = t2.copy_code
+        left join acc_vouch t3
+          on t2.vouch_id   = t3.vouch_id
+         and t2.group_id   = t3.group_id
+         and t2.hos_id     = t3.hos_id
+         and t2.copy_code  = t3.copy_code
+         and t2.acc_year   = t3.acc_year
+        left join acc_cash_item t4
+          on t1.group_id   = t4.group_id
+         and t1.hos_id     = t4.hos_id
+         and t1.copy_code  = t4.copy_code
+         and t1.cash_item_id  = t4.cash_item_id
+      where t1.group_id       = prm_group_id
+        and t1.hos_id         = prm_hos_id
+        and t1.copy_code      = prm_copy_code
+        and t2.acc_year       = prm_acc_year
+        and t3.acc_month      = prm_acc_month
+        and t3.state          > 0                -- -1草稿，0作废，1新建，2出纳签字，3审核，99记账 
+        and t4.cash_item_code = prm_cash_item;        
+    end if;
+    
+    return n_ret;
+  
+  EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+         return 0;
+      WHEN OTHERS THEN        
+         return 0; 
+  END RF_ACC_BQXJLL;
+  
+	]]></sql>
+	
+	
+	<sql id="rf_acc_bqjf" type="fun" desc="取本期借方发生额"><![CDATA[
+	   /*-------------------------------------------------------------------------
+   || 函数名称 ：RF_ACC_BQJF
+   || 功能描述 ：取本期借方发生额
+   || 参数描述 ：参数标识          名称             输入/输出    类型
+   ||            -------------------------------------------------------------
+   ||            prm_group_id       集团             IN           NUMBER
+   ||            prm_hos_id         医院             IN           NUMBER
+   ||            prm_copy_code      账套             IN           VARCHAR2
+   ||            prm_acc_year       年度             IN           VARCHAR2
+   ||            prm_acc_month      月份             IN           VARCHAR2
+   ||            prm_cur            币种:RMB/USB     IN           VARCHAR2
+   ||            prm_subj_code      会计科目         IN           VARCHAR2
+   ||            prm_con_acc        是否包含未记账   IN           NUMBER
+   ||
+   || 返 回 值 ：                   借方发生额       OUT          NUMBER
+   ||
+   || 作    者 ：           完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：           修改日期：
+   ||-------------------------------------------------------------------------*/
+   CREATE OR REPLACE FUNCTION RF_ACC_BQJF( prm_group_id       IN    NUMBER        --集团
+                                          ,prm_hos_id         IN    NUMBER        --医院
+                                          ,prm_copy_code      IN    VARCHAR2      --帐套
+                                          ,prm_acc_year       IN    VARCHAR2      --年度
+                                          ,prm_acc_month      IN    VARCHAR2      --月份
+                                          ,prm_cur            IN    VARCHAR2      --币种  RMB/USB
+                                          ,prm_subj_code      IN    VARCHAR2      --科目编码
+                                          ,prm_con_acc        IN    NUMBER        --是否包括未记账 0:不包含未记账  1:包含未记账
+                                         ) RETURN NUMBER
+  IS
+    n_ret  NUMBER(19,6);
+    n_3302         NUMBER(19,6);  
+    
+  BEGIN
+    --初始化变量
+    n_ret          :=  0 ;
+    n_3302         :=  0 ;
+    
+    if prm_con_acc = 0 then      --从帐表中获取        
+      if prm_cur = 'RMB' then    --币种为RMB
+          select nvl(sum(t1.this_od), 0)
+            into n_ret
+            from acc_leder t1          
+           where t1.group_id  = prm_group_id
+             and t1.hos_id    = prm_hos_id
+             and t1.copy_code = prm_copy_code
+             and t1.acc_year  = prm_acc_year
+             and (
+				(prm_acc_month<14 and t1.acc_month = prm_acc_month)
+				or (prm_acc_month='14' and t1.acc_month between '01' and '03')
+				or (prm_acc_month='15' and t1.acc_month between '04' and '06')
+				or (prm_acc_month='16' and t1.acc_month between '07' and '09')
+				or (prm_acc_month='17' and t1.acc_month between '10' and '12')
+				or (prm_acc_month='18' and t1.acc_month between '01' and '06')
+				or (prm_acc_month='19' and t1.acc_month between '07' and '12')
+			 )
+             and t1.subj_code like prm_subj_code || '%';      
+      else  --币种为外币
+          select nvl(sum(t1.this_od_w), 0)
+            into n_ret
+            from acc_leder t1          
+           where t1.group_id  = prm_group_id
+             and t1.hos_id    = prm_hos_id
+             and t1.copy_code = prm_copy_code
+             and t1.acc_year  = prm_acc_year
+             and (
+				(prm_acc_month<14 and t1.acc_month = prm_acc_month)
+				or (prm_acc_month='14' and t1.acc_month between '01' and '03')
+				or (prm_acc_month='15' and t1.acc_month between '04' and '06')
+				or (prm_acc_month='16' and t1.acc_month between '07' and '09')
+				or (prm_acc_month='17' and t1.acc_month between '10' and '12')
+				or (prm_acc_month='18' and t1.acc_month between '01' and '06')
+				or (prm_acc_month='19' and t1.acc_month between '07' and '12')
+			 )
+             and t1.subj_code like prm_subj_code || '%';   
+      end if;    
+    else    --从凭证中获取
+      if prm_cur = 'RMB' then    --币种为RMB
+         select nvl(sum(t1.DEBIT), 0)
+           into n_ret
+           from acc_vouch_detail t1
+           left join acc_vouch t2
+             on t1.vouch_id  = t2.vouch_id
+            and t1.group_id  = t2.group_id
+            and t1.hos_id    = t2.hos_id
+            and t1.copy_code = t2.copy_code
+            and t1.acc_year  = t2.acc_year          
+         where t1.group_id   = prm_group_id
+          and t1.hos_id      = prm_hos_id
+          and t1.copy_code   = prm_copy_code
+          and t1.acc_year    = prm_acc_year
+          and t2.acc_month   = prm_acc_month
+          and t2.STATE       >  0              ---1草稿，0作废，1新建，2出纳签字，3审核，99记账 
+          and t1.subj_code like  prm_subj_code || '%'; 
+      else
+         select nvl(sum(t1.DEBIT_W), 0)
+           into n_ret
+           from acc_vouch_detail t1
+           left join acc_vouch t2
+             on t1.vouch_id  = t2.vouch_id
+            and t1.group_id  = t2.group_id
+            and t1.hos_id    = t2.hos_id
+            and t1.copy_code = t2.copy_code
+            and t1.acc_year  = t2.acc_year           
+         where t1.group_id   = prm_group_id
+          and t1.hos_id      = prm_hos_id
+          and t1.copy_code   = prm_copy_code
+          and t1.acc_year    = prm_acc_year
+          and t2.acc_month   = prm_acc_month
+          and t2.STATE       >  0              ---1草稿，0作废，1新建，2出纳签字，3审核，99记账 
+          and t1.subj_code like  prm_subj_code || '%'; 
+      end if;
+    end if;
+    if substr(prm_subj_code,1,4) = '3301' then 
+        BEGIN
+          select nvl(t1.debit, 0) 
+            into n_3302
+            from acc_vouch_detail t1
+            left join acc_vouch t2
+              on t1.vouch_id = t2.vouch_id
+             and t1.group_id = t2.group_id
+             and t1.hos_id = t2.hos_id
+             and t1.copy_code = t2.copy_code
+             and t1.acc_year = t2.acc_year           
+           where t1.group_id = prm_group_id
+             and t1.hos_id = prm_hos_id
+             and t1.copy_code = prm_copy_code
+             and t2.acc_year = prm_acc_year
+             and t2.acc_month = prm_acc_month
+             and t2.STATE > 0
+             AND t1.subj_code like prm_subj_code || '%'
+             and t2.vouch_id in (select t1.vouch_id
+                                   from acc_vouch_detail t1
+                                   left join acc_vouch t2
+                                     on t1.vouch_id = t2.vouch_id
+                                    and t1.group_id = t2.group_id
+                                    and t1.hos_id = t2.hos_id
+                                    and t1.copy_code = t2.copy_code
+                                    and t1.acc_year = t2.acc_year                                  
+                                  where t1.group_id = prm_group_id
+                                    and t1.hos_id = prm_hos_id
+                                    and t1.copy_code = prm_copy_code
+                                    and t2.acc_year = prm_acc_year
+                                    and t2.acc_month = prm_acc_month
+                                    and t2.STATE > 0
+                                    AND t1.subj_code like '3302%');
+
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+               n_3302 := 0;
+        end;
+    end if;
+    return n_ret - n_3302;     
+  
+  EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+         return 0;
+      WHEN OTHERS THEN        
+         return 0; 
+  END RF_ACC_BQJF;
+  
+	]]></sql>
+	
+	
+	<sql id="rf_acc_bngnfllj" type="fun" desc="取本年功能分类累计借方发生额(科目类别)"><![CDATA[
+		 /*-------------------------------------------------------------------------
+   || 函数名称 ：RF_ACC_BNGNFLLJ
+   || 功能描述 ：取本年功能分类累计借方发生额
+   || 参数描述 ：参数标识          名称             输入/输出    类型
+   ||            -------------------------------------------------------------
+   ||            prm_group_id       集团             IN           NUMBER
+   ||            prm_hos_id         医院             IN           NUMBER
+   ||            prm_copy_code      账套             IN           VARCHAR2
+   ||            prm_acc_year       年度             IN           VARCHAR2
+   ||            prm_acc_month      月份             IN           VARCHAR2
+   ||            prm_cur            币种:RMB/USB     IN           VARCHAR2
+   ||            prm_subj_type      科目类型         IN           VARCHAR2
+   ||            prm_dept_type      科室类型         IN           VARCHAR2
+   ||            prm_con_acc        是否包含未记账   IN           NUMBER
+   ||
+   || 返 回 值 ：                   借方发生额       OUT          NUMBER
+   ||
+   || 作    者 ：           完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：           修改日期：
+   ||-------------------------------------------------------------------------*/
+   CREATE OR REPLACE FUNCTION RF_ACC_BNGNFLLJ( prm_group_id       IN    NUMBER        --集团
+                                              ,prm_hos_id         IN    NUMBER        --医院
+                                              ,prm_copy_code      IN    VARCHAR2      --帐套
+                                              ,prm_acc_year       IN    VARCHAR2      --年度
+                                              ,prm_acc_month      IN    VARCHAR2      --月份
+                                              ,prm_cur            IN    VARCHAR2      --币种  RMB/USB
+                                              ,prm_subj_type      IN    VARCHAR2      --科目编码
+                                              ,prm_dept_type      IN    VARCHAR2      --科室分类
+                                              ,prm_con_acc        IN    NUMBER        --是否包括未记账 0:不包含未记账  1:包含未记账
+                                             ) RETURN NUMBER
+  IS
+    n_init_money      NUMBER(19,6);  --初始账累计发生
+    n_period_money    NUMBER(19,6);  --期间累计发生
+    n_count           integer:= 0 ;
+    n_ret             NUMBER(19,6);   
+  BEGIN
+    --初始化变量
+    n_ret          :=  0 ;
+    n_init_money   :=  0 ;
+    n_period_money :=  0 ;
+    
+    if prm_con_acc = 0 then      --从帐表中获取        
+      if prm_cur = 'RMB' then    --币种为RMB
+          select nvl(sum(t1.sum_od), 0)
+            into n_ret
+            from acc_leder_check t1
+           left join acc_subj t2
+              on t1.group_id  = t2.group_id
+             and t1.hos_id    = t2.hos_id
+             and t1.copy_code = t2.copy_code
+             and t1.acc_year  = t2.acc_year
+             and t1.subj_code   = t2.subj_code
+           left join acc_dept_attr t3 
+             on t1.check1_id = t3.dept_id 
+             and t1.group_id = t3.group_id
+             and t1.hos_id   = t3.hos_id
+           where t1.group_id       = prm_group_id
+             and t1.hos_id         = prm_hos_id
+             and t1.copy_code      = prm_copy_code
+             and t1.acc_year       = prm_acc_year
+             and t1.acc_month      = prm_acc_month
+             and t2.subj_type_code = prm_subj_type
+             and t3.type_code      = prm_dept_type;     
+      else  --币种为外币
+          select nvl(sum(t1.sum_od_w), 0)
+            into n_ret
+            from acc_leder_check t1
+           left join acc_subj t2
+              on t1.group_id  = t2.group_id
+             and t1.hos_id    = t2.hos_id
+             and t1.copy_code = t2.copy_code
+             and t1.acc_year  = t2.acc_year
+             and t1.subj_code   = t2.subj_code
+           left join acc_dept_attr t3 
+             on t1.check1_id = t3.dept_id 
+             and t1.group_id = t3.group_id
+             and t1.hos_id   = t3.hos_id
+           where t1.group_id       = prm_group_id
+             and t1.hos_id         = prm_hos_id
+             and t1.copy_code      = prm_copy_code
+             and t1.acc_year       = prm_acc_year
+             and t1.acc_month      = prm_acc_month
+             and t2.subj_type_code = prm_subj_type
+             and t3.type_code      = prm_dept_type;   
+      end if;    
+    else    --从凭证中获取
+      if prm_cur = 'RMB' then    --币种为RMB
+        
+         --获取上线时的累计发生额
+         select count(1)
+            into n_count
+            from acc_leder_check t1
+           left join acc_subj t2
+              on t1.group_id  = t2.group_id
+             and t1.hos_id    = t2.hos_id
+             and t1.copy_code = t2.copy_code
+             and t1.acc_year  = t2.acc_year
+             and t1.subj_code   = t2.subj_code
+           left join acc_dept_attr t3 
+             on t1.check1_id = t3.dept_id 
+             and t1.group_id = t3.group_id
+             and t1.hos_id   = t3.hos_id
+           where t1.group_id       = prm_group_id
+             and t1.hos_id         = prm_hos_id
+             and t1.copy_code      = prm_copy_code
+             and t1.acc_year       = prm_acc_year
+             and t1.acc_month      = '00'
+             and t2.subj_type_code = prm_subj_type
+             and t3.type_code      = prm_dept_type;  
+             
+         if n_count > 0 then    
+             --获取上线时的累计发生额
+             select nvl(sum(t1.sum_od), 0)
+                into n_init_money
+                from acc_leder_check t1
+               left join acc_subj t2
+                  on t1.group_id  = t2.group_id
+                 and t1.hos_id    = t2.hos_id
+                 and t1.copy_code = t2.copy_code
+                 and t1.acc_year  = t2.acc_year
+                 and t1.subj_code   = t2.subj_code
+               left join acc_dept_attr t3 
+                 on t1.check1_id = t3.dept_id 
+                 and t1.group_id = t3.group_id
+                 and t1.hos_id   = t3.hos_id
+               where t1.group_id       = prm_group_id
+                 and t1.hos_id         = prm_hos_id
+                 and t1.copy_code      = prm_copy_code
+                 and t1.acc_year       = prm_acc_year
+                 and t1.acc_month      = '00'
+                 and t2.subj_type_code = prm_subj_type
+                 and t3.type_code      = prm_dept_type;  
+         end if;
+         
+         select nvl(sum(t1.DEBIT), 0)
+           into n_period_money
+           from acc_vouch_check t1
+           left join acc_vouch t2
+             on t1.vouch_id  = t2.vouch_id
+            and t1.group_id  = t2.group_id
+            and t1.hos_id    = t2.hos_id
+            and t1.copy_code = t2.copy_code
+            and t1.acc_year  = t2.acc_year
+           left join acc_subj t3
+             on t1.group_id  = t3.group_id
+            and t1.hos_id    = t3.hos_id
+            and t1.copy_code = t3.copy_code
+            and t1.acc_year  = t3.acc_year
+            and t1.subj_code   = t3.subj_code
+           left join acc_dept_attr t4 
+             on t1.check1_id = t4.dept_id 
+            and t1.group_id = t4.group_id
+            and t1.hos_id   = t4.hos_id 
+         where t1.group_id   = prm_group_id
+          and t1.hos_id      = prm_hos_id
+          and t1.copy_code   = prm_copy_code
+          and t1.acc_year    = prm_acc_year
+          and t2.acc_month  <= prm_acc_month
+          and t2.STATE       >  0              ---1草稿，0作废，1新建，2出纳签字，3审核，99记账 
+          and t3.subj_type_code   = prm_subj_type
+          and t4.type_code   = prm_dept_type;  
+          
+         n_ret := n_init_money + n_period_money ; 
+      else
+        --获取上线时的累计发生额
+         select count(1)
+            into n_count
+            from acc_leder_check t1
+           left join acc_subj t2
+              on t1.group_id  = t2.group_id
+             and t1.hos_id    = t2.hos_id
+             and t1.copy_code = t2.copy_code
+             and t1.acc_year  = t2.acc_year
+             and t1.subj_code   = t2.subj_code
+           left join acc_dept_attr t3 
+             on t1.check1_id = t3.dept_id 
+             and t1.group_id = t3.group_id
+             and t1.hos_id   = t3.hos_id
+           where t1.group_id       = prm_group_id
+             and t1.hos_id         = prm_hos_id
+             and t1.copy_code      = prm_copy_code
+             and t1.acc_year       = prm_acc_year
+             and t1.acc_month      = '00'
+             and t2.subj_type_code = prm_subj_type
+             and t3.type_code      = prm_dept_type;  
+             
+         if n_count > 0 then    
+             --获取上线时的累计发生额
+             select nvl(sum(t1.sum_od_w), 0)
+                into n_init_money
+                from acc_leder_check t1
+               left join acc_subj t2
+                  on t1.group_id  = t2.group_id
+                 and t1.hos_id    = t2.hos_id
+                 and t1.copy_code = t2.copy_code
+                 and t1.acc_year  = t2.acc_year
+                 and t1.subj_code   = t2.subj_code
+               left join acc_dept_attr t3 
+                 on t1.check1_id = t3.dept_id 
+                 and t1.group_id = t3.group_id
+                 and t1.hos_id   = t3.hos_id
+               where t1.group_id       = prm_group_id
+                 and t1.hos_id         = prm_hos_id
+                 and t1.copy_code      = prm_copy_code
+                 and t1.acc_year       = prm_acc_year
+                 and t1.acc_month      = '00'
+                 and t2.subj_type_code = prm_subj_type
+                 and t3.type_code      = prm_dept_type;  
+        end if;         
+             
+         select nvl(sum(t1.DEBIT_W), 0)
+           into n_period_money
+           from acc_vouch_check t1
+           left join acc_vouch t2
+             on t1.vouch_id  = t2.vouch_id
+            and t1.group_id  = t2.group_id
+            and t1.hos_id    = t2.hos_id
+            and t1.copy_code = t2.copy_code
+            and t1.acc_year  = t2.acc_year
+           left join acc_subj t3
+             on t1.group_id  = t3.group_id
+            and t1.hos_id    = t3.hos_id
+            and t1.copy_code = t3.copy_code
+            and t1.acc_year  = t3.acc_year
+            and t1.subj_code   = t3.subj_code
+           left join acc_dept_attr t4 
+             on t1.check1_id = t4.dept_id 
+            and t1.group_id = t4.group_id
+            and t1.hos_id   = t4.hos_id 
+         where t1.group_id   = prm_group_id
+          and t1.hos_id      = prm_hos_id
+          and t1.copy_code   = prm_copy_code
+          and t1.acc_year    = prm_acc_year
+          and t2.acc_month  <= prm_acc_month
+          and t2.STATE       >  0              ---1草稿，0作废，1新建，2出纳签字，3审核，99记账 
+          and t3.subj_type_code   = prm_subj_type
+          and t4.type_code   = prm_dept_type;  
+          
+          n_ret := n_init_money + n_period_money ; 
+          
+      end if;
+    end if;
+    
+    return n_ret;
+  
+  EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+         return 0;
+      WHEN OTHERS THEN        
+         return 0; 
+  END RF_ACC_BNGNFLLJ;
+		
+	]]></sql>
+	
+	<sql id="rf_acc_bqgnfljf" type="fun" desc="取本期功能分类借方发生额(科目类别)"><![CDATA[
+	   /*-------------------------------------------------------------------------
+   || 函数名称 ：RF_ACC_BQGNFLJF
+   || 功能描述 ：取本期功能分类借方发生额
+   || 参数描述 ：参数标识          名称             输入/输出    类型
+   ||            -------------------------------------------------------------
+   ||            prm_group_id       集团             IN           NUMBER
+   ||            prm_hos_id         医院             IN           NUMBER
+   ||            prm_copy_code      账套             IN           VARCHAR2
+   ||            prm_acc_year       年度             IN           VARCHAR2
+   ||            prm_acc_month      月份             IN           VARCHAR2
+   ||            prm_cur            币种:RMB/USB     IN           VARCHAR2
+   ||            prm_subj_type      科目类型         IN           VARCHAR2
+   ||            prm_dept_type      科室类型         IN           VARCHAR2
+   ||            prm_con_acc        是否包含未记账   IN           NUMBER
+   ||
+   || 返 回 值 ：                   借方发生额       OUT          NUMBER
+   ||
+   || 作    者 ：           完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：           修改日期：
+   ||-------------------------------------------------------------------------*/
+   CREATE OR REPLACE FUNCTION RF_ACC_BQGNFLJF( prm_group_id       IN    NUMBER        --集团
+                                              ,prm_hos_id         IN    NUMBER        --医院
+                                              ,prm_copy_code      IN    VARCHAR2      --帐套
+                                              ,prm_acc_year       IN    VARCHAR2      --年度
+                                              ,prm_acc_month      IN    VARCHAR2      --月份
+                                              ,prm_cur            IN    VARCHAR2      --币种  RMB/USB
+                                              ,prm_subj_type      IN    VARCHAR2      --科目编码
+                                              ,prm_dept_type      IN    VARCHAR2      --科室分类
+                                              ,prm_con_acc        IN    NUMBER        --是否包括未记账 0:不包含未记账  1:包含未记账
+                                             ) RETURN NUMBER
+  IS
+    n_ret  NUMBER(19,6);
+   
+  BEGIN
+    --初始化变量
+    n_ret      :=  0 ;
+    
+    if prm_con_acc = 0 then      --从帐表中获取        
+      if prm_cur = 'RMB' then    --币种为RMB
+          select nvl(sum(t1.this_od), 0)
+            into n_ret
+            from acc_leder_check t1
+           left join acc_subj t2
+              on t1.group_id  = t2.group_id
+             and t1.hos_id    = t2.hos_id
+             and t1.copy_code = t2.copy_code
+             and t1.acc_year  = t2.acc_year
+             and t1.subj_code   = t2.subj_code
+           left join acc_dept_attr t3 
+             on t1.check1_id = t3.dept_id 
+             and t1.group_id = t3.group_id
+             and t1.hos_id   = t3.hos_id
+           where t1.group_id       = prm_group_id
+             and t1.hos_id         = prm_hos_id
+             and t1.copy_code      = prm_copy_code
+             and t1.acc_year       = prm_acc_year
+             and t1.acc_month      = prm_acc_month
+             and t2.subj_type_code = prm_subj_type
+             and t3.type_code      = prm_dept_type;     
+      else  --币种为外币
+          select nvl(sum(t1.this_od_w), 0)
+            into n_ret
+            from acc_leder_check t1
+           left join acc_subj t2
+              on t1.group_id  = t2.group_id
+             and t1.hos_id    = t2.hos_id
+             and t1.copy_code = t2.copy_code
+             and t1.acc_year  = t2.acc_year
+             and t1.subj_code   = t2.subj_code
+           left join acc_dept_attr t3 
+             on t1.check1_id = t3.dept_id 
+             and t1.group_id = t3.group_id
+             and t1.hos_id   = t3.hos_id
+           where t1.group_id       = prm_group_id
+             and t1.hos_id         = prm_hos_id
+             and t1.copy_code      = prm_copy_code
+             and t1.acc_year       = prm_acc_year
+             and t1.acc_month      = prm_acc_month
+             and t2.subj_type_code = prm_subj_type
+             and t3.type_code      = prm_dept_type;   
+      end if;    
+    else    --从凭证中获取
+      if prm_cur = 'RMB' then    --币种为RMB
+         select nvl(sum(t1.DEBIT), 0)
+           into n_ret
+           from acc_vouch_check t1
+           left join acc_vouch t2
+             on t1.vouch_id  = t2.vouch_id
+            and t1.group_id  = t2.group_id
+            and t1.hos_id    = t2.hos_id
+            and t1.copy_code = t2.copy_code
+            and t1.acc_year  = t2.acc_year
+           left join acc_subj t3
+             on t1.group_id  = t3.group_id
+            and t1.hos_id    = t3.hos_id
+            and t1.copy_code = t3.copy_code
+            and t1.acc_year  = t3.acc_year
+            and t1.subj_code   = t3.subj_code
+           left join acc_dept_attr t4 
+             on t1.check1_id = t4.dept_id 
+            and t1.group_id = t4.group_id
+            and t1.hos_id   = t4.hos_id 
+         where t1.group_id   = prm_group_id
+          and t1.hos_id      = prm_hos_id
+          and t1.copy_code   = prm_copy_code
+          and t1.acc_year    = prm_acc_year
+          and t2.acc_month   = prm_acc_month
+          and t2.STATE       >  0              ---1草稿，0作废，1新建，2出纳签字，3审核，99记账 
+          and t3.subj_type_code   = prm_subj_type
+          and t4.type_code   = prm_dept_type;  
+      else
+         select nvl(sum(t1.DEBIT_W), 0)
+           into n_ret
+           from acc_vouch_check t1
+           left join acc_vouch t2
+             on t1.vouch_id  = t2.vouch_id
+            and t1.group_id  = t2.group_id
+            and t1.hos_id    = t2.hos_id
+            and t1.copy_code = t2.copy_code
+            and t1.acc_year  = t2.acc_year
+           left join acc_subj t3
+             on t1.group_id  = t3.group_id
+            and t1.hos_id    = t3.hos_id
+            and t1.copy_code = t3.copy_code
+            and t1.acc_year  = t3.acc_year
+            and t1.subj_code   = t3.subj_code
+           left join acc_dept_attr t4 
+             on t1.check1_id = t4.dept_id 
+            and t1.group_id = t4.group_id
+            and t1.hos_id   = t4.hos_id 
+         where t1.group_id   = prm_group_id
+          and t1.hos_id      = prm_hos_id
+          and t1.copy_code   = prm_copy_code
+          and t1.acc_year    = prm_acc_year
+          and t2.acc_month   = prm_acc_month
+          and t2.STATE       >  0              ---1草稿，0作废，1新建，2出纳签字，3审核，99记账 
+          and t3.subj_type_code   = prm_subj_type
+          and t4.type_code   = prm_dept_type;  
+      end if;
+    end if;
+    
+    return n_ret;
+  
+  EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+         return 0;
+      WHEN OTHERS THEN        
+         return 0; 
+  END RF_ACC_BQGNFLJF;
+	
+	]]></sql>
+	
+	<sql id="rf_acc_bqdf" type="fun" desc="取本期贷方发生额"><![CDATA[
+		   /*-------------------------------------------------------------------------
+   || 函数名称 ：RF_ACC_BQDF
+   || 功能描述 ：取本期贷方发生额
+   || 参数描述 ：参数标识          名称             输入/输出    类型
+   ||            -------------------------------------------------------------
+   ||            prm_group_id       集团             IN           NUMBER
+   ||            prm_hos_id         医院             IN           NUMBER
+   ||            prm_copy_code      账套             IN           VARCHAR2
+   ||            prm_acc_year       年度             IN           VARCHAR2
+   ||            prm_acc_month      月份             IN           VARCHAR2
+   ||            prm_cur            币种:RMB/USB     IN           VARCHAR2
+   ||            prm_subj_code      会计科目         IN           VARCHAR2
+   ||            prm_con_acc        是否包含未记账   IN           NUMBER
+   ||
+   || 返 回 值 ：                   借方发生额       OUT          NUMBER
+   ||
+   || 作    者 ：           完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：           修改日期：
+   ||-------------------------------------------------------------------------*/
+  CREATE OR REPLACE FUNCTION RF_ACC_BQDF( prm_group_id       IN    NUMBER        --集团
+                                          ,prm_hos_id         IN    NUMBER        --医院
+                                          ,prm_copy_code      IN    VARCHAR2      --帐套
+                                          ,prm_acc_year       IN    VARCHAR2      --年度
+                                          ,prm_acc_month      IN    VARCHAR2      --月份
+                                          ,prm_cur            IN    VARCHAR2      --币种  RMB/USB
+                                          ,prm_subj_code      IN    VARCHAR2      --科目编码
+                                          ,prm_con_acc        IN    NUMBER        --是否包括未记账 0:不包含未记账  1:包含未记账
+                                         ) RETURN NUMBER
+  IS
+    n_ret          NUMBER(19,6);
+    n_3302         NUMBER(19,6);  
+    
+  BEGIN
+    --初始化变量
+    n_ret          :=  0 ;
+    n_3302         :=  0 ;
+    
+    if prm_con_acc = 0 then      --从帐表中获取        
+      if prm_cur = 'RMB' then    --币种为RMB
+          select nvl(sum(t1.this_oc), 0)
+            into n_ret
+            from acc_leder t1          
+           where t1.group_id  = prm_group_id
+             and t1.hos_id    = prm_hos_id
+             and t1.copy_code = prm_copy_code
+             and t1.acc_year  = prm_acc_year
+             and t1.acc_month = prm_acc_month
+             and t1.subj_code like prm_subj_code || '%';      
+      else  --币种为外币
+          select nvl(sum(t1.this_oc_w), 0)
+            into n_ret
+            from acc_leder t1          
+           where t1.group_id  = prm_group_id
+             and t1.hos_id    = prm_hos_id
+             and t1.copy_code = prm_copy_code
+             and t1.acc_year  = prm_acc_year
+             and t1.acc_month = prm_acc_month
+             and t1.subj_code like prm_subj_code || '%';   
+      end if;    
+    else    --从凭证中获取
+      if prm_cur = 'RMB' then    --币种为RMB
+         select nvl(sum(t1.CREDIT), 0)
+           into n_ret
+           from acc_vouch_detail t1
+           left join acc_vouch t2
+             on t1.vouch_id  = t2.vouch_id
+            and t1.group_id  = t2.group_id
+            and t1.hos_id    = t2.hos_id
+            and t1.copy_code = t2.copy_code
+            and t1.acc_year  = t2.acc_year          
+         where t1.group_id   = prm_group_id
+          and t1.hos_id      = prm_hos_id
+          and t1.copy_code   = prm_copy_code
+          and t1.acc_year    = prm_acc_year
+          and t2.acc_month   = prm_acc_month
+          and t2.STATE       >  0              ---1草稿，0作废，1新建，2出纳签字，3审核，99记账 
+          and t1.subj_code like  prm_subj_code || '%'; 
+      else
+         select nvl(sum(t1.CREDIT_W), 0)
+           into n_ret
+           from acc_vouch_detail t1
+           left join acc_vouch t2
+             on t1.vouch_id  = t2.vouch_id
+            and t1.group_id  = t2.group_id
+            and t1.hos_id    = t2.hos_id
+            and t1.copy_code = t2.copy_code
+            and t1.acc_year  = t2.acc_year          
+         where t1.group_id   = prm_group_id
+          and t1.hos_id      = prm_hos_id
+          and t1.copy_code   = prm_copy_code
+          and t1.acc_year    = prm_acc_year
+          and t2.acc_month   = prm_acc_month
+          and t2.STATE       >  0              ---1草稿，0作废，1新建，2出纳签字，3审核，99记账 
+          and t1.subj_code like  prm_subj_code || '%'; 
+      end if;
+    end if;
+    
+    if substr(prm_subj_code,1,4) = '3301' then  
+        BEGIN
+          select nvl(t1.credit, 0) 
+            into n_3302
+            from acc_vouch_detail t1
+            left join acc_vouch t2
+              on t1.vouch_id = t2.vouch_id
+             and t1.group_id = t2.group_id
+             and t1.hos_id = t2.hos_id
+             and t1.copy_code = t2.copy_code
+             and t1.acc_year = t2.acc_year          
+           where t1.group_id = prm_group_id
+             and t1.hos_id = prm_hos_id
+             and t1.copy_code = prm_copy_code
+             and t2.acc_year = prm_acc_year
+             and t2.acc_month = prm_acc_month
+             and t2.STATE > 0
+             AND t1.subj_code like prm_subj_code || '%'
+             and t2.vouch_id in (select t1.vouch_id
+                                   from acc_vouch_detail t1
+                                   left join acc_vouch t2
+                                     on t1.vouch_id = t2.vouch_id
+                                    and t1.group_id = t2.group_id
+                                    and t1.hos_id = t2.hos_id
+                                    and t1.copy_code = t2.copy_code
+                                    and t1.acc_year = t2.acc_year                                 
+                                  where t1.group_id = prm_group_id
+                                    and t1.hos_id = prm_hos_id
+                                    and t1.copy_code = prm_copy_code
+                                    and t2.acc_year = prm_acc_year
+                                    and t2.acc_month = prm_acc_month
+                                    and t2.STATE > 0
+                                    AND t1.subj_code like '3302%');
+
+        EXCEPTION
+          WHEN NO_DATA_FOUND THEN
+               n_3302 := 0;
+        end;
+    end if;    
+    return n_ret - n_3302;
+  
+  EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+         return 0;
+      WHEN OTHERS THEN        
+         return 0; 
+  END RF_ACC_BQDF;
+  
+	]]></sql>
+	
+	<sql id="rf_acc_bnxjll" type="fun" desc="取本年现金流量金额"><![CDATA[
+	   /*-------------------------------------------------------------------------
+   || 函数名称 ：RF_ACC_BNXJLL
+   || 功能描述 ：取本年现金流量金额
+   || 参数描述 ：参数标识          名称             输入/输出    类型
+   ||            -------------------------------------------------------------
+   ||            prm_group_id       集团             IN           NUMBER
+   ||            prm_hos_id         医院             IN           NUMBER
+   ||            prm_copy_code      账套             IN           VARCHAR2
+   ||            prm_acc_year       年度             IN           VARCHAR2
+   ||            prm_acc_month      月份             IN           VARCHAR2   
+   ||            prm_cash_item      会计科目         IN           VARCHAR2
+   ||            prm_con_acc        是否包含未记账   IN           NUMBER
+   ||
+   || 返 回 值 ：                   借方发生额       OUT          NUMBER
+   ||
+   || 作    者 ：           完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：           修改日期：
+   ||-------------------------------------------------------------------------*/
+  CREATE OR REPLACE FUNCTION RF_ACC_BNXJLL( prm_group_id       IN    NUMBER        --集团
+                                            ,prm_hos_id         IN    NUMBER        --医院
+                                            ,prm_copy_code      IN    VARCHAR2      --帐套
+                                            ,prm_acc_year       IN    VARCHAR2      --年度
+                                            ,prm_acc_month      IN    VARCHAR2      --月份                                         
+                                            ,prm_cash_item      IN    VARCHAR2      --科目编码
+                                            ,prm_con_acc        IN    NUMBER        --是否包括未记账 0:不包含未记账  1:包含未记账
+                                           ) RETURN NUMBER
+  IS
+    n_init_money      NUMBER(19,6);  --初始现金流量
+    n_period_money    NUMBER(19,6);  --期间发生现金流量
+    n_count           integer:= 0 ;
+    n_ret             NUMBER(19,6);
+    
+  BEGIN
+    --初始化变量
+    n_ret          := 0 ;
+    n_init_money   := 0 ;
+    n_period_money := 0 ;
+  
+    --转换现金流编码
+    if prm_acc_year = '2018' and prm_cash_item = '203' then
+       return 0;
+    end if;  
+	  
+    if prm_con_acc = 0 then      --从帐表中获取       
+        
+       select count(1)
+         into n_count
+        from acc_cash_flow_init t1  
+        left join acc_cash_item t4
+          on t1.group_id   = t4.group_id
+         and t1.hos_id     = t4.hos_id
+         and t1.copy_code  = t4.copy_code
+         and t1.cash_item_id = t4.cash_item_id
+      where t1.group_id       = prm_group_id
+        and t1.hos_id         = prm_hos_id
+        and t1.copy_code      = prm_copy_code
+        and t1.acc_year       = prm_acc_year  
+        and ((t1.acc_year >='2019' and t4.is_stop = 0  and t4.cash_item_code = prm_cash_item)
+          or (t1.acc_year <='2018' and t4.is_stop = 1  
+              and t4.cash_item_code in(select item_code_old 
+                                         from acc_cash_item_map
+                                        where item_code_new = prm_cash_item
+                                       )
+             ));   
+      
+       if n_count > 0 then
+         select nvl(sum(t1.cash_money), 0)
+           into n_init_money
+          from acc_cash_flow_init t1  
+          left join acc_cash_item t4
+            on t1.group_id   = t4.group_id
+           and t1.hos_id     = t4.hos_id
+           and t1.copy_code  = t4.copy_code
+           and t1.cash_item_id = t4.cash_item_id
+        where t1.group_id       = prm_group_id
+          and t1.hos_id         = prm_hos_id
+          and t1.copy_code      = prm_copy_code
+          and t1.acc_year       = prm_acc_year
+          and ((t1.acc_year >='2019' and t4.is_stop = 0  and t4.cash_item_code = prm_cash_item)
+          or (t1.acc_year <='2018' and t4.is_stop = 1  
+              and t4.cash_item_code in(select item_code_old 
+                                         from acc_cash_item_map
+                                        where item_code_new = prm_cash_item
+                                       )
+             ));      
+       end if;   
+
+    
+       select nvl(sum(t1.cash_money), 0)
+         into n_period_money
+        from acc_cash_flow t1        
+       inner join acc_vouch_detail t2
+          on t1.vouch_id=t2.vouch_id
+         and t1.vouch_detail_id = t2.vouch_detail_id
+         and t1.group_id        = t2.group_id
+         and t1.hos_id          = t2.hos_id
+         and t1.copy_code       = t2.copy_code
+        left join acc_vouch t3
+          on t2.vouch_id   = t3.vouch_id
+         and t2.group_id   = t3.group_id
+         and t2.hos_id     = t3.hos_id
+         and t2.copy_code  = t3.copy_code
+         and t2.acc_year   = t3.acc_year
+        left join acc_cash_item t4
+          on t1.group_id   = t4.group_id
+         and t1.hos_id     = t4.hos_id
+         and t1.copy_code  = t4.copy_code
+         and t1.cash_item_id = t4.cash_item_id
+      where t1.group_id       = prm_group_id
+        and t1.hos_id         = prm_hos_id
+        and t1.copy_code      = prm_copy_code
+        and t2.acc_year       = prm_acc_year
+        and t3.acc_month     <= prm_acc_month
+        and t3.state          = 99                -- -1草稿，0作废，1新建，2出纳签字，3审核，99记账 
+        and ((t2.acc_year >='2019' and t4.is_stop = 0  and t4.cash_item_code = prm_cash_item)
+          or (t2.acc_year <='2018' and t4.is_stop = 1  
+              and t4.cash_item_code in(select item_code_old 
+                                         from acc_cash_item_map
+                                        where item_code_new = prm_cash_item
+                                       )
+             ));       
+     
+       n_ret := n_init_money + n_period_money;
+       
+    else    --从凭证中获取    
+       select count(1)
+         into n_count
+        from acc_cash_flow_init t1  
+        left join acc_cash_item t4
+          on t1.group_id   = t4.group_id
+         and t1.hos_id     = t4.hos_id
+         and t1.copy_code  = t4.copy_code
+         and t1.cash_item_id = t4.cash_item_id
+      where t1.group_id       = prm_group_id
+        and t1.hos_id         = prm_hos_id
+        and t1.copy_code      = prm_copy_code
+        and t1.acc_year       = prm_acc_year 
+        and ((t1.acc_year >='2019' and t4.is_stop = 0  and t4.cash_item_code = prm_cash_item)
+          or (t1.acc_year <='2018' and t4.is_stop = 1  
+              and t4.cash_item_code in(select item_code_old 
+                                         from acc_cash_item_map
+                                        where item_code_new = prm_cash_item
+                                       )
+             )); 
+      
+       if n_count > 0 then
+         select nvl(sum(t1.cash_money), 0)
+           into n_init_money
+          from acc_cash_flow_init t1  
+          left join acc_cash_item t4
+            on t1.group_id   = t4.group_id
+           and t1.hos_id     = t4.hos_id
+           and t1.copy_code  = t4.copy_code
+           and t1.cash_item_id = t4.cash_item_id
+        where t1.group_id       = prm_group_id
+          and t1.hos_id         = prm_hos_id
+          and t1.copy_code      = prm_copy_code
+          and t1.acc_year       = prm_acc_year     
+          and ((t1.acc_year >='2019' and t4.is_stop = 0  and t4.cash_item_code = prm_cash_item)
+          or (t1.acc_year <='2018' and t4.is_stop = 1  
+              and t4.cash_item_code in(select item_code_old 
+                                         from acc_cash_item_map
+                                        where item_code_new = prm_cash_item
+                                       )
+             ));       
+       end if;   
+ 
+       select nvl(sum(t1.cash_money), 0)
+         into n_period_money
+        from acc_cash_flow t1        
+       inner join acc_vouch_detail t2
+          on t1.vouch_id=t2.vouch_id
+         and t1.vouch_detail_id = t2.vouch_detail_id
+         and t1.group_id        = t2.group_id
+         and t1.hos_id          = t2.hos_id
+         and t1.copy_code       = t2.copy_code
+        left join acc_vouch t3
+          on t2.vouch_id   = t3.vouch_id
+         and t2.group_id   = t3.group_id
+         and t2.hos_id     = t3.hos_id
+         and t2.copy_code  = t3.copy_code
+         and t2.acc_year   = t3.acc_year
+        left join acc_cash_item t4
+          on t1.group_id   = t4.group_id
+         and t1.hos_id     = t4.hos_id
+         and t1.copy_code  = t4.copy_code
+         and t1.cash_item_id  = t4.cash_item_id
+      where t1.group_id       = prm_group_id
+        and t1.hos_id         = prm_hos_id
+        and t1.copy_code      = prm_copy_code
+        and t2.acc_year       = prm_acc_year
+        and t3.acc_month     <= prm_acc_month
+        and t3.state          > 0                -- -1草稿，0作废，1新建，2出纳签字，3审核，99记账 
+        and ((t2.acc_year >='2019' and t4.is_stop = 0  and t4.cash_item_code = prm_cash_item)
+          or (t2.acc_year <='2018' and t4.is_stop = 1  
+              and t4.cash_item_code in(select item_code_old 
+                                         from acc_cash_item_map
+                                        where item_code_new = prm_cash_item
+                                       )
+             ));        
+     
+        n_ret := n_init_money + n_period_money; 
+    end if;
+    
+    return n_ret;
+  
+  EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+         return 0;
+      WHEN OTHERS THEN        
+         return 0; 
+  END RF_ACC_BNXJLL;
+	
+	]]></sql>
+	
+	<sql id="rf_acc_bnlj" type="fun" desc="取本年累计借方发生额"><![CDATA[
+	   /*-------------------------------------------------------------------------
+   || 函数名称 ：RF_ACC_BNLJ
+   || 功能描述 ：取本年累计借方发生额
+   || 参数描述 ：参数标识          名称             输入/输出    类型
+   ||            -------------------------------------------------------------
+   ||            prm_group_id       集团             IN           NUMBER
+   ||            prm_hos_id         医院             IN           NUMBER
+   ||            prm_copy_code      账套             IN           VARCHAR2
+   ||            prm_acc_year       年度             IN           VARCHAR2
+   ||            prm_acc_month      月份             IN           VARCHAR2
+   ||            prm_cur            币种:RMB/USB     IN           VARCHAR2
+   ||            prm_subj_code      会计科目         IN           VARCHAR2
+   ||            prm_con_acc        是否包含未记账   IN           NUMBER
+   ||
+   || 返 回 值 ：                   借方发生额       OUT          NUMBER
+   ||
+   || 作    者 ：           完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：           修改日期：
+   ||-------------------------------------------------------------------------*/
+   CREATE OR REPLACE FUNCTION RF_ACC_BNLJ( prm_group_id       IN    NUMBER        --集团
+                                          ,prm_hos_id         IN    NUMBER        --医院
+                                          ,prm_copy_code      IN    VARCHAR2      --帐套
+                                          ,prm_acc_year       IN    VARCHAR2      --年度
+                                          ,prm_acc_month      IN    VARCHAR2      --月份
+                                          ,prm_cur            IN    VARCHAR2      --币种  RMB/USB
+                                          ,prm_subj_code      IN    VARCHAR2      --科目编码
+                                          ,prm_con_acc        IN    NUMBER        --是否包括未记账 0:不包含未记账  1:包含未记账
+                                         ) RETURN NUMBER
+  IS
+    n_init_money      NUMBER(19,6);  --初始账累计发生
+    n_period_money    NUMBER(19,6);  --期间累计发生
+    n_count           integer:= 0 ;
+    n_ret             NUMBER(19,6);
+   
+  BEGIN
+    --初始化变量
+    n_init_money   :=  0 ;
+    n_period_money :=  0 ;
+    n_ret          :=  0 ;
+    
+    if prm_con_acc = 0 then      --从帐表中获取        
+      if prm_cur = 'RMB' then    --币种为RMB
+          select nvl(sum(t1.sum_od), 0)
+            into n_ret
+            from acc_leder t1           
+           where t1.group_id  = prm_group_id
+             and t1.hos_id    = prm_hos_id
+             and t1.copy_code = prm_copy_code
+             and t1.acc_year  = prm_acc_year
+             and t1.acc_month = prm_acc_month
+             and t1.subj_code like prm_subj_code || '%';      
+      else  --币种为外币
+          select nvl(sum(t1.sum_od_w), 0)
+            into n_ret
+            from acc_leder t1         
+           where t1.group_id  = prm_group_id
+             and t1.hos_id    = prm_hos_id
+             and t1.copy_code = prm_copy_code
+             and t1.acc_year  = prm_acc_year
+             and t1.acc_month = prm_acc_month
+             and t1.subj_code like prm_subj_code || '%';   
+      end if;    
+    else    --从凭证中获取
+      if prm_cur = 'RMB' then    --币种为RMB
+        
+         select count(1)
+           into n_count
+           from acc_leder t1         
+         where t1.group_id  = prm_group_id
+           and t1.hos_id    = prm_hos_id
+           and t1.copy_code = prm_copy_code
+           and t1.acc_year  = prm_acc_year
+           and t1.acc_month = '00'
+           and t1.subj_code like prm_subj_code || '%';  
+         
+         if n_count > 0 then 
+           --获取初始账累计借方发生额
+           select nvl(sum(t1.sum_od), 0)
+              into n_init_money
+              from acc_leder t1            
+             where t1.group_id  = prm_group_id
+               and t1.hos_id    = prm_hos_id
+               and t1.copy_code = prm_copy_code
+               and t1.acc_year  = prm_acc_year
+               and t1.acc_month = '00'
+               and t1.subj_code like prm_subj_code || '%';     
+         end if;       
+             
+         select nvl(sum(t1.DEBIT), 0)
+           into n_period_money
+           from acc_vouch_detail t1
+           left join acc_vouch t2
+             on t1.vouch_id  = t2.vouch_id
+            and t1.group_id  = t2.group_id
+            and t1.hos_id    = t2.hos_id
+            and t1.copy_code = t2.copy_code
+            and t1.acc_year  = t2.acc_year          
+         where t1.group_id   = prm_group_id
+          and t1.hos_id      = prm_hos_id
+          and t1.copy_code   = prm_copy_code
+          and t1.acc_year    = prm_acc_year
+          and t2.acc_month  <= prm_acc_month
+          and t2.STATE      >  0              ---1草稿，0作废，1新建，2出纳签字，3审核，99记账 
+          and t1.subj_code like  prm_subj_code || '%'; 
+          
+          n_ret := n_init_money + n_period_money ; 
+      else
+         select count(1)
+           into n_count
+           from acc_leder t1         
+         where t1.group_id  = prm_group_id
+           and t1.hos_id    = prm_hos_id
+           and t1.copy_code = prm_copy_code
+           and t1.acc_year  = prm_acc_year
+           and t1.acc_month = '00'
+           and t1.subj_code like prm_subj_code || '%';  
+         
+         if n_count > 0 then 
+           --获取初始账累计借方发生额
+           select nvl(sum(t1.sum_od_w), 0)
+              into n_init_money
+              from acc_leder t1            
+             where t1.group_id  = prm_group_id
+               and t1.hos_id    = prm_hos_id
+               and t1.copy_code = prm_copy_code
+               and t1.acc_year  = prm_acc_year
+               and t1.acc_month = '00'
+               and t1.subj_code like prm_subj_code || '%';       
+          end if;     
+      
+         select nvl(sum(t1.DEBIT_W), 0)
+           into n_period_money
+           from acc_vouch_detail t1
+           left join acc_vouch t2
+             on t1.vouch_id  = t2.vouch_id
+            and t1.group_id  = t2.group_id
+            and t1.hos_id    = t2.hos_id
+            and t1.copy_code = t2.copy_code
+            and t1.acc_year  = t2.acc_year          
+         where t1.group_id   = prm_group_id
+          and t1.hos_id      = prm_hos_id
+          and t1.copy_code   = prm_copy_code
+          and t1.acc_year    = prm_acc_year
+          and t2.acc_month  <= prm_acc_month
+          and t2.STATE       >  0              ---1草稿，0作废，1新建，2出纳签字，3审核，99记账 
+          and t1.subj_code like  prm_subj_code || '%'; 
+          
+           n_ret := n_init_money + n_period_money ; 
+      end if;
+    end if;
+    
+    return n_ret;
+  
+  EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+         return 0;
+      WHEN OTHERS THEN        
+         return 0; 
+  END RF_ACC_BNLJ;
+	
+	]]></sql>
+	
+	<sql id="rf_acc_bnld" type="fun" desc="取本年累计贷方发生额"><![CDATA[
+	   /*-------------------------------------------------------------------------
+   || 函数名称 ：RF_ACC_BNLD
+   || 功能描述 ：取本年累计贷方发生额
+   || 参数描述 ：参数标识          名称             输入/输出    类型
+   ||            -------------------------------------------------------------
+   ||            prm_group_id       集团             IN           NUMBER
+   ||            prm_hos_id         医院             IN           NUMBER
+   ||            prm_copy_code      账套             IN           VARCHAR2
+   ||            prm_acc_year       年度             IN           VARCHAR2
+   ||            prm_acc_month      月份             IN           VARCHAR2
+   ||            prm_cur            币种:RMB/USB     IN           VARCHAR2
+   ||            prm_subj_code      会计科目         IN           VARCHAR2
+   ||            prm_con_acc        是否包含未记账   IN           NUMBER
+   ||
+   || 返 回 值 ：                   借方发生额       OUT          NUMBER
+   ||
+   || 作    者 ：           完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：           修改日期：
+   ||-------------------------------------------------------------------------*/
+   CREATE OR REPLACE FUNCTION RF_ACC_BNLD( prm_group_id       IN    NUMBER        --集团
+                                          ,prm_hos_id         IN    NUMBER        --医院
+                                          ,prm_copy_code      IN    VARCHAR2      --帐套
+                                          ,prm_acc_year       IN    VARCHAR2      --年度
+                                          ,prm_acc_month      IN    VARCHAR2      --月份
+                                          ,prm_cur            IN    VARCHAR2      --币种  RMB/USB
+                                          ,prm_subj_code      IN    VARCHAR2      --科目编码
+                                          ,prm_con_acc        IN    NUMBER        --是否包括未记账 0:不包含未记账  1:包含未记账
+                                         ) RETURN NUMBER
+  IS
+    n_init_money      NUMBER(19,6);  --初始账累计发生
+    n_period_money    NUMBER(19,6);  --期间累计发生
+    n_count           integer:= 0 ;
+    n_ret             NUMBER(19,6);
+   
+  BEGIN    
+    --初始化变量
+    n_init_money   :=  0 ;
+    n_period_money :=  0 ;
+    n_ret          :=  0 ;
+    
+    if prm_con_acc = 0 then      --从帐表中获取        
+      if prm_cur = 'RMB' then    --币种为RMB
+          select nvl(sum(t1.sum_oc), 0)
+            into n_ret
+            from acc_leder t1          
+           where t1.group_id  = prm_group_id
+             and t1.hos_id    = prm_hos_id
+             and t1.copy_code = prm_copy_code
+             and t1.acc_year  = prm_acc_year
+             and t1.acc_month = prm_acc_month
+             and t1.subj_code like prm_subj_code || '%';      
+      else  --币种为外币
+          select nvl(sum(t1.sum_oc_w), 0)
+            into n_ret
+            from acc_leder t1          
+           where t1.group_id  = prm_group_id
+             and t1.hos_id    = prm_hos_id
+             and t1.copy_code = prm_copy_code
+             and t1.acc_year  = prm_acc_year
+             and t1.acc_month = prm_acc_month
+             and t1.subj_code like prm_subj_code || '%';   
+      end if;    
+    else    --从凭证中获取
+      if prm_cur = 'RMB' then    --币种为RMB
+        
+        select count(1)
+           into n_count
+           from acc_leder t1         
+         where t1.group_id  = prm_group_id
+           and t1.hos_id    = prm_hos_id
+           and t1.copy_code = prm_copy_code
+           and t1.acc_year  = prm_acc_year
+           and t1.acc_month = '00'
+           and t1.subj_code like prm_subj_code || '%';  
+         
+         if n_count > 0 then  
+           --获取初始账累计借方发生额
+           select nvl(sum(t1.sum_oc), 0)
+              into n_init_money
+              from acc_leder t1            
+             where t1.group_id  = prm_group_id
+               and t1.hos_id    = prm_hos_id
+               and t1.copy_code = prm_copy_code
+               and t1.acc_year  = prm_acc_year
+               and t1.acc_month = '00'
+               and t1.subj_code like prm_subj_code || '%';  
+          end if;        
+             
+         select nvl(sum(t1.CREDIT), 0)
+           into n_period_money
+           from acc_vouch_detail t1
+           left join acc_vouch t2
+             on t1.vouch_id  = t2.vouch_id
+            and t1.group_id  = t2.group_id
+            and t1.hos_id    = t2.hos_id
+            and t1.copy_code = t2.copy_code
+            and t1.acc_year  = t2.acc_year           
+         where t1.group_id   = prm_group_id
+          and t1.hos_id      = prm_hos_id
+          and t1.copy_code   = prm_copy_code
+          and t1.acc_year    = prm_acc_year
+          and t2.acc_month  <= prm_acc_month
+          and t2.STATE      >  0              ---1草稿，0作废，1新建，2出纳签字，3审核，99记账 
+          and t1.subj_code like  prm_subj_code || '%'; 
+          
+         n_ret := n_init_money + n_period_money ; 
+         
+      else
+        
+        select count(1)
+           into n_count
+           from acc_leder t1        
+         where t1.group_id  = prm_group_id
+           and t1.hos_id    = prm_hos_id
+           and t1.copy_code = prm_copy_code
+           and t1.acc_year  = prm_acc_year
+           and t1.acc_month = '00'
+           and t1.subj_code like prm_subj_code || '%';  
+         
+         if n_count > 0 then  
+            --获取初始账累计借方发生额
+            select nvl(sum(t1.sum_oc_w), 0)
+              into n_init_money
+              from acc_leder t1           
+             where t1.group_id  = prm_group_id
+               and t1.hos_id    = prm_hos_id
+               and t1.copy_code = prm_copy_code
+               and t1.acc_year  = prm_acc_year
+               and t1.acc_month = '00'
+               and t1.subj_code like prm_subj_code || '%';     
+          end if;     
+           
+         select nvl(sum(t1.CREDIT_W), 0)
+           into n_period_money
+           from acc_vouch_detail t1
+           left join acc_vouch t2
+             on t1.vouch_id  = t2.vouch_id
+            and t1.group_id  = t2.group_id
+            and t1.hos_id    = t2.hos_id
+            and t1.copy_code = t2.copy_code
+            and t1.acc_year  = t2.acc_year         
+         where t1.group_id   = prm_group_id
+          and t1.hos_id      = prm_hos_id
+          and t1.copy_code   = prm_copy_code
+          and t1.acc_year    = prm_acc_year
+          and t2.acc_month  <= prm_acc_month
+          and t2.STATE       >  0              ---1草稿，0作废，1新建，2出纳签字，3审核，99记账 
+          and t1.subj_code like  prm_subj_code || '%'; 
+          
+          n_ret := n_init_money + n_period_money ; 
+      end if;
+    end if;
+    
+    return n_ret;
+  
+  EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+         return 0;
+      WHEN OTHERS THEN        
+         return 0; 
+  END RF_ACC_BNLD;
+  
+	]]></sql>
+	
+	
+	<sql id="rf_acc_jbsz" type="fun" desc="取本期发生基本数字"><![CDATA[
+	   /*-------------------------------------------------------------------------
+   || 函数名称 ：RF_ACC_JBSZ
+   || 功能描述 ：取本年发生基本数字
+   || 参数描述 ：参数标识          名称             输入/输出    类型
+   ||            -------------------------------------------------------------
+   ||            prm_group_id       集团             IN           NUMBER
+   ||            prm_hos_id         医院             IN           NUMBER
+   ||            prm_copy_code      账套             IN           VARCHAR2
+   ||            prm_acc_year       年度             IN           VARCHAR2
+   ||            prm_acc_month      月份             IN           VARCHAR2
+   ||            prm_target_code    基本指标编码         IN           VARCHAR2
+   ||
+   || 返 回 值 ：                   基本数字       OUT          NUMBER
+   ||
+   || 作    者 ：   sjy        完成日期 ：20170222
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：           修改日期：
+   ||-------------------------------------------------------------------------*/
+   CREATE OR REPLACE FUNCTION RF_ACC_JBSZ( prm_group_id       IN    NUMBER        --集团
+                                          ,prm_hos_id         IN    NUMBER        --医院
+                                          ,prm_copy_code      IN    VARCHAR2      --帐套
+                                          ,prm_acc_year       IN    VARCHAR2      --年度
+                                          ,prm_acc_month           IN    VARCHAR2  --月份
+                                          ,prm_target_code      IN    VARCHAR2      --基本指标编码
+                                         ) RETURN NUMBER
+  IS
+    num  NUMBER(19,6);
+
+  BEGIN
+    --初始化变量
+    num      :=  0;
+    
+    select target_num into num from
+    acc_target_data
+    where group_id = prm_group_id
+      and hos_id = prm_hos_id
+      and copy_code = prm_copy_code
+      and acc_year = prm_acc_year
+      and acc_month = prm_acc_month
+      and target_code = prm_target_code;
+    return num;
+  EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+         return 0;
+      WHEN OTHERS THEN
+         return 0;
+  END RF_ACC_JBSZ;
+	]]></sql>
+	
+
+	<sql id="rf_acc_jbszbnlj" type="fun" desc="取本年累计基本数字"><![CDATA[
+	   /*-------------------------------------------------------------------------
+   || 函数名称 ：RF_ACC_JBSZBNLJ
+   || 功能描述 ：取本年累计基本数字
+   || 参数描述 ：参数标识          名称             输入/输出    类型
+   ||            -------------------------------------------------------------
+   ||            prm_group_id       集团             IN           NUMBER
+   ||            prm_hos_id         医院             IN           NUMBER
+   ||            prm_copy_code      账套             IN           VARCHAR2
+   ||            prm_acc_year       年度             IN           VARCHAR2
+   ||            prm_acc_month      月份             IN           VARCHAR2
+   ||            prm_target_code    基本指标编码         IN           VARCHAR2
+   ||
+   || 返 回 值 ：                   基本数字       OUT          NUMBER
+   ||
+   || 作    者 ：   sjy        完成日期 ：20170222
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：           修改日期：
+   ||-------------------------------------------------------------------------*/
+   CREATE OR REPLACE FUNCTION RF_ACC_JBSZBNLJ( prm_group_id       IN    NUMBER        --集团
+                                          ,prm_hos_id         IN    NUMBER        --医院
+                                          ,prm_copy_code      IN    VARCHAR2      --帐套
+                                          ,prm_acc_year       IN    VARCHAR2      --年度
+                                          ,prm_acc_month           IN    VARCHAR2  --月份
+                                          ,prm_target_code      IN    VARCHAR2      --基本指标编码
+                                         ) RETURN NUMBER
+  IS
+    num  NUMBER(19,6);
+
+  BEGIN
+    --初始化变量
+    num      :=  0;
+    
+    select nvl(sum(target_num),0) into num from
+    acc_target_data
+    where group_id = prm_group_id
+      and hos_id = prm_hos_id
+      and copy_code = prm_copy_code
+      and acc_year = prm_acc_year
+      and acc_month <= prm_acc_month
+      and target_code = prm_target_code;
+    return num;
+  EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+         return 0;
+      WHEN OTHERS THEN
+         return 0;
+  END RF_ACC_JBSZBNLJ;
+	]]></sql>
+	
+	
+	
+	<sql id="RF_ACC_BNKMFLLJ" type="fun" desc="取本年功能分类累计借方发生额(科目)"><![CDATA[
+	  /*-------------------------------------------------------------------------
+   || 函数名称 ：RF_ACC_BNKMFLLJ
+   || 功能描述 ：取本年功能分类累计借方发生额
+   || 参数描述 ：参数标识          名称             输入/输出    类型
+   ||            -------------------------------------------------------------
+   ||            prm_group_id       集团             IN           NUMBER
+   ||            prm_hos_id         医院             IN           NUMBER
+   ||            prm_copy_code      账套             IN           VARCHAR2
+   ||            prm_acc_year       年度             IN           VARCHAR2
+   ||            prm_acc_month      月份             IN           VARCHAR2
+   ||            prm_cur            币种:RMB/USB     IN           VARCHAR2
+   ||            prm_subj_type      科目编码         IN           VARCHAR2
+   ||            prm_dept_type      科室类型         IN           VARCHAR2
+   ||            prm_con_acc        是否包含未记账   IN           NUMBER
+   ||
+   || 返 回 值 ：                   借方发生额       OUT          NUMBER
+   ||
+   || 作    者 ：           完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：           修改日期：
+   ||-------------------------------------------------------------------------*/
+   CREATE OR REPLACE FUNCTION RF_ACC_BNKMFLLJ( prm_group_id       IN    NUMBER        --集团
+                                              ,prm_hos_id         IN    NUMBER        --医院
+                                              ,prm_copy_code      IN    VARCHAR2      --帐套
+                                              ,prm_acc_year       IN    VARCHAR2      --年度
+                                              ,prm_acc_month      IN    VARCHAR2      --月份
+                                              ,prm_cur            IN    VARCHAR2      --币种  RMB/USB
+                                              ,prm_subj_type      IN    VARCHAR2      --科目编码
+                                              ,prm_dept_type      IN    VARCHAR2      --科室分类
+                                              ,prm_con_acc        IN    NUMBER        --是否包括未记账 0:不包含未记账  1:包含未记账
+                                             ) RETURN NUMBER
+  IS
+    n_init_money      NUMBER(19,6);  --初始账累计发生
+    n_period_money    NUMBER(19,6);  --期间累计发生
+    n_count           integer:= 0 ;
+    n_ret             NUMBER(19,6);   
+  BEGIN
+    --初始化变量
+    n_ret          :=  0 ;
+    n_init_money   :=  0 ;
+    n_period_money :=  0 ;
+    
+    if prm_con_acc = 0 then      --从帐表中获取        
+      if prm_cur = 'RMB' then    --币种为RMB
+          select nvl(sum(t1.sum_od), 0)
+            into n_ret
+            from acc_leder_check t1          
+           left join acc_dept_attr t3 
+             on t1.check1_id = t3.dept_id 
+             and t1.group_id = t3.group_id
+             and t1.hos_id   = t3.hos_id
+           where t1.group_id       = prm_group_id
+             and t1.hos_id         = prm_hos_id
+             and t1.copy_code      = prm_copy_code
+             and t1.acc_year       = prm_acc_year
+             and t1.acc_month      = prm_acc_month
+             and t1.subj_code  like '%'||prm_subj_type ||'%'
+             and t3.type_code      = prm_dept_type;     
+      else  --币种为外币
+          select nvl(sum(t1.sum_od_w), 0)
+            into n_ret
+            from acc_leder_check t1           
+           left join acc_dept_attr t3 
+             on t1.check1_id = t3.dept_id 
+             and t1.group_id = t3.group_id
+             and t1.hos_id   = t3.hos_id
+           where t1.group_id       = prm_group_id
+             and t1.hos_id         = prm_hos_id
+             and t1.copy_code      = prm_copy_code
+             and t1.acc_year       = prm_acc_year
+             and t1.acc_month      = prm_acc_month
+              and t1.subj_code  like '%'||prm_subj_type ||'%'
+             and t3.type_code      = prm_dept_type;   
+      end if;    
+    else    --从凭证中获取
+      if prm_cur = 'RMB' then    --币种为RMB
+        
+         --获取上线时的累计发生额
+         select count(1)
+            into n_count
+            from acc_leder_check t1         
+           left join acc_dept_attr t3 
+             on t1.check1_id = t3.dept_id 
+             and t1.group_id = t3.group_id
+             and t1.hos_id   = t3.hos_id
+           where t1.group_id       = prm_group_id
+             and t1.hos_id         = prm_hos_id
+             and t1.copy_code      = prm_copy_code
+             and t1.acc_year       = prm_acc_year
+             and t1.acc_month      = '00'
+             and t1.subj_code  like '%'||prm_subj_type ||'%'
+             and t3.type_code      = prm_dept_type;  
+             
+         if n_count > 0 then    
+             --获取上线时的累计发生额
+             select nvl(sum(t1.sum_od), 0)
+                into n_init_money
+                from acc_leder_check t1              
+               left join acc_dept_attr t3 
+                 on t1.check1_id = t3.dept_id 
+                 and t1.group_id = t3.group_id
+                 and t1.hos_id   = t3.hos_id
+               where t1.group_id       = prm_group_id
+                 and t1.hos_id         = prm_hos_id
+                 and t1.copy_code      = prm_copy_code
+                 and t1.acc_year       = prm_acc_year
+                 and t1.acc_month      = '00'
+                  and t1.subj_code  like '%'||prm_subj_type ||'%'
+                 and t3.type_code      = prm_dept_type;  
+         end if;
+         
+         select nvl(sum(t1.DEBIT), 0)
+           into n_period_money
+           from acc_vouch_check t1
+           left join acc_vouch t2
+             on t1.vouch_id  = t2.vouch_id
+            and t1.group_id  = t2.group_id
+            and t1.hos_id    = t2.hos_id
+            and t1.copy_code = t2.copy_code
+            and t1.acc_year  = t2.acc_year           
+           left join acc_dept_attr t4 
+             on t1.check1_id = t4.dept_id 
+            and t1.group_id = t4.group_id
+            and t1.hos_id   = t4.hos_id 
+         where t1.group_id   = prm_group_id
+          and t1.hos_id      = prm_hos_id
+          and t1.copy_code   = prm_copy_code
+          and t1.acc_year    = prm_acc_year
+          and t2.acc_month  <= prm_acc_month
+          and t2.STATE       >  0              ---1草稿，0作废，1新建，2出纳签字，3审核，99记账 
+          and t1.subj_code  like '%'||prm_subj_type ||'%'
+          and t4.type_code   = prm_dept_type;  
+          
+         n_ret := n_init_money + n_period_money ; 
+      else
+        --获取上线时的累计发生额
+         select count(1)
+            into n_count
+            from acc_leder_check t1          
+           left join acc_dept_attr t3 
+             on t1.check1_id = t3.dept_id 
+             and t1.group_id = t3.group_id
+             and t1.hos_id   = t3.hos_id
+           where t1.group_id       = prm_group_id
+             and t1.hos_id         = prm_hos_id
+             and t1.copy_code      = prm_copy_code
+             and t1.acc_year       = prm_acc_year
+             and t1.acc_month      = '00'
+             and t1.subj_code  like '%'||prm_subj_type ||'%'
+             and t3.type_code      = prm_dept_type;  
+             
+         if n_count > 0 then    
+             --获取上线时的累计发生额
+             select nvl(sum(t1.sum_od_w), 0)
+                into n_init_money
+                from acc_leder_check t1              
+               left join acc_dept_attr t3 
+                 on t1.check1_id = t3.dept_id 
+                 and t1.group_id = t3.group_id
+                 and t1.hos_id   = t3.hos_id
+               where t1.group_id       = prm_group_id
+                 and t1.hos_id         = prm_hos_id
+                 and t1.copy_code      = prm_copy_code
+                 and t1.acc_year       = prm_acc_year
+                 and t1.acc_month      = '00'
+                 and t1.subj_code  like '%'||prm_subj_type ||'%'
+                 and t3.type_code      = prm_dept_type;  
+        end if;         
+             
+         select nvl(sum(t1.DEBIT_W), 0)
+           into n_period_money
+           from acc_vouch_check t1
+           left join acc_vouch t2
+             on t1.vouch_id  = t2.vouch_id
+            and t1.group_id  = t2.group_id
+            and t1.hos_id    = t2.hos_id
+            and t1.copy_code = t2.copy_code
+            and t1.acc_year  = t2.acc_year          
+           left join acc_dept_attr t4 
+             on t1.check1_id = t4.dept_id 
+            and t1.group_id = t4.group_id
+            and t1.hos_id   = t4.hos_id 
+         where t1.group_id   = prm_group_id
+          and t1.hos_id      = prm_hos_id
+          and t1.copy_code   = prm_copy_code
+          and t1.acc_year    = prm_acc_year
+          and t2.acc_month  <= prm_acc_month
+          and t2.STATE       >  0              ---1草稿，0作废，1新建，2出纳签字，3审核，99记账 
+          and t1.subj_code  like '%'||prm_subj_type ||'%'
+          and t4.type_code   = prm_dept_type;  
+          
+          n_ret := n_init_money + n_period_money ; 
+          
+      end if;
+    end if;
+    
+    return n_ret;
+  
+  EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+         return 0;
+      WHEN OTHERS THEN        
+         return 0; 
+  END RF_ACC_BNKMFLLJ;
+	]]></sql>
+	
+	
+	<sql id="RF_ACC_BQKMFLJF" type="fun" desc="取本期功能分类借方发生额(科目)"><![CDATA[
+	  /*-------------------------------------------------------------------------
+   || 函数名称 ：RF_ACC_BQKMFLJF
+   || 功能描述 ：取本期功能分类借方发生额
+   || 参数描述 ：参数标识          名称             输入/输出    类型
+   ||            -------------------------------------------------------------
+   ||            prm_group_id       集团             IN           NUMBER
+   ||            prm_hos_id         医院             IN           NUMBER
+   ||            prm_copy_code      账套             IN           VARCHAR2
+   ||            prm_acc_year       年度             IN           VARCHAR2
+   ||            prm_acc_month      月份             IN           VARCHAR2
+   ||            prm_cur            币种:RMB/USB     IN           VARCHAR2
+   ||            prm_subj_type      科目编码        IN           VARCHAR2
+   ||            prm_dept_type      科室类型         IN           VARCHAR2
+   ||            prm_con_acc        是否包含未记账   IN           NUMBER
+   ||
+   || 返 回 值 ：                   借方发生额       OUT          NUMBER
+   ||
+   || 作    者 ：           完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：           修改日期：
+   ||-------------------------------------------------------------------------*/
+   CREATE OR REPLACE FUNCTION RF_ACC_BQKMFLJF( prm_group_id       IN    NUMBER        --集团
+                                              ,prm_hos_id         IN    NUMBER        --医院
+                                              ,prm_copy_code      IN    VARCHAR2      --帐套
+                                              ,prm_acc_year       IN    VARCHAR2      --年度
+                                              ,prm_acc_month      IN    VARCHAR2      --月份
+                                              ,prm_cur            IN    VARCHAR2      --币种  RMB/USB
+                                              ,prm_subj_type      IN    VARCHAR2      --科目编码
+                                              ,prm_dept_type      IN    VARCHAR2      --科室分类
+                                              ,prm_con_acc        IN    NUMBER        --是否包括未记账 0:不包含未记账  1:包含未记账
+                                             ) RETURN NUMBER
+  IS
+    n_ret  NUMBER(19,6);
+   
+  BEGIN
+    --初始化变量
+    n_ret      :=  0 ;
+    
+    if prm_con_acc = 0 then      --从帐表中获取        
+      if prm_cur = 'RMB' then    --币种为RMB
+          select nvl(sum(t1.this_od), 0)
+            into n_ret
+            from acc_leder_check t1           
+           left join acc_dept_attr t3 
+             on t1.check1_id = t3.dept_id 
+             and t1.group_id = t3.group_id
+             and t1.hos_id   = t3.hos_id
+           where t1.group_id       = prm_group_id
+             and t1.hos_id         = prm_hos_id
+             and t1.copy_code      = prm_copy_code
+             and t1.acc_year       = prm_acc_year
+             and t1.acc_month      = prm_acc_month
+             and t1.subj_code like '%'||prm_subj_type||'%'
+             and t3.type_code      = prm_dept_type;     
+      else  --币种为外币
+          select nvl(sum(t1.this_od_w), 0)
+            into n_ret
+            from acc_leder_check t1         
+           left join acc_dept_attr t3 
+             on t1.check1_id = t3.dept_id 
+             and t1.group_id = t3.group_id
+             and t1.hos_id   = t3.hos_id
+           where t1.group_id       = prm_group_id
+             and t1.hos_id         = prm_hos_id
+             and t1.copy_code      = prm_copy_code
+             and t1.acc_year       = prm_acc_year
+             and t1.acc_month      = prm_acc_month
+            and t1.subj_code like '%'||prm_subj_type||'%'
+             and t3.type_code      = prm_dept_type;   
+      end if;    
+    else    --从凭证中获取
+      if prm_cur = 'RMB' then    --币种为RMB
+         select nvl(sum(t1.DEBIT), 0)
+           into n_ret
+           from acc_vouch_check t1
+           left join acc_vouch t2
+             on t1.vouch_id  = t2.vouch_id
+            and t1.group_id  = t2.group_id
+            and t1.hos_id    = t2.hos_id
+            and t1.copy_code = t2.copy_code
+            and t1.acc_year  = t2.acc_year          
+           left join acc_dept_attr t4 
+             on t1.check1_id = t4.dept_id 
+            and t1.group_id = t4.group_id
+            and t1.hos_id   = t4.hos_id 
+         where t1.group_id   = prm_group_id
+          and t1.hos_id      = prm_hos_id
+          and t1.copy_code   = prm_copy_code
+          and t1.acc_year    = prm_acc_year
+          and t2.acc_month   = prm_acc_month
+          and t2.STATE       >  0              ---1草稿，0作废，1新建，2出纳签字，3审核，99记账 
+          and t1.subj_code like '%'||prm_subj_type||'%'
+          and t4.type_code   = prm_dept_type;  
+      else
+         select nvl(sum(t1.DEBIT_W), 0)
+           into n_ret
+           from acc_vouch_check t1
+           left join acc_vouch t2
+             on t1.vouch_id  = t2.vouch_id
+            and t1.group_id  = t2.group_id
+            and t1.hos_id    = t2.hos_id
+            and t1.copy_code = t2.copy_code
+            and t1.acc_year  = t2.acc_year         
+           left join acc_dept_attr t4 
+             on t1.check1_id = t4.dept_id 
+            and t1.group_id = t4.group_id
+            and t1.hos_id   = t4.hos_id 
+         where t1.group_id   = prm_group_id
+          and t1.hos_id      = prm_hos_id
+          and t1.copy_code   = prm_copy_code
+          and t1.acc_year    = prm_acc_year
+          and t2.acc_month   = prm_acc_month
+          and t2.STATE       >  0              ---1草稿，0作废，1新建，2出纳签字，3审核，99记账 
+          and t1.subj_code like '%'||prm_subj_type||'%'
+          and t4.type_code   = prm_dept_type;  
+      end if;
+    end if;
+    
+    return n_ret;
+  
+  EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+         return 0;
+      WHEN OTHERS THEN        
+         return 0; 
+  END RF_ACC_BQKMFLJF;
+	]]></sql>
+	
+	<sql id="RF_ACC_QBNJFFS" type="fun" desc="取本年借方发生"><![CDATA[
+   /*-------------------------------------------------------------------------
+   || 函数名称 ：RF_ACC_QBNJFFS
+   || 功能描述 ：取本年借方发生额
+   || 参数描述 ：参数标识          名称             输入/输出    类型
+   ||            -------------------------------------------------------------
+   ||            prm_group_id       集团             IN           NUMBER
+   ||            prm_hos_id         医院             IN           NUMBER
+   ||            prm_copy_code      账套             IN           VARCHAR2
+   ||            prm_acc_year       年度             IN           VARCHAR2
+   ||            prm_cur            币种:RMB/USB     IN           VARCHAR2
+   ||            prm_subj_code      会计科目         IN           VARCHAR2
+   ||            prm_con_acc        是否包含未记账   IN           NUMBER
+   ||
+   || 返 回 值 ：                   借方发生额       OUT          NUMBER
+   ||
+   || 作    者 ：           完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：           修改日期：
+   ||-------------------------------------------------------------------------*/
+   CREATE OR REPLACE FUNCTION RF_ACC_QBNJFFS( prm_group_id       IN    NUMBER        --集团
+                                          ,prm_hos_id         IN    NUMBER        --医院
+                                          ,prm_copy_code      IN    VARCHAR2      --帐套
+                                          ,prm_acc_year       IN    VARCHAR2      --年度
+                                          ,prm_cur            IN    VARCHAR2      --币种  RMB/USB
+                                          ,prm_subj_code      IN    VARCHAR2      --科目编码
+                                          ,prm_con_acc        IN    NUMBER        --是否包括未记账 0:不包含未记账  1:包含未记账
+                                         ) RETURN NUMBER
+  IS
+    n_ret  NUMBER(19,6);
+   
+  BEGIN
+    --初始化变量
+    n_ret      :=  0 ;
+    
+    if prm_con_acc = 0 then      --从帐表中获取        
+      if prm_cur = 'RMB' then    --币种为RMB
+          select nvl(sum(this_od), 0)
+            into n_ret
+            from acc_leder 
+           where group_id  = prm_group_id
+             and hos_id    = prm_hos_id
+             and copy_code = prm_copy_code
+             and acc_year  = prm_acc_year
+             and subj_code like prm_subj_code || '%';      
+      else  --币种为外币
+          select nvl(sum(this_od_w), 0)
+            into n_ret
+            from acc_leder 
+           where group_id  = prm_group_id
+             and hos_id    = prm_hos_id
+             and copy_code = prm_copy_code
+             and acc_year  = prm_acc_year
+             and subj_code like prm_subj_code || '%';   
+      end if;    
+    else    --从凭证中获取
+      if prm_cur = 'RMB' then    --币种为RMB
+         select nvl(sum(t1.DEBIT), 0)
+           into n_ret
+           from acc_vouch_detail t1
+           left join acc_vouch t2
+             on t1.vouch_id  = t2.vouch_id
+            and t1.group_id  = t2.group_id
+            and t1.hos_id    = t2.hos_id
+            and t1.copy_code = t2.copy_code
+            and t1.acc_year  = t2.acc_year
+         where t1.group_id   = prm_group_id
+          and t1.hos_id      = prm_hos_id
+          and t1.copy_code   = prm_copy_code
+          and t1.acc_year    = prm_acc_year
+          and t2.STATE       >  0              ---1草稿，0作废，1新建，2出纳签字，3审核，99记账 
+          and t1.subj_code like  prm_subj_code || '%'; 
+      else
+         select nvl(sum(t1.DEBIT_W), 0)
+           into n_ret
+           from acc_vouch_detail t1
+           left join acc_vouch t2
+             on t1.vouch_id  = t2.vouch_id
+            and t1.group_id  = t2.group_id
+            and t1.hos_id    = t2.hos_id
+            and t1.copy_code = t2.copy_code
+            and t1.acc_year  = t2.acc_year
+         where t1.group_id   = prm_group_id
+          and t1.hos_id      = prm_hos_id
+          and t1.copy_code   = prm_copy_code
+          and t1.acc_year    = prm_acc_year
+          and t2.STATE       >  0              ---1草稿，0作废，1新建，2出纳签字，3审核，99记账 
+          and t1.subj_code like  prm_subj_code || '%'; 
+      end if;
+    end if;
+    
+    return n_ret;
+  
+  EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+         return 0;
+      WHEN OTHERS THEN        
+         return 0; 
+  END RF_ACC_QBNJFFS;
+	]]></sql>
+	
+	<sql id="RF_ACC_QBNDFFS" type="fun" desc="取本年贷方发生"><![CDATA[
+   /*-------------------------------------------------------------------------
+   || 函数名称 ：RF_ACC_QBNDFFS
+   || 功能描述 ：取本期贷方发生额
+   || 参数描述 ：参数标识          名称             输入/输出    类型
+   ||            -------------------------------------------------------------
+   ||            prm_group_id       集团             IN           NUMBER
+   ||            prm_hos_id         医院             IN           NUMBER
+   ||            prm_copy_code      账套             IN           VARCHAR2
+   ||            prm_acc_year       年度             IN           VARCHAR2
+   ||            prm_cur            币种:RMB/USB     IN           VARCHAR2
+   ||            prm_subj_code      会计科目         IN           VARCHAR2
+   ||            prm_con_acc        是否包含未记账   IN           NUMBER
+   ||
+   || 返 回 值 ：                   贷方发生额       OUT          NUMBER
+   ||
+   || 作    者 ：           完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：           修改日期：
+   ||-------------------------------------------------------------------------*/
+   CREATE OR REPLACE FUNCTION RF_ACC_QBNDFFS( prm_group_id       IN    NUMBER        --集团
+                                          ,prm_hos_id         IN    NUMBER        --医院
+                                          ,prm_copy_code      IN    VARCHAR2      --帐套
+                                          ,prm_acc_year       IN    VARCHAR2      --年度
+                                          ,prm_cur            IN    VARCHAR2      --币种  RMB/USB
+                                          ,prm_subj_code      IN    VARCHAR2      --科目编码
+                                          ,prm_con_acc        IN    NUMBER        --是否包括未记账 0:不包含未记账  1:包含未记账
+                                         ) RETURN NUMBER
+  IS
+    n_ret  NUMBER(19,6);
+   
+  BEGIN
+    --初始化变量
+    n_ret      :=  0 ;
+    
+    if prm_con_acc = 0 then      --从帐表中获取        
+      if prm_cur = 'RMB' then    --币种为RMB
+          select nvl(sum(this_oc), 0)
+            into n_ret
+            from acc_leder 
+           where group_id  = prm_group_id
+             and hos_id    = prm_hos_id
+             and copy_code = prm_copy_code
+             and acc_year  = prm_acc_year
+             and subj_code like prm_subj_code || '%';      
+      else  --币种为外币
+          select nvl(sum(this_oc_w), 0)
+            into n_ret
+            from acc_leder 
+           where group_id  = prm_group_id
+             and hos_id    = prm_hos_id
+             and copy_code = prm_copy_code
+             and acc_year  = prm_acc_year
+             and subj_code like prm_subj_code || '%';   
+      end if;    
+    else    --从凭证中获取
+      if prm_cur = 'RMB' then    --币种为RMB
+         select nvl(sum(t1.CREDIT), 0)
+           into n_ret
+           from acc_vouch_detail t1
+           left join acc_vouch t2
+             on t1.vouch_id  = t2.vouch_id
+            and t1.group_id  = t2.group_id
+            and t1.hos_id    = t2.hos_id
+            and t1.copy_code = t2.copy_code
+            and t1.acc_year  = t2.acc_year
+         where t1.group_id   = prm_group_id
+          and t1.hos_id      = prm_hos_id
+          and t1.copy_code   = prm_copy_code
+          and t1.acc_year    = prm_acc_year
+          and t2.STATE       >  0              ---1草稿，0作废，1新建，2出纳签字，3审核，99记账 
+          and t1.subj_code like  prm_subj_code || '%'; 
+      else
+         select nvl(sum(t1.CREDIT_W), 0)
+           into n_ret
+           from acc_vouch_detail t1
+           left join acc_vouch t2
+             on t1.vouch_id  = t2.vouch_id
+            and t1.group_id  = t2.group_id
+            and t1.hos_id    = t2.hos_id
+            and t1.copy_code = t2.copy_code
+            and t1.acc_year  = t2.acc_year
+         where t1.group_id   = prm_group_id
+          and t1.hos_id      = prm_hos_id
+          and t1.copy_code   = prm_copy_code
+          and t1.acc_year    = prm_acc_year
+          and t2.STATE       >  0              ---1草稿，0作废，1新建，2出纳签字，3审核，99记账 
+          and t1.subj_code like  prm_subj_code || '%'; 
+      end if;
+    end if;
+    
+    return n_ret;
+  
+  EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+         return 0;
+      WHEN OTHERS THEN        
+         return 0; 
+  END RF_ACC_QBNDFFS;
+	]]></sql>
+	
+	<sql id="RF_ACC_QBJRSZKMBQJF" type="fun" desc="取不记入收支科目本期借方发生"><![CDATA[
+   /*-------------------------------------------------------------------------
+   || 函数名称 ：RF_ACC_QBJRSZKMBQJFFSE
+   || 功能描述 ：取不记入收支科目本期借方发生额
+   || 参数描述 ：参数标识          名称             输入/输出    类型
+   ||            -------------------------------------------------------------
+   ||            prm_group_id       集团             IN           NUMBER
+   ||            prm_hos_id         医院             IN           NUMBER
+   ||            prm_copy_code      账套             IN           VARCHAR2
+   ||            prm_acc_year       年度             IN           VARCHAR2
+   ||            prm_acc_month      月份             IN           VARCHAR2
+   ||            prm_cur            币种:RMB/USB     IN           VARCHAR2
+   ||            prm_con_acc        是否包含未记账   IN           NUMBER
+   ||
+   || 返 回 值 ：                   借方发生额       OUT          NUMBER
+   ||
+   || 作    者 ：           完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：           修改日期：
+   ||-------------------------------------------------------------------------*/
+   CREATE OR REPLACE FUNCTION RF_ACC_QBJRSZKMBQJFFSE( prm_group_id       IN    NUMBER        --集团
+                                          ,prm_hos_id         IN    NUMBER        --医院
+                                          ,prm_copy_code      IN    VARCHAR2      --帐套
+                                          ,prm_acc_year       IN    VARCHAR2      --年度
+                                          ,prm_acc_month      IN    VARCHAR2      --月份
+                                          ,prm_cur            IN    VARCHAR2      --币种  RMB/USB
+                                          ,prm_con_acc        IN    NUMBER        --是否包括未记账 0:不包含未记账  1:包含未记账
+                                         ) RETURN NUMBER
+  IS
+    n_ret  NUMBER(19,6);
+   
+  BEGIN
+    --初始化变量
+    n_ret      :=  0 ;
+    
+    if prm_con_acc = 0 then      --从帐表中获取        
+      if prm_cur = 'RMB' then    --币种为RMB
+          select nvl(sum(t1.this_od), 0)
+            into n_ret
+            from acc_leder t1
+           left join acc_subj t2
+              on t1.group_id  = t2.group_id
+             and t1.hos_id    = t2.hos_id
+             and t1.copy_code = t2.copy_code
+             and t1.acc_year  = t2.acc_year
+             and t1.subj_code   = t2.subj_code
+           where t1.group_id  = prm_group_id
+             and t1.hos_id    = prm_hos_id
+             and t1.copy_code = prm_copy_code
+             and t1.acc_year  = prm_acc_year
+             and t1.acc_month = prm_acc_month
+             and t2.is_jrsz = 0;      
+      else  --币种为外币
+          select nvl(sum(t1.this_od_w), 0)
+            into n_ret
+            from acc_leder t1
+           left join acc_subj t2
+              on t1.group_id  = t2.group_id
+             and t1.hos_id    = t2.hos_id
+             and t1.copy_code = t2.copy_code
+             and t1.acc_year  = t2.acc_year
+             and t1.subj_code   = t2.subj_code
+           where t1.group_id  = prm_group_id
+             and t1.hos_id    = prm_hos_id
+             and t1.copy_code = prm_copy_code
+             and t1.acc_year  = prm_acc_year
+             and t1.acc_month = prm_acc_month
+             and t2.is_jrsz = 0;   
+      end if;    
+    else    --从凭证中获取
+      if prm_cur = 'RMB' then    --币种为RMB
+         select nvl(sum(t1.DEBIT), 0)
+           into n_ret
+           from acc_vouch_detail t1
+           left join acc_vouch t2
+             on t1.vouch_id  = t2.vouch_id
+            and t1.group_id  = t2.group_id
+            and t1.hos_id    = t2.hos_id
+            and t1.copy_code = t2.copy_code
+            and t1.acc_year  = t2.acc_year
+           left join acc_subj t3
+             on t1.group_id  = t3.group_id
+            and t1.hos_id    = t3.hos_id
+            and t1.copy_code = t3.copy_code
+            and t1.acc_year  = t3.acc_year
+            and t1.subj_code   = t3.subj_code
+         where t1.group_id   = prm_group_id
+          and t1.hos_id      = prm_hos_id
+          and t1.copy_code   = prm_copy_code
+          and t1.acc_year    = prm_acc_year
+          and t2.acc_month   = prm_acc_month
+          and t2.STATE       >  0              ---1草稿，0作废，1新建，2出纳签字，3审核，99记账 
+          and t3.is_jrsz = 0; 
+      else
+         select nvl(sum(t1.DEBIT_W), 0)
+           into n_ret
+           from acc_vouch_detail t1
+           left join acc_vouch t2
+             on t1.vouch_id  = t2.vouch_id
+            and t1.group_id  = t2.group_id
+            and t1.hos_id    = t2.hos_id
+            and t1.copy_code = t2.copy_code
+            and t1.acc_year  = t2.acc_year
+           left join acc_subj t3
+             on t1.group_id  = t3.group_id
+            and t1.hos_id    = t3.hos_id
+            and t1.copy_code = t3.copy_code
+            and t1.acc_year  = t3.acc_year
+            and t1.subj_code   = t3.subj_code
+         where t1.group_id   = prm_group_id
+          and t1.hos_id      = prm_hos_id
+          and t1.copy_code   = prm_copy_code
+          and t1.acc_year    = prm_acc_year
+          and t2.acc_month   = prm_acc_month
+          and t2.STATE       >  0              ---1草稿，0作废，1新建，2出纳签字，3审核，99记账 
+          and t3.is_jrsz = 0; 
+      end if;
+    end if;
+    
+    return n_ret;
+  
+  EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+         return 0;
+      WHEN OTHERS THEN        
+         return 0; 
+  END RF_ACC_QBJRSZKMBQJFFSE;
+	]]></sql>
+	
+	<sql id="RF_ACC_QBJRSZKMBQLJJF" type="fun" desc="取不记入收支科目本期累计借方发生"><![CDATA[
+   /*-------------------------------------------------------------------------
+   || 函数名称 ：RF_ACC_QBJRSZKMBQLJJF
+   || 功能描述 ：取不记入收支科目本期累计借方发生额
+   || 参数描述 ：参数标识          名称             输入/输出    类型
+   ||            -------------------------------------------------------------
+   ||            prm_group_id       集团             IN           NUMBER
+   ||            prm_hos_id         医院             IN           NUMBER
+   ||            prm_copy_code      账套             IN           VARCHAR2
+   ||            prm_acc_year       年度             IN           VARCHAR2
+   ||            prm_acc_month      月份             IN           VARCHAR2
+   ||            prm_cur            币种:RMB/USB     IN           VARCHAR2
+   ||            prm_con_acc        是否包含未记账   IN           NUMBER
+   ||
+   || 返 回 值 ：                   借方发生额       OUT          NUMBER
+   ||
+   || 作    者 ：           完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：           修改日期：
+   ||-------------------------------------------------------------------------*/
+   CREATE OR REPLACE FUNCTION RF_ACC_QBJRSZKMBQLJJF( prm_group_id       IN    NUMBER        --集团
+                                          ,prm_hos_id         IN    NUMBER        --医院
+                                          ,prm_copy_code      IN    VARCHAR2      --帐套
+                                          ,prm_acc_year       IN    VARCHAR2      --年度
+                                          ,prm_acc_month      IN    VARCHAR2      --月份
+                                          ,prm_cur            IN    VARCHAR2      --币种  RMB/USB
+                                          ,prm_con_acc        IN    NUMBER        --是否包括未记账 0:不包含未记账  1:包含未记账
+                                         ) RETURN NUMBER
+  IS
+    n_ret  NUMBER(19,6);
+   
+  BEGIN
+    --初始化变量
+    n_ret      :=  0 ;
+    
+    if prm_con_acc = 0 then      --从帐表中获取        
+      if prm_cur = 'RMB' then    --币种为RMB
+          select nvl(sum(t1.sum_od), 0)
+            into n_ret
+            from acc_leder t1
+           left join acc_subj t2
+              on t1.group_id  = t2.group_id
+             and t1.hos_id    = t2.hos_id
+             and t1.copy_code = t2.copy_code
+             and t1.acc_year  = t2.acc_year
+             and t1.subj_code   = t2.subj_code
+           where t1.group_id  = prm_group_id
+             and t1.hos_id    = prm_hos_id
+             and t1.copy_code = prm_copy_code
+             and t1.acc_year  = prm_acc_year
+             and t1.acc_month = prm_acc_month
+             and t2.is_jrsz = 0;      
+      else  --币种为外币
+          select nvl(sum(t1.sum_od_w), 0)
+            into n_ret
+            from acc_leder t1
+           left join acc_subj t2
+              on t1.group_id  = t2.group_id
+             and t1.hos_id    = t2.hos_id
+             and t1.copy_code = t2.copy_code
+             and t1.acc_year  = t2.acc_year
+             and t1.subj_code   = t2.subj_code
+           where t1.group_id  = prm_group_id
+             and t1.hos_id    = prm_hos_id
+             and t1.copy_code = prm_copy_code
+             and t1.acc_year  = prm_acc_year
+             and t1.acc_month = prm_acc_month
+             and t2.is_jrsz = 0;   
+      end if;    
+    else    --从凭证中获取
+      if prm_cur = 'RMB' then    --币种为RMB
+         select nvl(sum(t1.DEBIT), 0)
+           into n_ret
+           from acc_vouch_detail t1
+           left join acc_vouch t2
+             on t1.vouch_id  = t2.vouch_id
+            and t1.group_id  = t2.group_id
+            and t1.hos_id    = t2.hos_id
+            and t1.copy_code = t2.copy_code
+            and t1.acc_year  = t2.acc_year
+           left join acc_subj t3
+             on t1.group_id  = t3.group_id
+            and t1.hos_id    = t3.hos_id
+            and t1.copy_code = t3.copy_code
+            and t1.acc_year  = t3.acc_year
+            and t1.subj_code   = t3.subj_code
+         where t1.group_id   = prm_group_id
+          and t1.hos_id      = prm_hos_id
+          and t1.copy_code   = prm_copy_code
+          and t1.acc_year    = prm_acc_year
+          and t2.acc_month   <= prm_acc_month
+          and t2.STATE       >  0              ---1草稿，0作废，1新建，2出纳签字，3审核，99记账 
+          and t3.is_jrsz = 0; 
+      else
+         select nvl(sum(t1.DEBIT_W), 0)
+           into n_ret
+           from acc_vouch_detail t1
+           left join acc_vouch t2
+             on t1.vouch_id  = t2.vouch_id
+            and t1.group_id  = t2.group_id
+            and t1.hos_id    = t2.hos_id
+            and t1.copy_code = t2.copy_code
+            and t1.acc_year  = t2.acc_year
+           left join acc_subj t3
+             on t1.group_id  = t3.group_id
+            and t1.hos_id    = t3.hos_id
+            and t1.copy_code = t3.copy_code
+            and t1.acc_year  = t3.acc_year
+            and t1.subj_code   = t3.subj_code
+         where t1.group_id   = prm_group_id
+          and t1.hos_id      = prm_hos_id
+          and t1.copy_code   = prm_copy_code
+          and t1.acc_year    = prm_acc_year
+          and t2.acc_month   <= prm_acc_month
+          and t2.STATE       >  0              ---1草稿，0作废，1新建，2出纳签字，3审核，99记账 
+          and t3.is_jrsz = 0; 
+      end if;
+    end if;
+    
+    return n_ret;
+  
+  EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+         return 0;
+      WHEN OTHERS THEN        
+         return 0; 
+  END RF_ACC_QBJRSZKMBQLJJF;
+	]]></sql>
+	
+	<sql id="RF_ACC_QBJRSZKMBQDF" type="fun" desc="取不记入收支科目本期贷方发生"><![CDATA[
+   /*-------------------------------------------------------------------------
+   || 函数名称 ：RZ_ACC_QBJRSZkMBQDFFSE
+   || 功能描述 ：取不记入收支科目本期贷方发生额
+   || 参数描述 ：参数标识          名称             输入/输出    类型
+   ||            -------------------------------------------------------------
+   ||            prm_group_id       集团             IN           NUMBER
+   ||            prm_hos_id         医院             IN           NUMBER
+   ||            prm_copy_code      账套             IN           VARCHAR2
+   ||            prm_acc_year       年度             IN           VARCHAR2
+   ||            prm_acc_month      月份             IN           VARCHAR2
+   ||            prm_cur            币种:RMB/USB     IN           VARCHAR2
+   ||            prm_con_acc        是否包含未记账   IN           NUMBER
+   ||
+   || 返 回 值 ：                   贷方发生额       OUT          NUMBER
+   ||
+   || 作    者 ：           完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：           修改日期：
+   ||-------------------------------------------------------------------------*/
+   CREATE OR REPLACE FUNCTION RZ_ACC_QBJRSZkMBQDFFSE( prm_group_id       IN    NUMBER        --集团
+                                          ,prm_hos_id         IN    NUMBER        --医院
+                                          ,prm_copy_code      IN    VARCHAR2      --帐套
+                                          ,prm_acc_year       IN    VARCHAR2      --年度
+                                          ,prm_acc_month      IN    VARCHAR2      --月份
+                                          ,prm_cur            IN    VARCHAR2      --币种  RMB/USB
+                                          ,prm_con_acc        IN    NUMBER        --是否包括未记账 0:不包含未记账  1:包含未记账
+                                         ) RETURN NUMBER
+  IS
+    n_ret  NUMBER(19,6);
+   
+  BEGIN
+    --初始化变量
+    n_ret      :=  0 ;
+    
+    if prm_con_acc = 0 then      --从帐表中获取        
+      if prm_cur = 'RMB' then    --币种为RMB
+          select nvl(sum(t1.this_oc), 0)
+            into n_ret
+            from acc_leder t1
+           left join acc_subj t2
+              on t1.group_id  = t2.group_id
+             and t1.hos_id    = t2.hos_id
+             and t1.copy_code = t2.copy_code
+             and t1.acc_year  = t2.acc_year
+             and t1.subj_code   = t2.subj_code
+           where t1.group_id  = prm_group_id
+             and t1.hos_id    = prm_hos_id
+             and t1.copy_code = prm_copy_code
+             and t1.acc_year  = prm_acc_year
+             and t1.acc_month = prm_acc_month
+             and t2.is_jrsz = 0;   
+      else  --币种为外币
+          select nvl(sum(t1.this_oc_w), 0)
+            into n_ret
+            from acc_leder t1
+           left join acc_subj t2
+              on t1.group_id  = t2.group_id
+             and t1.hos_id    = t2.hos_id
+             and t1.copy_code = t2.copy_code
+             and t1.acc_year  = t2.acc_year
+             and t1.subj_code   = t2.subj_code
+           where t1.group_id  = prm_group_id
+             and t1.hos_id    = prm_hos_id
+             and t1.copy_code = prm_copy_code
+             and t1.acc_year  = prm_acc_year
+             and t1.acc_month = prm_acc_month
+             and t2.is_jrsz = 0;    
+      end if;    
+    else    --从凭证中获取
+      if prm_cur = 'RMB' then    --币种为RMB
+         select nvl(sum(t1.CREDIT), 0)
+           into n_ret
+           from acc_vouch_detail t1
+           left join acc_vouch t2
+             on t1.vouch_id  = t2.vouch_id
+            and t1.group_id  = t2.group_id
+            and t1.hos_id    = t2.hos_id
+            and t1.copy_code = t2.copy_code
+            and t1.acc_year  = t2.acc_year
+           left join acc_subj t3
+             on t1.group_id  = t3.group_id
+            and t1.hos_id    = t3.hos_id
+            and t1.copy_code = t3.copy_code
+            and t1.acc_year  = t3.acc_year
+            and t1.subj_code   = t3.subj_code
+         where t1.group_id   = prm_group_id
+          and t1.hos_id      = prm_hos_id
+          and t1.copy_code   = prm_copy_code
+          and t1.acc_year    = prm_acc_year
+          and t2.acc_month   = prm_acc_month
+          and t2.STATE       >  0              ---1草稿，0作废，1新建，2出纳签字，3审核，99记账 
+          and t3.is_jrsz = 0;   
+      else
+         select nvl(sum(t1.CREDIT_W), 0)
+           into n_ret
+           from acc_vouch_detail t1
+           left join acc_vouch t2
+             on t1.vouch_id  = t2.vouch_id
+            and t1.group_id  = t2.group_id
+            and t1.hos_id    = t2.hos_id
+            and t1.copy_code = t2.copy_code
+            and t1.acc_year  = t2.acc_year
+           left join acc_subj t3
+             on t1.group_id  = t3.group_id
+            and t1.hos_id    = t3.hos_id
+            and t1.copy_code = t3.copy_code
+            and t1.acc_year  = t3.acc_year
+            and t1.subj_code   = t3.subj_code
+         where t1.group_id   = prm_group_id
+          and t1.hos_id      = prm_hos_id
+          and t1.copy_code   = prm_copy_code
+          and t1.acc_year    = prm_acc_year
+          and t2.acc_month   = prm_acc_month
+          and t2.STATE       >  0              ---1草稿，0作废，1新建，2出纳签字，3审核，99记账 
+          and t3.is_jrsz = 0;   
+      end if;
+    end if;
+    
+    return n_ret;
+  
+  EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+         return 0;
+      WHEN OTHERS THEN        
+         return 0; 
+  END RZ_ACC_QBJRSZkMBQDFFSE;
+	]]></sql>
+	
+	<sql id="RF_ACC_QBJRSZKMBQLJDF" type="fun" desc="取不记入收支科目本期累计贷方发生"><![CDATA[
+   /*-------------------------------------------------------------------------
+   || 函数名称 ：RF_ACC_QBJRSZkMBQLJDF
+   || 功能描述 ：取不记入收支科目本期累计贷方发生额
+   || 参数描述 ：参数标识          名称             输入/输出    类型
+   ||            -------------------------------------------------------------
+   ||            prm_group_id       集团             IN           NUMBER
+   ||            prm_hos_id         医院             IN           NUMBER
+   ||            prm_copy_code      账套             IN           VARCHAR2
+   ||            prm_acc_year       年度             IN           VARCHAR2
+   ||            prm_acc_month      月份             IN           VARCHAR2
+   ||            prm_cur            币种:RMB/USB     IN           VARCHAR2
+   ||            prm_con_acc        是否包含未记账   IN           NUMBER
+   ||
+   || 返 回 值 ：                   贷方发生额       OUT          NUMBER
+   ||
+   || 作    者 ：           完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：           修改日期：
+   ||-------------------------------------------------------------------------*/
+   CREATE OR REPLACE FUNCTION RF_ACC_QBJRSZkMBQLJDF( prm_group_id       IN    NUMBER        --集团
+                                          ,prm_hos_id         IN    NUMBER        --医院
+                                          ,prm_copy_code      IN    VARCHAR2      --帐套
+                                          ,prm_acc_year       IN    VARCHAR2      --年度
+                                          ,prm_acc_month      IN    VARCHAR2      --月份
+                                          ,prm_cur            IN    VARCHAR2      --币种  RMB/USB
+                                          ,prm_con_acc        IN    NUMBER        --是否包括未记账 0:不包含未记账  1:包含未记账
+                                         ) RETURN NUMBER
+  IS
+    n_ret  NUMBER(19,6);
+   
+  BEGIN
+    --初始化变量
+    n_ret      :=  0 ;
+    
+    if prm_con_acc = 0 then      --从帐表中获取        
+      if prm_cur = 'RMB' then    --币种为RMB
+          select nvl(sum(t1.sum_oc), 0)
+            into n_ret
+            from acc_leder t1
+           left join acc_subj t2
+              on t1.group_id  = t2.group_id
+             and t1.hos_id    = t2.hos_id
+             and t1.copy_code = t2.copy_code
+             and t1.acc_year  = t2.acc_year
+             and t1.subj_code   = t2.subj_code
+           where t1.group_id  = prm_group_id
+             and t1.hos_id    = prm_hos_id
+             and t1.copy_code = prm_copy_code
+             and t1.acc_year  = prm_acc_year
+             and t1.acc_month = prm_acc_month
+             and t2.is_jrsz = 0;   
+      else  --币种为外币
+          select nvl(sum(t1.sum_oc_w), 0)
+            into n_ret
+            from acc_leder t1
+           left join acc_subj t2
+              on t1.group_id  = t2.group_id
+             and t1.hos_id    = t2.hos_id
+             and t1.copy_code = t2.copy_code
+             and t1.acc_year  = t2.acc_year
+             and t1.subj_code   = t2.subj_code
+           where t1.group_id  = prm_group_id
+             and t1.hos_id    = prm_hos_id
+             and t1.copy_code = prm_copy_code
+             and t1.acc_year  = prm_acc_year
+             and t1.acc_month = prm_acc_month
+             and t2.is_jrsz = 0;    
+      end if;    
+    else    --从凭证中获取
+      if prm_cur = 'RMB' then    --币种为RMB
+         select nvl(sum(t1.CREDIT), 0)
+           into n_ret
+           from acc_vouch_detail t1
+           left join acc_vouch t2
+             on t1.vouch_id  = t2.vouch_id
+            and t1.group_id  = t2.group_id
+            and t1.hos_id    = t2.hos_id
+            and t1.copy_code = t2.copy_code
+            and t1.acc_year  = t2.acc_year
+           left join acc_subj t3
+             on t1.group_id  = t3.group_id
+            and t1.hos_id    = t3.hos_id
+            and t1.copy_code = t3.copy_code
+            and t1.acc_year  = t3.acc_year
+            and t1.subj_code   = t3.subj_code
+         where t1.group_id   = prm_group_id
+          and t1.hos_id      = prm_hos_id
+          and t1.copy_code   = prm_copy_code
+          and t1.acc_year    = prm_acc_year
+          and t2.acc_month   <= prm_acc_month
+          and t2.STATE       >  0              ---1草稿，0作废，1新建，2出纳签字，3审核，99记账 
+          and t3.is_jrsz = 0;   
+      else
+         select nvl(sum(t1.CREDIT_W), 0)
+           into n_ret
+           from acc_vouch_detail t1
+           left join acc_vouch t2
+             on t1.vouch_id  = t2.vouch_id
+            and t1.group_id  = t2.group_id
+            and t1.hos_id    = t2.hos_id
+            and t1.copy_code = t2.copy_code
+            and t1.acc_year  = t2.acc_year
+           left join acc_subj t3
+             on t1.group_id  = t3.group_id
+            and t1.hos_id    = t3.hos_id
+            and t1.copy_code = t3.copy_code
+            and t1.acc_year  = t3.acc_year
+            and t1.subj_code   = t3.subj_code
+         where t1.group_id   = prm_group_id
+          and t1.hos_id      = prm_hos_id
+          and t1.copy_code   = prm_copy_code
+          and t1.acc_year    = prm_acc_year
+          and t2.acc_month   <= prm_acc_month
+          and t2.STATE       >  0              ---1草稿，0作废，1新建，2出纳签字，3审核，99记账 
+          and t3.is_jrsz = 0;   
+      end if;
+    end if;
+    
+    return n_ret;
+  
+  EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+         return 0;
+      WHEN OTHERS THEN        
+         return 0; 
+  END RF_ACC_QBJRSZkMBQLJDF;
+	]]></sql>
+	
+	<sql id="RF_ACC_QCWKMNMJZJE" type="fun" desc="取财务科目年末结转金额"><![CDATA[
+   /*-------------------------------------------------------------------------
+   || 函数名称 ：RF_ACC_QCWKMNMJZJE
+   || 功能描述 ：取财务科目年末结转金额
+   || 参数描述 ：参数标识          名称             输入/输出    类型
+   ||            -------------------------------------------------------------
+   ||            prm_group_id       集团             IN           NUMBER
+   ||            prm_hos_id           医院             IN           NUMBER
+   ||            prm_copy_code     账套             IN           VARCHAR2
+   ||            prm_acc_year        年度             IN           VARCHAR2
+   ||            prm_subj_code      科目             IN           VARCHAR2
+   ||
+   || 返 回 值 ：                        结转金额       OUT        NUMBER
+   ||
+   || 作    者 ：           完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：           修改日期：
+   ||-------------------------------------------------------------------------*/
+   CREATE OR REPLACE FUNCTION RF_ACC_QCWKMNMJZJE( prm_group_id       IN    NUMBER        --集团
+                                          ,prm_hos_id             IN    NUMBER          --医院
+                                          ,prm_copy_code       IN    VARCHAR2      --帐套
+                                          ,prm_acc_year          IN    VARCHAR2      --年度
+                                          ,prm_subj_code        IN    VARCHAR2      --科目
+                                         ) RETURN NUMBER
+  IS
+    n_ret  NUMBER(19,6);
+    money1 NUMBER(19,6);
+    money2 NUMBER(19,6);
+    subj_code1 VARCHAR2(50);
+    subj_code2 VARCHAR2(50);
+  BEGIN
+    --初始化变量
+    n_ret           :=  0 ;  
+    money1      :=  0 ;  
+    money2      :=  0 ;  
+    subj_code1 := '3001';  --累计盈余科目
+    subj_code2 := '3302';  --本期盈余分配科目
+    
+    SELECT sum(debit - credit) INTO money1 
+    FROM acc_vouch_detail 
+    WHERE group_id = prm_group_id 
+      AND hos_id = prm_hos_id 
+      AND copy_code = prm_copy_code 
+      AND acc_year = prm_acc_year 
+      AND subj_code like prm_subj_code || '%' 
+      AND vouch_id in ( 
+        SELECT vouch_id 
+        FROM acc_vouch_detail 
+        WHERE group_id = prm_group_id 
+          AND hos_id = prm_hos_id 
+          AND copy_code = prm_copy_code 
+          AND acc_year = prm_acc_year 
+          AND subj_code like subj_code1 || '%' 
+      ); 
+    
+    SELECT sum(debit - credit) INTO money2 
+    FROM acc_vouch_detail 
+    WHERE group_id = prm_group_id 
+      AND hos_id = prm_hos_id 
+      AND copy_code = prm_copy_code 
+      AND acc_year = prm_acc_year 
+      AND subj_code like prm_subj_code || '%' 
+      AND vouch_id in ( 
+        SELECT vouch_id 
+        FROM acc_vouch_detail 
+        WHERE group_id = prm_group_id 
+          AND hos_id = prm_hos_id 
+          AND copy_code = prm_copy_code 
+          AND acc_year = prm_acc_year 
+          AND subj_code like subj_code2 || '%' 
+      ); 
+      
+    n_ret := nvl(money1, 0) + nvl(money2, 0);   
+    
+    return n_ret;
+  EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+         return 0;
+      WHEN OTHERS THEN        
+         return 0; 
+  END RF_ACC_QCWKMNMJZJE;
+	]]></sql>
+	
+	<sql id="RF_ACC_QYSKMNMJZJE" type="fun" desc="取预算科目年末结转金额"><![CDATA[
+   /*-------------------------------------------------------------------------
+   || 函数名称 ：RF_ACC_QYSKMNMJZJE
+   || 功能描述 ：取预算科目年末结转金额
+   || 参数描述 ：参数标识          名称             输入/输出    类型
+   ||            -------------------------------------------------------------
+   ||            prm_group_id       集团             IN           NUMBER
+   ||            prm_hos_id           医院             IN           NUMBER
+   ||            prm_copy_code     账套             IN           VARCHAR2
+   ||            prm_acc_year        年度             IN           VARCHAR2
+   ||            prm_subj_code      科目             IN           VARCHAR2
+   ||
+   || 返 回 值 ：                        结转金额       OUT        NUMBER
+   ||
+   || 作    者 ：           完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：           修改日期：
+   ||-------------------------------------------------------------------------*/
+   CREATE OR REPLACE FUNCTION RF_ACC_QYSKMNMJZJE( prm_group_id       IN    NUMBER        --集团
+                                          ,prm_hos_id             IN    NUMBER          --医院
+                                          ,prm_copy_code       IN    VARCHAR2      --帐套
+                                          ,prm_acc_year          IN    VARCHAR2      --年度
+                                          ,prm_subj_code        IN    VARCHAR2      --科目
+                                         ) RETURN NUMBER
+  IS
+    n_ret  NUMBER(19,6);    
+    money1 NUMBER(19,6);
+    money2 NUMBER(19,6);
+    money3 NUMBER(19,6);
+    subj_code1 VARCHAR2(50);
+    subj_code2 VARCHAR2(50);
+    subj_code3 VARCHAR2(50);
+  BEGIN
+    --初始化变量
+    n_ret           :=  0 ;      
+    money1      :=  0 ;  
+    money2      :=  0 ;
+    money3      :=  0 ;
+    subj_code1 := '8102';  --财政拨款结余科目
+    subj_code1 := '8202';  --非财政拨款结余科目
+    subj_code1 := '8701';  --非财政拨款结余分配科目
+    
+    SELECT sum(debit - credit) INTO money1 
+    FROM acc_vouch_detail 
+    WHERE group_id = prm_group_id 
+      AND hos_id = prm_hos_id 
+      AND copy_code = prm_copy_code 
+      AND acc_year = prm_acc_year 
+      AND subj_code like prm_subj_code || '%' 
+      AND vouch_id in ( 
+        SELECT vouch_id 
+        FROM acc_vouch_detail 
+        WHERE group_id = prm_group_id 
+          AND hos_id = prm_hos_id 
+          AND copy_code = prm_copy_code 
+          AND acc_year = prm_acc_year 
+          AND subj_code like subj_code1 || '%' 
+      ); 
+      
+    SELECT sum(debit - credit) INTO money2 
+    FROM acc_vouch_detail 
+    WHERE group_id = prm_group_id 
+      AND hos_id = prm_hos_id 
+      AND copy_code = prm_copy_code 
+      AND acc_year = prm_acc_year 
+      AND subj_code like prm_subj_code || '%' 
+      AND vouch_id in ( 
+        SELECT vouch_id 
+        FROM acc_vouch_detail 
+        WHERE group_id = prm_group_id 
+          AND hos_id = prm_hos_id 
+          AND copy_code = prm_copy_code 
+          AND acc_year = prm_acc_year 
+          AND subj_code like subj_code2 || '%' 
+      ); 
+      
+    SELECT sum(debit - credit) INTO money3 
+    FROM acc_vouch_detail 
+    WHERE group_id = prm_group_id 
+      AND hos_id = prm_hos_id 
+      AND copy_code = prm_copy_code 
+      AND acc_year = prm_acc_year 
+      AND subj_code like prm_subj_code || '%' 
+      AND vouch_id in ( 
+        SELECT vouch_id 
+        FROM acc_vouch_detail 
+        WHERE group_id = prm_group_id 
+          AND hos_id = prm_hos_id 
+          AND copy_code = prm_copy_code 
+          AND acc_year = prm_acc_year 
+          AND subj_code like subj_code3 || '%' 
+      ); 
+      
+    n_ret := nvl(money1, 0) + nvl(money2, 0) + nvl(money3, 0);   
+    
+    return n_ret;
+  EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+         return 0;
+      WHEN OTHERS THEN 
+         return 0; 
+  END RF_ACC_QYSKMNMJZJE;
+	]]></sql>
+	
+	
+	<sql id="RF_ACC_BQCYBZ" type="fun" desc="取本期差异标注金额"><![CDATA[
+		CREATE OR REPLACE FUNCTION RF_ACC_BQCYBZ( prm_group_id       IN    NUMBER        --集团
+	                                            ,prm_hos_id         IN    NUMBER        --医院
+	                                            ,prm_copy_code      IN    VARCHAR2      --帐套
+	                                            ,prm_acc_year       IN    VARCHAR2      --年度
+	                                            ,prm_acc_month      IN    VARCHAR2      --月份                                         
+	                                            ,prm_diff_item      IN    VARCHAR2      --差异项目
+	                                            ,prm_con_acc        IN    NUMBER        --是否包括未记账 0:不包含未记账  1:包含未记账
+	                                           ) RETURN NUMBER
+	  IS
+	    n_ret    NUMBER(19,6);  --期间发生差异标注
+	    
+	  BEGIN
+	    --初始化变量
+	    n_ret := 0 ;
+	  
+	    
+	    if prm_con_acc = 0 then      --不含未记账     
+	        
+	       select nvl(sum(t1.diff_money), 0)
+	         into n_ret
+	        from acc_vouch_diff t1        
+	        left join acc_vouch t2
+	          on t1.vouch_id   = t2.vouch_id
+	         and t1.group_id   = t2.group_id
+	         and t1.hos_id     = t2.hos_id
+	         and t1.copy_code  = t2.copy_code
+	         and t1.acc_year   = t2.acc_year
+	         and t1.acc_month   = t2.acc_month
+	        left join acc_diff_item t3
+	          on t1.group_id   = t3.group_id
+	         and t1.hos_id     = t3.hos_id
+	         and t1.copy_code  = t3.copy_code
+	         and t1.diff_item_code = t3.diff_item_code
+	      where t1.group_id       = prm_group_id
+	        and t1.hos_id         = prm_hos_id
+	        and t1.copy_code      = prm_copy_code
+	        and t2.acc_year       = prm_acc_year
+	        and t2.acc_month      = prm_acc_month
+	        and t2.state          = 99                -- -1草稿，0作废，1新建，2出纳签字，3审核，99记账 
+	        and t3.is_stop = 0  
+	        and t3.diff_item_code = prm_diff_item;
+	       
+	    else    --含未记账      
+	       select nvl(sum(t1.diff_money), 0)
+	         into n_ret
+	        from acc_vouch_diff t1        
+	        left join acc_vouch t2
+	          on t1.vouch_id   = t2.vouch_id
+	         and t1.group_id   = t2.group_id
+	         and t1.hos_id     = t2.hos_id
+	         and t1.copy_code  = t2.copy_code
+	         and t1.acc_year   = t2.acc_year
+	         and t1.acc_month   = t2.acc_month
+	        left join acc_diff_item t3
+	          on t1.group_id   = t3.group_id
+	         and t1.hos_id     = t3.hos_id
+	         and t1.copy_code  = t3.copy_code
+	         and t1.diff_item_code = t3.diff_item_code
+	      where t1.group_id       = prm_group_id
+	        and t1.hos_id         = prm_hos_id
+	        and t1.copy_code      = prm_copy_code
+	        and t2.acc_year       = prm_acc_year
+	        and t2.acc_month      = prm_acc_month
+	        and t2.state          > 0                -- -1草稿，0作废，1新建，2出纳签字，3审核，99记账 
+	        and t3.is_stop = 0  
+	        and t3.diff_item_code = prm_diff_item;
+	        
+	    end if;
+	    
+	    return n_ret;
+	  
+	  EXCEPTION
+	      WHEN NO_DATA_FOUND THEN
+	         return 0;
+	      WHEN OTHERS THEN        
+	         return 0; 
+	  END RF_ACC_BQCYBZ;
+	]]></sql>
+	
+	<sql id="RF_ACC_BNCYBZ" type="fun" desc="取本年差异标注金额"><![CDATA[
+		 /*-------------------------------------------------------------------------
+	   || 函数名称 ：RF_ACC_BNCYBZ
+	   || 功能描述 ：取本年差异标注金额
+	   || 参数描述 ：参数标识          名称             输入/输出    类型
+	   ||            -------------------------------------------------------------
+	   ||            prm_group_id       集团             IN           NUMBER
+	   ||            prm_hos_id         医院             IN           NUMBER
+	   ||            prm_copy_code      账套             IN           VARCHAR2
+	   ||            prm_acc_year       年度             IN           VARCHAR2
+	   ||            prm_acc_month      月份             IN           VARCHAR2   
+	   ||            prm_diff_item      差异项目         IN           VARCHAR2
+	   ||            prm_con_acc        是否包含未记账   IN           NUMBER
+	   ||
+	   || 返 回 值 ：                   借方发生额       OUT          NUMBER
+	   ||
+	   || 作    者 ：           完成日期 ：
+	   ||-------------------------------------------------------------------------
+	   || 修改记录 ：           修改日期：
+	   ||-------------------------------------------------------------------------*/
+	  CREATE OR REPLACE FUNCTION RF_ACC_BNCYBZ( prm_group_id       IN    NUMBER        --集团
+	                                            ,prm_hos_id         IN    NUMBER        --医院
+	                                            ,prm_copy_code      IN    VARCHAR2      --帐套
+	                                            ,prm_acc_year       IN    VARCHAR2      --年度
+	                                            ,prm_acc_month      IN    VARCHAR2      --月份                                         
+	                                            ,prm_diff_item      IN    VARCHAR2      --差异项目
+	                                            ,prm_con_acc        IN    NUMBER        --是否包括未记账 0:不包含未记账  1:包含未记账
+	                                           ) RETURN NUMBER
+	  IS
+	    n_diff_money    NUMBER(19,6);  --期间发生差异标注
+	    
+	  BEGIN
+	    --初始化变量
+	    n_diff_money := 0 ;
+	  
+	    
+	    if prm_con_acc = 0 then      --不含未记账     
+	     
+	       select nvl(sum(t1.diff_money), 0)
+	         into n_diff_money
+	        from acc_vouch_diff t1        
+	        left join acc_vouch t2
+	          on t1.vouch_id   = t2.vouch_id
+	         and t1.group_id   = t2.group_id
+	         and t1.hos_id     = t2.hos_id
+	         and t1.copy_code  = t2.copy_code
+	         and t1.acc_year   = t2.acc_year
+	         and t1.acc_month   = t2.acc_month
+	        left join acc_diff_item t3
+	          on t1.group_id   = t3.group_id
+	         and t1.hos_id     = t3.hos_id
+	         and t1.copy_code  = t3.copy_code
+	         and t1.diff_item_code = t3.diff_item_code
+	      where t1.group_id       = prm_group_id
+	        and t1.hos_id         = prm_hos_id
+	        and t1.copy_code      = prm_copy_code
+	        and t2.acc_year       = prm_acc_year
+	        and t2.acc_month     <= prm_acc_month
+	        and t2.state          = 99                -- -1草稿，0作废，1新建，2出纳签字，3审核，99记账 
+	        and t3.is_stop = 0  
+	        and t3.diff_item_code = prm_diff_item;
+	       
+	    else    --含未记账      
+	      
+	       select nvl(sum(t1.diff_money), 0)
+	         into n_diff_money
+	        from acc_vouch_diff t1        
+	        left join acc_vouch t2
+	          on t1.vouch_id   = t2.vouch_id
+	         and t1.group_id   = t2.group_id
+	         and t1.hos_id     = t2.hos_id
+	         and t1.copy_code  = t2.copy_code
+	         and t1.acc_year   = t2.acc_year
+	         and t1.acc_month   = t2.acc_month
+	        left join acc_diff_item t3
+	          on t1.group_id   = t3.group_id
+	         and t1.hos_id     = t3.hos_id
+	         and t1.copy_code  = t3.copy_code
+	         and t1.diff_item_code = t3.diff_item_code
+	      where t1.group_id       = prm_group_id
+	        and t1.hos_id         = prm_hos_id
+	        and t1.copy_code      = prm_copy_code
+	        and t2.acc_year       = prm_acc_year
+	        and t2.acc_month     <= prm_acc_month
+	        and t2.state          > 0                -- -1草稿，0作废，1新建，2出纳签字，3审核，99记账 
+	        and t3.is_stop = 0  
+	        and t3.diff_item_code = prm_diff_item;
+	        
+	    end if;
+	    
+	    return n_diff_money;
+	  
+	  EXCEPTION
+	      WHEN NO_DATA_FOUND THEN
+	         return 0;
+	      WHEN OTHERS THEN        
+	         return 0; 
+	  END RF_ACC_BNCYBZ;
+		
+	]]></sql>
+<sql id="RF_ACC_QBNFS_NO_YEAREND" type="fun" desc="取本年发生"><![CDATA[
+	 /*-------------------------------------------------------------------------
+   || 函数名称 ：RF_ACC_QBNFS_NO_YEAREND
+   || 功能描述 ：取本年发生额(不含年末)
+   || 参数描述 ：参数标识          名称             输入/输出    类型
+   ||            -------------------------------------------------------------
+   ||            prm_group_id       集团             IN           NUMBER
+   ||            prm_hos_id         医院             IN           NUMBER
+   ||            prm_copy_code      账套             IN           VARCHAR2
+   ||            prm_acc_year       年度             IN           VARCHAR2
+   ||            prm_cur            币种:RMB/USB     IN           VARCHAR2
+   ||            prm_subj_code      会计科目         IN           VARCHAR2
+   ||            prm_con_acc        是否包含未记账   IN           NUMBER
+   ||
+   || 返 回 值 ：                   借方发生额       OUT          NUMBER
+   ||
+   || 作    者 ：           完成日期 ：
+   ||-------------------------------------------------------------------------
+   || 修改记录 ：           修改日期：
+   ||-------------------------------------------------------------------------*/
+   CREATE OR REPLACE FUNCTION RF_ACC_QBNFS_NO_YEAREND( prm_group_id       IN    NUMBER        --集团
+                                          ,prm_hos_id         IN    NUMBER        --医院
+                                          ,prm_copy_code      IN    VARCHAR2      --帐套
+                                          ,prm_acc_year       IN    VARCHAR2      --年度
+                                          ,prm_cur            IN    VARCHAR2      --币种  RMB/USB
+                                          ,prm_subj_code      IN    VARCHAR2      --科目编码
+                                          ,prm_con_acc        IN    NUMBER        --是否包括未记账 0:不包含未记账  1:包含未记账
+                                         ) RETURN NUMBER
+  IS
+    n_ret  NUMBER(19,6);
+    dire  NUMBER(4);
+  BEGIN
+    --初始化变量
+    n_ret      :=  0 ;
+    dire  :=  0 ;
+    
+    select subj_dire
+      into dire
+      from acc_subj
+     where group_id = prm_group_id
+       and hos_id = prm_hos_id
+       and copy_code = prm_copy_code
+       and acc_year = prm_acc_year
+       and subj_code = prm_subj_code;
+   
+  if dire = 0 then  --借方科目
+
+    if prm_con_acc = 0 then      --不含未记账
+      if prm_cur = 'RMB' then    --币种为RMB
+          select  nvl(sum(t1.DEBIT), 0) - nvl(sum(t1.CREDIT), 0)
+           into n_ret
+           from acc_vouch_detail t1
+           left join acc_vouch t2
+             on t1.vouch_id  = t2.vouch_id
+            and t1.group_id  = t2.group_id
+            and t1.hos_id    = t2.hos_id
+            and t1.copy_code = t2.copy_code
+            and t1.acc_year  = t2.acc_year
+         where t1.group_id   = prm_group_id
+          and t1.hos_id      = prm_hos_id
+          and t1.copy_code   = prm_copy_code
+          and t1.acc_year    = prm_acc_year
+          and t2.STATE       =  99              ---1草稿，0作废，1新建，2出纳签字，3审核，99记账
+          and t1.subj_code like  prm_subj_code || '%'
+          and not exists(select 1
+                         from acc_busi_type abt
+                         where abt.group_id=prm_group_id
+                           and abt.hos_id=prm_hos_id
+                           and abt.copy_code=prm_copy_code
+                           and abt.busi_type_code=t2.busi_type_code
+                           and  (abt.busi_type_code='Z012' or abt.busi_type_code='Z009')
+                         );
+      else  --币种为外币
+          select  nvl(sum(t1.DEBIT_W), 0) - nvl(sum(t1.CREDIT_W), 0)
+           into n_ret
+           from acc_vouch_detail t1
+           left join acc_vouch t2
+             on t1.vouch_id  = t2.vouch_id
+            and t1.group_id  = t2.group_id
+            and t1.hos_id    = t2.hos_id
+            and t1.copy_code = t2.copy_code
+            and t1.acc_year  = t2.acc_year
+         where t1.group_id   = prm_group_id
+          and t1.hos_id      = prm_hos_id
+          and t1.copy_code   = prm_copy_code
+          and t1.acc_year    = prm_acc_year
+          and t2.STATE       = 99              ---1草稿，0作废，1新建，2出纳签字，3审核，99记账
+          and t1.subj_code like  prm_subj_code || '%'
+          and not exists(select 1
+                         from acc_busi_type abt
+                         where abt.group_id=prm_group_id
+                           and abt.hos_id=prm_hos_id
+                           and abt.copy_code=prm_copy_code
+                           and abt.busi_type_code=t2.busi_type_code
+                           and  (abt.busi_type_code='Z012' or abt.busi_type_code='Z009')
+                         );
+      end if;
+    else    --从凭证中获取
+      if prm_cur = 'RMB' then    --币种为RMB
+         select  nvl(sum(t1.DEBIT), 0) - nvl(sum(t1.CREDIT) , 0)
+           into n_ret
+           from acc_vouch_detail t1
+           left join acc_vouch t2
+             on t1.vouch_id  = t2.vouch_id
+            and t1.group_id  = t2.group_id
+            and t1.hos_id    = t2.hos_id
+            and t1.copy_code = t2.copy_code
+            and t1.acc_year  = t2.acc_year
+         where t1.group_id   = prm_group_id
+          and t1.hos_id      = prm_hos_id
+          and t1.copy_code   = prm_copy_code
+          and t1.acc_year    = prm_acc_year
+          and t2.STATE       >  0              ---1草稿，0作废，1新建，2出纳签字，3审核，99记账
+          and t1.subj_code like  prm_subj_code || '%'
+          and not exists(select 1
+                         from acc_busi_type abt
+                         where abt.group_id=prm_group_id
+                           and abt.hos_id=prm_hos_id
+                           and abt.copy_code=prm_copy_code
+                           and abt.busi_type_code=t2.busi_type_code
+                           and  (abt.busi_type_code='Z012' or abt.busi_type_code='Z009')
+                         );
+      else
+         select  nvl(sum(t1.DEBIT_W), 0) - nvl(sum(t1.CREDIT_W), 0)
+           into n_ret
+           from acc_vouch_detail t1
+           left join acc_vouch t2
+             on t1.vouch_id  = t2.vouch_id
+            and t1.group_id  = t2.group_id
+            and t1.hos_id    = t2.hos_id
+            and t1.copy_code = t2.copy_code
+            and t1.acc_year  = t2.acc_year
+         where t1.group_id   = prm_group_id
+          and t1.hos_id      = prm_hos_id
+          and t1.copy_code   = prm_copy_code
+          and t1.acc_year    = prm_acc_year
+          and t2.STATE       >  0              ---1草稿，0作废，1新建，2出纳签字，3审核，99记账
+          and t1.subj_code like  prm_subj_code || '%'
+          and not exists(select 1
+                         from acc_busi_type abt
+                         where abt.group_id=prm_group_id
+                           and abt.hos_id=prm_hos_id
+                           and abt.copy_code=prm_copy_code
+                           and abt.busi_type_code=t2.busi_type_code
+                           and  (abt.busi_type_code='Z012' or abt.busi_type_code='Z009')
+                         );
+      end if;
+    end if;
+    
+   else
+     
+      if prm_con_acc = 0 then      --不含未记账
+      if prm_cur = 'RMB' then    --币种为RMB
+          select nvl(sum(t1.CREDIT), 0) - nvl(sum(t1.DEBIT), 0)
+           into n_ret
+           from acc_vouch_detail t1
+           left join acc_vouch t2
+             on t1.vouch_id  = t2.vouch_id
+            and t1.group_id  = t2.group_id
+            and t1.hos_id    = t2.hos_id
+            and t1.copy_code = t2.copy_code
+            and t1.acc_year  = t2.acc_year
+         where t1.group_id   = prm_group_id
+          and t1.hos_id      = prm_hos_id
+          and t1.copy_code   = prm_copy_code
+          and t1.acc_year    = prm_acc_year
+          and t2.STATE       =  99              ---1草稿，0作废，1新建，2出纳签字，3审核，99记账
+          and t1.subj_code like  prm_subj_code || '%'
+          and not exists(select 1
+                         from acc_busi_type abt
+                         where abt.group_id=prm_group_id
+                           and abt.hos_id=prm_hos_id
+                           and abt.copy_code=prm_copy_code
+                           and abt.busi_type_code=t2.busi_type_code
+                           and  (abt.busi_type_code='Z012' or abt.busi_type_code='Z009')
+                         );
+      else  --币种为外币
+          select nvl(sum(t1.CREDIT_W), 0) - nvl(sum(t1.DEBIT_W), 0)
+           into n_ret
+           from acc_vouch_detail t1
+           left join acc_vouch t2
+             on t1.vouch_id  = t2.vouch_id
+            and t1.group_id  = t2.group_id
+            and t1.hos_id    = t2.hos_id
+            and t1.copy_code = t2.copy_code
+            and t1.acc_year  = t2.acc_year
+         where t1.group_id   = prm_group_id
+          and t1.hos_id      = prm_hos_id
+          and t1.copy_code   = prm_copy_code
+          and t1.acc_year    = prm_acc_year
+          and t2.STATE       = 99              ---1草稿，0作废，1新建，2出纳签字，3审核，99记账
+          and t1.subj_code like  prm_subj_code || '%'
+          and not exists(select 1
+                         from acc_busi_type abt
+                         where abt.group_id=prm_group_id
+                           and abt.hos_id=prm_hos_id
+                           and abt.copy_code=prm_copy_code
+                           and abt.busi_type_code=t2.busi_type_code
+                           and  (abt.busi_type_code='Z012' or abt.busi_type_code='Z009')
+                         );
+      end if;
+    else    --从凭证中获取
+      if prm_cur = 'RMB' then    --币种为RMB
+         select nvl(sum(t1.CREDIT) , 0) -  nvl(sum(t1.DEBIT), 0)
+           into n_ret
+           from acc_vouch_detail t1
+           left join acc_vouch t2
+             on t1.vouch_id  = t2.vouch_id
+            and t1.group_id  = t2.group_id
+            and t1.hos_id    = t2.hos_id
+            and t1.copy_code = t2.copy_code
+            and t1.acc_year  = t2.acc_year
+         where t1.group_id   = prm_group_id
+          and t1.hos_id      = prm_hos_id
+          and t1.copy_code   = prm_copy_code
+          and t1.acc_year    = prm_acc_year
+          and t2.STATE       >  0              ---1草稿，0作废，1新建，2出纳签字，3审核，99记账
+          and t1.subj_code like  prm_subj_code || '%'
+          and not exists(select 1
+                         from acc_busi_type abt
+                         where abt.group_id=prm_group_id
+                           and abt.hos_id=prm_hos_id
+                           and abt.copy_code=prm_copy_code
+                           and abt.busi_type_code=t2.busi_type_code
+                           and  (abt.busi_type_code='Z012' or abt.busi_type_code='Z009')
+                         );
+      else
+         select nvl(sum(t1.CREDIT_W), 0) -  nvl(sum(t1.DEBIT_W), 0)
+           into n_ret
+           from acc_vouch_detail t1
+           left join acc_vouch t2
+             on t1.vouch_id  = t2.vouch_id
+            and t1.group_id  = t2.group_id
+            and t1.hos_id    = t2.hos_id
+            and t1.copy_code = t2.copy_code
+            and t1.acc_year  = t2.acc_year
+         where t1.group_id   = prm_group_id
+          and t1.hos_id      = prm_hos_id
+          and t1.copy_code   = prm_copy_code
+          and t1.acc_year    = prm_acc_year
+          and t2.STATE       >  0              ---1草稿，0作废，1新建，2出纳签字，3审核，99记账
+          and t1.subj_code like  prm_subj_code || '%'
+          and not exists(select 1
+                         from acc_busi_type abt
+                         where abt.group_id=prm_group_id
+                           and abt.hos_id=prm_hos_id
+                           and abt.copy_code=prm_copy_code
+                           and abt.busi_type_code=t2.busi_type_code
+                           and  (abt.busi_type_code='Z012' or abt.busi_type_code='Z009')
+                         );
+      end if;
+    end if;
+   
+   end if;
+    return n_ret;
+
+  EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+         return 0;
+      WHEN OTHERS THEN
+         return 0;
+  END RF_ACC_QBNFS_NO_YEAREND;
+	]]></sql>
+</root>

@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.htcg.dao.calculation.HtcgChargeCostHosMapper">
+	<resultMap id="htcgChargeCostHos" type="com.chd.hrp.htcg.entity.calculation.HtcgChargeCostHos">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="period_type_code" column="period_type_code" />
+		<result property="period_type_name" column="period_type_name" />
+		<result property="period_code" column="period_code" />
+		<result property="period_name" column="period_name" />
+		<result property="acc_year" column="acc_year" />
+		<result property="acc_month" column="acc_month" />
+		<result property="charge_item_code" column="charge_item_code" />
+		<result property="charge_item_name" column="charge_item_name" />
+		<result property="charge_num" column="charge_num" />
+		<result property="charge_price" column="charge_price" />
+		<result property="charge_money" column="charge_money" />
+		<result property="dir_cost" column="dir_cost" />
+		<result property="pub_cost" column="pub_cost" />
+		<result property="man_cost" column="man_cost" />
+		<result property="mea_cost" column="mea_cost" />
+		<result property="cost_price" column="cost_price" />
+		<result property="cost_money" column="cost_money" />
+		<result property="profit_money" column="profit_money" />
+		<result property="source_id" column="source_id" />
+		<result property="source_code" column="source_code" />
+		<result property="source_name" column="source_name" />
+	</resultMap>
+
+    <select id="initHtcgChargeCostHos" statementType="CALLABLE" parameterType="java.util.Map" resultType="java.util.Map">
+      <![CDATA[
+			{call pkg_htcg_cal.prc_htcg_charge_cost_hos(
+		        #{group_id, mode=IN},
+		        #{hos_id, mode=IN},
+		        #{copy_code, mode=IN},
+		        #{scheme_code, mode=IN},
+		        #{acc_year, mode=IN},
+		        #{msg,mode=OUT,jdbcType=VARCHAR}
+			)}
+			]]>
+    </select>
+    
+     <delete id= "deleteBatchHtcgChargeCostHos" parameterType="java.util.List">
+                    delete htcg_charge_cost_hos  where
+		<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+			       group_id = #{item.group_id}
+			   and hos_id = #{item.hos_id}
+			   and copy_code = #{item.copy_code}
+			   and period_type_code = #{item.period_type_code}
+			   and acc_year = #{item.acc_year}
+			   and acc_month = #{item.acc_month}
+			   and charge_item_code = #{item.charge_item_code}
+			   and source_id = #{item.source_id}
+		</foreach>
+    </delete>
+    
+    
+	<select id="queryHtcgChargeCostHos" parameterType="java.util.Map" resultMap="htcgChargeCostHos">
+			 with temp as(
+					  select hcch.group_id,
+							 hcch.hos_id,
+							 hcch.copy_code,
+							 hcch.period_type_code,
+							 hpt.period_type_name,
+							 hpd.period_code,
+							 hpd.period_name,
+							 hcch.acc_year,
+							 hcch.acc_month,
+							 ccia.charge_item_code,
+							 ccia.charge_item_name,
+							 hcch.charge_num,
+							 hcch.charge_money / hcch.charge_num charge_price,
+							 hcch.charge_money,
+							 hcch.dir_cost,
+							 hcch.pub_cost,
+							 hcch.man_cost,
+							 hcch.mea_cost,
+							 (nvl(hcch.dir_cost,0) + nvl(hcch.pub_cost,0) 
+							 + nvl(hcch.man_cost,0) + nvl(hcch.mea_cost,0))/hcch.charge_num cost_price,
+							 nvl(hcch.dir_cost,0) + nvl(hcch.pub_cost,0) 
+							 + nvl(hcch.man_cost,0) + nvl(hcch.mea_cost,0) cost_money,
+							 hcch.charge_money - (
+								 nvl(hcch.dir_cost,0) + nvl(hcch.pub_cost,0) 
+							 + nvl(hcch.man_cost,0) + nvl(hcch.mea_cost,0)) profit_money,
+							 hcch.source_id,
+							 hs.source_code,
+							 hs.source_name
+							from htcg_charge_cost_hos hcch
+							left join htcg_period_type hpt
+							on hpt.period_type_code = hcch.period_type_code
+							left join htcg_period_dict hpd
+							on hpd.period_type_code = hcch.period_type_code
+							and hpd.period_code = hcch.acc_month
+							left join cost_charge_item_arrt ccia
+							on ccia.group_id = hcch.group_id
+							and ccia.hos_id = hcch.hos_id
+							and ccia.copy_code = hcch.copy_code
+							and ccia.charge_item_code = hcch.charge_item_code
+							left join hos_source hs
+							on hs.group_id = hcch.group_id
+							and hs.hos_id = hcch.hos_id
+							and hs.source_id = hcch.source_id
+						 <where>  hcch.group_id = #{group_id}
+						      and hcch.hos_id = #{hos_id}
+						      and hcch.copy_code = #{copy_code}
+						      <if test="acc_year != null and acc_year != ''">
+								 and hcch.acc_year = #{acc_year}
+							  </if>
+							   <if test="period_type_code != null and period_type_code != ''">
+								 and hcch.period_type_code = #{period_type_code}
+							  </if>
+							   <if test="period_code != null and period_code != ''">
+								 and hpd.period_code = #{period_code}
+							  </if>
+							    <if test="charge_item_code != null and charge_item_code != ''">
+								 and ccia.charge_item_code like  '%'||#{charge_item_code}||'%'
+							  </if>
+						 </where>
+					)select
+					 group_id,
+					 hos_id,
+					 copy_code,
+					 period_type_code,
+					 period_type_name,
+					 period_code,
+					 period_name,
+					 acc_year,
+					 acc_month,
+					 charge_item_code,
+					 charge_item_name,
+					 charge_num,
+					 charge_price,
+					 charge_money,
+					 dir_cost,
+					 pub_cost,
+					 man_cost,
+					 mea_cost,
+					 cost_price,
+					 cost_money,
+					 profit_money,
+					 source_id,
+					 source_code,
+					 source_name
+					 from temp
+				order by  group_id,hos_id,copy_code, period_type_code, period_code
+	</select>
+
+</mapper>
+

@@ -1,0 +1,368 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.hr.dao.medicalmanagement.HrAccessTechnologyMapper">
+	<resultMap id="hrEmpTechRec" type="com.chd.hrp.hr.entity.medicalmanagement.HrAccessTechnology">
+	<result property="group_id" column="group_id"/>
+	<result property="hos_id" column="hos_id"/>
+	<result property="app_no" column="app_no"/>
+	<result property="emp_id" column="emp_id"/>
+	<result property="emp_name" column="emp_name"/>
+	<result property="dept_name" column="dept_name"/>
+	<result property="oper_name" column="oper_name"/>
+	<result property="title_code" column="title_code"/>
+	<result property="app_type" column="app_type"/>
+	<result property="app_date" column="app_date"/>
+	<result property="acce_date" column="acce_date"/>
+	<result property="case_num" column="case_num"/>
+	<result property="state" column="state"/>
+	<result property="state_name" column="state_name"/>
+	<result property="note" column="note"/>
+	</resultMap>
+
+
+
+	<insert id="add" useGeneratedKeys="true" >
+	
+		INSERT INTO HR_EMP_TECH_REC (
+		<trim suffix="" suffixOverrides=",">
+		group_id,
+		hos_id,
+		app_no,
+		emp_id,
+		oper_name,
+		title_code,
+		app_type,
+		app_date,
+		acce_date,
+		case_num,
+		state,
+		note,
+		</trim>
+		) VALUES (
+		<trim suffix="" suffixOverrides=",">
+		#{group_id,jdbcType=INTEGER},
+		#{hos_id,jdbcType=INTEGER},
+		#{app_no,jdbcType=VARCHAR},
+		#{emp_id,jdbcType=INTEGER},
+		#{oper_name,jdbcType=VARCHAR},
+		#{title_code,jdbcType=VARCHAR},
+		#{app_type,jdbcType=VARCHAR},
+		to_date(#{app_date},'YYYY/MM/DD'),
+	    to_date(#{acce_date,jdbcType=DATE},'YYYY/MM/DD'),
+		#{case_num,jdbcType=INTEGER},
+		#{state,jdbcType=INTEGER},
+		#{note,jdbcType=VARCHAR}
+		</trim>		
+		)
+	
+	</insert>
+	
+	<select id="query" parameterType="java.util.Map" resultMap="hrEmpTechRec" >
+	SELECT 
+    het.group_id,
+    het.hos_id,
+    het.app_no,
+    het.emp_id,
+    he.emp_name,
+    hd.dept_name,
+    het.oper_name,
+    het.title_code,
+    het.app_type,
+    het.app_date,
+    het.acce_date,
+    het.case_num,
+    hfd.TITLE_NAME,
+    het.state,
+    case when het.state = 0 then '新建' when het.state = 1
+    then '待准入' when het.state = 2
+    then '已准入'  else '未通过' end state_name ,
+    het.note
+    FROM HR_EMP_TECH_REC het 
+    left join hos_emp he on he.emp_id=het.emp_id 
+    and he.group_id=het.group_id and he.hos_id = het.hos_id 
+    left join hos_dept_dict hd on he.dept_id=hd.dept_id and he.dept_no =hd.dept_no 
+    and he.group_id=hd.group_id and he.hos_id = hd.hos_id 
+    left join HR_EMP_TECHNOLOGY_TITLE htt on het.emp_id=htt.emp_id 
+    and htt.group_id=het.group_id and htt.hos_id = het.hos_id 
+    left join  HR_TITLE 　hfd on   hfd.TITLE_CODE=htt.title_code
+    and htt.group_id=hfd.group_id and htt.hos_id = hfd.hos_id 
+		<where>                     
+		<if test="group_id != null and group_id != ''">
+		AND het.group_id = #{group_id,jdbcType=INTEGER}
+		</if>
+		<if test="hos_id != null and hos_id != ''">
+		AND het.hos_id = #{hos_id,jdbcType=INTEGER}
+		</if>
+		<if test="app_no != null and app_no != ''">
+		
+		AND het.app_no like '%${app_no}%'
+		</if>
+		
+		<if test="dept_id != null and dept_id != ''">
+			AND hd.dept_id = #{dept_id,jdbcType=INTEGER}
+		</if>
+	<!-- 	
+		<if test="dept_no != null and dept_no != ''">
+			AND hd.dept_no = #{dept_no,jdbcType=INTEGER}
+		</if> -->
+		
+		<if test="emp_id != null and emp_id != ''">
+		AND het.emp_id = #{emp_id,jdbcType=INTEGER}
+		</if>
+		<if test="oper_name != null and oper_name != ''">
+		AND het.oper_name like '%${oper_name}%'
+		</if>
+		<if test="title_code != null and title_code != ''">
+		AND het.title_code = #{title_code,jdbcType=VARCHAR}
+		</if>
+		<if test="app_type != null and app_type != ''">
+		AND het.app_type = #{app_type,jdbcType=VARCHAR}
+		</if>
+		<if test="apply_date != null and apply_date != ''">
+		AND het.app_date &gt;= to_date(#{apply_date},'YYYY-MM-DD')
+		</if>
+		<if test="end_date != null and end_date != ''">
+		AND het.app_date &lt;= to_date(#{end_date},'YYYY-MM-DD')
+		</if>
+		<if test="acce_date != null and acce_date != ''">
+		AND het.acce_date = #{acce_date,jdbcType=DATE}
+		</if>
+		<if test="case_num != null and case_num != ''">
+		AND het.case_num = #{case_num,jdbcType=INTEGER}
+		</if>
+		<if test="state != null and state != ''">
+		AND het.state = #{state,jdbcType=INTEGER}
+		</if>
+		<if test="note != null and note != ''">
+		AND het.note = #{note,jdbcType=VARCHAR}
+		</if>
+		</where>   
+		order by het.app_no asc
+	</select>
+	
+	<select id="queryByCodeExec" resultMap="hrEmpTechRec"  parameterType="java.util.Map" >
+	
+		SELECT 
+		het.group_id,
+		het.hos_id,
+		het.app_no,
+		het.emp_id,
+		he.emp_name,
+		het.oper_name,
+		het.title_code,
+		het.app_type,
+		het.app_date,
+		het.acce_date,
+		het.case_num,
+		het.state,
+		het.note
+		FROM hr_emp_tech_rec het left join hos_emp he on het.emp_id=he.emp_id 
+		and het.group_id=he.group_id and het.hos_id=he.hos_id
+		WHERE 
+		het.group_id = #{group_id,jdbcType=INTEGER}   and 
+		het.hos_id = #{hos_id,jdbcType=INTEGER}   and 
+		het.app_no = #{app_no,jdbcType=VARCHAR}   and 
+		het.emp_id = #{emp_id,jdbcType=INTEGER}   and 
+		het.oper_name = #{oper_name,jdbcType=VARCHAR} 
+	
+	</select>
+	
+
+<!--提交晋级申请 -->
+	<update id="reConfirmHrHrTechRec" parameterType="java.util.Map">
+		
+			UPDATE HR_EMP_TECH_REC
+			<trim prefix="SET" suffixOverrides=",">
+
+				state = #{state,jdbcType=INTEGER}
+			</trim>
+			<where>
+				AND group_id = #{group_id,jdbcType=INTEGER}
+				AND hos_id = #{hos_id,jdbcType=INTEGER}
+				AND app_no = #{app_no,jdbcType=VARCHAR}
+				AND emp_id = #{emp_id,jdbcType=INTEGER}
+		<!-- 		AND oper_name = #{oper_name,jdbcType=VARCHAR} -->
+			</where>
+	
+	</update>
+
+	
+		<select id="queryByCode" resultMap="hrEmpTechRec"  parameterType="java.util.Map" >
+	
+		SELECT 
+		het.group_id,
+		het.hos_id,
+		het.app_no,
+		het.emp_id,
+		he.emp_name,
+		het.oper_name,
+		het.title_code,
+		het.app_type,
+		het.app_date,
+		het.acce_date,
+		het.case_num,
+		het.state,
+		het.note
+		FROM hr_emp_tech_rec het left join hos_emp he on het.emp_id=he.emp_id 
+		and het.group_id=he.group_id and het.hos_id=he.hos_id
+		WHERE 
+		het.group_id = #{group_id,jdbcType=INTEGER}   and 
+		het.hos_id = #{hos_id,jdbcType=INTEGER}   and 
+		het.app_no = #{app_no,jdbcType=VARCHAR}   and 
+		het.emp_id = #{emp_id,jdbcType=INTEGER}   and 
+		het.oper_name = #{oper_name,jdbcType=VARCHAR} 
+	
+	</select>
+  <select id="queryByCodeAdd" resultMap="hrEmpTechRec"  parameterType="java.util.Map" >
+	
+		SELECT 
+		group_id,
+		hos_id,
+		app_no,
+		emp_id,
+		oper_name,
+		title_code,
+		app_type,
+		app_date,
+		acce_date,
+		case_num,
+		state,
+		note
+		FROM hr_emp_tech_rec 
+		WHERE 
+		group_id = #{group_id,jdbcType=INTEGER}   and 
+		hos_id = #{hos_id,jdbcType=INTEGER}   and 
+		app_no = #{app_no,jdbcType=VARCHAR}   and 
+		emp_id = #{emp_id,jdbcType=INTEGER}   and 
+		oper_name = #{oper_name,jdbcType=VARCHAR} 
+	
+	</select>
+	<delete id="deleteAccessTechnology" parameterType="java.util.List">
+		DELETE FROM HR_EMP_TECH_REC 
+		<where>
+				<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+				 group_id = #{map.group_id,jdbcType=INTEGER}
+				AND hos_id = #{map.hos_id,jdbcType=INTEGER}
+				<if test="item.app_no != null and item.app_no != ''">
+				AND app_no = #{item.app_no,jdbcType=VARCHAR}
+				</if>
+				<if test="item.emp_id != null and item.emp_id != ''">
+				AND emp_id = #{item.emp_id,jdbcType=INTEGER}
+				</if>
+				<if test="item.oper_name != null and item.oper_name != ''">
+				AND oper_name = #{item.oper_name,jdbcType=VARCHAR}
+				</if>
+				
+			</foreach>
+	    </where>  
+	</delete>
+	
+		<update id="update" parameterType="java.util.Map">
+	
+		UPDATE hr_emp_tech_rec 
+		<trim prefix="SET"  suffixOverrides=","> 
+		title_code = #{title_code,jdbcType=VARCHAR},
+		app_type = #{app_type,jdbcType=VARCHAR},
+		app_date = to_date(#{app_date},'YYYY/MM/DD'),
+		acce_date = #{acce_date,jdbcType=DATE},
+		case_num = #{case_num,jdbcType=INTEGER},
+		oper_name = #{oper_name,jdbcType=VARCHAR},
+		state = #{state,jdbcType=INTEGER},
+		note = #{note,jdbcType=VARCHAR},
+		</trim>
+		<where>                     
+		AND group_id = #{group_id,jdbcType=INTEGER}
+		AND hos_id = #{hos_id,jdbcType=INTEGER}
+		AND app_no = #{app_no,jdbcType=VARCHAR}
+		AND emp_id = #{emp_id,jdbcType=INTEGER}
+		
+		</where>  
+	</update>
+	<update id="updateCaseNuM"  parameterType="java.util.Map">
+	
+		UPDATE hr_emp_tech_rec 
+		<trim prefix="SET"  suffixOverrides=","> 
+		case_num = #{case_num,jdbcType=INTEGER},
+		</trim>
+		<where>                     
+		AND group_id = #{group_id,jdbcType=INTEGER}
+		AND hos_id = #{hos_id,jdbcType=INTEGER}
+		AND app_no = #{app_no,jdbcType=VARCHAR}
+		AND emp_id = #{emp_id,jdbcType=INTEGER}
+		AND oper_name = #{oper_name,jdbcType=VARCHAR}
+		</where>  </update>
+		<select id="queryAccessTechnologyByPrint" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT 
+    het.group_id,
+    het.hos_id,
+    het.app_no,
+    het.emp_id,
+    he.emp_name,
+    hd.dept_name,
+    het.oper_name,
+    het.title_code,
+    het.app_type,
+    het.app_date,
+    het.acce_date,
+    het.case_num,
+    hfd.TITLE_NAME,
+    het.state,
+    case when het.state = 0 then '新建' when het.state = 1
+    then '待准入' when het.state = 2
+    then '已准入'  else '未通过' end state_name ,
+    het.note
+    FROM HR_EMP_TECH_REC het 
+    left join hos_emp he on he.emp_id=het.emp_id 
+    and he.group_id=het.group_id and he.hos_id = het.hos_id 
+    left join hos_dept_dict hd on he.dept_id=hd.dept_id and he.dept_no =hd.dept_no 
+    and he.group_id=hd.group_id and he.hos_id = hd.hos_id 
+    left join HR_EMP_TECHNOLOGY_TITLE htt on het.emp_id=htt.emp_id 
+    and htt.group_id=het.group_id and htt.hos_id = het.hos_id 
+    left join  HR_TITLE 　hfd on   hfd.TITLE_CODE=htt.title_code
+    and htt.group_id=hfd.group_id and htt.hos_id = hfd.hos_id 
+		<where>                     
+		<if test="group_id != null and group_id != ''">
+		AND het.group_id = #{group_id,jdbcType=INTEGER}
+		</if>
+		<if test="hos_id != null and hos_id != ''">
+		AND het.hos_id = #{hos_id,jdbcType=INTEGER}
+		</if>
+		<if test="app_no != null and app_no != ''">
+		
+		AND het.app_no like '%${app_no}%'
+		</if>
+		<if test="emp_id != null and emp_id != ''">
+		AND het.emp_id = #{emp_id,jdbcType=INTEGER}
+		</if>
+		<if test="oper_name != null and oper_name != ''">
+		AND het.oper_name like '%${oper_name}%'
+		</if>
+		<if test="title_code != null and title_code != ''">
+		AND het.title_code = #{title_code,jdbcType=VARCHAR}
+		</if>
+		<if test="app_type != null and app_type != ''">
+		AND het.app_type = #{app_type,jdbcType=VARCHAR}
+		</if>
+		<if test="apply_date != null and apply_date != ''">
+		AND het.app_date &gt;= to_date(#{apply_date},'YYYY-MM-DD')
+		</if>
+		<if test="end_date != null and end_date != ''">
+		AND het.app_date &lt;= to_date(#{end_date},'YYYY-MM-DD')
+		</if>
+		<if test="acce_date != null and acce_date != ''">
+		AND het.acce_date = #{acce_date,jdbcType=DATE}
+		</if>
+		<if test="case_num != null and case_num != ''">
+		AND het.case_num = #{case_num,jdbcType=INTEGER}
+		</if>
+		<if test="state != null and state != ''">
+		AND het.state = #{state,jdbcType=INTEGER}
+		</if>
+		<if test="note != null and note != ''">
+		AND het.note = #{note,jdbcType=VARCHAR}
+		</if>
+		</where>   
+		order by het.group_id asc
+		</select>
+	
+</mapper>

@@ -1,0 +1,704 @@
+﻿<!doctype html>
+<html>
+<head>
+    <title>Spread.Sheets - Conditional Rules</title>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+
+    <link href="../../../external/spreadjs/css/gc.spread.sheets.excel2013white.10.1.0.css" rel="stylesheet" type="text/css" />
+
+    <script src="../../../external/external/jquery-1.8.2.min.js" type="text/javascript"></script>
+
+    <script type="text/javascript" src="../../../external/spreadjs/gc.spread.sheets.all.10.1.0.min.js"></script>
+
+    <style type="text/css">
+    /*css_begin*/
+        table input[type='text'] {
+            width: 140px;
+        }
+
+        table select {
+            width: 144px;
+        }
+
+        #colorScale tr+tr td { 
+            text-align: right;
+        }
+
+        #iconCriteriaSetting input {
+            width: 60px;
+            margin-left: 10px;
+            margin-right: 10px;
+        }
+    /*css_end*/
+    </style>
+
+    <script id="scriptInit" type="text/javascript">
+        /*code_begin*/
+        var spreadNS = GC.Spread.Sheets;
+    $(document).ready(function () {
+        var spread = new GC.Spread.Sheets.Workbook(document.getElementById("ss"), { sheetCount: 2 });
+        initSpread(spread);
+    });
+
+    function initSpread(spread) {
+
+        $("#btnRemoveRule").click(function () {
+            var sheet = spread.getActiveSheet(),
+                cfs = sheet.conditionalFormats ,
+                sels = sheet.getSelections();
+
+            if (sels && sels.length > 0) {
+                var sel = sels[0];
+                cfs.removeRuleByRange(sel.row, sel.col, sel.rowCount, sel.colCount);
+            }
+        });
+
+        $("#btnSetCF").click(function () {
+            var sheet = spread.getActiveSheet();
+            var sels = sheet.getSelections();
+            var style = new spreadNS.Style();
+            var ranges = [];
+            style.backColor = "red";
+            style.foreColor = "green";
+            var value1 = $("#value1").val();
+            var value2 = $("#value2").val();
+            var cfs = sheet.conditionalFormats ;
+            var rule = $("#optCFRule").val();
+            var operator = parseInt($("#ComparisonOperator1").val());
+
+            var minType = parseInt($("#minType").val());
+            var midType = parseInt($("#midType").val());
+            var maxType = parseInt($("#maxType").val());
+            var midColor = $("#midColor").val();
+            var minColor = $("#minColor").val();
+            var maxColor = $("#maxColor").val();
+            var midValue = $("#midValue").val();
+            var maxValue = $("#maxValue").val();
+            var minValue = $("#minValue").val();
+
+            switch (rule) {
+                case "0":
+                    var doubleValue1 = parseFloat(value1);
+                    var doubleValue2 = parseFloat(value2);
+                    cfs.addCellValueRule(operator, isNaN(doubleValue1) ? value1 : doubleValue1, isNaN(doubleValue2) ? value2 : doubleValue2, style, sels);
+                    break;
+                case "1":
+                    cfs.addSpecificTextRule(operator, value1, style, sels);
+                    break;
+                case "2":
+                    cfs.addDateOccurringRule(operator, style, sels);
+                    break;
+                case "3":
+                    cfs.addFormulaRule(value1, style, sels);
+                    break;
+                case "4":
+                    cfs.addTop10Rule(operator, parseInt(value1), style, sels);
+                    break;
+                case "5":
+                    cfs.addUniqueRule(style, sels);
+                    break;
+                case "6":
+                    cfs.addDuplicateRule(style, sels);
+                    break;
+                case "7":
+                    cfs.addAverageRule(operator, style, sels);
+                    break;
+                case "8":
+                    cfs.add2ScaleRule(minType, minValue, minColor, maxType, maxValue, maxColor, sels);
+                    break;
+                case "9":
+                    cfs.add3ScaleRule(minType, minValue, minColor, midType, midValue, midColor, maxType, maxValue, maxColor, sels);
+                    break;
+                case "10":
+                    sheet.suspendPaint();
+
+                    if (sels) {
+                        $.each(sels, function (i, v) {
+                            ranges.push(new spreadNS.Range(v.row, v.col, v.rowCount, v.colCount));
+                        });
+                        cfs = sheet.conditionalFormats ;
+                        var dataBarRule = new spreadNS.ConditionalFormatting.DataBarRule();
+                        dataBarRule.ranges(ranges);
+                        dataBarRule.minType(parseInt($("#minimumType").val()));
+                        dataBarRule.minValue(parseValue($("#minimumValue").val()));
+                        dataBarRule.maxType(parseInt($("#maximumType").val()));
+                        dataBarRule.maxValue(parseValue($("#maximumValue").val()));
+                        dataBarRule.gradient($("#gradient").prop("checked"));
+                        dataBarRule.color($("#color").val());
+                        dataBarRule.showBorder($("#showBorder").prop("checked"));
+                        dataBarRule.borderColor($("#borderColor").val());
+                        dataBarRule.dataBarDirection(parseInt($("#dataBarDirection").val()));
+                        dataBarRule.negativeFillColor($("#negativeFillColor").val());
+                        dataBarRule.useNegativeFillColor($("#useNegativeFillColor").prop("checked"));
+                        dataBarRule.negativeBorderColor($("#negativeBorderColor").val());
+                        dataBarRule.useNegativeBorderColor($("#useNegativeBorderColor").prop("checked"));
+                        dataBarRule.axisPosition(parseInt($("#axisPosition").val()));
+                        dataBarRule.axisColor($("#axisColor").val());
+                        dataBarRule.showBarOnly($("#showBarOnly").prop("checked"));
+                        cfs.addRule(dataBarRule);
+                    }
+
+                    sheet.resumePaint();
+                    break;
+                case "11":
+                    sheet.suspendPaint();
+                    sels = sheet.getSelections();
+                    if (sels) {
+                        $.each(sels, function (i, v) {
+                            ranges.push(new spreadNS.Range(v.row, v.col, v.rowCount, v.colCount));
+                        });
+                        cfs = sheet.conditionalFormats ;
+                        var iconSetRule = new spreadNS.ConditionalFormatting.IconSetRule();
+                        iconSetRule.ranges(ranges);
+                        iconSetRule.iconSetType(parseInt($("#iconSetType").val()));
+                        var $divs = $("#iconCriteriaSetting div");
+                        var iconCriteria = iconSetRule.iconCriteria();
+                        $.each($divs, function (i, v) {
+                            var isGreaterThanOrEqualTo = parseInt($(v.children[0]).val()) === 1;
+                            var iconValueType = parseInt($(v.children[2]).val());
+                            var iconValue = $(v.children[1]).val();
+                            if (iconValueType !== spreadNS.ConditionalFormatting.IconValueType.formula) {
+                                iconValue = parseInt(iconValue);
+                            }
+                            iconCriteria[i] = new spreadNS.ConditionalFormatting.IconCriterion(isGreaterThanOrEqualTo, iconValueType, iconValue);
+                        });
+                        iconSetRule.reverseIconOrder($("#reverseIconOrder").prop("checked"));
+                        iconSetRule.showIconOnly($("#showIconOnly").prop("checked"));
+                        cfs.addRule(iconSetRule);
+                    }
+
+                    sheet.resumePaint();
+                    break;
+                default:
+                    var doubleValue1 = parseFloat(value1);
+                    var doubleValue2 = parseFloat(value2);
+                    cfs.addCellValueRule(operator, isNaN(doubleValue1) ? value1 : doubleValue1, isNaN(doubleValue2) ? value2 : doubleValue2, style, sels);
+                    break;
+            }
+            sheet.repaint();
+        });
+
+        function parseValue(value) {
+            if (!isNaN(value) && isFinite(value)) {
+                return parseFloat(value);
+            } else {
+                return value;
+            }
+        }
+        $("#optCFRule").change(function () {
+            var rule = $("#optCFRule").val();
+            var type = $("#ComparisonOperator1");
+            setEnumTypeOfCF(rule, type);
+        });
+        function setEnumTypeOfCF(rule, type) {
+            switch (rule) {
+                case "0":
+                    type.empty();
+                    type.show();
+                    $("#ComparisonOperator1").show();
+                    $("#value1").show();
+                    $("#value2").show();
+                    $("#iconset").hide();
+                    $("#colorScale").hide();
+                    $("#databar").hide();
+                    type.append("<option value='0'>EqualsTo</option>");
+                    type.append("<option value='1'>NotEqualsTo</option>");
+                    type.append("<option value='2'>GreaterThan</option>");
+                    type.append("<option value='3'>GreaterThanOrEqualsTo</option>");
+                    type.append("<option value='4'>LessThan</option>");
+                    type.append("<option value='5'>LessThanOrEqualsTo</option>");
+                    type.append("<option value='6'>Between</option>");
+                    type.append("<option value='7'>NotBetween</option>");
+                    break;
+                case "1":
+                    type.empty();
+                    type.show();
+                    $("#ComparisonOperator1").show();
+                    $("#value1").show();
+                    $("#value2").show();
+                    $("#iconset").hide();
+                    $("#colorScale").hide();
+                    $("#databar").hide();
+                    type.append("<option value='0'>Contains</option>");
+                    type.append("<option value='1'>DoesNotContain</option>");
+                    type.append("<option value='2'>BeginsWith</option>");
+                    type.append("<option value='3'>EndsWith</option>");
+                    break;
+                case "2":
+                    type.empty();
+                    type.show();
+                    $("#ComparisonOperator1").show();
+                    $("#value1").show();
+                    $("#value2").show();
+                    $("#iconset").hide();
+                    $("#colorScale").hide();
+                    $("#databar").hide();
+                    type.append("<option value='0'>Today</option>");
+                    type.append("<option value='1'>Yesterday</option>");
+                    type.append("<option value='2'>Tomorrow</option>");
+                    type.append("<option value='3'>Last7Days</option>");
+                    type.append("<option value='4'>ThisMonth</option>");
+                    type.append("<option value='5'>LastMonth</option>");
+                    type.append("<option value='6'>NextMonth</option>");
+                    type.append("<option value='7'>ThisWeek</option>");
+                    type.append("<option value='8'>LastWeek</option>");
+                    type.append("<option value='9'>NextWeek</option>");
+                    break;
+                case "3":
+                    type.empty();
+                    $("#ComparisonOperator1").hide();
+                    $("#value1").show();
+                    $("#value2").hide();
+                    $("#iconset").hide();
+                    $("#colorScale").hide();
+                    $("#databar").hide();
+                    break;
+                case "4":
+                    type.empty();
+                    $("#ComparisonOperator1").show();
+                    $("#value1").show();
+                    $("#value2").hide();
+                    $("#iconset").hide();
+                    $("#colorScale").hide();
+                    $("#databar").hide();
+                    type.append("<option value='0'>Top</option>");
+                    type.append("<option value='1'>Bottom</option>");
+                    break;
+                case "5":
+                    type.empty();
+                    $("#ComparisonOperator1").hide();
+                    $("#value1").hide();
+                    $("#value2").hide();
+                    $("#iconset").hide();
+                    $("#colorScale").hide();
+                    $("#databar").hide();
+                    break;
+                case "6":
+                    type.empty();
+                    $("#ComparisonOperator1").hide();
+                    $("#value1").hide();
+                    $("#value2").hide();
+                    $("#iconset").hide();
+                    $("#colorScale").hide();
+                    $("#databar").hide();
+                    break;
+                case "7":
+                    type.empty();
+                    type.show();
+                    $("#ComparisonOperator1").show();
+                    $("#value1").show();
+                    $("#value2").show();
+                    $("#iconset").hide();
+                    $("#colorScale").hide();
+                    $("#databar").hide();
+                    type.append("<option value='0'>Above</option>");
+                    type.append("<option value='1'>Below</option>");
+                    type.append("<option value='2'>EqualOrAbove</option>");
+                    type.append("<option value='3'>EqualOrBelow</option>");
+                    type.append("<option value='4'>Above1StdDev</option>");
+                    type.append("<option value='5'>Below1StdDev</option>");
+                    type.append("<option value='6'>Above2StdDev</option>");
+                    type.append("<option value='7'>Below2StdDev</option>");
+                    type.append("<option value='8'>Above3StdDev</option>");
+                    type.append("<option value='9'>Below3StdDev</option>");
+                    break;
+                case "8":
+                    type.empty();
+                    type.hide();
+                    $("#ComparisonOperator1").hide();
+                    $("#value1").hide();
+                    $("#value2").hide();
+                    $("#iconset").hide();
+                    $("#colorScale").show();
+                    $("#databar").hide();
+                    $("#midpoint").hide();
+                    $("#midType").hide();
+                    $("#midValue").hide();
+                    $("#midColor").hide();
+                    break;
+                case "9":
+                    type.empty();
+                    type.hide();
+                    $("#ComparisonOperator1").hide();
+                    $("#value1").hide();
+                    $("#value2").hide();
+                    $("#databar").hide();
+                    $("#iconset").hide();
+                    $("#colorScale").show();
+                    $("#midpoint").show();
+                    $("#midType").show();
+                    $("#midValue").show();
+                    $("#midColor").show();
+                    break;
+                case "10":
+                    type.empty();
+                    type.hide();
+                    $("#ComparisonOperator1").hide();
+                    $("#value1").hide();
+                    $("#value2").hide();
+                    $("#colorScale").hide();
+                    $("#iconset").hide();
+                    $("#databar").show();
+                    break;
+                case "11":
+                    type.empty();
+                    type.hide();
+                    $("#ComparisonOperator1").hide();
+                    $("#value1").hide();
+                    $("#value2").hide();
+                    $("#databar").hide();
+                    $("#colorScale").hide();
+                    $("#iconset").show();
+                    createIconCriteriaDOM();
+                    break;
+                default:
+                    type.empty();
+                    type.show();
+                    $("#ComparisonOperator1").show();
+                    $("#value1").show();
+                    $("#value2").show();
+                    $("#databar").hide();
+                    $("#colorScale").hide();
+                    $("#iconset").hide();
+                    type.append("<option value='0'>EqualsTo</option>");
+                    type.append("<option value='1'>NotEqualsTo</option>");
+                    type.append("<option value='2'>GreaterThan</option>");
+                    type.append("<option value='3'>GreaterThanOrEqualsTo</option>");
+                    type.append("<option value='4'>LessThan</option>");
+                    type.append("<option value='5'>LessThanOrEqualsTo</option>");
+                    type.append("<option value='6'>Between</option>");
+                    type.append("<option value='7'>NotBetween</option>");
+
+                    break;
+            }
+        }
+
+        function createIconCriteriaDOM() {
+            var IconSetType = spreadNS.ConditionalFormatting.IconSetType,
+                    IconCriterion = spreadNS.ConditionalFormatting.IconCriterion,
+                    IconValueType = spreadNS.ConditionalFormatting.IconValueType;
+            var iconSetType = parseInt($("#iconSetType").val());
+            var iconCriteria = [];
+            if (iconSetType >= IconSetType.threeArrowsColored &&
+                    iconSetType <= IconSetType.threeSymbolsUncircled) {
+                iconCriteria = new Array(2);
+                iconCriteria[0] = new IconCriterion(true, IconValueType.percent, 33);
+                iconCriteria[1] = new IconCriterion(true, IconValueType.percent, 67);
+            }
+            else if (iconSetType >= IconSetType.fourArrowsColored &&
+                    iconSetType <= IconSetType.fourTrafficLights) {
+                iconCriteria = new Array(3);
+                iconCriteria[0] = new IconCriterion(true, IconValueType.percent, 25);
+                iconCriteria[1] = new IconCriterion(true, IconValueType.percent, 50);
+                iconCriteria[2] = new IconCriterion(true, IconValueType.percent, 75);
+            }
+            else if (iconSetType >= IconSetType.fiveArrowsColored &&
+                    iconSetType <= IconSetType.fiveBoxes) {
+                iconCriteria = new Array(4);
+                iconCriteria[0] = new IconCriterion(true, IconValueType.percent, 20);
+                iconCriteria[1] = new IconCriterion(true, IconValueType.percent, 40);
+                iconCriteria[2] = new IconCriterion(true, IconValueType.percent, 60);
+                iconCriteria[3] = new IconCriterion(true, IconValueType.percent, 80);
+            }
+
+            function getSelected(v1, v2) {
+                return v1 === v2 ? "selected='selected'" : "";
+            }
+
+            $("#iconSetType").bind("change", function () {
+                createIconCriteriaDOM();
+            });
+
+            $("#iconCriteriaSetting").empty();
+            $.each(iconCriteria, function (i, v) {
+                var $div = $("<div></div>"),
+                        $selectOperator = $("<select></select>"),
+                        $input = $("<input/>"),
+                        $selectType = $("<select></select>");
+                $selectOperator.html("<option value=1 " + getSelected(v.isGreaterThanOrEqualTo, true) + ">>=</option>" +
+                        "<option value=0 " + getSelected(v.isGreaterThanOrEqualTo, false) + ">></option>");
+                $input.val(v.iconValue);
+                $selectType.html("<option value=1 " + getSelected(v.iconValueType, 1) + ">Number</option>" +
+                        "<option value=4 " + getSelected(v.iconValueType, 4) + ">Percent</option>" +
+                        "<option value=7 " + getSelected(v.iconValueType, 7) + ">Formula</option>" +
+                        "<option value=5 " + getSelected(v.iconValueType, 5) + ">Percentile</option>");
+                $div.append($selectOperator).append($input).append($selectType);
+                $("#iconCriteriaSetting").append($div);
+            });
+        }
+    }
+    /*code_end*/
+    </script>
+
+</head>
+<body>
+<div class="sample-turtorial">
+    <div id="ss" style="width:100%; height:300px;border: 1px solid gray;"></div>
+    <div class="demo-options">
+        <label>Rules:</label>
+        <br />
+        <table>
+        <tr>
+            <td>
+                <select id="optCFRule">
+                    <option value="0" selected>CellValueRule</option>
+                    <option value="1">SpecificTextRule</option>
+                    <option value="2">DateOccurringRule</option>
+                    <option value="3">FormulaRule</option>
+                    <option value="4">Top10Rule</option>
+                    <option value="5">UniqueRule</option>
+                    <option value="6">DuplicateRule</option>
+                    <option value="7">AverageRule</option>
+                    <option value="8">2-Color Scale</option>
+                    <option value="9">3-Color Scale</option>
+                    <option value="10">Data bar</option>
+                    <option value="11">Icon Set</option>
+                </select>
+            </td>
+            <td>
+                <select id="ComparisonOperator1">
+                    <option value='0' selected>EqualsTo</option>
+                    <option value='1'>NotEqualsTo</option>
+                    <option value='2'>GreaterThan</option>
+                    <option value='3'>GreaterThanOrEqualsTo</option>
+                    <option value='4'>LessThan</option>
+                    <option value='5'>LessThanOrEqualsTo</option>
+                    <option value='6'>Between</option>
+                    <option value='7'>NotBetween</option>
+                </select>
+            </td>
+            <td>
+                <input type="text" id="value1" style="width: 60px" />
+            </td>
+            <td>
+                <input type="text" id="value2" style="width: 60px" />
+            </td>
+        </tr>
+        <tbody id="colorScale" style="display: none">
+        <tr>
+            <td>Minimum
+            </td>
+            <td>
+                <label id="midpoint">Mid-point</label>
+            </td>
+            <td>Maximum
+            </td>
+        </tr>
+        <tr>
+            <td>Type:
+                <select id="minType">
+                    <option value="0">Number</option>
+                    <option value="1" selected>LowestValue</option>
+                    <option value="2">HighestValue</option>
+                    <option value="3">Percent</option>
+                    <option value="4">Percentile</option>
+                    <option value="5">Automin</option>
+                    <option value="6">Formula</option>
+                    <option value="7">Automax</option>
+                </select>
+            </td>
+            <td>
+                <select id="midType">
+                    <option value="0">Number</option>
+                    <option value="1">LowestValue</option>
+                    <option value="2">HighestValue</option>
+                    <option value="3">Percent</option>
+                    <option value="4" selected>Percentile</option>
+                    <option value="5">Automin</option>
+                    <option value="6">Formula</option>
+                    <option value="7">Automax</option>
+                </select>
+            </td>
+            <td>
+                <select id="maxType">
+                    <option value="0">Number</option>
+                    <option value="1">LowestValue</option>
+                    <option value="2" selected>HighestValue</option>
+                    <option value="3">Percent</option>
+                    <option value="4">Percentile</option>
+                    <option value="5">Automin</option>
+                    <option value="6">Formula</option>
+                    <option value="7">Automax</option>
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <td>Value:
+                <input id='minValue' type='text' value=' ' />
+            </td>
+            <td>
+                <input id='midValue' type='text' value='50' />
+            </td>
+            <td>
+                <input id='maxValue' type='text' value=' ' />
+            </td>
+        </tr>
+        <tr>
+            <td>Color:
+                <input id='minColor' type='text' value='red' />
+            </td>
+            <td>
+                <input id='midColor' type='text' value='yellow' />
+            </td>
+            <td>
+                <input id='maxColor' type='text' value='green' />
+            </td>
+        </tr>
+        </tbody>
+        <tbody id="databar" style="display: none">
+        <tr>
+            <td>minimumType:</td>
+            <td>
+                <select id="minimumType">
+                    <option value="0" selected="selected">Number</option>
+                    <option value="1">LowestValue</option>
+                    <option value="2">HighestValue</option>
+                    <option value="3">Percent</option>
+                    <option value="4">Percentile</option>
+                    <option value="5">Automin</option>
+                    <option value="6">Formula</option>
+                    <option value="7">Automax</option>
+                </select>
+            </td>
+            <td>minimumValue:</td>
+            <td>
+                <input type="text" id="minimumValue" style="display: inline-block;width: 50px"/>
+            </td>
+        </tr>
+        <tr>
+            <td>maximumType:</td>
+            <td>
+                <select id="maximumType">
+                    <option value="0" selected="selected">Number</option>
+                    <option value="1">LowestValue</option>
+                    <option value="2">HighestValue</option>
+                    <option value="3">Percent</option>
+                    <option value="4">Percentile</option>
+                    <option value="5">Automin</option>
+                    <option value="6">Formula</option>
+                    <option value="7">Automax</option>
+                </select>
+            </td>
+            <td>maximumValue:</td>
+            <td>
+                <input type="text" id="maximumValue" style="display: inline-block;width: 50px"/>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <input type="checkbox" id="gradient" />gradient</td>
+            <td>color:</td>
+            <td>
+                <input type="text" id="color" />
+            </td>
+            <td></td>
+        </tr>
+        <tr>
+            <td>
+                <input type="checkbox" id="showBorder" />showBorder</td>
+            <td>borderColor:</td>
+            <td>
+                <input type="text" id="borderColor" />
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <input type="checkbox" id="showBarOnly" />showBarOnly
+            </td>
+            <td>dataBarDirection:
+            </td>
+            <td>
+                <select id="dataBarDirection">
+                    <option value="0" selected>LeftToRight</option>
+                    <option value="1">RightToLeft</option>
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <input type="checkbox" id="useNegativeFillColor" />useNegativeFillColor
+            </td>
+            <td>negativeFillColor:
+            </td>
+            <td>
+                <input type="text" id="negativeFillColor" />
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <input type="checkbox" id="useNegativeBorderColor" />useNegativeBorderColor
+            </td>
+            <td>negativeBorderColor:
+            </td>
+            <td>
+                <input type="text" id="negativeBorderColor" />
+            </td>
+        </tr>
+        <tr>
+            <td>axisPosition:</td>
+            <td>
+                <select id="axisPosition">
+                    <option value="0" selected="selected">Automatic</option>
+                    <option value="1">CellMidPoint</option>
+                    <option value="2">None</option>
+                </select>
+            </td>
+            <td>axisColor:</td>
+            <td>
+                <input type="text" id="Text1" style="display: inline-block;width: 50px"/>
+            </td>
+        </tr>
+        </tbody>
+        <tbody id="iconset" style="display: none">
+        <tr>
+            <td>iconSetType:</td>
+            <td>
+                <select id="iconSetType">
+                    <option value="0" selected="selected">ThreeArrowsColored</option>
+                    <option value="1">ThreeArrowsGray</option>
+                    <option value="2">ThreeTriangles</option>
+                    <option value="3">ThreeStars</option>
+                    <option value="4">ThreeFlags</option>
+                    <option value="5">ThreeTrafficLightsUnrimmed</option>
+                    <option value="6">ThreeTrafficLightsRimmed</option>
+                    <option value="7">ThreeSigns</option>
+                    <option value="8">ThreeSymbolsCircled</option>
+                    <option value="9">ThreeSymbolsUncircled</option>
+                    <option value="10">FourArrowsColored</option>
+                    <option value="11">FourArrowsGray</option>
+                    <option value="12">FourRedToBlack</option>
+                    <option value="13">FourRatings</option>
+                    <option value="14">FourTrafficLights</option>
+                    <option value="15">FiveArrowsColored</option>
+                    <option value="16">FiveArrowsGray</option>
+                    <option value="17">FiveRatings</option>
+                    <option value="18">FiveQuarters</option>
+                    <option value="19">FiveBoxes</option>
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <input type="checkbox" id="reverseIconOrder" />reverseIconOrder
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <input type="checkbox" id="showIconOnly" />showIconOnly
+            </td>
+        </tr>
+        <tr>
+            <td colspan="4">
+                <div id="iconCriteriaSetting" style="width: 420px">
+                </div>
+            </td>
+        </tr>
+        </tbody>
+        </table>
+        <input type="button" value="Add conditional rule" id="btnSetCF" />
+        <input type="button" value="Remove conditional rule" id="btnRemoveRule" />
+    </div>
+</div>
+</body>
+</html>

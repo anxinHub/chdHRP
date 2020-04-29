@@ -1,0 +1,169 @@
+﻿<!doctype html>
+<html>
+<head>
+    <title>Spread.Sheets - Vari Sparkline</title>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+
+    <link href="../../../external/spreadjs/css/gc.spread.sheets.excel2013white.10.1.0.css" rel="stylesheet" type="text/css" />
+
+    <script src="../../../external/external/jquery-1.8.2.min.js" type="text/javascript"></script>
+
+    <script type="text/javascript" src="../../../external/spreadjs/gc.spread.sheets.all.10.1.0.min.js"></script>
+
+    <script id="scriptInit" type="text/javascript">
+        /*code_begin*/
+        $(document).ready(function () {
+            var spread = new GC.Spread.Sheets.Workbook(document.getElementById("ss"), { sheetCount: 2 });
+            initSpread(spread);
+        });
+
+        function initSpread(spread) {
+            var common = ["Screen Size(inches)", "RAM Capacity(G)", "Front-facing Camera", "Rear Camera", "Weight(g)", "Battery Capacity(mAH)", "CPU Cores Number", "CPU Frequency(GHZ)"];
+            var typea = { lscreenSize: 5, lramCap: 3, lfCamera: 800, lrCamera: 1300, lweight: 149, lbatteryCap: 3080, lcpuCoreNum: 4, lcpuFreq: 2.5 };
+            var typeb = { lscreenSize: 5.36, lramCap: 2, lfCamera: 200, lrCamera: 2070, lweight: 147, lbatteryCap: 3100, lcpuCoreNum: 8, lcpuFreq: 2 };
+            var phone1 = { rscreenSize: 4, rramCap: 1, rfCamera: 120, rrCamera: 800, rweight: 112, rbatteryCap: 1440, rcpuCoreNum: 2, rcpuFreq: 1.04 };
+            var phone2 = { rscreenSize: 4.7, rramCap: 1, rfCamera: 120, rrCamera: 800, rweight: 129, rbatteryCap: 1800, rcpuCoreNum: 2, rcpuFreq: 1.32 };
+            var mobileType = ["Type A", "Type B", "Phone I", "Phone II"];
+            var dataSource = { "Type A": typea, "Type B": typeb, "Phone I": phone1, "Phone II": phone2 };
+
+            var spreadNS = GC.Spread.Sheets;
+            spread.options.newTabVisible = false;
+            var sheet = spread.sheets[0],
+                sheet2 = spread.sheets[1];
+
+            sheet.name("Horizontal");
+            sheet2.name("Vertical");
+            sheet.bind(spreadNS.Events.ValueChanged, function (event, data) {
+                var col = data.col;
+                var row = data.row;
+                var sheet = data.sheet;
+                if (row === 1 && (col === 1 || col === 3)) {
+                    var newValue = data.newValue;
+                    var updateSource;
+                    if (col === 1) {
+                        var rValue = sheet.getValue(1, 3);
+                        updateSource = $.extend({}, dataSource[newValue], dataSource[rValue]);
+                    } else {
+                        var lValue = sheet.getValue(1, 1);
+                        updateSource = $.extend({}, dataSource[newValue], dataSource[lValue]);
+                    }
+                    var source = new spreadNS.Bindings.CellBindingSource(updateSource);
+                    sheet.setDataSource(source);
+                }
+            })
+
+            sheet.suspendPaint();
+            sheet.addSpan(0, 0, 1, 5);
+            sheet.getCell(0, 0)
+                .value("Mobile Phone Contrast")
+                .font("25px 'Comic Sans MS'")
+                .hAlign(spreadNS.HorizontalAlign.center)
+                .vAlign(spreadNS.VerticalAlign.center)
+                .backColor("purple")
+                .foreColor("white");
+            sheet.addSpan(1, 1, 1, 2);
+            sheet.addSpan(1, 3, 1, 2);
+            sheet.setRowHeight(0, 60);
+            sheet.setRowHeight(1, 40);
+            sheet.setColumnWidth(0, 160);
+            sheet.setColumnWidth(2, 200);
+            sheet.setColumnWidth(3, 200);
+            for (var i = 2; i < 10; i++) {
+                sheet.setRowHeight(i, 40);
+                sheet.getCell(i, 0).value(common[i - 2]).font("bold 14px Arial");
+            }
+            var androidType = new spreadNS.CellTypes.ComboBox();
+            androidType.items([mobileType[0], mobileType[1]]);
+            sheet.setCellType(1, 1, androidType);
+            sheet.getCell(1, 1).value(mobileType[0]).hAlign(spreadNS.HorizontalAlign.center).vAlign(spreadNS.VerticalAlign.center);
+            var iphoneType = new spreadNS.CellTypes.ComboBox();
+            iphoneType.items([mobileType[2], mobileType[3]]);
+            sheet.setCellType(1, 3, iphoneType);
+            sheet.getCell(1, 3).value(mobileType[3]).hAlign(spreadNS.HorizontalAlign.center).vAlign(spreadNS.VerticalAlign.center);
+
+            sheet.setBindingPath(2, 1, "lscreenSize");
+            sheet.setBindingPath(3, 1, "lramCap");
+            sheet.setBindingPath(4, 1, "lfCamera");
+            sheet.setBindingPath(5, 1, "lrCamera");
+            sheet.setBindingPath(6, 1, "lweight");
+            sheet.setBindingPath(7, 1, "lbatteryCap");
+            sheet.setBindingPath(8, 1, "lcpuCoreNum");
+            sheet.setBindingPath(9, 1, "lcpuFreq");
+
+            sheet.setBindingPath(2, 4, "rscreenSize");
+            sheet.setBindingPath(3, 4, "rramCap");
+            sheet.setBindingPath(4, 4, "rfCamera");
+            sheet.setBindingPath(5, 4, "rrCamera");
+            sheet.setBindingPath(6, 4, "rweight");
+            sheet.setBindingPath(7, 4, "rbatteryCap");
+            sheet.setBindingPath(8, 4, "rcpuCoreNum");
+            sheet.setBindingPath(9, 4, "rcpuFreq");
+
+            var source = new spreadNS.Bindings.CellBindingSource($.extend({}, typea, phone2));
+            sheet.setDataSource(source);
+
+            setFormula(sheet, sheet2);
+
+            sheet.resumePaint();
+
+            // custom sheet2
+            sheet2.suspendPaint();
+            sheet2.setRowHeight(0, 60);
+            sheet2.addSpan(0, 0, 1, 8);
+            sheet2.getCell(0, 0)
+                .value("Mobile Phone Contrast")
+                .font("25px 'Comic Sans MS'")
+                .hAlign(spreadNS.HorizontalAlign.center)
+                .vAlign(spreadNS.VerticalAlign.center)
+                .backColor("purple")
+                .foreColor("white");
+            for (var r = 2; r <= 10; r++) {
+                sheet2.setValue(1, r - 2, sheet.getValue(r, 0));
+                sheet2.setColumnWidth(r - 2, 120);
+            }
+            sheet2.setRowHeight(1, 40);
+            sheet2.setRowHeight(2, 140);
+            sheet2.setRowHeight(3, 140);
+            sheet2.getRange(1, 0, 1, 9).wordWrap(true).font("bold 14px Arial");
+            sheet2.resumePaint();
+        };
+
+        function setFormula(sheet, sheet2) {
+            var sheetName = sheet.name();
+
+            for (var i = 2; i < 10; i++) {
+                var lValue = sheetName + "!B" + (i + 1);
+                var rValue = sheetName + "!E" + (i + 1);
+                var lvariance, rvariance;
+                if (i === 6) { //weight
+                    lvariance = "ROUND(-1*" + "(" + lValue + "-" + rValue + ")/" + lValue + ",2)";
+                } else {
+                    lvariance = "ROUND(" + "(" + lValue + "-" + rValue + ")/" + lValue + ",2)";
+                }
+                rvariance = "-1*" + lvariance;
+                if (i === 9) {
+                    sheet.setFormula(i, 2, "VARISPARKLINE(" + lvariance + ",0,,,,0.2,true)");
+                    sheet.setFormula(i, 3, "VARISPARKLINE(" + rvariance + ",0,,,,0.2,true)");
+
+                    sheet2.setFormula(2, i - 2, "VARISPARKLINE(" + lvariance + ",0,,,,0.2,true,,,true)");
+                    sheet2.setFormula(3, i - 2, "VARISPARKLINE(" + lvariance + ",0,,,,0.2,true,,,true)");
+                } else {
+                    sheet.setFormula(i, 2, "VARISPARKLINE(" + lvariance + ",0,,,,,true)");
+                    sheet.setFormula(i, 3, "VARISPARKLINE(" + rvariance + ",0,,,,,true)");
+
+                    sheet2.setFormula(2, i - 2, "VARISPARKLINE(" + lvariance + ",0,,,,,true,,,true)");
+                    sheet2.setFormula(3, i - 2, "VARISPARKLINE(" + rvariance + ",0,,,,,true,,,true)");
+                }
+            }
+        }
+        /*code_end*/
+    </script>
+
+</head>
+<body>
+    <div class="sample-turtorial">
+        <div id="ss" style="width: 100%; height: 480px; border: 1px solid gray;"></div>
+    </div>
+</body>
+</html>

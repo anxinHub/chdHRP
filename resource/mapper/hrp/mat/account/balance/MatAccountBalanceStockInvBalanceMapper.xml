@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.mat.dao.account.balance.MatAccountBalanceStockInvBalanceMapper">
+
+	<resultMap id="matAccountBalanceStockInvBalanceMap"  type="java.util.Map">
+		<result property="group_id"  column="group_id"/>
+		<result property="hos_id"  column="hos_id"/>
+		<result property="copy_code"  column="copy_code"/>
+		<result property="mat_type_id"  column="mat_type_id"/>
+		<result property="mat_type_code"  column="mat_type_code"/>
+		<result property="mat_type_name"  column="mat_type_name"/>
+		<result property="begin_money"  column="begin_money"/>
+		<result property="in_money"  column="in_money"/>
+		<result property="out_money"  column="out_money"/>
+		<result property="remove_zero_error"  column="remove_zero_error"/>
+		<result property="end_money" column="end_money"/>
+		
+	</resultMap>
+	
+	<!-- 库存材料收发账表 查询-->
+	<select id="queryMatAccountBalanceStockInvBalance" parameterType="java.util.Map"  resultMap="matAccountBalanceStockInvBalanceMap">
+		
+		with temp as (
+			<!-- 物资类别信息  汇总上级物资-->
+			select
+			  a.group_id,
+			  a.hos_id,
+			  a.copy_code,
+			  a.mat_type_id,
+			  to_char(a.mat_type_code) mat_type_code,
+			  a.mat_type_name,
+			  a.super_code, 
+			  sum(begin_money) as begin_money,
+			  sum(in_money) as in_money,
+			  sum(out_money) as out_money,
+			  sum(remove_zero_error) as remove_zero_error,
+			  sum(end_money) as end_money
+			from (
+				<!-- 汇总所有物资类别信息 -->
+			     select
+			       mbb.group_id,
+			       mbb.hos_id,
+			       mbb.copy_code,
+			       mtd.mat_type_id,
+			       mtd.mat_type_code,
+			       sum(nvl(mbb.begin_money,0)) as begin_money,
+			       sum(nvl(mbb.in_money,0)) as in_money,
+			       sum(nvl(mbb.out_money,0)) as out_money,
+			       sum(nvl(mbb.remove_zero_error,0)) as remove_zero_error,
+			       sum(nvl(mbb.end_money,0)) as end_money
+			    from mat_batch_balance mbb
+			    left join mat_inv_dict mid
+			    on
+			         mbb.group_id = mid.group_id
+			         and mbb.hos_id = mid.hos_id
+			         and mbb.copy_code = mid.copy_code
+			         and mbb.inv_id = mid.inv_id
+			         and mid.is_stop = 0
+			    left join mat_type_dict mtd
+			    	on mid.group_id = mtd.group_id
+			    	and mid.hos_id = mtd.hos_id
+			    	and mid.copy_code = mtd.copy_code
+					and mid.mat_type_id = mtd.mat_type_id
+					and mid.mat_type_no = mtd.mat_type_no
+			    where
+			         mbb.group_id = #{group_id}
+			         and mbb.hos_id = #{hos_id}
+			         and mbb.copy_code = #{copy_code}
+			         <if test="store_id != null and store_id != '' ">
+				         and mbb.store_id = #{store_id}
+			         </if>
+					<if test="store_id == null or store_id == ''">
+						and mbb.store_id in (
+							select perm_code from v_user_data_perm  
+							where group_id = #{group_id,jdbcType=INTEGER}
+							and hos_id = #{hos_id,jdbcType=INTEGER}
+							and table_code = 'HOS_STORE_DICT'
+							and user_id = #{user_id,jdbcType=INTEGER}
+							and is_read = 1 and is_write = 1 
+						)
+					</if>
+			         <if test="begin_date != null and begin_date != '' and end_date != null and end_date != '' ">
+				         and mbb.year|| '-' ||mbb.month between  #{begin_date} and  #{end_date}
+			         </if>
+			         <if test="mat_type_id != null and mat_type_id != '' ">
+				         and mtd.mat_type_id = #{mat_type_id}
+			         </if>
+			         <if test="mat_type_id == null or mat_type_id == '' ">
+				        and to_char(mtd.mat_type_id) in (
+							select perm_code from v_user_data_perm  
+							where group_id = #{group_id,jdbcType=INTEGER}
+								and hos_id = #{hos_id,jdbcType=INTEGER}
+								and table_code = 'MAT_TYPE_DICT'
+								and user_id = #{user_id,jdbcType=INTEGER}
+								and is_read = 1 and is_write = 1 
+						)
+			         </if>
+			         <!-- 2017/03/22 查询条件 是否收费-->
+			         <if test="is_charge != null and is_charge != '' ">
+			         	and mid.is_charge = #{is_charge}
+			         </if>
+			    group by mbb.group_id,mbb.hos_id,mbb.copy_code,mtd.mat_type_id,mtd.mat_type_code
+			) b left join mat_type_dict a 
+			    on
+			         b.group_id = a.group_id and b.hos_id = a.hos_id and b.copy_code = a.copy_code and a.is_stop = 0
+			         and b.mat_type_code like(a.mat_type_code || '%')
+			   where  b.mat_type_code is not null
+			   group by a.group_id,a.hos_id,a.copy_code,a.mat_type_id,a.mat_type_code,a.mat_type_name,a.super_code
+			   order by a.mat_type_code
+		),temp2 as (
+			<!-- 合计行 合计所有一级物资-->
+			select 
+		        NULL as group_id,NULL as hos_id,NULL as copy_code,NULL as mat_type_id,to_char('合计') as mat_type_code,NULL as mat_type_name,NULL as super_code,
+		         SUM(begin_money) AS begin_money, SUM(in_money) AS in_money,
+		         SUM(out_money) AS out_money, SUM(remove_zero_error) AS remove_zero_error
+		        ,SUM(end_money) AS end_money
+		    from temp
+		    where temp.super_code = 0 
+		)
+		select a.* from temp a
+		union all
+		select b.* from temp2 b
+	</select>
+</mapper>
+

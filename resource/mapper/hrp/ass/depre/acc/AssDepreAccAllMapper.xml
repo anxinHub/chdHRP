@@ -1,0 +1,252 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.ass.dao.depre.acc.AssDepreAccAllMapper">
+	
+	<resultMap id="assDepreAccAllMap" type="java.util.Map">
+	<result property="group_id" column="group_id"/>
+	<result property="hos_id" column="hos_id"/>
+	<result property="copy_code" column="copy_code"/>
+	<result property="depre_year_month" column="depre_year_month"/>
+	<result property="ass_card_no" column="ass_card_no"/>
+	<result property="ass_code" column="ass_code"/>
+	<result property="ass_name" column="ass_name"/>
+	<result property="ass_type_name" column="ass_type_name"/>
+	<result property="ass_spec" column="ass_spec"/>
+	<result property="ass_mondl" column="ass_mondl"/>
+	<result property="ass_brand" column="ass_brand"/>
+	<result property="in_date" column="in_date"/>
+	<result property="source_id" column="source_id"/>
+	<result property="source_name" column="source_name"/>
+	<result property="use_dept_id" column="use_dept_id"/>
+	<result property="use_dept_no" column="use_dept_no"/>
+	<result property="use_dept_name" column="use_dept_name"/>
+	<result property="use_percent" column="use_percent"/>
+	<result property="prim_money" column="prim_money"/>
+	<result property="now_depre_amount" column="now_depre_amount"/>
+	<result property="add_depre_amount" column="add_depre_amount"/>
+	<result property="add_depre_month" column="add_depre_month"/>
+	<result property="cur_money" column="cur_money"/>
+	<result property="fore_money" column="fore_money"/>
+	<result property="operator" column="operator"/>
+	<result property="deal_date" column="deal_date"/>
+	<result property="equi_depre_code" column="equi_depre_code"/>
+	<result property="note" column="note"/>
+	<result property="dispose_income" column="dispose_income"/>
+	<result property="back_price" column="back_price"/>
+	<result property="change_price" column="change_price"/>
+	<result property="change_depre" column="change_depre"/>
+	</resultMap>
+	
+	<select id="queryAssDepreAccInfo" parameterType="java.util.Map" resultMap="assDepreAccAllMap">
+		with back_t as
+		 (select t1.group_id, t1.hos_id, t1.copy_code, t2.ass_card_no, t2.cur_money
+		    from v_ass_back_main t1
+		    left join v_ass_back_detail t2
+		      on t1.group_id = t2.group_id
+		     and t1.hos_id = t2.hos_id
+		     and t1.copy_code = t2.copy_code
+		     and t1.ass_back_no = t2.ass_back_no
+		     and t1.state = 2
+		  
+		  union all
+		  
+		  select t1.group_id, t1.hos_id, t1.copy_code, t2.ass_card_no, t2.cur_money
+		    from v_ass_rest_back_main t1
+		    left join v_ass_back_rest_detail t2
+		      on t1.group_id = t2.group_id
+		     and t1.hos_id = t2.hos_id
+		     and t1.copy_code = t2.copy_code
+		     and t1.ass_back_no = t2.ass_back_no
+		     and t1.state = 2
+		  
+		  ),
+		depre_acc as(
+		select depre.depre_year || '-' || depre.depre_month depre_year_month,
+		       dept.dept_name use_dept_name,
+		       depre.ass_card_no,
+		       ass.ass_code,
+		       ass.ass_name,
+		       typed.ass_type_name,
+		       card.ass_spec,
+		       card.ass_mondl,
+		       card.ass_brand,
+		       card.in_date,
+		       depre.prim_money,
+		       depre.now_depre_amount,
+		       depre.add_depre_amount,
+		       source.source_name,
+		       nvl(dis.dispose_income, 0) dispose_income,
+		       nvl(temp.cur_money,0) back_price,
+		       nvl(cha.change_price, 0) change_price,
+		       nvl(deprecha.change_depre, 0) change_depre
+		  from v_ass_depre_acc depre
+		  
+		  left join v_ass_card card
+		    on depre.group_id = card.group_id
+		   and depre.hos_id = card.hos_id
+		   and depre.copy_code = card.copy_code
+		   and depre.ass_card_no = card.ass_card_no
+		   
+		  left join ass_no_dict ass
+		    on depre.group_id = ass.group_id
+		   and depre.hos_id = ass.hos_id
+		   and depre.copy_code = ass.copy_code
+		   and card.ass_id = ass.ass_id
+		   and card.ass_no = ass.ass_no
+		   
+		  left join ass_type_dict typed
+		    on depre.group_id = typed.group_id
+		   and depre.hos_id = typed.hos_id
+		   and depre.copy_code = typed.copy_code
+		   and ass.ass_type_id = typed.ass_type_id
+		   
+		  left join hos_dept_dict dept
+		    on depre.use_dept_id = dept.dept_id
+		   and depre.use_dept_no = dept.dept_no
+		   and depre.group_id = dept.group_id
+		   and depre.hos_id = dept.hos_id
+		   
+		  left join hos_source source
+		    on depre.group_id = source.group_id
+		   and depre.hos_id = source.hos_id
+		   and depre.source_id = source.source_id
+		   
+		  left join (select dism.group_id,
+		                    dism.hos_id,
+		                    dism.copy_code,
+		                    disd.ass_card_no,
+		                    nvl(disd.dispose_income, 0) dispose_income
+		               from v_ass_disposal_r_main dism
+		               left join v_ass_disposal_r_detail disd
+		                 on dism.group_id = disd.group_id
+		                and dism.hos_id = disd.hos_id
+		                and dism.copy_code = disd.copy_code
+		                and dism.dis_r_no = disd.dis_r_no
+		                and dism.state = 2) dis
+		    on depre.group_id = dis.group_id
+		   and depre.hos_id = dis.hos_id
+		   and depre.copy_code = dis.copy_code
+		   and depre.ass_card_no = dis.ass_card_no
+		   
+		  left join back_t temp
+		    on depre.group_id = temp.group_id
+		   and depre.hos_id = temp.hos_id
+		   and depre.copy_code = temp.copy_code
+		   and depre.ass_card_no = temp.ass_card_no
+		   
+		  left join (select changem.group_id,
+		                    changem.hos_id,
+		                    changem.copy_code,
+		                    changed.ass_card_no,
+		                    changed.change_price
+		               from v_ass_change_main changem
+		               left join v_ass_change_detail changed
+		                 on changem.group_id = changed.group_id
+		                and changem.hos_id = changed.hos_id
+		                and changem.copy_code = changed.copy_code
+		                and changem.change_no = changed.change_no
+		                and changem.state = 2) cha
+		    on depre.group_id = cha.group_id
+		   and depre.hos_id = cha.hos_id
+		   and depre.copy_code = cha.copy_code
+		   and depre.ass_card_no = cha.ass_card_no
+		   
+		  left join (select deprem.group_id,
+		                    deprem.hos_id,
+		                    deprem.copy_code,
+		                    depred.ass_card_no,
+		                    depred.change_depre
+		               from v_ass_depre_main deprem
+		               left join v_ass_depre_detail depred
+		                 on deprem.group_id = depred.group_id
+		                and deprem.hos_id = depred.hos_id
+		                and deprem.copy_code = depred.copy_code
+		                and deprem.change_no = depred.change_no
+		                and deprem.state = 2) deprecha
+		    on depre.group_id = deprecha.group_id
+		   and depre.hos_id = deprecha.hos_id
+		   and depre.copy_code = deprecha.copy_code
+		   and depre.ass_card_no = deprecha.ass_card_no
+		
+		 where 
+		       depre.group_id = #{group_id}
+		   and depre.hos_id = #{hos_id}
+		   and depre.copy_code = #{copy_code}    
+		   <if test="ass_type_id != null and ass_type_id != ''">
+		   and ass.ass_type_id = #{ass_type_id}
+		   </if>
+		   <if test="ass_name != null and ass_name != ''">
+		   and ass.ass_name like '%'||#{ass_name}||'%' 
+		   </if>
+		   <if test="ass_card_no != null and ass_card_no != ''">
+		   and depre.ass_card_no = #{ass_card_no}
+		   </if>
+		   <if test="source_id != null and source_id != ''">
+		   and depre.source_id = #{source_id}
+		   </if>
+		   <if test="use_dept_id != null and use_dept_id != ''">
+		   and depre.use_dept_id = #{use_dept_id}
+		   </if>
+		   <if test="dept_id != null and dept_id != ''">
+		   and card.dept_id = #{dept_id}
+		   </if>
+		   <if test="dept_no != null and dept_no != ''">
+		   and card.dept_no = #{dept_no}
+		   </if>
+		   <if test="depre_year_month != null and depre_year_month != ''">
+		   and depre.depre_year = substr('${depre_year_month}',0,4)
+		   </if>
+		   <if test="depre_year_month != null and depre_year_month != ''">
+		   and depre.depre_month = substr('${depre_year_month}',5,2)
+		   </if>
+		)
+		select * from(
+			select 
+			   depre_year_month,
+		       use_dept_name,
+		       ass_card_no,
+		       ass_code,
+		       ass_name,
+		       ass_type_name,
+		       ass_spec,
+		       ass_mondl,
+		       ass_brand,
+		       in_date,
+		       prim_money,
+		       now_depre_amount,
+		       add_depre_amount,
+		       source_name,
+		       dispose_income,
+		       back_price,
+		       change_price,
+		       change_depre 
+			from depre_acc
+			
+			union all
+			
+			select 
+			   '合计' depre_year_month,
+		       null use_dept_name,
+		       null ass_card_no,
+		       null ass_code,
+		       null ass_name,
+		       null ass_type_name,
+		       null ass_spec,
+		       null ass_mondl,
+		       null ass_brand,
+		       null in_date,
+		       sum(prim_money) prim_money,
+		       sum(now_depre_amount) now_depre_amount,
+		       sum(add_depre_amount) add_depre_amount,
+		       null source_name,
+		       sum(dispose_income) dispose_income,
+		       sum(back_price) back_price,
+		       sum(change_price) change_price,
+		       sum(change_depre) change_depre
+			
+			from depre_acc
+		) t
+		order by t.ass_code
+	</select>
+</mapper>
+

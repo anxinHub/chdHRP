@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.sys.dao.ModMapper">
+
+	<resultMap id="mod" type="com.chd.hrp.sys.entity.Mod">
+		<result property="mod_code" column="mod_code" />
+		<result property="mod_name" column="mod_name" />
+		<result property="parent_code" column="parent_code" />
+		<result property="is_sys" column="is_sys" />
+		<result property="start_year" column="start_year" />
+		<result property="start_month" column="start_month" />
+		<result property="create_user" column="create_user" />
+		<result property="create_date" column="create_date" />
+	</resultMap>
+
+	<insert id="addMod" useGeneratedKeys="true">
+
+		INSERT INTO SYS_MOD (
+		mod_code
+		,
+		mod_name
+		,
+		parent_code
+		,
+		is_sys
+
+		) VALUES (
+		#{mod_code} ,
+		#{mod_name} ,
+		#{parent_code} ,
+		#{is_sys}
+		)
+
+	</insert>
+	<insert id="addBatchMod" parameterType="java.util.List">
+
+		INSERT INTO SYS_MOD (
+		mod_code
+		,
+		mod_name
+		,
+		parent_code
+		,
+		is_sys
+
+		)
+		<foreach collection="list" item="item" index="index"
+			separator=" union all ">
+			select
+			#{item.mod_code} ,
+			#{item.mod_name} ,
+			#{item.parent_code} ,
+			#{item.is_sys}
+			from dual
+		</foreach>
+
+	</insert>
+
+	<update id="updateMod" parameterType="java.util.Map">
+
+		UPDATE sys_mod SET
+		mod_name
+		= #{mod_name}
+		,
+		parent_code = #{parent_code}
+		,
+		is_sys = #{is_sys}
+
+		WHERE
+		mod_code = #{mod_code}
+
+
+	</update>
+	<update id="updateBatchMod" parameterType="java.util.List">
+
+		<foreach collection="list" item="item" index="index" open="begin"
+			close="end;" separator=";">
+			UPDATE sys_mod SET
+			mod_name = #{mod_name}
+			,
+			parent_code = #{parent_code}
+			,
+			is_sys = #{is_sys}
+
+			WHERE
+			mod_code =
+			#{item.mod_code}
+
+		</foreach>
+	</update>
+
+	<delete id="deleteMod" parameterType="java.util.Map">
+
+		DELETE FROM sys_mod WHERE
+		mod_code = #{mod_code}
+
+	</delete>
+	<delete id="deleteBatchMod" parameterType="java.util.List">
+		DELETE FROM sys_mod WHERE
+		<foreach collection="list" index="index" item="item" open="("
+			separator="or" close=")">
+			mod_code = #{item.mod_code}
+
+		</foreach>
+
+
+	</delete>
+
+	<select id="queryModByCode" resultType="com.chd.hrp.sys.entity.Mod"
+		parameterType="string">
+
+		SELECT
+		mod_code,
+		mod_name,
+		parent_code,
+		is_sys
+		FROM sys_mod
+		WHERE
+		mod_code = #{mod_code}
+
+	</select>
+	<select id="queryModList" parameterType="java.util.Map"
+		resultMap="mod">
+
+		SELECT
+		sm.mod_code,
+		sm.mod_name,
+		sm.parent_code,
+		sm.is_sys
+		FROM SYS_MOD sm
+		right join SYS_GROUP_PERM sms on
+		sm.mod_code = sms.mod_code
+		<where>
+			<if test="group_id != null and group_id != ''">
+				AND sms.group_id = #{group_id}
+			</if>
+			<if test="mod_code != null and mod_code != ''">
+				AND sm.mod_code like #{mod_code}
+			</if>
+			<if test="mod_name != null and mod_name != ''">
+				AND sm.mod_name = #{mod_name}
+			</if>
+			<if test="parent_code != null and parent_code != ''">
+				AND sm.parent_code = #{parent_code}
+			</if>
+			<if test="is_sys != null and is_sys != ''">
+				AND sm.is_sys = #{is_sys}
+			</if>
+		</where>
+		order by sm.mod_code asc
+	</select>
+
+	<select id="queryMod" parameterType="java.util.Map" resultMap="mod">
+
+		SELECT
+		sm.mod_code,
+		sm.mod_name,
+		sm.parent_code,
+		sm.is_sys
+		FROM SYS_MOD sm
+		<where>
+			<if test="mod_code != null and mod_code != ''">
+				AND sm.mod_code like #{mod_code}
+			</if>
+			<if test="mod_name != null and mod_name != ''">
+				AND sm.mod_name = #{mod_name}
+			</if>
+			<if test="parent_code != null and parent_code != ''">
+				AND sm.parent_code = #{parent_code}
+			</if>
+			<if test="is_sys != null and is_sys != ''">
+				AND sm.is_sys = #{is_sys}
+			</if>
+		</where>
+		order by sm.mod_code asc
+	</select>
+
+	<!-- 医院权限查询系统模块，只查询具有集团权限的系统模块 -->
+	<select id="queryModByGroupPerm" parameterType="java.util.Map" resultMap="mod">
+
+		SELECT
+		sm.mod_code,
+		sm.mod_name,
+		sm.parent_code,
+		sm.is_sys
+		FROM SYS_MOD sm
+		where mod_code in(select mod_code from SYS_GROUP_PERM where group_id=#{group_id})
+		order by sm.mod_code asc
+	</select>
+
+
+	<!-- 查询有权限的模块信息 -->
+	<select id="queryModByPerm" parameterType="java.util.Map" resultMap="mod">
+		select m.mod_code,m.mod_name,m.is_sys,m.parent_code
+		from sys_mod m
+		where m.is_sys=1 and exists (
+		select distinct up.mod_code from v_user_perm up
+		where up.group_id=#{group_id} and up.hos_id=nvl(#{hos_id},0) and
+		up.user_id=#{user_id} and up.mod_code=m.mod_code
+		<if test="copy_code != null and copy_code != ''">
+			and up.copy_code=#{copy_code}
+		</if>
+		)
+		<if test="mod_code != null and mod_code != ''">
+			and m.mod_code=#{mod_code}
+		</if>
+		order by m.mod_code
+	</select>
+
+	<select id="queryParentByModCode" parameterType="java.util.Map"
+		resultType="com.chd.hrp.sys.entity.Mod">
+		
+		
+		select sm.mod_name, t.start_year, t.start_month
+		  from sys_mod_start t
+		  left join sys_mod sm
+		    on t.mod_code = sm.mod_code
+		 where sm.is_sys = 1
+		   and t.mod_code = #{mod_code}
+	    and t.group_id = #{group_id}
+	    and t.hos_id = nvl(#{hos_id},0)
+	    and t.copy_code = #{copy_code}
+		union all
+		select t.mod_name, sms.start_year, sms.start_month
+		  from sys_mod_start sms
+		  left join sys_mod t
+		    on sms.mod_code = t.mod_code
+		 where exists (select 1
+		          from sys_mod a
+		         where sms.mod_code = a.parent_code
+		           and a.mod_code = #{mod_code})
+		      
+		   and sms.group_id = #{group_id}
+		   and sms.hos_id = nvl(#{hos_id},0)
+		   and sms.copy_code = #{copy_code}
+		
+	</select>
+</mapper>
+

@@ -1,0 +1,70 @@
+﻿<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.acc.dao.autovouch.accamortize.AccAmortizeSourceMapper">
+	<resultMap id="result" type="java.util.Map">
+        <result property="apply_code" column="apply_code"/>
+        <result property="money" column="money"/>
+        <result property="source_id" column="source_id"/>
+        <result property="source_name" column="source_name"/>
+	</resultMap>
+
+	<select id="query" parameterType="java.util.Map" resultMap="result">
+		select a.apply_code,a.money,a.source_id || ' '||c.source_name as source_name,a.source_id
+		from ACC_AMORTIZE_SOURCE a 
+		left join HOS_SOURCE c on a.group_id = c.group_id and a.hos_id = c.hos_id and a.source_id = c.source_id and c.is_stop = 0
+		<where>
+			a.group_id = #{group_id}
+			and a.hos_id = #{hos_id}
+			and a.copy_code = #{copy_code}
+			and a.apply_code = #{apply_code}
+			<if test="source_id != null and source_id != ''">
+				and a.source_id = #{source_id}
+			</if>
+			<if test="source_name != null and source_name != ''">
+				and a.source_name like '%'||#{source_name}||'%'
+			</if>
+		</where>
+	</select>
+
+
+	<insert id="addBatch" parameterType="java.util.Map">
+		insert into ACC_AMORTIZE_SOURCE (
+			group_id, hos_id, copy_code, apply_code, source_id, money
+		) select t.* from(
+		<foreach collection="list" item="item" index="index"
+			separator=" union all ">
+			select
+			#{item.group_id,jdbcType=INTEGER},
+			#{item.hos_id,jdbcType=INTEGER},
+			#{item.copy_code,jdbcType=VARCHAR},
+			#{item.apply_code,jdbcType=VARCHAR},
+			#{item.source_id,jdbcType=VARCHAR},
+			#{item.money,jdbcType=NUMERIC}
+			from dual
+		</foreach>
+		)t
+	</insert>
+	
+	<delete id="deleteAmortizeSourceList" parameterType="java.util.List">
+		DELETE FROM ACC_AMORTIZE_SOURCE WHERE
+		<foreach collection="list" index="index" item="item" open="("
+			separator="or" close=")">
+			apply_code = #{item.apply_code}
+			and group_id = #{item.group_id}
+			and hos_id = #{item.hos_id}
+			and copy_code = #{item.copy_code}
+			and source_id = #{item.source_id}
+		</foreach>
+	</delete>
+	<delete id="deleteBatch" parameterType="java.util.List">
+		DELETE FROM ACC_AMORTIZE_SOURCE WHERE
+		<foreach collection="list" index="index" item="item" open="("
+			separator="or" close=")">
+			apply_code = #{item.apply_code}
+			and group_id = #{item.group_id}
+			and hos_id = #{item.hos_id}
+			and copy_code = #{item.copy_code}
+		</foreach>
+	</delete>
+	
+</mapper>

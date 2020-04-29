@@ -1,0 +1,343 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.mat.dao.dura.query.MatDuraQueryBalanceReportMapper">
+	<select id="queryMatDuraQueryBalanceReport" parameterType="java.util.Map"  resultType="java.util.Map">
+	
+		with inTemp as(<!-- 采购入库（采购入库 2）  数据 临时表-->
+			select mid.inv_id , mid.inv_no , mid.price , mim.store_id , sum(nvl(mid.amount,0)) amount , 
+					sum(nvl(mid.amount_money,0)) amount_money
+			from mat_in_detail mid
+			left join mat_inv_dict ad
+				on
+					mid.group_id = ad.group_id
+					and mid.hos_id = ad.hos_id
+					and mid.copy_code = ad.copy_code
+					and mid.inv_id = ad.inv_id
+			left join mat_in_main mim
+				on
+					mid.group_id = mim.group_id
+					and mid.hos_id = mim.hos_id
+					and mid.copy_code = mim.copy_code
+					and mid.in_id = mim.in_id
+					and mid.in_no = mim.in_no
+			where 
+				 mid.group_id = #{group_id,jdbcType=INTEGER} 
+				AND mid.hos_id = #{hos_id,jdbcType=INTEGER} 
+				AND mid.copy_code = #{copy_code,jdbcType=VARCHAR} 
+				<if test=" start_yearmonth != null and start_yearmonth != '' and end_yearmonth != null and end_yearmonth!=''">
+				AND mim.year || mim.month between  #{start_yearmonth}  and #{end_yearmonth}
+				</if>
+				<if test="store_id != null and store_id !=''">
+				AND mim.store_id = #{store_id,jdbcType=INTEGER}
+				</if>
+				AND mim.bus_type_code ='2'<!--采购入库 2 -->
+				AND ad.is_dura = 1
+				and ad.is_stop = 0
+			group by mid.inv_id , mid.inv_no , mid.price ,mim.store_id
+			
+		),
+		inStore as(<!-- 移入库(库-库 流入)  数据 临时表-->
+			select mdssd.inv_id , mdssd.inv_no , mdssd.price , mdss.in_store_id store_id , sum(nvl(mdssd.amount,0)) amount , 
+					sum(nvl(mdssd.amount_money,0)) amount_money
+			from MAT_DURA_STORE_STORE_D mdssd
+			left join MAT_DURA_STORE_STORE mdss
+				on
+					mdssd.group_id = mdss.group_id
+					and mdssd.hos_id = mdss.hos_id
+					and mdssd.copy_code = mdss.copy_code
+					and mdssd.dura_id = mdss.dura_id
+			where 
+				 mdssd.group_id = #{group_id,jdbcType=INTEGER} 
+				AND mdssd.hos_id = #{hos_id,jdbcType=INTEGER} 
+				AND mdssd.copy_code = #{copy_code,jdbcType=VARCHAR} 
+				<if test=" start_yearmonth != null and start_yearmonth != '' and end_yearmonth != null and end_yearmonth!=''">
+				AND mdss.year || mdss.month between  #{start_yearmonth}  and #{end_yearmonth}
+				</if>
+				<if test=" store_id != null and store_id !=''">
+				AND mdss.in_store_id = #{store_id,jdbcType=INTEGER}
+				</if>
+				
+			group by mdssd.inv_id , mdssd.inv_no , mdssd.price ,mdss.in_store_id
+			
+		),
+		storeBack as(<!-- 采购退货 12  数据 临时表-->
+			select mid.inv_id , mid.inv_no , mid.price , mim.store_id , sum(nvl(mid.amount,0)) amount , 
+					sum(nvl(mid.amount_money,0)) amount_money
+			from mat_in_detail mid
+			left join mat_inv_dict ad
+				on
+					mid.group_id = ad.group_id
+					and mid.hos_id = ad.hos_id
+					and mid.copy_code = ad.copy_code
+					and mid.inv_id = ad.inv_id
+			left join mat_in_main mim
+				on
+					mid.group_id = mim.group_id
+					and mid.hos_id = mim.hos_id
+					and mid.copy_code = mim.copy_code
+					and mid.in_id = mim.in_id
+					and mid.in_no = mim.in_no
+			where 
+				 mid.group_id = #{group_id,jdbcType=INTEGER} 
+				AND mid.hos_id = #{hos_id,jdbcType=INTEGER} 
+				AND mid.copy_code = #{copy_code,jdbcType=VARCHAR} 
+				<if test=" start_yearmonth != null and start_yearmonth != '' and end_yearmonth != null and end_yearmonth!=''">
+				AND mim.year || mim.month between  #{start_yearmonth}  and #{end_yearmonth}
+				</if>
+				<if test="store_id != null and store_id !=''">
+				AND mim.store_id = #{store_id,jdbcType=INTEGER}
+				</if>
+				AND mim.bus_type_code ='12'<!--采购退货 12 -->
+				AND ad.is_dura = 1
+				and ad.is_stop = 0
+			group by mid.inv_id , mid.inv_no , mid.price ,mim.store_id
+			
+		),
+		
+		outStoreDept as(<!-- 科室领用  数据 临时表-->
+			select mdsdd.inv_id , mdsdd.inv_no , mdsdd.price , mdsd.store_id , sum(nvl(mdsdd.amount,0)) amount , 
+					sum(nvl(mdsdd.amount_money,0)) amount_money
+			from MAT_DURA_STORE_DEPT_D mdsdd
+			left join MAT_DURA_STORE_DEPT mdsd
+				on
+					mdsdd.group_id = mdsd.group_id
+					and mdsdd.hos_id = mdsd.hos_id
+					and mdsdd.copy_code = mdsd.copy_code
+					and mdsdd.dura_id = mdsd.dura_id
+			where 
+				 mdsdd.group_id = #{group_id,jdbcType=INTEGER} 
+				AND mdsdd.hos_id = #{hos_id,jdbcType=INTEGER} 
+				AND mdsdd.copy_code = #{copy_code,jdbcType=VARCHAR} 
+				<if test=" start_yearmonth != null and start_yearmonth != '' and end_yearmonth != null and end_yearmonth!=''">
+				AND mdsd.year || mdsd.month between  #{start_yearmonth}  and #{end_yearmonth}
+				</if>
+				<if test=" store_id != null and store_id !=''">
+				AND mdsd.store_id = #{store_id,jdbcType=INTEGER}
+				</if>
+			group by mdsdd.inv_id , mdsdd.inv_no , mdsdd.price ,mdsd.store_id
+			
+		),
+		deptBack as(<!-- 科室退库 38  数据 临时表-->
+			select mid.inv_id , mid.inv_no , mid.price , mim.store_id , sum(nvl(mid.amount,0)) amount , 
+					sum(nvl(mid.amount_money,0)) amount_money
+			from mat_in_detail mid
+			left join mat_in_main mim
+				on
+					mid.group_id = mim.group_id
+					and mid.hos_id = mim.hos_id
+					and mid.copy_code = mim.copy_code
+					and mid.in_id = mim.in_id
+					and mid.in_no = mim.in_no
+			where 
+				 mid.group_id = #{group_id,jdbcType=INTEGER} 
+				AND mid.hos_id = #{hos_id,jdbcType=INTEGER} 
+				AND mid.copy_code = #{copy_code,jdbcType=VARCHAR} 
+				<if test=" start_yearmonth != null and start_yearmonth != '' and end_yearmonth != null and end_yearmonth!=''">
+				AND mim.year || mim.month between  #{start_yearmonth}  and #{end_yearmonth}
+				</if>
+				<if test="store_id != null and store_id !=''">
+				AND mim.store_id = #{store_id,jdbcType=INTEGER}
+				</if>
+				AND mim.bus_type_code ='38'<!--科室退库 38 -->
+			group by mid.inv_id , mid.inv_no , mid.price ,mim.store_id
+			
+		),
+		outStore as(<!-- 移出库(库-库 流出) 数据 临时表-->
+			select mdssd.inv_id , mdssd.inv_no , mdssd.price , mdss.store_id , sum(nvl(mdssd.amount,0)) amount , 
+					sum(nvl(mdssd.amount_money,0)) amount_money
+			from MAT_DURA_STORE_STORE_D mdssd
+			left join MAT_DURA_STORE_STORE mdss
+				on
+					mdssd.group_id = mdss.group_id
+					and mdssd.hos_id = mdss.hos_id
+					and mdssd.copy_code = mdss.copy_code
+					and mdssd.dura_id = mdss.dura_id
+			where 
+				 mdssd.group_id = #{group_id,jdbcType=INTEGER} 
+				AND mdssd.hos_id = #{hos_id,jdbcType=INTEGER} 
+				AND mdssd.copy_code = #{copy_code,jdbcType=VARCHAR} 
+				<if test=" start_yearmonth != null and start_yearmonth != '' and end_yearmonth != null and end_yearmonth!=''">
+				AND mdss.year || mdss.month between  #{start_yearmonth}  and #{end_yearmonth}
+				</if>
+				<if test=" store_id != null and store_id !=''">
+				AND mdss.store_id = #{store_id,jdbcType=INTEGER}
+				</if>
+			group by mdssd.inv_id , mdssd.inv_no , mdssd.price ,mdss.store_id
+			
+		),
+		baseData as(
+			SELECT mdss.inv_id , mid.mat_type_id ,mtd.mat_type_code ,mtd.type_level , 
+				nvl(mdss.begin_amount,0) begin_amount, nvl(mdss.begin_money,0) begin_money, <!-- 期初金额-->
+				nvl(a.amount,0) add_in_amount , nvl(a.amount_money,0) add_in_money, <!-- 采购入库--> 
+				nvl(b.amount,0) dec_in_amount , nvl(b.amount_money,0) in_store_money ,<!-- 移入库 -->
+				(nvl(a.amount_money,0) + nvl(b.amount_money,0) ) in_money ,<!-- 增加  合计 -->
+				nvl(c.amount,0) add_out_amount , nvl(c.amount_money,0) store_back_money, <!-- 采购退货  --> 
+				nvl(d.amount,0) add_out_amount , nvl(d.amount_money,0) dept_out_money, <!-- 科室领用 --> 
+				nvl(e.amount,0) add_out_amount , nvl(e.amount_money,0) dept_back_money, <!-- 科室退库 --> 
+				nvl(f.amount,0) add_out_amount , nvl(f.amount_money,0) out_store_money, <!-- 移出库 --> 
+				-1 * nvl(c.amount_money,0) + nvl(d.amount_money,0) - nvl(e.amount_money,0) + nvl(f.amount_money,0) as out_money, <!-- 减少 合计  -->
+                nvl(mdss.begin_money,0) + nvl(a.amount_money,0) + nvl(b.amount_money,0) + nvl(c.amount_money,0) - nvl(d.amount_money,0) + nvl(e.amount_money,0) - nvl(f.amount_money,0) as end_money <!-- 期末余额 -->
+			FROM MAT_DURA_STORE_SURPLUS mdss
+			<!-- 采购入库 2 -->
+			LEFT JOIN	inTemp  a
+				on
+					mdss.store_id = a.store_id
+					and mdss.inv_id = a.inv_id
+					and mdss.price = a.price
+			<!-- 移入库 -->
+			LEFT JOIN	inStore  b
+				on
+					mdss.store_id = b.store_id
+					and mdss.inv_id = b.inv_id
+					and mdss.price = b.price
+			<!-- 采购退货-->		
+			LEFT JOIN	storeBack  c
+				on
+					mdss.store_id = c.store_id
+					and mdss.inv_id = c.inv_id
+					and mdss.price = c.price
+			<!-- 科室领用 -->
+			LEFT JOIN	outStoreDept  d
+				on
+					mdss.store_id = d.store_id
+					and mdss.inv_id = d.inv_id
+					and mdss.price = d.price
+					
+			<!-- 科室退库 -->
+			LEFT JOIN	deptBack  e
+				on
+					mdss.store_id = e.store_id
+					and mdss.inv_id = e.inv_id
+					and mdss.price = e.price
+			<!-- 移出库 -->
+			LEFT JOIN	outStore  f
+				on
+					mdss.store_id = f.store_id
+					and mdss.inv_id = f.inv_id
+					and mdss.price = f.price
+			LEFT JOIN mat_inv_dict mid 
+				ON mdss.group_id = mid.group_id 
+				AND mdss.hos_id = mid.hos_id 
+				AND mdss.copy_code = mid.copy_code 
+				AND mdss.inv_id = mid.inv_id 
+				AND mid.is_stop = 0
+			LEFT JOIN MAT_TYPE_DICT mtd
+				on
+					mid.group_id = mtd.group_id 
+					AND mid.hos_id = mtd.hos_id 
+					AND mid.copy_code = mtd.copy_code 
+					AND mid.mat_type_id = mtd.mat_type_id  
+			where mdss.group_id = #{group_id,jdbcType=INTEGER} 
+				AND mdss.hos_id = #{hos_id,jdbcType=INTEGER} 
+				AND mdss.copy_code = #{copy_code,jdbcType=VARCHAR}
+				<if test=" start_yearmonth != null and start_yearmonth != '' and end_yearmonth != null and end_yearmonth!=''">
+				AND mdss.year || mdss.month between  #{start_yearmonth}  and #{end_yearmonth}
+				</if>
+				<if test="store_id != null and store_id != ''">
+				AND mdss.store_id = #{store_id,jdbcType=INTEGER} 
+				</if>
+				<if test="type_level != null and type_level != '' and type_level != 99">
+					AND mtd.type_level = #{type_level,jdbcType=INTEGER}
+				</if>
+				<if test="type_level == 99 ">
+					AND mtd.is_last = 1
+				</if>
+				and mtd.is_stop = 0
+		) 
+		
+		select a.mat_type_code , a.mat_type_name ,nvl(sum(b.begin_money),0) begin_money ,<!-- 期初金额--> 
+			nvl(sum(b.add_in_money),0) add_in_money ,<!-- 采购入库--> 
+			nvl(sum(b.in_store_money),0)	in_store_money ,<!-- 移入库 -->
+			nvl(sum(b.in_money),0) in_money ,<!-- 增加  合计 -->
+			nvl(sum(b.store_back_money),0) store_back_money ,<!-- 采购退货  --> 
+			nvl(sum(b.dept_out_money),0) dept_out_money, <!-- 科室领用 --> 
+			nvl(sum(b.dept_back_money),0) dept_back_money, <!-- 科室退库 --> 
+			nvl(sum(b.out_store_money),0) out_store_money, <!-- 移出库 --> 
+			nvl(sum(b.out_money),0) out_money ,<!-- 减少 合计  -->
+			nvl(sum(b.end_money),0) end_money <!-- 期末余额 -->
+		from mat_type_dict a
+		LEFT JOIN baseData b
+			on	b.mat_type_code like (a.mat_type_code||'%')
+		where
+			a.group_id = #{group_id,jdbcType=INTEGER} 
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR} 
+			<if test="type_level != null and type_level != '' and type_level != 99">
+			AND a.type_level = #{type_level,jdbcType=INTEGER}
+			</if>
+			<if test="type_level == 99 ">
+			AND a.is_last = 1
+			</if>
+			and a.is_stop = 0
+			group by a.mat_type_code , a.mat_type_name 
+		order by a.mat_type_code
+		<!-- SELECT hdd.dept_code, hdd.dept_name, mid.inv_code, mid.inv_name, mid.inv_model, hu.unit_name, 
+			mddb.bar_code, mdss.price, mdss.begin_amount, mdss.begin_money, mdss.in_amount, mdss.in_money, 
+			mdss.out_amount, mdss.out_money, mdss.end_amount, mdss.end_money
+		FROM mat_dura_dept_surplus mdss
+		LEFT JOIN mat_dura_dept_bar mddb 
+			ON mdss.group_id = mddb.group_id 
+			AND mdss.hos_id = mddb.hos_id 
+			AND mdss.copy_code = mddb.copy_code 
+			AND mdss.dept_id = mddb.dept_id 
+			AND mdss.inv_id = mddb.inv_id  
+			AND mdss.price = mddb.price 
+		LEFT JOIN hos_dept_dict hdd
+			ON mdss.group_id = hdd.group_id 
+			AND mdss.hos_id = hdd.hos_id 
+			AND mdss.dept_id = hdd.dept_id 
+			AND hdd.is_stop = 0 
+		LEFT JOIN mat_inv_dict mid 
+			ON mdss.group_id = mid.group_id 
+			AND mdss.hos_id = mid.hos_id 
+			AND mdss.copy_code = mid.copy_code 
+			AND mdss.inv_id = mid.inv_id 
+			AND mid.is_stop = 0
+		LEFT JOIN hos_unit hu 
+			ON mid.group_id = hu.group_id 
+			AND mid.hos_id = hu.hos_id 
+			AND mid.unit_code = hu.unit_code 
+		LEFT JOIN hos_fac_dict hfd 
+			ON mid.group_id = hfd.group_id 
+			AND mid.hos_id = hfd.hos_id 
+			AND mid.fac_id = hfd.fac_id 
+			AND mid.fac_no = hfd.fac_no 
+		where mdss.group_id = #{group_id,jdbcType=INTEGER} 
+			AND mdss.hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND mdss.copy_code = #{copy_code,jdbcType=VARCHAR} 
+			AND mdss.year = #{year,jdbcType=VARCHAR} 
+			AND mdss.month = #{month,jdbcType=VARCHAR} 
+			<if test="dept_id != null and dept_id != ''">
+				AND mdss.dept_id = #{dept_id,jdbcType=INTEGER} 
+			</if>
+			<if test="dept_id == null or dept_id == ''">
+				AND exists( 
+					SELECT 1 from v_user_data_perm 
+					WHERE group_id = #{group_id,jdbcType=INTEGER} 
+						AND hos_id = #{hos_id,jdbcType=INTEGER} 
+						AND table_code = 'HOS_DEPT_DICT' 
+						AND user_id = #{user_id,jdbcType=INTEGER} 
+						AND is_read = 1 and is_write = 1 
+						AND perm_code = mdss.dept_id 
+				)
+			</if>
+			<if test="inv_code != null and inv_code != ''">
+				AND (
+					mid.inv_code like '%' || #{inv_code,jdbcType=VARCHAR} || '%'
+					OR
+					mid.inv_name like '%' || #{inv_code,jdbcType=VARCHAR} || '%'
+					OR
+					mid.spell_code like '%' || #{inv_code,jdbcType=VARCHAR} || '%'
+					OR
+					mid.wbx_code like '%' || #{inv_code,jdbcType=VARCHAR} || '%'
+					OR
+					mid.inv_model like '%' || #{inv_code,jdbcType=VARCHAR} || '%'
+					OR
+					mid.alias like '%' || #{inv_code,jdbcType=VARCHAR} || '%'
+					OR
+					mid.alias_spell like '%' || #{inv_code,jdbcType=VARCHAR} || '%'
+				)
+			</if> -->
+	</select>
+</mapper>
+

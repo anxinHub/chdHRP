@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.mat.dao.account.report.MatAccountReportInvStockToFimMapper">
+	<resultMap id="matAccountReportInvStockToFim" type="java.util.Map">
+		<result property="mat_type_code" column="mat_type_code" />
+		<result property="mat_type_name" column="mat_type_name" />
+		<result property="begin_money" column="begin_money" />
+		<result property="bal_money" column="bal_money" />
+		<result property="add_sum_money" column="add_sum_money" />
+		<result property="reduct_sum_money" column="reduct_sum_money" />
+		<result property="end_money" column="end_money" />
+		<result property="row_index" column="row_index" />
+		<result property="type_level" column="type_level" />
+		<result property="fim_type_code" column="fim_type_code" />
+		<result property="fim_type_name" column="fim_type_name" />
+		
+		
+	</resultMap>
+	<select id="queryMatAccountReportInvStockToFim" statementType="CALLABLE" parameterType="java.util.Map"  resultMap="matAccountReportInvStockToFim">
+		<![CDATA[
+			{call MAT_ACCOUNT_INVSTOCK_FIM(
+				#{group_id,jdbcType=INTEGER, mode=IN},  
+		        #{hos_id,jdbcType=INTEGER, mode=IN},  
+		        #{copy_code,jdbcType=VARCHAR, mode=IN},  
+		        #{begin_year,jdbcType=VARCHAR, mode=IN},
+		        #{begin_month,jdbcType=VARCHAR, mode=IN},
+		        #{end_year,jdbcType=VARCHAR, mode=IN},
+		        #{end_month,jdbcType=VARCHAR, mode=IN},
+		        #{store_type,jdbcType=INTEGER, mode=IN},
+		        #{store_id,jdbcType=INTEGER, mode=IN},
+		        #{resultData, mode=OUT, jdbcType=CURSOR, javaType=java.sql.ResultSet, resultMap=matAccountReportInvStockToFim}
+			)}
+		]]>
+	</select>
+	
+	<select id="queryMatAccountReportInvStockToFimColumns" parameterType="java.util.Map"  resultType="java.util.TreeMap">
+		<!-- 由于上面的resultMap未指定动态列所以这里使用大写 -->
+		SELECT direction_flag, show_name, 'ITEM'||show_id as show_code
+		FROM mat_show_set
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND show_flag = 1
+	</select>
+	
+	<select id="collectMatStoreInvStock" statementType="CALLABLE" parameterType="java.util.Map"  resultMap="matAccountReportInvStockToFim">
+		<![CDATA[
+			{call mat_store_inv_stock(
+				#{group_id,jdbcType=INTEGER, mode=IN},  
+		        #{hos_id,jdbcType=INTEGER, mode=IN},  
+		        #{copy_code,jdbcType=VARCHAR, mode=IN},  
+		        #{begin_year,jdbcType=VARCHAR, mode=IN},
+		        #{begin_month,jdbcType=VARCHAR, mode=IN},
+		        #{end_year,jdbcType=VARCHAR, mode=IN},
+		        #{end_month,jdbcType=VARCHAR, mode=IN},
+		        #{store_type,jdbcType=INTEGER, mode=IN},
+		        #{set_store_id,jdbcType=INTEGER, mode=IN},
+		        #{resultData, mode=OUT, jdbcType=CURSOR, javaType=java.sql.ResultSet, resultMap=matAccountReportInvStockToFim}
+			)}
+		]]>
+	</select>
+	
+	
+	<select id="queryIsEntireAccByYearMonth" parameterType="java.util.Map" resultType="int">
+		select count(*) as acc_month_amount
+		from acc_year_month a 
+		where a.group_id = #{group_id}
+		and a.hos_id = #{hos_id}
+		and a.copy_code = #{copy_code}
+		and a.acc_year || '@' ||a.acc_month  between '${begin_year}@${begin_month}' and '${end_year}@${end_month}'
+		and a.mat_flag=1
+	</select>
+	
+	<select id="queryIsAccByStore" parameterType="java.util.Map" resultType="int">
+		select count(*) as acc_month_amount
+		from mat_termend_store
+		where group_id=#{group_id}
+		and hos_id=#{hos_id}
+		and copy_code=#{copy_code}
+		and store_id=#{store_id}
+		and is_account=1
+		and year||'@'|| month between '${begin_year}@${begin_month}' and '${end_year}@${end_month}'
+	</select>
+	
+	<select id="queryIsAccBySet" parameterType="java.util.Map" resultType="java.util.Map">
+		select a.store_id,d.start_year,d.start_month,count(*) as store_acc_month_amount
+	      from mat_termend_store a
+	      left join mat_store_detail b
+	        on a.group_id = b.group_id
+	       and a.hos_id = b.hos_id
+	       and a.store_id = b.store_id
+	       and a.is_account = 1
+	      left join mat_store_start d
+	        on a.group_id = d.group_id
+	       and a.hos_id = d.hos_id
+	       and a.copy_code=d.copy_code
+	       and a.store_id = d.store_id
+	     where a.group_id = #{group_id}
+	       and a.hos_id = #{hos_id}
+	       and a.copy_code = #{copy_code}
+	       and b.set_id = #{set_id}
+	       and d.start_year || d.start_month &lt;=  to_char(${end_year} || ${end_month})
+	       and a.year || '@' || a.month  between '${begin_year}@${begin_month}' and   '${end_year}@${end_month}'
+	     group by a.store_id,d.start_year,d.start_month
+	</select>
+</mapper>
+

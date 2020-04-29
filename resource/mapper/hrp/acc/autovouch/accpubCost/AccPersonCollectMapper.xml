@@ -1,0 +1,461 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.acc.dao.autovouch.accpubCost.AccPersonCollectMapper">
+
+	<resultMap id="accpersonMap" type="java.util.Map">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="year_month" column="year_month" />
+		<result property="dept_id" column="dept_id" />
+		<result property="dept_code_name" column="dept_code_name" />
+		<result property="emp_count" column="emp_count" />
+		<result property="state" column="state" />
+		<result property="total" column="total" />
+	</resultMap>
+	
+	<resultMap id="accpersonMainMap" type="java.util.Map">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="year_month" column="year_month" />
+		<result property="dept_id" column="dept_id" />
+		<result property="dept_code" column="dept_code" />
+		<result property="dept_name" column="dept_name" />
+		<result property="kind_name" column="kind_name" />
+		<result property="type_name" column="type_name" />
+		<result property="natur_name" column="natur_name" />
+		<result property="out_name" column="out_name" />
+		<result property="emp_count" column="emp_count" />
+		<result property="total_num" column="total_num" />
+		<result property="ft_bl" column="ft_bl" />
+		<result property="state" column="state" />
+		<result property="dept_no" column="dept_no" />
+	</resultMap>
+	
+	
+	<select id="queryAccPersonCollect" parameterType="java.util.Map" resultMap="accpersonMainMap">
+		select
+		ace.group_id,
+		ace.hos_id,
+		ace.copy_code,
+		ace.year_month,
+		ace.dept_id,
+		hdd.dept_code,
+		hdd.dept_name,
+		hdk.kind_name,
+		adt.type_name,
+		adn.natur_name,
+		ado.out_name,
+		ace.emp_count,
+		ace.ft_bl,
+		(case when ace.state=1 then '未审核'
+			  else '已审核'
+			  end ) state,
+		(SELECT
+		nvl(sum(emp_count),0)
+		FROM 	acc_cost_emp
+		where   group_id = #{group_id,jdbcType=INTEGER}
+			
+				AND hos_id = #{hos_id,jdbcType=INTEGER}
+			
+				AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			
+				AND year_month = #{year_month,jdbcType=VARCHAR}
+		)as total_num
+		from acc_cost_emp ace
+		left join hos_dept_dict hdd
+		on ace.group_id = hdd.group_id
+			and ace.hos_id = hdd.hos_id
+			and ace.dept_id = hdd.dept_id
+		left join acc_dept_attr ada
+		on ace.group_id = ada.group_id
+			and ace.hos_id = ada.hos_id
+			and ace.dept_id = ada.dept_id
+		left join hos_dept_kind hdk 
+		on ace.group_id = hdk.group_id
+			and ace.hos_id = hdk.hos_id
+			and hdd.kind_code = hdk.kind_code
+		left join acc_dept_type adt
+		on ada.type_code = adt.type_code
+		left join acc_dept_natur adn
+		on ada.natur_code = adn.natur_code
+		left join acc_dept_out ado
+		on ada.out_code = ado.out_code
+		where ace.group_id = #{group_id,jdbcType=INTEGER}
+			and ace.hos_id = #{hos_id,jdbcType=INTEGER}	
+			and ace.copy_code = #{copy_code,jdbcType=VARCHAR}
+			and ace.year_month = #{year_month,jdbcType=VARCHAR}
+			<if test="dept_item != null and dept_item != ''">
+				and hdd.dept_code like '${dept_item}%'
+			</if>
+			<if test="dept_out != null and dept_out != ''">
+				and ada.out_code = #{dept_out,jdbcType=VARCHAR}
+			</if>
+			<if test="dept_natur != null and dept_natur != ''">
+				and ada.natur_code = #{dept_natur,jdbcType=VARCHAR}
+			</if>
+			<if test="dept_type != null and dept_type != ''">
+				and ada.type_code = #{dept_type,jdbcType=VARCHAR}
+			</if>
+			<if test="dept_kind != null and dept_kind != ''">
+				and hdd.kind_code = #{dept_kind,jdbcType=VARCHAR}
+			</if>
+		order by hdd.dept_code
+	</select>
+	
+	<select id="queryAccPersonByCode" parameterType="java.util.Map" resultMap="accpersonMap">
+		SELECT
+		group_id,
+		hos_id,
+		copy_code,
+		year_month,
+		dept_id,
+		emp_count,
+		state
+		FROM 	acc_cost_emp
+		where   group_id = #{group_id,jdbcType=INTEGER}
+			
+				AND hos_id = #{hos_id,jdbcType=INTEGER}
+			
+				AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			
+				AND year_month = #{year_month,jdbcType=VARCHAR}
+				
+				AND dept_id = #{dept_id,jdbcType=INTEGER}
+	</select>
+	
+	<select id="queryAccPersonByFirst" parameterType="java.util.Map" resultMap="accpersonMap">
+		SELECT
+		group_id,
+		hos_id,
+		copy_code,
+		year_month,
+		dept_id,
+		emp_count,
+		ft_bl,
+		state
+		FROM 	acc_cost_emp
+		where   group_id = #{group_id,jdbcType=INTEGER}
+			
+				AND hos_id = #{hos_id,jdbcType=INTEGER}
+			
+				AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			
+				AND year_month = #{year_month,jdbcType=VARCHAR}
+				
+				AND rownum = 1
+				
+	</select>
+	
+	<select id="queryAccPersonByLastMonth" parameterType="java.util.Map" resultMap="accpersonMap">
+		SELECT
+		group_id,
+		hos_id,
+		copy_code,
+		#{year_month,jdbcType=VARCHAR} as year_month,
+		dept_id, 
+		emp_count,
+		ft_bl,
+		1 as state
+		FROM 	acc_cost_emp
+		where   group_id = #{group_id,jdbcType=INTEGER}
+			
+				AND hos_id = #{hos_id,jdbcType=INTEGER}
+			
+				AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			
+				AND year_month = #{last_month,jdbcType=VARCHAR}
+							
+	</select>
+	
+	<select id="queryAccPersonById" parameterType="java.util.Map" resultMap="accpersonMap">
+		SELECT
+		ace.group_id,
+		ace.hos_id,
+		ace.copy_code,
+		ace.year_month,
+		ace.dept_id,
+		hdd.dept_code||' '||hdd.dept_name as dept_code_name,
+		ace.emp_count,
+		ace.state
+		FROM 	acc_cost_emp ace
+		left join hos_dept_dict hdd
+		on ace.group_id = hdd.group_id
+			and ace.hos_id = hdd.hos_id
+			and ace.dept_id = hdd.dept_id
+		where   ace.group_id = #{group_id,jdbcType=INTEGER}
+			
+				AND ace.hos_id = #{hos_id,jdbcType=INTEGER}
+			
+				AND ace.copy_code = #{copy_code,jdbcType=VARCHAR}
+			
+				AND ace.year_month = #{year_month,jdbcType=VARCHAR}
+				
+				AND ace.dept_id = #{dept_id,jdbcType=INTEGER}
+	</select>
+	
+	<select id="queryTotalNum" parameterType="java.util.Map" resultMap="accpersonMap">
+		SELECT
+		nvl(sum(emp_count),0) as total
+		FROM 	acc_cost_emp
+		where   group_id = #{group_id,jdbcType=INTEGER}
+			
+				AND hos_id = #{hos_id,jdbcType=INTEGER}
+			
+				AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			
+				AND year_month = #{year_month,jdbcType=VARCHAR}
+				
+	</select>
+	
+	<select id="queryDeptAllInfoDict" parameterType="java.util.Map" resultMap="accpersonMainMap">
+		SELECT a.DEPT_ID ,a.DEPT_CODE,a.DEPT_NAME ,a.dept_no,b.KIND_NAME,d.TYPE_NAME,e.OUT_NAME ,f.NATUR_NAME FROM 
+		HOS_DEPT_DICT a 
+		LEFT JOIN HOS_DEPT_KIND b ON a.GROUP_ID = b.GROUP_ID AND a.HOS_ID = b.HOS_ID AND a.KIND_CODE = b.KIND_CODE 
+		LEFT JOIN ACC_DEPT_ATTR c ON a.GROUP_ID = c.GROUP_ID AND a.HOS_ID = c.HOS_ID AND a.DEPT_ID  = c.DEPT_ID 
+		LEFT JOIN ACC_DEPT_TYPE d ON c.TYPE_CODE = d.TYPE_CODE
+		LEFT JOIN ACC_DEPT_OUT e ON c.OUT_CODE = e.OUT_CODE
+		LEFT JOIN ACC_DEPT_NATUR f ON c.NATUR_CODE = f.NATUR_CODE
+		<where>
+			a.group_id = #{group_id}
+			and a.hos_id = #{hos_id}
+			<if test="key != null and key != ''">
+				and a.dept_code like '${key}%'
+			</if>	
+			<if test="dept_code != null and dept_code != ''">
+				and a.dept_code = #{dept_code}
+			</if>	
+			and a.is_stop = 0
+			and a.is_last = 1
+		</where>
+		ORDER BY DEPT_CODE
+	</select>
+	
+	<select id="queryQuoteOrNot" parameterType="java.util.Map" resultType="java.lang.Integer">
+		SELECT count(1)
+		FROM ACC_PUB_COST_DETAIL d
+		inner join acc_pub_cost a on a.group_id=d.group_id and a.hos_id=d.hos_id and a.copy_code=d.copy_code
+		and a.year_month=d.year_month and a.ft_para='01'
+		where d.group_id = #{group_id,jdbcType=INTEGER}
+		AND d.hos_id = #{hos_id,jdbcType=INTEGER}
+		AND d.copy_code = #{copy_code,jdbcType=VARCHAR}
+		AND d.year_month = #{year_month,jdbcType=VARCHAR}
+		and d.DATA_TYPE=1
+				
+	</select>
+	
+	<insert id="addAccPerson" useGeneratedKeys="true">
+
+		insert into
+		acc_cost_emp(
+		group_id,
+		hos_id,
+		copy_code,
+		year_month,
+		dept_id,
+		emp_count,
+		ft_bl,
+		state
+		) values (
+		#{group_id,jdbcType=INTEGER}
+		,
+		#{hos_id,jdbcType=INTEGER}
+		,
+		#{copy_code,jdbcType=VARCHAR}
+		,
+		#{year_month,jdbcType=VARCHAR}
+		,
+		#{dept_id,jdbcType=INTEGER}
+		,
+		#{emp_count,jdbcType=INTEGER}
+		,
+		#{ft_bl,jdbcType=INTEGER}
+		,
+		#{state,jdbcType=INTEGER}
+		)
+
+	</insert>
+	
+	<insert id="updateAccPersonDataFromLastMonth">
+		insert into acc_cost_emp(
+			group_id,
+			hos_id,
+			copy_code,
+			year_month,
+			dept_id,
+			emp_count,
+			ft_bl,
+			state
+		)
+		select 
+		#{group_id,jdbcType=INTEGER},
+		#{hos_id,jdbcType=INTEGER},
+		#{copy_code,jdbcType=VARCHAR},
+		#{year_month,jdbcType=VARCHAR},
+		dept_id,
+		emp_count,
+		ft_bl,
+		1
+		from acc_cost_emp
+		where group_id=#{group_id,jdbcType=INTEGER}
+		and   hos_id=#{hos_id,jdbcType=INTEGER}
+		and   copy_code=#{copy_code,jdbcType=VARCHAR}
+		and   year_month=#{last_month,jdbcType=VARCHAR}
+	</insert>
+	
+	<insert id="insertAccSysPerson">
+		insert into acc_cost_emp(
+			group_id,
+			hos_id,
+			copy_code,
+			year_month,
+			dept_id,
+			emp_count,
+			ft_bl,
+			state
+		)
+		select 
+		#{group_id,jdbcType=INTEGER},
+		#{hos_id,jdbcType=INTEGER},
+		#{copy_code,jdbcType=VARCHAR},
+		#{year_month,jdbcType=VARCHAR},
+		hs.dept_id,
+		count(hs.dept_id),
+		0,
+		1
+		from hos_emp hs
+		inner join hos_dept hd 
+		on hs.group_id=hd.group_id
+		and hs.hos_id=hd.hos_id 
+		and hs.dept_id=hd.dept_id 
+		where hs.is_stop = 0
+		and   hs.group_id=#{group_id,jdbcType=INTEGER}
+		and   hs.hos_id=#{hos_id,jdbcType=INTEGER}
+		and   not EXISTS(
+			   SELECT 1 FROM 
+			   acc_cost_emp b
+			   WHERE b.GROUP_ID  = hs.GROUP_ID
+			   and b.HOS_ID = hs.HOS_ID
+			   AND b.DEPT_ID = hs.DEPT_ID
+			  )
+		group by hs.dept_id
+	</insert>
+	
+	<insert id="insertAccPersonByImport" parameterType="java.util.List">
+		merge into acc_cost_emp ace using(
+		<foreach collection="list" item="item" index="index" separator="union">
+			select
+			#{item.group_id} as group_id,
+			#{item.hos_id} as hos_id,
+			#{item.copy_code} as copy_code,
+			#{item.year_month} as year_month,
+			dept_id,
+			#{item.emp_count} as emp_count,
+			#{item.ft_bl} as ft_bl,
+			#{item.state} as state
+			from hos_dept_dict
+			where group_id = #{item.group_id}
+			and   hos_id = #{item.hos_id}
+			and   dept_code = #{item.dept_code}
+		</foreach>
+		) t on (
+		ace.dept_id = t.dept_id
+		)
+		when not matched then
+		insert (
+			group_id,
+			hos_id,
+			copy_code,
+			year_month,
+			dept_id,
+			emp_count,
+			ft_bl,
+			state
+		) values (
+			t.group_id,
+			t.hos_id,
+			t.copy_code,
+			t.year_month,
+			t.dept_id,
+			t.emp_count,
+			t.ft_bl,
+			t.state
+		)
+		when matched then
+		update
+		set ace.emp_count = t.emp_count
+	</insert>
+	
+	<delete id="deletePersonCollect" parameterType="java.util.List">
+
+		delete from acc_cost_emp
+		<where>
+			<foreach collection="list" index="index" item="item" open="("
+				separator="or" close=")">
+				group_id = #{item.group_id}
+				and
+				hos_id = #{item.hos_id}
+				and
+				copy_code = #{item.copy_code}
+				and
+				year_month = #{item.year_month}
+				and
+				dept_id = #{item.dept_id}
+			</foreach>
+		</where>
+	</delete>
+	
+	<update id="updateAccPersonFtBl" parameterType="java.util.Map">
+		update acc_cost_emp
+		set
+		ft_bl = (round(emp_count/(select nvl(sum(emp_count),0) FROM acc_cost_emp
+										where group_id = #{group_id,jdbcType=INTEGER}
+										and hos_id = #{hos_id,jdbcType=INTEGER}
+										and copy_code = #{copy_code,jdbcType=VARCHAR}
+										and year_month = #{year_month,jdbcType=VARCHAR}),4)
+				)*100
+		
+		where   
+		group_id = #{group_id,jdbcType=INTEGER}
+								
+		AND hos_id = #{hos_id,jdbcType=INTEGER}
+	
+		AND copy_code = #{copy_code,jdbcType=VARCHAR}
+	
+		AND year_month = #{year_month,jdbcType=VARCHAR}
+
+	</update>
+	
+	<update id="updateAccPersonCollect" parameterType="java.util.Map">
+
+		update acc_cost_emp set
+		emp_count = #{emp_count,jdbcType=INTEGER}
+		WHERE
+		group_id = #{group_id,jdbcType=INTEGER}
+		and
+		hos_id = #{hos_id,jdbcType=INTEGER}
+		and
+		copy_code = #{copy_code,jdbcType=VARCHAR}
+		and
+		year_month = #{year_month,jdbcType=VARCHAR}
+		and
+		dept_id = #{dept_id,jdbcType=INTEGER}
+	</update>
+	
+	<update id="updateAccPersonState" parameterType="java.util.Map">
+
+		update acc_cost_emp set
+		state = #{state,jdbcType=INTEGER}
+		WHERE
+		group_id = #{group_id,jdbcType=INTEGER}
+		and
+		hos_id = #{hos_id,jdbcType=INTEGER}
+		and
+		copy_code = #{copy_code,jdbcType=VARCHAR}
+		and
+		year_month = #{year_month,jdbcType=VARCHAR}
+
+	</update>
+</mapper>
+

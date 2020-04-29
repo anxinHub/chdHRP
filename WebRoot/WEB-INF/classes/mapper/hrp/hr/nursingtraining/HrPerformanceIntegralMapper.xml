@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.hr.dao.nursingtraining.HrPerformanceIntegralMapper">
+<resultMap id="hrPerformanceIntegral" type="com.chd.hrp.hr.entity.nursingtraining.HrPerformanceIntegral">
+	<result property="group_id" column="group_id"/>
+	<result property="hos_id" column="hos_id"/>
+	<result property="year" column="year"/>
+	<result property="emp_code" column="emp_code"/>
+	<result property="emp_id" column="emp_id"/>
+	<result property="emp_name" column="emp_name"/>
+	<result property="duty_code" column="duty_code"/>
+	<result property="title_code" column="title_code"/>
+	<result property="level_code" column="level_code"/>
+	<result property="morality" column="morality"/>
+	<result property="quality" column="quality"/>
+	<result property="safety" column="safety"/>
+	<result property="resteach" column="resteach"/>
+	<result property="accessory" column="accessory"/>
+	<result property="note" column="note"/>
+	</resultMap>
+	
+	
+	<insert id="addBatch" parameterType="java.util.List" >
+	
+		INSERT INTO HR_EMP_YEAR_NURSE_SUM (
+		group_id,
+		hos_id,
+		year,
+		emp_id,
+		morality,
+		quality,
+		safety,
+		resteach,
+		accessory,
+		note
+		) (
+		<foreach collection="list" item="item" index="index" separator=" union all " >
+			select 		
+			#{item.group_id,jdbcType=INTEGER},
+			#{item.hos_id,jdbcType=INTEGER},
+			#{item.year,jdbcType=VARCHAR},
+			#{item.emp_id,jdbcType=INTEGER},
+			#{item.morality,jdbcType=INTEGER},
+			#{item.quality,jdbcType=INTEGER},
+			#{item.safety,jdbcType=INTEGER},
+			#{item.resteach,jdbcType=INTEGER},
+			#{item.accessory,jdbcType=INTEGER},
+			#{item.note,jdbcType=VARCHAR}
+		    from dual
+		</foreach>
+		)
+	</insert>
+		<delete id="deleteAll" parameterType="java.util.Map">
+	
+		DELETE FROM HR_EMP_YEAR_NURSE_SUM 
+
+	</delete>
+	
+		<delete id="deletePerformanceIntegral" parameterType="java.util.List">
+		DELETE FROM HR_EMP_YEAR_NURSE_SUM 
+		<where>
+			<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+				<if test="item.group_id != null and item.group_id != ''">
+				 group_id = #{item.group_id,jdbcType=INTEGER}
+				</if>
+				<if test="item.hos_id != null and item.hos_id != ''">
+				AND hos_id = #{item.hos_id,jdbcType=INTEGER}
+				</if>
+				<if test="item.year != null and item.year != ''">
+				AND year = #{item.year,jdbcType=VARCHAR}
+				</if>
+				<if test="item.emp_id != null and item.emp_id != ''">
+				AND emp_id = #{item.emp_id,jdbcType=INTEGER}
+				</if>
+			</foreach>
+	    </where>  
+	</delete>
+	<select id="query" parameterType="java.util.Map" resultMap="hrPerformanceIntegral" >
+	
+	with inservice_statistics as( 
+		 select hoe.emp_id,hoe.emp_code,hoe.emp_name,hde.dept_no,hde.dept_name,hd.duty_code,hd.duty_name,ht.title_code,ht.title_name,
+    t.field_col_code level_code ,t.field_col_name  level_name,hes.year,hes.morality,hes.quality,hes.safety,hes.resteach,hes.accessory
+     from HR_EMP_YEAR_NURSE_SUM hes 
+    left join hos_emp hoe on hes.emp_id=hoe.emp_id 
+    left join hr_emp_promotion hep on hes.emp_id = hep.emp_id and
+    hes.group_id=hep.group_id and hes.hos_id=hep.hos_id
+    left join hr_fiied_data t on hep.level_code =t.field_col_code and
+    field_tab_code = 'DIC_LEVEL'
+    left join hos_dept_dict hde on hoe.dept_no =hde.dept_no and
+    hoe.group_id=hde.group_id and hoe.hos_id=hde.hos_id
+    left join hr_hos_duty hhd on hoe.emp_id=hhd.emp_id and
+    hoe.group_id=hhd.group_id and hoe.hos_id=hhd.hos_id
+    left join hos_duty hd on hhd.duty_code=hd.duty_code and
+    hd.group_id=hhd.group_id and hd.hos_id=hhd.hos_id
+    left join hr_emp_technology_title het on hoe.emp_id =het.emp_id and
+    hoe.group_id=het.group_id and hoe.hos_id=het.hos_id left join hr_title ht on het.title_code=ht.title_code and
+    ht.group_id=het.group_id and ht.hos_id=het.hos_id
+    group by hoe.emp_id,hoe.emp_code,hoe.emp_name,hde.dept_no,hde.dept_name,hd.duty_code,hd.duty_name,ht.title_code,ht.title_name,
+    t.field_col_code  ,t.field_col_name ,hes.year,hes.morality,hes.quality,hes.safety,hes.resteach,hes.accessory
+		)
+     	select * from inservice_statistics inst 
+		<where>
+		<if test="edu_date!=null and edu_date !=''">
+		and inst.edu_date=#{edu_date}
+		</if>
+		<if test="emp_id !=null and emp_id !=''">
+ 		 and inst.emp_code like '%${emp_id}%'
+		</if>
+		<if test="emp_name !=null and emp_name !=''">
+		and inst.emp_name like  '%${emp_name}%'
+		</if>
+		<if test="dept_no !=null and dept_no !=''">
+ 		and inst.dept_no=#{dept_no}
+		</if>
+		<if test="duty_code !=null and duty_code !=''">
+		and  inst.duty_code=#{duty_code}
+		</if>
+		<if test="title_code !=null and title_code !=''">
+		and inst.title_code=#{title_code}
+		</if>
+		<if test="level_code !=null and level_code !=''">
+		and inst.level_code=#{level_code}
+		</if>
+		</where>
+	</select>
+</mapper>

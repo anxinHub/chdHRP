@@ -1,0 +1,475 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.acc.dao.vouch.AccVouchDifferMapper">
+
+	<resultMap id="resultMap" type="java.util.Map">
+		<result property="vouch_id" column="vouch_id" />
+		<result property="vouch_no" column="vouch_no" />
+		<result property="diff_date" column="diff_date" />
+		<result property="vouch_date" column="vouch_date" />
+		<result property="summary" column="summary" />
+		<result property="diff_money" column="diff_money" />
+		<result property="cash_user" column="cash_user" />
+		<result property="cash_name" column="cash_name" />
+		<result property="audit_user" column="audit_user" />
+		<result property="audit_name" column="audit_name" />
+		<result property="acc_user" column="acc_user" />
+		<result property="acc_name" column="acc_name" />
+		<result property="busi_type_code" column="busi_type_code" />
+		<result property="note" column="note" />
+		<result property="create_name" column="create_name" />
+		<result property="diff_item_name" column="diff_item_name" />
+	</resultMap>
+
+
+	<select id="queryDataByVouch" parameterType="java.util.Map" resultMap="resultMap">
+	select 
+		null vouch_id,
+		null vouch_no,
+		null vouch_date,
+		null diff_date,
+		'余额' summary,
+		sum(case when i.DIFF_DIRE = 0 then d.diff_money else -d.DIFF_MONEY end) diff_money,
+		null cash_user,
+		null cash_name,
+		null audit_user,
+		null audit_name,
+		null acc_user,
+		null acc_name,
+		null busi_type_code,
+		null note ,
+		null create_name
+		from acc_vouch a
+		inner join acc_vouch_type t on a.group_id = t.group_id and a.hos_id = t.hos_id  and a.copy_code = t.copy_code and a.vouch_type_code=t.vouch_type_code
+		inner join acc_vouch_diff d on a.group_id = d.group_id and a.hos_id = d.hos_id  and a.copy_code = d.copy_code and a.vouch_id=d.vouch_id
+		left join acc_diff_item i on a.group_id = i.group_id and a.hos_id = i.hos_id and a.copy_code = i.copy_code and d.diff_item_code = i.diff_item_code
+		left join sys_user c on a.group_id=c.group_id and a.hos_id=c.hos_id and a.create_user=c.user_id
+		left join sys_user b on a.group_id=b.group_id and a.hos_id=b.hos_id and a.cash_user=b.user_id
+		left join sys_user e on a.group_id=e.group_id and a.hos_id=e.hos_id and a.audit_user=e.user_id
+		left join sys_user g on a.group_id=g.group_id and a.hos_id=g.hos_id and a.acc_user=g.user_id
+		<where>
+			a.group_id = #{group_id}
+			and a.hos_id = #{hos_id}
+			and a.copy_code = #{copy_code}
+			and a.sign_flag = 1
+			<if test="diff_item_code != null and diff_item_code != ''">
+				and d.diff_item_code = #{diff_item_code}
+			</if> 
+			<if test="diff_type_code != null and diff_type_code != ''">
+				and i.diff_type_code = #{diff_type_code}
+			</if> 
+			<if test="create_date_b != null and create_date_b != '' and create_date_e != null and create_date_e != ''">
+				and a.vouch_date between to_date(#{create_date_b},'yyyy-MM-dd') and to_date(#{create_date_e},'yyyy-MM-dd')
+			</if> 
+			<if test="vouch_type_code != null and vouch_type_code != ''">
+				and a.vouch_type_code = #{vouch_type_code}
+			</if> 
+			<if test="state != null and state != ''">
+				and a.state = #{state}
+			</if> 
+			<if test="summary != null and summary != ''">
+				and d.summary like '%'|| #{summary} || '%'
+			</if> 
+			<if test="busi_type_code != null and busi_type_code != '' and busi_type_code != 'undefined' ">
+				AND a.busi_type_code = #{busi_type_code}
+			</if>
+			<if test=" busi_type_code == 'undefined'">
+				AND a.busi_type_code is null
+			</if>
+			<if test="vouch_no_b != null and vouch_no_b != ''">
+				AND a.vouch_no &gt;= to_number(#{vouch_no_b})
+			</if>
+			<if test="vouch_no_e != null and vouch_no_e != ''">
+				AND a.vouch_no &lt;= to_number(#{vouch_no_e})
+			</if>				
+			<if test="create_user != null and create_user != ''">
+				AND a.create_user = #{create_user}
+			</if>
+			<if test="create_date != null and create_date != ''">
+				AND a.vouch_date = #{create_date}
+			</if>
+			<if test="cash_user != null and cash_user != ''">
+				AND a.cash_user = #{cash_user}
+			</if>				
+			<if test="audit_user != null and audit_user != ''">
+				AND a.audit_user = #{audit_user}
+			</if>				
+			<if test="acc_user != null and acc_user != ''">
+				AND a.acc_user = #{acc_user}
+			</if>			
+			<if test='note =="1" '>
+				and a.note is not null
+			</if>					
+			<if test="(subj_code_b!=null and subj_code_b != '') or (subj_code_e != null and subj_code_e != '') or  (money!=null and money != '') or (sumMoney!=null and sumMoney  != '')">
+		    	and exists(
+		         	select 1 from acc_vouch_detail b1 
+		         	left join  acc_vouch_check avc on avc.group_id =b1.group_id 
+		              and avc.hos_id =b1.hos_id 
+		              and avc.copy_code =b1.copy_code 
+		              and avc.vouch_id =b1.vouch_id 
+		              and avc.vouch_detail_id =b1.vouch_detail_id
+		         	LEFT JOIN acc_subj asubj ON b1.group_id = asubj.group_id
+		              AND b1.hos_id = asubj.hos_id
+		              AND b1.copy_code = asubj.copy_code
+		              AND b1.acc_year = asubj.acc_year
+		              AND b1.subj_code = asubj.subj_code
+		         	where b1.group_id=#{group_id} and b1.hos_id=#{hos_id}  and b1.copy_code=#{copy_code} 
+	         		and a.vouch_id=b1.vouch_id
+					<choose>
+						<when test="subj_code_b != null and subj_code_b != '' and  subj_code_e != null and subj_code_e != ''">
+							and asubj.subj_code between #{subj_code_b} and '${subj_code_e}%'
+						</when>
+						<otherwise>
+							<if test="subj_code_b != null and subj_code_b != ''">
+								AND asubj.subj_code like '${subj_code_b}%'
+							</if>
+							<if test="subj_code_e != null and subj_code_e != ''">
+								AND asubj.subj_code like '${subj_code_e}%'
+							</if>
+						</otherwise>
+					</choose>
+	     		)
+     		</if>	
+		</where>
+		<if test="money != null and money != '' and sumMoney != null and sumMoney != ''">
+			having sum(d.diff_money) between #{money} and #{sumMoney}
+		</if> 
+		
+		union all
+		
+		select a.vouch_id,
+		t.vouch_type_short||'-'||a.vouch_no vouch_no,
+		a.vouch_date,
+		d.diff_date,
+		(select d.summary from acc_vouch_diff d 
+		where a.group_id = d.group_id and a.hos_id = d.hos_id  and a.copy_code = d.copy_code and a.vouch_id=d.vouch_id and d.diff_id=1) summary,
+		sum(d.diff_money) diff_money,
+		a.cash_user,
+		b.user_name cash_name,
+		a.audit_user,
+		e.user_name audit_name,
+		a.acc_user,
+		g.user_name acc_name,
+		a.busi_type_code,
+		a.note ,
+		c.user_name create_name
+		from acc_vouch a
+		inner join acc_vouch_type t on a.group_id = t.group_id and a.hos_id = t.hos_id  and a.copy_code = t.copy_code and a.vouch_type_code=t.vouch_type_code
+		inner join acc_vouch_diff d on a.group_id = d.group_id and a.hos_id = d.hos_id  and a.copy_code = d.copy_code and a.vouch_id=d.vouch_id
+		left join acc_diff_item i on a.group_id = i.group_id and a.hos_id = i.hos_id and a.copy_code = i.copy_code and d.diff_item_code = i.diff_item_code
+		left join sys_user c on a.group_id=c.group_id and a.hos_id=c.hos_id and a.create_user=c.user_id
+		left join sys_user b on a.group_id=b.group_id and a.hos_id=b.hos_id and a.cash_user=b.user_id
+		left join sys_user e on a.group_id=e.group_id and a.hos_id=e.hos_id and a.audit_user=e.user_id
+		left join sys_user g on a.group_id=g.group_id and a.hos_id=g.hos_id and a.acc_user=g.user_id
+		<where>
+			a.group_id = #{group_id}
+			and a.hos_id = #{hos_id}
+			and a.copy_code = #{copy_code}
+			and a.sign_flag = 1
+			<if test="diff_item_code != null and diff_item_code != ''">
+				and d.diff_item_code = #{diff_item_code}
+			</if> 
+			<if test="diff_type_code != null and diff_type_code != ''">
+				and i.diff_type_code = #{diff_type_code}
+			</if> 
+			<if test="create_date_b != null and create_date_b != '' and create_date_e != null and create_date_e != ''">
+				and a.vouch_date between to_date(#{create_date_b},'yyyy-MM-dd') and to_date(#{create_date_e},'yyyy-MM-dd')
+			</if> 
+			<if test="vouch_type_code != null and vouch_type_code != ''">
+				and a.vouch_type_code = #{vouch_type_code}
+			</if> 
+			<if test="state != null and state != ''">
+				and a.state = #{state}
+			</if> 
+			<if test="summary != null and summary != ''">
+				and d.summary like '%'|| #{summary} || '%'
+			</if> 
+			<if test="busi_type_code != null and busi_type_code != '' and busi_type_code != 'undefined' ">
+				AND a.busi_type_code = #{busi_type_code}
+			</if>
+			<if test=" busi_type_code == 'undefined'">
+				AND a.busi_type_code is null
+			</if>
+			<if test="vouch_no_b != null and vouch_no_b != ''">
+				AND a.vouch_no &gt;= to_number(#{vouch_no_b})
+			</if>
+			<if test="vouch_no_e != null and vouch_no_e != ''">
+				AND a.vouch_no &lt;= to_number(#{vouch_no_e})
+			</if>				
+			<if test="create_user != null and create_user != ''">
+				AND a.create_user = #{create_user}
+			</if>
+			<if test="create_date != null and create_date != ''">
+				AND a.vouch_date = #{create_date}
+			</if>
+			<if test="cash_user != null and cash_user != ''">
+				AND a.cash_user = #{cash_user}
+			</if>				
+			<if test="audit_user != null and audit_user != ''">
+				AND a.audit_user = #{audit_user}
+			</if>				
+			<if test="acc_user != null and acc_user != ''">
+				AND a.acc_user = #{acc_user}
+			</if>			
+			<if test='note =="1" '>
+				and a.note is not null
+			</if>					
+			<if test="(subj_code_b!=null and subj_code_b != '') or (subj_code_e != null and subj_code_e != '') or  (money!=null and money != '') or (sumMoney!=null and sumMoney  != '')">
+		    	and exists(
+		         	select 1 from acc_vouch_detail b1 
+		         	left join  acc_vouch_check avc on avc.group_id =b1.group_id 
+		              and avc.hos_id =b1.hos_id 
+		              and avc.copy_code =b1.copy_code 
+		              and avc.vouch_id =b1.vouch_id 
+		              and avc.vouch_detail_id =b1.vouch_detail_id
+		         	LEFT JOIN acc_subj asubj ON b1.group_id = asubj.group_id
+		              AND b1.hos_id = asubj.hos_id
+		              AND b1.copy_code = asubj.copy_code
+		              AND b1.acc_year = asubj.acc_year
+		              AND b1.subj_code = asubj.subj_code
+		         	where b1.group_id=#{group_id} and b1.hos_id=#{hos_id}  and b1.copy_code=#{copy_code} 
+	         		and a.vouch_id=b1.vouch_id
+					<choose>
+						<when test="subj_code_b != null and subj_code_b != '' and  subj_code_e != null and subj_code_e != ''">
+							and asubj.subj_code between #{subj_code_b} and '${subj_code_e}%'
+						</when>
+						<otherwise>
+							<if test="subj_code_b != null and subj_code_b != ''">
+								AND asubj.subj_code like '${subj_code_b}%'
+							</if>
+							<if test="subj_code_e != null and subj_code_e != ''">
+								AND asubj.subj_code like '${subj_code_e}%'
+							</if>
+						</otherwise>
+					</choose>
+	     		)
+     		</if>	
+		</where>
+		group by a.group_id,a.hos_id,a.copy_code,a.vouch_id,t.vouch_type_short,a.vouch_no,d.diff_date,a.cash_user,a.audit_user,a.acc_user,a.busi_type_code,a.note,b.user_name
+		,e.user_name,g.user_name,c.user_name,a.vouch_date
+		<if test="money != null and money != '' and sumMoney != null and sumMoney != ''">
+			having sum(d.diff_money) between #{money} and #{sumMoney}
+		</if> 
+	</select>
+	
+	<select id="queryDataByDiffer" parameterType="java.util.Map" resultMap="resultMap">
+	select 
+		null vouch_id,
+		null vouch_no,
+		null diff_date,
+		null vouch_date,
+		null diff_item_name,
+		'余额' summary,
+		sum(case when m.DIFF_DIRE = 0 then d.diff_money else -d.DIFF_MONEY end) diff_money,
+		null busi_type_code,
+		null note,
+		null cash_user,
+		null cash_name,
+		null audit_user,
+		null audit_name,
+		null acc_user,
+		null acc_name,
+		null create_name
+		from acc_vouch a
+		inner join acc_vouch_type t on a.group_id = t.group_id and a.hos_id = t.hos_id  and a.copy_code = t.copy_code and a.vouch_type_code=t.vouch_type_code
+		inner join acc_vouch_diff d on a.group_id = d.group_id and a.hos_id = d.hos_id  and a.copy_code = d.copy_code and a.vouch_id=d.vouch_id
+		inner join acc_diff_item m on  a.group_id = m.group_id and a.hos_id = m.hos_id  and a.copy_code = m.copy_code and d.diff_item_code=m.diff_item_code
+		left join sys_user c on a.group_id=c.group_id and a.hos_id=c.hos_id and a.create_user=c.user_id
+		left join sys_user b on a.group_id=b.group_id and a.hos_id=b.hos_id and a.cash_user=b.user_id
+		left join sys_user e on a.group_id=e.group_id and a.hos_id=e.hos_id and a.audit_user=e.user_id
+		left join sys_user g on a.group_id=g.group_id and a.hos_id=g.hos_id and a.acc_user=g.user_id
+		<where>
+			a.group_id = #{group_id}
+			and a.hos_id = #{hos_id}
+			and a.copy_code = #{copy_code}
+			and a.sign_flag = 1
+			<if test="diff_item_code != null and diff_item_code != ''">
+				and d.diff_item_code = #{diff_item_code}
+			</if> 
+			<if test="diff_type_code != null and diff_type_code != ''">
+				and m.diff_type_code = #{diff_type_code}
+			</if> 
+			<if test="create_date_b != null and create_date_b != '' and create_date_e != null and create_date_e != ''">
+				and a.vouch_date between to_date(#{create_date_b},'yyyy-MM-dd') and to_date(#{create_date_e},'yyyy-MM-dd')
+			</if> 
+			<if test="vouch_type_code != null and vouch_type_code != ''">
+				and a.vouch_type_code = #{vouch_type_code}
+			</if> 
+			<if test="state != null and state != ''">
+				and a.state = #{state}
+			</if> 
+			<if test="summary != null and summary != ''">
+				and d.summary like '%'|| #{summary} || '%'
+			</if> 
+			<if test="money != null and money != '' and sumMoney != null and sumMoney != ''">
+				and d.diff_money between #{money} and #{sumMoney}
+			</if> 
+			<if test="busi_type_code != null and busi_type_code != '' and busi_type_code != 'undefined' ">
+				AND a.busi_type_code = #{busi_type_code}
+			</if>
+			<if test=" busi_type_code == 'undefined'">
+				AND a.busi_type_code is null
+			</if>
+			<if test="vouch_no_b != null and vouch_no_b != ''">
+				AND a.vouch_no &gt;= to_number(#{vouch_no_b})
+			</if>
+			<if test="vouch_no_e != null and vouch_no_e != ''">
+				AND a.vouch_no &lt;= to_number(#{vouch_no_e})
+			</if>				
+			<if test="create_user != null and create_user != ''">
+				AND a.create_user = #{create_user}
+			</if>
+			<if test="create_date != null and create_date != ''">
+				AND a.vouch_date = #{create_date}
+			</if>
+			<if test="cash_user != null and cash_user != ''">
+				AND a.cash_user = #{cash_user}
+			</if>				
+			<if test="audit_user != null and audit_user != ''">
+				AND a.audit_user = #{audit_user}
+			</if>				
+			<if test="acc_user != null and acc_user != ''">
+				AND a.acc_user = #{acc_user}
+			</if>			
+			<if test='note =="1" '>
+				and a.note is not null
+			</if>					
+			<if test="(subj_code_b!=null and subj_code_b != '') or (subj_code_e != null and subj_code_e != '') or  (money!=null and money != '') or (sumMoney!=null and sumMoney  != '')">
+		    	and exists(
+		         	select 1 from acc_vouch_detail b1 
+		         	left join  acc_vouch_check avc on avc.group_id =b1.group_id 
+		              and avc.hos_id =b1.hos_id 
+		              and avc.copy_code =b1.copy_code 
+		              and avc.vouch_id =b1.vouch_id 
+		              and avc.vouch_detail_id =b1.vouch_detail_id
+		         	LEFT JOIN acc_subj asubj ON b1.group_id = asubj.group_id
+		              AND b1.hos_id = asubj.hos_id
+		              AND b1.copy_code = asubj.copy_code
+		              AND b1.acc_year = asubj.acc_year
+		              AND b1.subj_code = asubj.subj_code
+		         	where b1.group_id=#{group_id} and b1.hos_id=#{hos_id}  and b1.copy_code=#{copy_code} 
+	         		and a.vouch_id=b1.vouch_id
+					<choose>
+						<when test="subj_code_b != null and subj_code_b != '' and  subj_code_e != null and subj_code_e != ''">
+							and asubj.subj_code between #{subj_code_b} and '${subj_code_e}%'
+						</when>
+						<otherwise>
+							<if test="subj_code_b != null and subj_code_b != ''">
+								AND asubj.subj_code like '${subj_code_b}%'
+							</if>
+							<if test="subj_code_e != null and subj_code_e != ''">
+								AND asubj.subj_code like '${subj_code_e}%'
+							</if>
+						</otherwise>
+					</choose>
+	     		)
+     		</if>	
+		</where>
+		union all
+		select a.vouch_id,t.vouch_type_short||'-'||a.vouch_no vouch_no,d.diff_date,a.vouch_date,m.diff_item_name,d.summary,d.diff_money,
+		a.busi_type_code,a.note,
+		a.cash_user,
+		b.user_name cash_name,
+		a.audit_user,
+		e.user_name audit_name,
+		a.acc_user,
+		g.user_name acc_name,
+		c.user_name create_name
+		from acc_vouch a
+		inner join acc_vouch_type t on a.group_id = t.group_id and a.hos_id = t.hos_id  and a.copy_code = t.copy_code and a.vouch_type_code=t.vouch_type_code
+		inner join acc_vouch_diff d on a.group_id = d.group_id and a.hos_id = d.hos_id  and a.copy_code = d.copy_code and a.vouch_id=d.vouch_id
+		inner join acc_diff_item m on  a.group_id = m.group_id and a.hos_id = m.hos_id  and a.copy_code = m.copy_code and d.diff_item_code=m.diff_item_code
+		left join sys_user c on a.group_id=c.group_id and a.hos_id=c.hos_id and a.create_user=c.user_id
+		left join sys_user b on a.group_id=b.group_id and a.hos_id=b.hos_id and a.cash_user=b.user_id
+		left join sys_user e on a.group_id=e.group_id and a.hos_id=e.hos_id and a.audit_user=e.user_id
+		left join sys_user g on a.group_id=g.group_id and a.hos_id=g.hos_id and a.acc_user=g.user_id
+		<where>
+			a.group_id = #{group_id}
+			and a.hos_id = #{hos_id}
+			and a.copy_code = #{copy_code}
+			and a.sign_flag = 1
+			<if test="diff_item_code != null and diff_item_code != ''">
+				and d.diff_item_code = #{diff_item_code}
+			</if> 
+			<if test="diff_type_code != null and diff_type_code != ''">
+				and m.diff_type_code = #{diff_type_code}
+			</if> 
+			<if test="create_date_b != null and create_date_b != '' and create_date_e != null and create_date_e != ''">
+				and a.vouch_date between to_date(#{create_date_b},'yyyy-MM-dd') and to_date(#{create_date_e},'yyyy-MM-dd')
+			</if> 
+			<if test="vouch_type_code != null and vouch_type_code != ''">
+				and a.vouch_type_code = #{vouch_type_code}
+			</if> 
+			<if test="state != null and state != ''">
+				and a.state = #{state}
+			</if> 
+			<if test="summary != null and summary != ''">
+				and d.summary like '%'|| #{summary} || '%'
+			</if> 
+			<if test="money != null and money != '' and sumMoney != null and sumMoney != ''">
+				and d.diff_money between #{money} and #{sumMoney}
+			</if> 
+			<if test="busi_type_code != null and busi_type_code != '' and busi_type_code != 'undefined' ">
+				AND a.busi_type_code = #{busi_type_code}
+			</if>
+			<if test=" busi_type_code == 'undefined'">
+				AND a.busi_type_code is null
+			</if>
+			<if test="vouch_no_b != null and vouch_no_b != ''">
+				AND a.vouch_no &gt;= to_number(#{vouch_no_b})
+			</if>
+			<if test="vouch_no_e != null and vouch_no_e != ''">
+				AND a.vouch_no &lt;= to_number(#{vouch_no_e})
+			</if>				
+			<if test="create_user != null and create_user != ''">
+				AND a.create_user = #{create_user}
+			</if>
+			<if test="create_date != null and create_date != ''">
+				AND a.vouch_date = #{create_date}
+			</if>
+			<if test="cash_user != null and cash_user != ''">
+				AND a.cash_user = #{cash_user}
+			</if>				
+			<if test="audit_user != null and audit_user != ''">
+				AND a.audit_user = #{audit_user}
+			</if>				
+			<if test="acc_user != null and acc_user != ''">
+				AND a.acc_user = #{acc_user}
+			</if>			
+			<if test='note =="1" '>
+				and a.note is not null
+			</if>					
+			<if test="(subj_code_b!=null and subj_code_b != '') or (subj_code_e != null and subj_code_e != '') or  (money!=null and money != '') or (sumMoney!=null and sumMoney  != '')">
+		    	and exists(
+		         	select 1 from acc_vouch_detail b1 
+		         	left join  acc_vouch_check avc on avc.group_id =b1.group_id 
+		              and avc.hos_id =b1.hos_id 
+		              and avc.copy_code =b1.copy_code 
+		              and avc.vouch_id =b1.vouch_id 
+		              and avc.vouch_detail_id =b1.vouch_detail_id
+		         	LEFT JOIN acc_subj asubj ON b1.group_id = asubj.group_id
+		              AND b1.hos_id = asubj.hos_id
+		              AND b1.copy_code = asubj.copy_code
+		              AND b1.acc_year = asubj.acc_year
+		              AND b1.subj_code = asubj.subj_code
+		         	where b1.group_id=#{group_id} and b1.hos_id=#{hos_id}  and b1.copy_code=#{copy_code} 
+	         		and a.vouch_id=b1.vouch_id
+					<choose>
+						<when test="subj_code_b != null and subj_code_b != '' and  subj_code_e != null and subj_code_e != ''">
+							and asubj.subj_code between #{subj_code_b} and '${subj_code_e}%'
+						</when>
+						<otherwise>
+							<if test="subj_code_b != null and subj_code_b != ''">
+								AND asubj.subj_code like '${subj_code_b}%'
+							</if>
+							<if test="subj_code_e != null and subj_code_e != ''">
+								AND asubj.subj_code like '${subj_code_e}%'
+							</if>
+						</otherwise>
+					</choose>
+	     		)
+     		</if>	
+		</where>
+	</select>
+</mapper>
+

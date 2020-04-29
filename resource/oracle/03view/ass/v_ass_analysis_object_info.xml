@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+
+	<sql id="v_ass_analysis_object_info" type="view" desc="效益分析分析项信息 "><![CDATA[
+		create or replace view v_ass_analysis_object_info as
+			select a.group_id , a.hos_id , a.copy_code, a.analysis_code ,a.analysis_name, to_char(c.in_date,'yyyy') year ,
+		           to_char(c.in_date,'mm') month , sum(nvl(d.price,0)*nvl(d.in_amount,0)) money ,-- 采购金额/原值
+		           sum(nvl(c.depre_money,0)) depre_money ,--累计折旧
+		           null acc_depre_amount ,-- 折旧年限
+		           sum(nvl(c.manage_depre_money,0)) manage_depre_money, -- 累计分摊
+		           null ass_spec , -- 规格
+		           null price , --  单价
+		           count(1) amount , --  设备数量
+		           c.dept_id || ',' || c.dept_no dept_id -- 科室
+		      from ass_benefit_analysis_object a
+		      left join ass_eq_unit_detail b
+		            on a.group_id = b.group_id
+		           and a.hos_id = b.hos_id
+		           and a.copy_code = b.copy_code
+		           and a.analysis_code = b.eq_unit_code
+		      left join V_ASS_CARD c
+		           on b.group_id = c.group_id
+		           and b.hos_id = c.hos_id
+		           and b.copy_code = c.copy_code
+		           and b.eo_eq_group = c.ass_card_no
+		      left join V_ASS_IN_DETAIL d
+		           on c.group_id = d.group_id
+		           and c.hos_id = d.hos_id
+		           and c.copy_code = d.copy_code
+		           and c.ass_in_no = d.ass_in_no
+		           and c.ass_id = d.ass_id
+		           and c.ass_no = d.ass_no
+		      where a.analysis_attribute = '01'
+		      group  by a.group_id , a.hos_id , a.copy_code, a.analysis_code ,a.analysis_name,  c.in_date , c.dept_id , c.dept_no
+		
+		union all
+		      select a.group_id , a.hos_id , a.copy_code, a.analysis_code ,a.analysis_name, to_char(c.in_date,'yyyy') year ,
+		           to_char(c.in_date,'mm') month , c.price money ,-- 采购金额/原值
+		           depre_money ,--累计折旧
+		           acc_depre_amount ,-- 折旧年限
+		           manage_depre_money , -- 累计分摊
+		           c.ass_spec , --  规格
+		           c.price , -- 单价
+		           1 amount , -- 设备数量
+		           c.dept_id || ',' || c.dept_no dept_id -- 科室
+		      from ass_benefit_analysis_object a
+		      left join V_ASS_CARD c
+		           on a.group_id = c.group_id
+		           and a.hos_id = c.hos_id
+		           and a.copy_code = c.copy_code
+		           and a.analysis_code = c.ass_card_no
+		      left join V_ASS_IN_DETAIL d
+		           on c.group_id = d.group_id
+		           and c.hos_id = d.hos_id
+		           and c.copy_code = d.copy_code
+		           and c.ass_in_no = d.ass_in_no
+		           and c.ass_id = d.ass_id
+		           and c.ass_no = d.ass_no
+		      where a.analysis_attribute = '02';
+	]]></sql>
+</root>

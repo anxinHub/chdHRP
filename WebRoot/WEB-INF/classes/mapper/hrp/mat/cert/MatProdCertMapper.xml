@@ -1,0 +1,560 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.mat.dao.cert.MatProdCertMapper">
+	<!-- 定义产品注册证数据集 -->
+	<resultMap id="matProdCert" type="java.util.Map">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="cert_type_code" column="cert_type_code"/>
+		<result property="cert_type_name" column="cert_type_name"/>
+		<result property="cert_id" column="cert_id"/>
+		<result property="cert_code" column="cert_code"/>
+		<result property="prod_name" column="prod_name"/>
+		<result property="prod_alias" column="prod_alias"/>
+		<result property="fac_id" column="fac_id"/>
+		<result property="fac_code" column="fac_code"/>
+		<result property="fac_name" column="fac_name"/>
+		<result property="start_date" column="start_date"/>
+		<result property="end_date" column="end_date"/>
+		<result property="is_long" column="is_long"/>
+		<result property="cert_date" column="cert_date"/>
+		<result property="is_new" column="is_new"/>
+		<result property="is_new_name" column="is_new_name"/>
+		<result property="check_state" column="check_state"/>
+		<result property="check_state_name" column="check_state_name"/>
+		<result property="is_stop" column="is_stop"/>
+		<result property="is_stop_name" column="is_stop_name"/>
+		<result property="authent_state" column="authent_state"/>
+		<result property="authent_state_name" column="authent_state_name"/>
+		<result property="date_state" column="date_state"/>
+		<result property="new_cert_id" column="new_cert_id"/>
+		<result property="new_cert_info" column="new_cert_info"/>
+		<result property="old_cert_id" column="old_cert_id"/>
+		<result property="old_cert_info" column="old_cert_info"/>
+		<result property="inv_count" column="inv_count"/>
+	</resultMap>
+	
+	<!-- 产品注册证列表查询 -->
+	<select id="queryMatProdCertList" parameterType="java.util.Map" resultMap="matProdCert">
+		SELECT a.group_id, a.hos_id, a.copy_code, b.cert_type_name, 
+			a.cert_id, a.cert_code, a.prod_name, c.fac_code, c.fac_name, a.cert_date, 
+			a.is_new, a.check_state, a.is_stop, a.authent_state, d.inv_count, 
+			case a.is_new when 1 then '是' else '否' end is_new_name, 
+			case a.check_state when 1 then '未审核' else '已审核' end check_state_name, 
+			case a.is_stop when 1 then '停用' else '在用' end is_stop_name, 
+			case a.authent_state when 0 then '缺失' when 1 then '未认证' else '已认证' end authent_state_name, 
+			case a.is_long when 1 then '未过期' else case when a.end_date &lt; sysdate then '已过期' else '未过期' end end date_state
+		FROM mat_prod_cert a 
+		LEFT JOIN mat_cert_type b 
+			ON a.group_id = b.group_id 
+			AND a.hos_id = b.hos_id 
+			AND a.copy_code = b.copy_code 
+			AND a.cert_type_code = b.cert_type_code 
+		LEFT JOIN hos_fac c 
+			ON a.group_id = c.group_id 
+			AND a.hos_id = c.hos_id 
+			AND a.fac_id = c.fac_id 
+		LEFT JOIN (
+			SELECT cert_id, count(1) inv_count
+			FROM mat_prod_cert_inv
+			WHERE group_id = #{group_id,jdbcType=INTEGER}
+				AND hos_id = #{hos_id,jdbcType=INTEGER}
+				AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			GROUP BY cert_id
+		) d 
+			ON a.cert_id = d.cert_id 
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			<if test="start_date != null and start_date != ''">
+			AND a.start_date &gt;= #{start_date,jdbcType=DATE}
+			</if>
+			<if test="end_date != null and end_date != ''">
+			AND (a.is_long = 1 or a.end_date &lt;= #{end_date,jdbcType=DATE})
+			</if>
+			<if test="cert_text != null and cert_text != ''">
+			AND (
+				a.cert_code like '%'||#{cert_text,jdbcType=VARCHAR}||'%'
+				or
+				a.prod_name like '%'||#{cert_text,jdbcType=VARCHAR}||'%'
+			)
+			</if>
+			<if test="cert_type_text != null and cert_type_text != ''">
+			AND (
+				b.cert_type_code like '%' || #{cert_type_text,jdbcType=VARCHAR} || '%'
+				or 
+				b.cert_type_name like '%' || #{cert_type_text,jdbcType=VARCHAR} || '%'
+				or 
+				b.spell_code like '%' || #{cert_type_text,jdbcType=VARCHAR} || '%'
+			)
+			</if>
+			<if test="fac_text != null and fac_text != ''">
+			AND (
+				c.fac_code like '%' || #{fac_text,jdbcType=VARCHAR} || '%'
+				or 
+				c.fac_name like '%' || #{fac_text,jdbcType=VARCHAR} || '%'
+				or 
+				c.spell_code like '%' || #{fac_text,jdbcType=VARCHAR} || '%'
+			)
+			</if>
+			<if test="authent_state != null and authent_state != ''">
+			AND a.authent_state = #{authent_state,jdbcType=INTEGER}
+			</if>
+			<if test="is_stop != null and is_stop != ''">
+			AND a.is_stop = #{is_stop,jdbcType=INTEGER}
+			</if>
+		ORDER BY a.oper_date desc, a.cert_id
+	</select>
+	
+	<!-- 产品注册证查询 -->
+	<select id="queryMatProdCertById" parameterType="java.util.Map" resultMap="matProdCert">
+		SELECT a.group_id, a.hos_id, a.copy_code, a.cert_type_code, b.cert_type_name, 
+			a.cert_id, a.cert_code, a.prod_name, a.prod_alias, a.fac_id, c.fac_code, c.fac_name, 
+			a.start_date, a.end_date, a.is_long, a.cert_date, a.is_new, a.check_state, a.is_stop, 
+			a.authent_state, a.new_cert_id, a.new_cert_info, a.old_cert_id, a.old_cert_info, 
+			case a.check_state when 1 then '未审核' else '已审核' end check_state_name, 
+			case a.authent_state when 0 then '缺失' when 1 then '未认证' else '已认证' end authent_state_name, 
+			case a.is_long when 1 then '未过期' else case when a.end_date &lt; sysdate then '已过期' else '未过期' end end date_state
+		FROM mat_prod_cert a 
+		LEFT JOIN mat_cert_type b 
+			ON a.group_id = b.group_id 
+			AND a.hos_id = b.hos_id 
+			AND a.copy_code = b.copy_code 
+			AND a.cert_type_code = b.cert_type_code 
+		LEFT JOIN hos_fac c 
+			ON a.group_id = c.group_id 
+			AND a.hos_id = c.hos_id 
+			AND a.fac_id = c.fac_id 
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND a.cert_id = #{cert_id,jdbcType=BIGINT}
+	</select>
+	
+	<!-- 产品注册证新增 -->
+	<insert id="addMatProdCert" parameterType="java.util.Map">
+		INSERT INTO mat_prod_cert(
+			group_id, hos_id, copy_code, cert_id, cert_code, prod_name, prod_alias, 
+			fac_id, cert_type_code, start_date, end_date, is_long, cert_date, com_from, 
+			is_stop, oper_date, oper_name, check_state, authent_state, 
+			is_new, new_cert_id, new_cert_info, old_cert_id, old_cert_info, note
+		)
+		VALUES(
+			#{group_id,jdbcType=INTEGER}, 
+			#{hos_id,jdbcType=INTEGER},
+			#{copy_code,jdbcType=VARCHAR}, 
+			#{cert_id,jdbcType=BIGINT}, 
+			#{cert_code,jdbcType=VARCHAR}, 
+			#{prod_name,jdbcType=VARCHAR}, 
+			#{prod_alias,jdbcType=VARCHAR}, 
+			#{fac_id,jdbcType=INTEGER},
+			#{cert_type_code,jdbcType=VARCHAR}, 
+			#{start_date,jdbcType=DATE}, 
+			#{end_date,jdbcType=DATE}, 
+			#{is_long,jdbcType=INTEGER}, 
+			#{cert_date,jdbcType=VARCHAR}, 
+			#{com_from,jdbcType=INTEGER},
+			#{is_stop,jdbcType=INTEGER},
+			#{oper_date,jdbcType=TIMESTAMP},
+			#{oper_name,jdbcType=VARCHAR}, 
+			#{check_state,jdbcType=INTEGER}, 
+			#{authent_state,jdbcType=INTEGER}, 
+			#{is_new,jdbcType=INTEGER}, 
+			#{new_cert_id,jdbcType=BIGINT}, 
+			#{new_cert_info,jdbcType=VARCHAR}, 
+			#{old_cert_id,jdbcType=BIGINT}, 
+			#{old_cert_info,jdbcType=VARCHAR}, 
+			#{note,jdbcType=VARCHAR}
+		)
+	</insert>
+	
+	<!-- 更新老证信息 -->
+	<update id="updateMatProdCertToOld" parameterType="java.util.Map">
+		UPDATE mat_prod_cert 
+		SET is_new = 0, 
+			new_cert_id = #{cert_id,jdbcType=BIGINT}, 
+			new_cert_info = #{cert_code,jdbcType=VARCHAR} || ' ' || #{cert_date,jdbcType=VARCHAR}, 
+			changer = #{changer,jdbcType=VARCHAR}, 
+			change_date = #{change_date,jdbcType=TIMESTAMP}, 
+			change_note = #{change_note,jdbcType=VARCHAR}
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND cert_id = #{old_cert_id,jdbcType=BIGINT}
+	</update>
+	<!-- 复制老证材料信息 -->
+	<insert id="addMatProdCertInvByCopyOld" parameterType="java.util.Map">
+		INSERT INTO mat_prod_cert_inv(
+	 		group_id, hos_id, copy_code, cert_id, cert_code, inv_id 
+	 	)
+	 	SELECT group_id, hos_id, copy_code, #{cert_id,jdbcType=BIGINT}, #{cert_code,jdbcType=VARCHAR}, inv_id 
+	 	FROM mat_prod_cert_inv
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND cert_id = #{old_cert_id,jdbcType=BIGINT}
+	</insert>
+	
+	<!-- 产品注册证修改 -->
+	<update id="updateMatProdCert" parameterType="java.util.Map">
+		UPDATE mat_prod_cert 
+		SET cert_code = #{cert_code,jdbcType=VARCHAR}, 
+			prod_name = #{prod_name,jdbcType=VARCHAR},
+			fac_id = #{fac_id,jdbcType=INTEGER},  
+			cert_type_code = #{cert_type_code,jdbcType=VARCHAR}, 
+			start_date = #{start_date,jdbcType=DATE}, 
+			end_date = #{end_date,jdbcType=DATE}, 
+			is_long = #{is_long,jdbcType=INTEGER}, 
+			cert_date = #{cert_date,jdbcType=VARCHAR}, 
+			prod_alias = #{prod_alias,jdbcType=VARCHAR},
+			is_stop = #{is_stop,jdbcType=INTEGER}, 
+			oper_name = #{oper_name,jdbcType=VARCHAR}, 
+			oper_date = #{oper_date,jdbcType=TIMESTAMP}, 
+			note = #{note,jdbcType=VARCHAR}
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND cert_id = #{cert_id,jdbcType=BIGINT}
+	</update>
+	
+	<!-- 修改对应关系中证件编号字段 -->
+	<update id="updateMatProdCertInvForCertCode" parameterType="java.util.Map">
+		UPDATE mat_prod_cert_inv
+		SET cert_code = #{cert_code,jdbcType=VARCHAR}
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND cert_id = #{cert_id,jdbcType=BIGINT}
+	</update>
+	
+	<!-- 产品注册证修改停用标志 -->
+	<update id="updateMatProdCertIsStop" parameterType="java.util.Map">
+		UPDATE mat_prod_cert 
+		SET is_stop = #{map.is_stop,jdbcType=INTEGER}, 
+			oper_name = #{map.oper_name,jdbcType=VARCHAR}, 
+			oper_date = #{map.oper_date,jdbcType=TIMESTAMP}
+		WHERE group_id = #{map.group_id,jdbcType=INTEGER}
+			AND hos_id = #{map.hos_id,jdbcType=INTEGER}
+			AND copy_code = #{map.copy_code,jdbcType=VARCHAR}
+			AND cert_id in(
+				<foreach collection="list" item="item" separator="union all">
+				SELECT #{item.cert_id,jdbcType=BIGINT} cert_id FROM dual
+				</foreach>
+			)
+	</update>
+	
+	<!-- 产品注册证修改认证标志 -->
+	<update id="updateMatProdCertAuthentState" parameterType="java.util.Map">
+		UPDATE mat_prod_cert 
+		SET authent_state = #{map.authent_state,jdbcType=INTEGER}, 
+			authenter = #{map.authenter,jdbcType=VARCHAR}, 
+			authent_date = #{map.authent_date,jdbcType=TIMESTAMP}
+		WHERE group_id = #{map.group_id,jdbcType=INTEGER}
+			AND hos_id = #{map.hos_id,jdbcType=INTEGER}
+			AND copy_code = #{map.copy_code,jdbcType=VARCHAR}
+			AND cert_id in(
+				<foreach collection="list" item="item" separator="union all">
+				SELECT #{item.cert_id,jdbcType=BIGINT} cert_id FROM dual
+				</foreach>
+			)
+	</update>
+	
+	<!-- 产品注册证修改审核标志 -->
+	<update id="updateMatProdCertCheckState" parameterType="java.util.Map">
+		UPDATE mat_prod_cert 
+		SET check_state = #{map.check_state,jdbcType=INTEGER}, 
+			checker = #{map.checker,jdbcType=VARCHAR}, 
+			check_date = #{map.check_date,jdbcType=TIMESTAMP}
+		WHERE group_id = #{map.group_id,jdbcType=INTEGER}
+			AND hos_id = #{map.hos_id,jdbcType=INTEGER}
+			AND copy_code = #{map.copy_code,jdbcType=VARCHAR}
+			AND cert_id in(
+				<foreach collection="list" item="item" separator="union all">
+				SELECT #{item.cert_id,jdbcType=BIGINT} cert_id FROM dual
+				</foreach>
+			)
+	</update>
+	
+	<!-- 产品注册证删除 -->
+	<delete id="deleteMatProdCert" parameterType="java.util.Map">
+		BEGIN
+			DELETE FROM mat_prod_cert_inv
+			WHERE group_id = #{map.group_id,jdbcType=INTEGER}
+				AND hos_id = #{map.hos_id,jdbcType=INTEGER}
+				AND copy_code = #{map.copy_code,jdbcType=VARCHAR}
+				AND cert_id in(
+					<foreach collection="list" item="item" separator="union all">
+					SELECT #{item.cert_id,jdbcType=VARCHAR} cert_id FROM dual
+					</foreach>
+				);
+			DELETE FROM mat_prod_cert
+			WHERE group_id = #{map.group_id,jdbcType=INTEGER}
+				AND hos_id = #{map.hos_id,jdbcType=INTEGER}
+				AND copy_code = #{map.copy_code,jdbcType=VARCHAR}
+				AND cert_id in(
+					<foreach collection="list" item="item" separator="union all">
+					SELECT #{item.cert_id,jdbcType=VARCHAR} cert_id FROM dual
+					</foreach>
+				);
+		END;
+	</delete>
+	
+	<!-- 产品注册证导入 -->
+	<insert id="addMatProdCertByImp" parameterType="java.util.Map">
+		INSERT INTO mat_prod_cert(
+			group_id, hos_id, copy_code, com_from, oper_name, oper_date, 
+			cert_id, cert_code, prod_name, prod_alias, fac_id, cert_type_code, 
+			start_date, end_date, is_long, cert_date, is_stop, check_state, 
+			authent_state, is_new, new_cert_id, old_cert_id, note
+		)
+		SELECT #{map.group_id,jdbcType=INTEGER} group_id, 
+			#{map.hos_id,jdbcType=INTEGER} hos_id, 
+			#{map.copy_code,jdbcType=VARCHAR} copy_code, 
+			#{map.com_from,jdbcType=INTEGER} com_from, 
+			#{map.oper_name,jdbcType=VARCHAR} oper_name, 
+			#{map.oper_date,jdbcType=TIMESTAMP} oper_date, 
+			cert_id, cert_code, prod_name, prod_alias, fac_id, cert_type_code, 
+			start_date, end_date, is_long, cert_date, is_stop, check_state, 
+			authent_state, is_new, new_cert_id, old_cert_id, note
+		FROM (
+			<foreach collection="list" item="item" separator="union all">
+				SELECT 
+					#{item.cert_id,jdbcType=BIGINT} cert_id, 
+					#{item.cert_code,jdbcType=VARCHAR} cert_code, 
+					#{item.prod_name,jdbcType=VARCHAR} prod_name, 
+					#{item.prod_alias,jdbcType=VARCHAR} prod_alias, 
+					#{item.fac_id,jdbcType=INTEGER} fac_id,
+					#{item.cert_type_code,jdbcType=VARCHAR} cert_type_code, 
+					#{item.start_date,jdbcType=DATE} start_date, 
+					#{item.end_date,jdbcType=DATE} end_date, 
+					#{item.is_long,jdbcType=INTEGER} is_long, 
+					#{item.cert_date,jdbcType=VARCHAR} cert_date, 
+					#{item.is_stop,jdbcType=INTEGER} is_stop,
+					#{item.check_state,jdbcType=INTEGER} check_state, 
+					#{item.authent_state,jdbcType=INTEGER} authent_state, 
+					#{item.is_new,jdbcType=INTEGER} is_new, 
+					#{item.new_cert_id,jdbcType=BIGINT} new_cert_id, 
+					#{item.old_cert_id,jdbcType=BIGINT} old_cert_id, 
+					#{item.note,jdbcType=VARCHAR} note
+				FROM DUAL 
+			</foreach>
+		) tmp
+	</insert>
+	
+	<!-- 校验是否含不为该状态的数据 -->
+	<select id="notExistsMatProdCertByState" parameterType="java.util.Map" resultType="java.lang.Integer">
+		SELECT count(1) 
+		FROM mat_prod_cert 
+		WHERE group_id = #{map.group_id,jdbcType=INTEGER}
+			AND hos_id = #{map.hos_id,jdbcType=INTEGER}
+			AND copy_code = #{map.copy_code,jdbcType=VARCHAR}
+			AND ${state_col} &lt;&gt; #{state_val,jdbcType=INTEGER}
+			AND cert_id in(
+				<foreach collection="list" item="item" separator="union all">
+				SELECT #{item.cert_id,jdbcType=VARCHAR} cert_id FROM dual
+				</foreach>
+			)
+	</select>
+	
+	
+	 <!-- 定义产品注册证数据集 -->
+	<resultMap id="matProdCertInv" type="java.util.Map">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="cert_id" column="cert_id"/>
+		<result property="inv_id" column="inv_id"/>
+		<result property="inv_code" column="inv_code"/>
+		<result property="inv_name" column="inv_name"/>
+		<result property="inv_model" column="inv_model"/>
+		<result property="unit_name" column="unit_name"/>
+		<result property="plan_price" column="plan_price"/>
+		<result property="use_state" column="use_state"/>
+	</resultMap>
+	 <!-- 查询材料列表 -->
+	 <select id="queryMatInvList" parameterType="java.util.Map" resultMap="matProdCertInv">
+	 	SELECT a.inv_id, a.inv_code, a.inv_name, a.inv_model, b.unit_name, a.plan_price, 
+	 		case a.use_state when 1 then '在用' else '停用' end use_state 
+	 	FROM mat_inv a
+	 	LEFT JOIN hos_unit b 
+	 		ON a.group_id = b.group_id
+	 		AND a.hos_id = b.hos_id 
+	 		AND a.unit_code = b.unit_code 
+	 	WHERE a.group_id = #{group_id,jdbcType=INTEGER}
+	 		AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+	 		AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+	 		<if test="inv_text != null and inv_text != ''">
+	 		AND (
+	 			a.inv_code like #{inv_text,jdbcType=VARCHAR} || '%'
+	 			or 
+	 			a.inv_name like '%' || #{inv_text,jdbcType=VARCHAR} || '%'
+	 			or 
+	 			a.inv_model like '%' || #{inv_text,jdbcType=VARCHAR} || '%'
+	 			or 
+	 			a.spell_code like '%' || #{inv_text,jdbcType=VARCHAR} || '%'
+	 		)
+	 		</if>
+	 		<if test="use_state != null and use_state != ''">
+	 		AND a.use_state = #{use_state,jdbcType=INTEGER}
+	 		</if>
+	 		AND not exists(
+	 			SELECT 1 
+	 			FROM mat_prod_cert_inv c
+	 			WHERE c.group_id = #{group_id,jdbcType=INTEGER}
+			 		AND c.hos_id = #{hos_id,jdbcType=INTEGER}
+			 		AND c.copy_code = #{copy_code,jdbcType=VARCHAR}
+			 		AND c.cert_id = #{cert_id,jdbcType=BIGINT}
+			 		AND c.inv_id = a.inv_id 
+	 		)
+	 	ORDER BY a.inv_code
+	 </select>
+	 
+	 <!-- 查询关联材料 -->
+	 <select id="queryMatProdCertInvList" parameterType="java.util.Map" resultMap="matProdCertInv">
+	 	SELECT a.group_id, a.hos_id, a.copy_code, a.cert_id, a.inv_id, 
+	 		b.inv_code, b.inv_name, b.inv_model, c.unit_name, b.plan_price, 
+	 		case b.use_state when 1 then '在用' else '停用' end use_state 
+	 	FROM mat_prod_cert_inv a 
+	 	LEFT JOIN mat_inv b
+	 		ON a.group_id = b.group_id 
+	 		AND a.hos_id = b.hos_id 
+	 		AND a.copy_code = b.copy_code 
+	 		AND a.inv_id = b.inv_id 
+	 	LEFT JOIN hos_unit c 
+	 		ON b.group_id = c.group_id
+	 		AND b.hos_id = c.hos_id 
+	 		AND b.unit_code = c.unit_code 
+	 	WHERE a.group_id = #{group_id,jdbcType=INTEGER}
+	 		AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+	 		AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+	 		AND a.cert_id = #{cert_id,jdbcType=BIGINT}
+	 	ORDER BY b.inv_code
+	 </select>
+	 
+	 <!-- 保存关联材料前先删除 -->
+	 <delete id="deleteMatProdCertInv" parameterType="java.util.Map">
+	 	DELETE FROM mat_prod_cert_inv 
+	 	WHERE group_id = #{group_id,jdbcType=INTEGER}
+	 		AND hos_id = #{hos_id,jdbcType=INTEGER}
+	 		AND copy_code = #{copy_code,jdbcType=VARCHAR}
+	 		AND cert_id = #{cert_id,jdbcType=BIGINT}
+	 </delete>
+	 <!-- 保存关联材料 -->
+	 <insert id="addMatProdCertInv" parameterType="java.util.Map">
+	 	INSERT INTO mat_prod_cert_inv(
+	 		group_id, hos_id, copy_code, cert_id, cert_code, inv_id 
+	 	)
+	 	SELECT #{map.group_id,jdbcType=INTEGER} group_id,  
+	 		#{map.hos_id,jdbcType=INTEGER} hos_id, 
+	 		#{map.copy_code,jdbcType=VARCHAR} copy_code, 
+	 		#{map.cert_id,jdbcType=BIGINT} cert_id, 
+	 		#{map.cert_code,jdbcType=VARCHAR} cert_code, 
+	 		inv_id 
+	 	FROM (
+	 		<foreach collection="list" item="inv_id" separator="union all">
+	 		SELECT #{inv_id,jdbcType=INTEGER} inv_id FROM dual
+	 		</foreach>
+	 	) tmp
+	 </insert>
+	 
+	 <!-- 选择新证查询 -->
+	 <select id="queryMatProdCertChooseList" parameterType="java.util.Map" resultMap="matProdCert">
+	 		SELECT a.group_id, a.hos_id, a.copy_code, b.cert_type_name, 
+			a.cert_id, a.cert_code, a.prod_name, c.fac_name, a.cert_date, 
+			case a.is_new when 1 then '是' else '否' end is_new_name, 
+			case a.is_long when 1 then '未过期' else case when a.end_date &lt; sysdate then '已过期' else '未过期' end end date_state
+		FROM mat_prod_cert a 
+		LEFT JOIN mat_cert_type b 
+			ON a.group_id = b.group_id 
+			AND a.hos_id = b.hos_id 
+			AND a.copy_code = b.copy_code 
+			AND a.cert_type_code = b.cert_type_code 
+		LEFT JOIN hos_fac c 
+			ON a.group_id = c.group_id 
+			AND a.hos_id = c.hos_id 
+			AND a.fac_id = c.fac_id 
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND a.fac_id = #{fac_id,jdbcType=INTEGER}
+			AND a.is_stop = 0
+			AND a.authent_state = 2 
+			AND a.check_state = 2 
+			<if test="cert_id != null and cert_id != ''"><!-- 新证不能选本身 -->
+			AND a.cert_id &lt;&gt; #{cert_id,jdbcType=BIGINT}
+			</if>
+			<if test="new_cert_id != null and new_cert_id != ''"><!-- 新证不能选本身的新证 -->
+			AND a.cert_id &lt;&gt; #{new_cert_id,jdbcType=BIGINT}
+			</if>
+			<if test="old_cert_id != null and old_cert_id != ''"><!-- 新证不能选本身的老证 -->
+			AND a.cert_id &lt;&gt; #{old_cert_id,jdbcType=BIGINT}
+			</if>
+			<if test="cert_text != null and cert_text != ''">
+			AND (
+				a.cert_code like '%'||#{cert_text,jdbcType=VARCHAR}||'%'
+				or
+				a.prod_name like '%'||#{cert_text,jdbcType=VARCHAR}||'%'
+			)
+			</if>
+		ORDER BY a.oper_date desc, a.cert_id
+	 </select>
+	<!-- 选择新证 -->
+	<update id="updateMatProdCertToNewCert" parameterType="java.util.Map">
+		BEGIN
+			<!-- 修改老证信息 -->
+			UPDATE mat_prod_cert 
+			SET is_new = 0, 
+				new_cert_id = #{new_cert_id,jdbcType=INTEGER}, 
+				new_cert_info = #{new_cert_info,jdbcType=VARCHAR},
+				changer = #{oper_name,jdbcType=VARCHAR}, 
+				change_date = #{oper_date,jdbcType=TIMESTAMP}, 
+				change_note = '用户使用【选择新证】按钮'
+			WHERE group_id = #{group_id,jdbcType=INTEGER}
+		 		AND hos_id = #{hos_id,jdbcType=INTEGER}
+		 		AND copy_code = #{copy_code,jdbcType=VARCHAR}
+		 		AND cert_id = #{cert_id,jdbcType=BIGINT};
+			<!-- 修改新证信息 -->
+			UPDATE mat_prod_cert 
+			SET is_new = 1, 
+				old_cert_id = #{cert_id,jdbcType=INTEGER}, 
+				old_cert_info = #{cert_info,jdbcType=VARCHAR},
+				changer = #{oper_name,jdbcType=VARCHAR}, 
+				change_date = #{oper_date,jdbcType=TIMESTAMP}, 
+				change_note = '用户使用【选择新证】按钮'
+			WHERE group_id = #{group_id,jdbcType=INTEGER}
+		 		AND hos_id = #{hos_id,jdbcType=INTEGER}
+		 		AND copy_code = #{copy_code,jdbcType=VARCHAR}
+		 		AND cert_id = #{new_cert_id,jdbcType=BIGINT};
+		END; 
+	</update>
+	<!-- 取消新证 -->
+	<update id="updateMatProdCertToUnNewCert" parameterType="java.util.Map">
+		BEGIN 
+			<!-- 修改老证信息 -->
+			UPDATE mat_prod_cert 
+			SET is_new = 1, 
+				new_cert_id = NULL, 
+				new_cert_info = NULL,
+				changer = #{oper_name,jdbcType=VARCHAR}, 
+				change_date = #{oper_date,jdbcType=TIMESTAMP}, 
+				change_note = '用户使用【取消新证】按钮'
+			WHERE group_id = #{group_id,jdbcType=INTEGER}
+		 		AND hos_id = #{hos_id,jdbcType=INTEGER}
+		 		AND copy_code = #{copy_code,jdbcType=VARCHAR}
+		 		AND cert_id = #{cert_id,jdbcType=BIGINT};
+			<!-- 修改新证信息 -->
+			UPDATE mat_prod_cert 
+			SET is_new = 1, 
+				old_cert_id = NULL, 
+				old_cert_info = NULL,
+				changer = #{oper_name,jdbcType=VARCHAR}, 
+				change_date = #{oper_date,jdbcType=TIMESTAMP}, 
+				change_note = '用户使用【取消新证】按钮'
+			WHERE group_id = #{group_id,jdbcType=INTEGER}
+		 		AND hos_id = #{hos_id,jdbcType=INTEGER}
+		 		AND copy_code = #{copy_code,jdbcType=VARCHAR}
+		 		AND cert_id = #{new_cert_id,jdbcType=BIGINT};	
+		END; 
+	</update>
+</mapper>

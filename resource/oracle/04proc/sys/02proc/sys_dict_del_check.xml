@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+
+	<sql id="sys_dict_del_check" type="proc"><![CDATA[
+	CREATE OR REPLACE PROCEDURE SYS_DICT_DEL_CHECK
+
+  /*删除字典表，检查是否使用*/
+  (
+   p_dict_id_str varchar2,--ID字符串逗号分隔：1,2,3
+   p_dict_code varchar2,--字典表名：ACC_SUBJ
+   p_group_id number,
+   p_hos_id number,
+   p_copy_code varchar2,
+   p_acc_year varchar2,
+   p_flag number,--查询标志，会计科目使用,=1包括所有子科目
+   p_note out varchar2--返回提示
+   )
+  IS
+     type v_cursor_type is ref cursor;
+     v_cursor v_cursor_type;
+     v_record sys_dict_use%ROWTYPE;
+     v_str varchar2(3000);
+     v_count number;
+  BEGIN
+     v_str:=' ';
+     /*根据ID删除会计科目，检查是否使用*/
+     open v_cursor for select dict_code,table_code,column_code,note from SYS_DICT_USE where DICT_CODE=p_dict_code;
+     loop
+     fetch v_cursor into v_record;
+     exit when v_cursor%notfound;
+       /*校验表是否存在*/
+       v_count := 0;
+       execute immediate '
+         select count(1) 
+         from USER_tables 
+         where TABLE_NAME = '''||v_record.table_code||'''
+       ' into v_count; 
+       if v_count = 0 then 
+         continue;
+       end if;
+       
+       v_count := 0;
+
+       if (p_dict_code='ACC_SUBJ' and p_flag=0) then
+       --会计科目，根据科目编码查询，科目编码修改判断新的父级编码是否有数据
+             execute immediate '
+             select count(1) from '||v_record.table_code||' where '||v_record.column_code||'
+             in (
+                    select subj_id from acc_subj where subj_id in ('||p_dict_id_str||') and group_id='||p_group_id||'
+                    and hos_id='||p_hos_id||' and copy_code='''||p_copy_code||''' and acc_year='''||p_acc_year||'''
+             )
+             ' into v_count;
+
+       elsif (p_dict_code='ACC_SUBJ' and p_flag=1) then
+       
+       --会计科目，根据科目ID的所有子科目查询
+       
+       
+
+           execute immediate '
+             select count(1) from '||v_record.table_code||' where '||v_record.column_code||'
+             in (
+                    select distinct subj_id from acc_subj where  group_id='||p_group_id||'
+                    and hos_id='||p_hos_id||' and copy_code='''||p_copy_code||''' and acc_year='''||p_acc_year||''' start with  subj_id in ('||p_dict_id_str||')
+                    connect by prior subj_code = super_code
+             )
+             ' into v_count;
+             
+             
+          
+       elsif (p_dict_code='ASS_TYPE_DICT' and p_flag=1) then
+       --资产分类，根据分类ID的所有子分类查询
+
+             execute immediate '
+             select count(1) from '||v_record.table_code||' where '||v_record.column_code||'
+             in (
+                    select ass_type_id from ass_type_dict
+                    start with  ass_type_id in ('||p_dict_id_str||')
+                    connect by prior ass_type_code = super_code
+             )
+             ' into v_count;
+       elsif (p_dict_code='MAT_TYPE' and p_flag=1) then
+       --物资分类，根据分类ID的所有子分类查询
+
+             execute immediate '
+             select count(1) from '||v_record.table_code||' where '||v_record.column_code||'
+             in (
+                    select mat_type_id from MAT_TYPE
+                    start with  mat_type_id in ('||p_dict_id_str||')
+                    connect by prior mat_type_code = super_code
+             )
+             ' into v_count;
+		
+	   elsif (p_dict_code='HOS_DEPT_KIND') then
+       --部门分类
+
+             execute immediate '
+             select count(1) from '||v_record.table_code||' where '
+                    || ' group_id = ' || p_group_id
+                    || ' and hos_id= '||p_hos_id || ' and '
+                    || v_record.column_code || ' in ('||p_dict_id_str||')' into v_count;
+       elsif ((p_dict_code='BUDG_INCOME_SUBJ' or p_dict_code='BUDG_COST_SUBJ' ) and p_flag=1) then
+       --预算科目
+              execute immediate '
+        select count(1) from    '||v_record.table_code||' where ' || ' group_id = ' || p_group_id
+                    || ' and hos_id= '||p_hos_id ||' and copy_code='''||p_copy_code|| ''' and '||v_record.column_code||' in ('||p_dict_id_str||') and budg_year='||p_acc_year|| ''into v_count;   
+        
+        elsif (p_dict_code='BUDG_SINGLE_DISEASE_DICT' or p_dict_code='BUDG_YB_TYPE_DICT' ) then
+       --单病种字典 --医保类型字典
+       
+             execute immediate '
+          select count(1) from    '||v_record.table_code||' where ' || ' group_id = ' || p_group_id
+                    || ' and hos_id= '||p_hos_id ||' and copy_code='''||p_copy_code|| ''' and '||v_record.column_code||' in ('||p_dict_id_str||') 'into v_count;         
+                  
+    else
+         --其他字典，没有级次
+         execute immediate '
+         select count(1) from '||v_record.table_code||' where instr('','||p_dict_id_str||','', '',''||'||v_record.column_code||'||'','') > 0
+         ' into v_count;
+
+       end if;
+
+
+       IF v_count > 0  and instr(v_str,v_record.note)=0 THEN
+
+              v_str:=v_str||v_record.note||'，';
+
+       END IF;
+
+     end loop;
+     close v_cursor;
+
+     --dbms_output.put_line(substr(v_str,3));
+     p_note:=substr(v_str,2);
+  END SYS_DICT_DEL_CHECK;
+	
+
+	]]></sql>
+	
+</root>
+

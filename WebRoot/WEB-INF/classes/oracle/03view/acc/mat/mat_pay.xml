@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+
+	<sql id="v_mat_pre_pay_main" type="view" desc="物流发票主表视图"><![CDATA[
+	CREATE OR REPLACE VIEW v_mat_pre_pay_main AS
+	SELECT 
+      MPPM.GROUP_ID,  --集团ID
+      MPPM.HOS_ID,    --医院ID
+      MPPM.COPY_CODE, --账套编码
+      MPPM.PRE_PAY_ID AS BUSINESS_ID,     --预付款单ID
+      MPPM.PRE_PAY_NO AS BUSINESS_NO,     --预付款单号
+      MPPM.PAY_BILL_TYPE AS BILL_TYPE ,   --单据类型
+      MPPM.PAY_TYPE_CODE AS SUB_TYPE_ID,    --支付方式编码
+      APT.PAY_NAME AS PAY_TYPE_NAME,    --支付方式名称
+      MPPM.CHEQ_NO  , --票据号
+      mppm.acct_code , --付款账号
+      MPPM.SUP_ID,  --供应商ID
+      HSD.SUP_NO,  --供应商变更ID
+      HSD.SUP_CODE,    --供应商编码
+      HSD.SUP_NAME,    --供应商名称
+      MPPM.NOTE,    --摘要
+      MPPM.PAYABLE_MONEY, --应付金额
+      MPPM.PRE_PAY_MONEY,  --预付款金额
+      MPPM.MAKER,    --制单人ID
+      SM.USER_NAME AS MAKER_NAME, --制单人名称
+      MPPM.PAY_DATE AS BUSI_DATE,    --付款日期
+      MPPM.CHECKER,    --审核人ID
+      SC.USER_NAME AS CHECKER_NAME,    --审核人名称
+      MPPM.CHK_DATE,    --审核日期
+      MPPM.STATE       --状态
+   FROM MAT_PRE_PAY_MAIN MPPM
+   LEFT JOIN HOS_SUP_DICT HSD --供应商
+   ON 
+      MPPM.GROUP_ID=HSD.GROUP_ID 
+      AND MPPM.HOS_ID=HSD.HOS_ID
+      AND MPPM.SUP_ID=HSD.SUP_ID
+      AND MPPM.SUP_NO=HSD.SUP_NO
+    LEFT JOIN ACC_PAY_TYPE APT --支付方式
+   ON
+      APT.GROUP_ID=MPPM.GROUP_ID
+      AND APT.HOS_ID=MPPM.HOS_ID
+      AND APT.COPY_CODE=MPPM.COPY_CODE
+      AND APT.PAY_CODE=MPPM.PAY_TYPE_CODE
+   LEFT JOIN SYS_USER SM  --制单人
+   ON 
+      MPPM.GROUP_ID=SM.GROUP_ID
+      AND MPPM.HOS_ID=SM.HOS_ID
+      AND MPPM.COPY_CODE=SM.COPY_CODE
+      AND MPPM.MAKER=SM.USER_ID
+   LEFT JOIN SYS_USER SC   --审核人
+   ON 
+      MPPM.GROUP_ID=SC.GROUP_ID
+      AND MPPM.HOS_ID=SC.HOS_ID
+      AND MPPM.COPY_CODE=SC.COPY_CODE
+      AND MPPM.CHECKER=SC.USER_ID
+   WHERE MPPM.STATE=2
+ 
+	]]></sql>
+	<sql id="v_mat_pre_pay_detail" type="view" desc="物流发票明细视图"><![CDATA[
+	CREATE OR REPLACE VIEW v_mat_pre_pay_detail AS
+	SELECT 
+     MPPD.GROUP_ID,  --集团ID
+     MPPD.HOS_ID,    --单位ID
+     MPPD.COPY_CODE, --账套编码
+     MPPD.PRE_PAY_ID AS BUSINESS_ID,    --预付款单ID
+     MPPD.PRE_PAY_NO  AS BUSINESS_NO,   --预付款单号
+     MPPD.PRE_DETAIL_ID AS DETAIL_ID,   --明细ID
+     MPPD.IN_ID ,    --入库单ID
+     MIM.IN_NO ,     --入库单号
+     MPPD.IN_DETAIL_ID , --入库单明细ID
+     MIM.PROTOCOL_CODE, --协议编号
+     MIV.MAT_TYPE_ID AS SUB_TYPE_ID, --物资分类ID
+     MIV.INV_CODE,  --材料编码
+     MID.BATCH_NO,  --批号
+     MID.PRICE,     --单价
+     MID.AMOUNT,    --数量
+     MPPD.PAYABLE_MONEY, --应付金额
+     MPPD.PRE_PAY_MONEY, --付款金额
+   HS.SOURCE_ID,    --资金来源ID
+   HS.SOURCE_CODE,    --资金来源编码
+   HS.SOURCE_NAME,    --资金来源名称
+   HSN.NATURE_CODE AS SOURCE_NATURE_CODE, --资金来源属性
+   HSN.NATURE_NAME AS SOURCE_NATURE_NAME, --资金来源性质名称
+     MIV.AMORTIZE_TYPE  --摊销方式
+    FROM MAT_PRE_PAY_DETAIL MPPD
+    LEFT JOIN MAT_IN_MAIN MIM
+    ON
+         MPPD.GROUP_ID=MIM.GROUP_ID
+      AND MPPD.HOS_ID=MIM.HOS_ID
+      AND MPPD.COPY_CODE=MIM.COPY_CODE
+      AND MPPD.IN_ID=MIM.IN_ID
+    LEFT JOIN MAT_IN_DETAIL MID
+    ON 
+          MPPD.GROUP_ID=MID.GROUP_ID
+      AND MPPD.HOS_ID=MID.HOS_ID
+      AND MPPD.COPY_CODE=MID.COPY_CODE
+      AND MPPD.IN_ID=MID.IN_ID
+      AND MPPD.IN_DETAIL_ID=MID.IN_DETAIL_ID
+    LEFT JOIN MAT_IN_RESOURCE MIR
+    ON
+         MIR.GROUP_ID=MIM.GROUP_ID
+      AND MIR.HOS_ID=MIM.HOS_ID
+      AND MIR.COPY_CODE=MIM.COPY_CODE
+      AND MIR.IN_ID=MIM.IN_ID
+    LEFT JOIN HOS_SOURCE HS
+    ON 
+          MIR.GROUP_ID=HS.GROUP_ID
+      AND MIR.HOS_ID=HS.HOS_ID
+      AND MIR.SOURCE_ID=HS.SOURCE_ID
+    LEFT JOIN HOS_SOURCE_NATURE HSN
+    ON 
+         HS.SOURCE_ATTR=HSN.NATURE_CODE
+    LEFT JOIN MAT_INV_DICT MIV
+    ON 
+          MID.GROUP_ID=MIV.GROUP_ID
+      AND MID.HOS_ID=MIV.HOS_ID
+      AND MID.COPY_CODE=MIV.COPY_CODE
+      AND MID.INV_ID=MIV.INV_ID
+      AND MID.INV_NO=MIV.INV_NO
+ 
+	]]></sql>
+	<sql id="v_mat_pay_main" type="view" desc="物流付款主表视图"><![CDATA[
+	CREATE OR REPLACE VIEW v_mat_pay_main AS
+	SELECT 
+      MPM.GROUP_ID,  --集团ID
+      MPM.HOS_ID,    --医院ID
+      MPM.COPY_CODE, --账套编码
+      MPM.PAY_ID AS BUSINESS_ID,     --付款单ID
+      MPM.PAY_BILL_NO AS BUSINESS_NO,     --付款单号
+      MPM.PAY_BILL_TYPE AS BILL_TYPE ,   --单据类型
+      MPM.PAY_TYPE_CODE AS SUB_TYPE_ID,    --支付方式编码
+      APT.PAY_NAME AS PAY_TYPE_NAME,    --支付方式名称
+      MPM.CHEQ_NO  , --票据号
+      MPM.ACCT_CODE , --付款账号
+      MPM.SUP_ID,  --供应商ID
+      HSD.SUP_NO,  --供应商变更ID
+      HSD.SUP_CODE,    --供应商编码
+      HSD.SUP_NAME,    --供应商名称
+      MPM.NOTE,    --摘要
+      MPM.PAYABLE_MONEY, --应付金额
+      MPM.PAYED_MONEY,--已付金额
+      MPM.PAY_MONEY,  --付款金额
+      MPM.MAKER,    --制单人ID
+      SM.USER_NAME AS MAKER_NAME, --制单人名称
+      MPM.PAY_DATE AS BUSI_DATE,    --付款日期
+      MPM.CHECKER,    --审核人ID
+      SC.USER_NAME AS CHECKER_NAME,    --审核人名称
+      MPM.CHK_DATE,    --审核日期
+      MPM.STATE       --状态
+   FROM MAT_PAY_MAIN MPM
+   LEFT JOIN HOS_SUP_DICT HSD --供应商
+   ON 
+      MPM.GROUP_ID=HSD.GROUP_ID 
+      AND MPM.HOS_ID=HSD.HOS_ID
+      AND MPM.SUP_ID=HSD.SUP_ID
+      AND MPM.SUP_NO=HSD.SUP_NO
+    LEFT JOIN ACC_PAY_TYPE APT --支付方式
+   ON
+      APT.GROUP_ID=MPM.GROUP_ID
+      AND APT.HOS_ID=MPM.HOS_ID
+      AND APT.COPY_CODE=MPM.COPY_CODE
+      AND APT.PAY_CODE=MPM.PAY_TYPE_CODE
+   LEFT JOIN SYS_USER SM  --制单人
+   ON 
+      MPM.GROUP_ID=SM.GROUP_ID
+      AND MPM.HOS_ID=SM.HOS_ID
+      AND MPM.COPY_CODE=SM.COPY_CODE
+      AND MPM.MAKER=SM.USER_ID
+   LEFT JOIN SYS_USER SC   --审核人
+   ON 
+      MPM.GROUP_ID=SC.GROUP_ID
+      AND MPM.HOS_ID=SC.HOS_ID
+      AND MPM.COPY_CODE=SC.COPY_CODE
+      AND MPM.CHECKER=SC.USER_ID
+   WHERE MPM.STATE=2
+ 
+	]]></sql>
+	<sql id="v_mat_pay_detail" type="view" desc="物流付款明细视图"><![CDATA[
+	CREATE OR REPLACE VIEW v_mat_pay_detail AS
+  SELECT 
+     MPD.GROUP_ID,  --集团ID
+     MPD.HOS_ID,    --单位ID
+     MPD.COPY_CODE, --账套编码
+     MPD.PAY_ID AS BUSINESS_ID,    --付款单ID
+     MPD.Pay_Bill_No  AS BUSINESS_NO,   --付款单号
+     MPD.Pay_Detail_Id AS DETAIL_ID,   --明细ID
+     MIV.MAT_TYPE_ID AS SUB_TYPE_ID, --物资分类ID
+     MPD.bill_ID ,    --发票ID
+     MBM.bill_NO ,     --发票号
+     MPD.bill_DETAIL_ID , --发票明细ID
+     MPD.BILL_MONEY, --发票金额
+     mpd.payed_money As pre_payed_money ,--预付款金额
+     MPD.PAY_MONEY AMOUNT_MONEY,--付款金额
+     MIM.IN_NO--单据号
+    FROM MAT_PAY_DETAIL MPD   
+    LEFT JOIN MAT_bill_MAIN MBM
+    ON
+         MPD.GROUP_ID=MBM.GROUP_ID
+      AND MPD.HOS_ID=MBM.HOS_ID
+      AND MPD.COPY_CODE=MBM.COPY_CODE
+      AND MPD.bill_id=MBM.bill_id
+    LEFT JOIN MAT_bill_DETAIL MBD
+    ON 
+          MPD.GROUP_ID=MBD.GROUP_ID
+      AND MPD.HOS_ID=MBD.HOS_ID
+      AND MPD.COPY_CODE=MBD.COPY_CODE
+      AND MPD.bill_id=MBD.bill_id
+      AND MPD.bill_DETAIL_ID=MBD.bill_DETAIL_ID
+    LEFT JOIN MAT_IN_DETAIL MID  
+    on 
+         MBD.GROUP_ID=MID.GROUP_ID
+      AND MBD.HOS_ID=MID.HOS_ID
+      AND MBD.COPY_CODE=MID.COPY_CODE
+      AND MBD.in_id=MID.in_id
+      AND MBD.in_DETAIL_ID=MID.in_DETAIL_ID
+    LEFT JOIN MAT_IN_MAIN MIM  
+    on 
+         MIM.GROUP_ID=MID.GROUP_ID
+      AND MIM.HOS_ID=MID.HOS_ID
+      AND MIM.COPY_CODE=MID.COPY_CODE
+      AND MIM.in_id=MID.in_id    
+     LEFT JOIN MAT_INV_DICT MIV
+	  ON 
+	        MID.GROUP_ID=MIV.GROUP_ID
+	    AND MID.HOS_ID=MIV.HOS_ID
+	    AND MID.COPY_CODE=MIV.COPY_CODE
+	    AND MID.INV_ID=MIV.INV_ID
+	    AND MID.INV_NO=MIV.INV_NO  
+	]]></sql>
+	
+</root>
+

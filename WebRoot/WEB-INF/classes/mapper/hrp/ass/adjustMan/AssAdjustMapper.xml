@@ -1,0 +1,504 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.ass.dao.adjustMan.AssAdjustMapper">
+	<resultMap id="assAdjust" type="java.util.Map">
+		<result property="group_id" column="group_id"/><!-- 集团ID -->   
+		<result property="hos_id" column="hos_id"/><!-- 医院ID --> 
+		<result property="copy_code" column="copy_code"/><!-- 账套编码 -->	
+		<result property="adjust_id" column="adjust_id"/><!-- 调价单ID -->	
+		<result property="adjust_code" column="adjust_code"/><!-- 调价单编码 -->	
+		<result property="create_date" column="create_date"/><!-- 编制日期 -->	  
+		<result property="note" column="note"/>	<!-- 备注 -->
+		<result property="maker" column="maker"/><!-- 制单人ID -->	
+		<result property="make_name" column="make_name"/><!-- 制单人名称 -->	
+		<result property="make_date" column="make_date"/><!-- 制单日期 -->	
+		<result property="checker" column="checker"/><!-- 审核人ID -->	
+		<result property="checker_name" column="checker_name"/><!-- 审核人名称 -->
+		<result property="adjust_date" column="adjust_date"/><!-- 审核日期 -->
+		<result property="state" column="state"/><!-- 状态 -->
+		
+		<result property="new_price" column="new_price"/>	<!-- 新计划价 -->	
+		<result property="old_price" column="old_price"/><!-- 原计划价 -->
+		<result property="ass_id" column="ass_id"/><!-- 资产ID -->				
+		<result property="ass_no" column="ass_no"/><!-- 资产变更号 -->
+		<result property="ass_code" column="ass_code"/><!-- 资产编码 -->
+		<result property="ass_name" column="ass_name"/><!-- 资产名称 -->
+		<result property="ass_model" column="ass_model"/><!-- 规格型号 -->
+		<result property="unit_code" column="unit_code"/><!-- 计量单位编码 -->
+		<result property="unit_name" column="unit_name"/><!-- 计量单位名称 -->
+		
+		<result property="price" column="price"/>
+		
+		<result property="fac_id" column="fac_id"/><!-- 厂商ID -->
+		<result property="fac_no" column="fac_no"/><!-- 厂商变更号 -->
+		<result property="fac_name" column="fac_name"/><!-- 厂商名称 -->
+		<result property="sup_id" column="sup_id"/><!-- 供应商ID -->
+		<result property="sup_name" column="sup_name"/><!-- 供应商名称 -->
+		<result property="adjust_reason" column="adjust_reason"/><!-- 调价原因 -->
+	</resultMap>
+	
+	 <select id="queryCurrentSequence" resultType="java.lang.Long">
+		select ASS_ADJUST_MAIN_SEQ.currval val from dual
+	</select>
+	
+	<!-- 增加调价单主表 -->
+	<insert id="add" useGeneratedKeys="true">
+	<selectKey resultType="java.lang.Integer" order="BEFORE"  keyProperty="adjust_id">
+			SELECT ASS_ADJUST_MAIN_SEQ.Nextval as adjust_id FROM DUAL
+		</selectKey> 
+	INSERT INTO ASS_ADJUST_MAIN(
+		     adjust_id,
+		     group_id,
+		     hos_id,
+		     copy_code,
+		     adjust_code,
+		     create_date,
+		     note,
+		     maker,
+		     make_date,
+		     checker,
+		     adjust_date,
+		     state     
+		)VALUES(
+		     #{adjust_id,jdbcType=INTEGER},
+		     #{group_id,jdbcType=INTEGER},
+		     #{hos_id,jdbcType=INTEGER},
+		     #{copy_code,jdbcType=VARCHAR},
+		     #{adjust_code,jdbcType=VARCHAR},
+		     to_date(#{create_date,jdbcType=DATE},'yyyy/MM/dd'),
+		     #{note,jdbcType=VARCHAR},
+		     #{maker,jdbcType=INTEGER},
+		     to_date(#{make_date,jdbcType=DATE},'yyyy/MM/dd'),
+		     #{checker,jdbcType=INTEGER},
+		     to_date(#{adjust_date,jdbcType=DATE},'yyyy/MM/dd'),
+		     #{state}
+		)
+	
+	</insert>
+	
+	<!-- 添加调价单明细 -->
+	<insert id="addBatchAssAdjustDetail" parameterType="java.util.List">
+		INSERT INTO ASS_ADJUST_DETAIL(
+			adjust_detail_id,
+			group_id,
+			hos_id,
+			copy_code,
+			adjust_id,
+			ass_id,
+			ass_no,
+			old_price,
+			new_price,
+			adjust_reason
+		)
+		SELECT ASS_ADJUST_DETAIL_SEQ.Nextval,a.* from (
+			<foreach collection="list" item="item" index="index" separator="union all" >
+				SELECT 
+					#{item.group_id},
+					#{item.hos_id},
+					#{item.copy_code},
+					#{item.adjust_id},	 
+					#{item.ass_id},
+					#{item.ass_no},
+					#{item.old_price},
+					#{item.new_price},
+					#{item.adjust_reason}
+				from dual
+			</foreach>
+		) a
+	</insert>
+	
+	
+	<!-- 查询 调价单主表 -->
+	<select id="query" parameterType="java.util.Map"
+		resultMap="assAdjust">
+		SELECT
+		  mam.group_id,
+		  mam.hos_id,
+		  mam.copy_code,
+		  mam.adjust_id,
+		  mam.adjust_code,
+		  to_char(mam.create_date,'yyyy-MM-dd') as create_date,
+		  mam.note,
+		  mam.maker,
+		  su.user_name as make_name,
+		  to_char(mam.make_date,'yyyy-MM-dd') as make_date,
+		  mam.checker,
+		  sus.user_name as checker_name,
+		  to_char(mam.adjust_date,'yyyy-MM-dd') as adjust_date,
+		  mam.state
+		FROM ASS_ADJUST_MAIN  mam
+		LEFT JOIN SYS_USER su
+		ON
+		     mam.group_id = su.group_id
+		     AND mam.hos_id = su.hos_id
+		     AND mam.copy_code = su.copy_code
+		     AND mam.maker = su.user_id
+		LEFT JOIN SYS_USER sus 
+		ON
+		     mam.group_id = sus.group_id
+		     AND mam.hos_id = sus.hos_id
+		     AND mam.copy_code = sus.copy_code
+		     AND mam.checker = sus.user_id
+		<where>
+			<if test="group_id != null and group_id != '' ">
+			     mam.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != '' ">
+			     AND mam.hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != '' ">
+			     AND mam.copy_code = #{copy_code}
+			</if>
+			<if test="creBegin_date != null and creBegin_date != '' and creEnd_date != null and creEnd_date != '' ">
+		     	 AND mam.create_date between to_date(#{creBegin_date},'yyyy-MM-dd') and to_date(#{creEnd_date},'yyyy-MM-dd')
+			</if>
+			<if test="adjust_code != null and adjust_code != '' ">
+			     AND mam.adjust_code like '%${adjust_code}%'
+			</if>
+			<if test="state != null and state != '' ">
+			     AND mam.state = #{state}
+			</if>
+			<if test="adjBegin_date != null and adjBegin_date != '' and adjEnd_date != null and adjEnd_date != '' ">
+			     AND mam.adjust_date between to_date(#{adjBegin_date},'yyyy-MM-dd') and to_date(#{adjEnd_date},'yyyy-MM-dd')
+			</if>
+			<if test="note != null and note != '' ">
+			     AND mam.note like '%${note}%'
+			</if>
+			 ORDER BY mam.adjust_id,mam.adjust_code
+		</where>     
+	</select>
+	
+	<!-- 业务数据选择资产所用 -->
+	<select id="queryAssList" parameterType="java.util.Map" resultMap="assAdjust">
+		SELECT a.group_id,
+       a.hos_id,
+       a.copy_code,
+       a.ass_id,
+       a.ass_no,
+       a.ass_code,
+       a.ass_name,
+       a.ass_unit,
+       hu.unit_name ,
+       a.is_stop,
+       a.ass_model,
+       a.fac_id,
+       a.fac_no,
+       hfd.fac_code || ' ' || hfd.fac_name fac_code,
+       hfd.fac_name,
+       a.ven_id,
+       a.ven_no,
+       hsd.sup_code || ' ' || hsd.sup_name ven_code,
+       hsd.sup_name,
+       a.price
+  FROM ASS_NO_DICT a
+  
+  left join ass_type_dict b
+    on a.group_id = b.group_id
+   and a.hos_id = b.hos_id
+   and a.copy_code = b.copy_code
+   and a.ass_type_id = b.ass_type_id
+   
+  LEFT JOIN HOS_UNIT hu
+    ON a.group_id = hu.group_id
+   and a.hos_id = hu.hos_id
+   and a.ass_unit = hu.unit_code
+   
+  left join HOS_SUP_dict hsd
+    on a.group_id = hsd.group_id
+   and a.hos_id = hsd.hos_id
+   and a.ven_id = hsd.sup_id
+   and hsd.is_stop = 0
+   
+  left join hos_fac_dict hfd
+    on a.group_id = hfd.group_id
+   and a.hos_id = hfd.hos_id
+   and a.fac_id = hfd.fac_id
+   and hfd.is_stop = 0
+   
+   
+ where a.group_id = #{group_id,jdbcType=INTEGER}
+   and a.hos_id = #{hos_id,jdbcType=INTEGER}
+   and a.copy_code = #{copy_code,jdbcType=VARCHAR}
+   <if test="key != null  and  key != ''">
+   	and (
+					a.ass_code like '%${key}%' or 
+					a.ass_name like '%${key}%'
+					or
+					a.spell_code like '%${key}%' or 
+					a.wbx_code like '%${key}%'
+				)
+   </if>
+	</select>
+	
+	<!-- 按调价单ID查询主表 -->
+	<select id="queryByCode" parameterType="java.util.Map"
+		resultMap="assAdjust">
+		SELECT
+		       mam.group_id,
+		       mam.hos_id,
+		       mam.copy_code,
+		       mam.adjust_id,
+		       mam.adjust_code,
+		       to_char(mam.create_date,'yyyy-MM-dd') as create_date,
+		       mam.note,
+		       mam.maker,
+		       to_char(mam.make_date,'yyyy-MM-dd') as make_date,
+		       mam.checker,
+		       to_char(mam.adjust_date,'yyyy-MM-dd') as adjust_date,
+		       mam.state    
+		FROM ass_ADJUST_MAIN mam
+		<where>
+			<if test="group_id != null and group_id != '' ">
+			     group_id = #{group_id}
+			</if>
+			
+			<if test="hos_id != null and hos_id != '' ">
+			     and hos_id = #{hos_id}
+			</if>
+			
+			<if test="copy_code != null and copy_code != '' ">
+			     and copy_code = #{copy_code}
+			</if>
+			
+			<if test="adjust_id != null and adjust_id != '' ">
+			     and adjust_id = #{adjust_id}
+			</if>
+		</where>
+	</select>	
+	
+	<!-- 按调价单主表ID查询明细 -->
+	<select id="queryAssAdjustDetailByCode" parameterType="java.util.Map" 
+		resultMap="assAdjust">
+			SELECT aad.group_id,
+       aad.hos_id,
+       aad.copy_code,
+       aad.adjust_id,
+       aad.adjust_detail_id,
+       andi.ass_id,
+       andi.ass_no,
+       andi.ass_code,
+       andi.ass_name,
+       andi.ass_model,
+       andi.ass_unit,
+       hu.unit_name,
+       andi.fac_id,
+       andi.fac_no,
+       hfd.fac_name,
+       hsd.sup_name,
+       aad.old_price,
+       aad.new_price,
+       aad.adjust_reason
+  FROM ASS_ADJUST_DETAIL aad
+  LEFT JOIN ASS_NO_DICT andi
+    ON aad.group_id = andi.group_id
+   and aad.hos_id = andi.hos_id
+   and aad.copy_code = andi.copy_code
+   and aad.ass_id = andi.ass_id
+   and aad.ass_no = andi.ass_no
+
+  LEFT JOIN HOS_UNIT hu
+    ON andi.group_id = hu.group_id
+   and andi.hos_id = hu.hos_id
+   and andi.ass_unit = hu.unit_code
+   and hu.is_stop = 0
+  LEFT JOIN HOS_FAC_DICT hfd
+    ON andi.group_id = hfd.group_id
+   and andi.hos_id = hfd.hos_id
+   and andi.fac_id = hfd.fac_id
+   and andi.fac_no = hfd.fac_no
+
+  left join hos_sup_dict hsd
+    on andi.group_id = hsd.group_id
+   and andi.hos_id = hsd.hos_id
+   and andi.ven_id = hsd.sup_id
+   and hsd.is_stop = 0
+
+WHERE
+			     aad.group_id = #{group_id}
+			     and aad.hos_id = #{hos_id}
+			     and aad.copy_code = #{copy_code}
+			     and aad.adjust_id = #{adjust_id}
+ group by aad.group_id,
+       aad.hos_id,
+       aad.copy_code,
+       aad.adjust_id,
+       aad.adjust_detail_id,
+       andi.ass_id,
+       andi.ass_no,
+       andi.ass_code,
+       andi.ass_name,
+       andi.ass_model,
+       andi.ass_unit,
+       hu.unit_name,
+       andi.fac_id,
+       andi.fac_no,
+       hfd.fac_name,
+       hsd.sup_name,
+       aad.old_price,
+       aad.new_price,
+       aad.adjust_reason
+ order by aad.adjust_detail_id
+
+	</select>
+	
+	<!-- 删除调价单明细 -->
+	<delete id="deleteBatchAssAdjustDetail" parameterType="java.util.List">
+		DELETE FROM ASS_ADJUST_DETAIL WHERE
+			<foreach collection="list" item="item" index="index" open="(" separator="or" close=")">
+				group_id = #{item.group_id}
+				and hos_id = #{item.hos_id}
+				and copy_code = #{item.copy_code}
+				and adjust_id = #{item.adjust_id}
+			</foreach>
+	
+	</delete>
+	
+	<!-- 删除调价单主表数据 -->
+	<delete id="deleteBatch" parameterType="java.util.List">
+		DELETE FROM ASS_ADJUST_MAIN WHERE
+			<foreach collection="list" item="item" index="index" open="(" separator="or" close=")">
+				group_id = #{item.group_id}
+				and hos_id = #{item.hos_id}
+				and copy_code = #{item.copy_code}
+				and adjust_id = #{item.adjust_id}
+			</foreach>
+	</delete>
+	
+	<!-- 修改调价单主表 -->
+	<update id="update" parameterType="java.util.Map">
+		UPDATE ASS_ADJUST_MAIN SET
+		create_date = to_date(#{create_date},'yyyy/MM/dd'),
+		note = #{note}
+		where
+			group_id = #{group_id}
+			and hos_id = #{hos_id}
+			and copy_code = #{copy_code}
+			and adjust_id = #{adjust_id}
+	</update>
+	
+	
+	<!-- 按调价单主表ID 批量查询明细 -->
+	<select id="queryBatchAssAdjustDetailByCode" parameterType="java.util.List" 
+		resultMap="assAdjust">
+			SELECT
+			   	  aad.group_id,
+				  aad.hos_id,
+				  aad.copy_code,
+				  aad.adjust_id,
+				  aad.adjust_detail_id,
+				  aad.ass_id,
+				  aad.ass_no,
+				  andi.ass_code,
+				  andi.ass_name,
+				  andi.ass_model,
+				  andi.ass_unit,
+				  hu.unit_name,
+				  andi.fac_id,
+				  andi.fac_no,
+				  hfd.fac_name,
+				  aad.old_price,
+				  aad.new_price,
+				  aad.adjust_reason
+			FROM ASS_ADJUST_DETAIL aad
+			LEFT JOIN ASS_NO_DICT andi ON aad.group_id = andi.group_id
+			     and aad.hos_id = andi.hos_id
+			     and aad.copy_code = andi.copy_code
+			     and aad.ass_id = andi.ass_id
+			     and aad.ass_no = andi.ass_no
+			LEFT JOIN HOS_UNIT hu ON andi.group_id=hu.group_id and andi.hos_id=hu.hos_id and andi.ass_unit = hu.unit_code 
+			LEFT JOIN HOS_FAC_DICT hfd ON andi.fac_id = hfd.fac_id
+			     and andi.fac_no = hfd.fac_no
+			     and andi.group_id = hfd.group_id
+			     and andi.hos_id = hfd.hos_id
+					WHERE
+			<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+					 aad.group_id = #{item.group_id}
+			     and aad.hos_id = #{item.hos_id}
+			     and aad.copy_code = #{item.copy_code}
+			     and aad.adjust_id = #{item.adjust_id}
+			</foreach>
+			ORDER BY aad.adjust_id,aad.adjust_detail_id
+	</select>
+	
+	<!-- 审核 修改状态 -->
+	<update id="updateAssAdjustState" parameterType="java.util.List">
+		<foreach collection="list" index="index" item="item" open="begin"
+			separator=";" close=";end;">
+			UPDATE ASS_ADJUST_MAIN
+			<set>
+				state = 2,
+				checker = #{item.checker},
+				adjust_date = to_date(#{item.adjust_date},'yyyy/MM/dd')
+			</set> 
+			<where>
+				group_id = #{item.group_id}
+				and hos_id = #{item.hos_id}
+				and copy_code = #{item.copy_code}
+				and adjust_id = #{item.adjust_id}
+				and state = #{item.state}
+			</where>
+		</foreach>
+	</update>
+	
+	
+	<!-- 修改资产表计划价 -->
+	<update id="updateBatchAssPrice" parameterType="java.util.List">
+		<foreach collection="list" index="index" item="item" open="begin"
+			separator=";" close=";end;">
+			UPDATE ASS_DICT
+			<set>
+				price = #{item.new_price}
+			</set> 
+			<where>
+				group_id = #{item.group_id} 
+					and hos_id = #{item.hos_id} 
+					and copy_code = #{item.copy_code}
+					and ass_id = #{item.ass_id}
+			</where>
+		</foreach>		
+	</update>
+	
+	
+	<!-- 修改资产变更表单价 -->
+	<update id="updateBatchAssDictPlanPrice" parameterType="java.util.List">
+		<foreach collection="list" index="index" item="item" open="begin"
+			separator=";" close=";end;">
+			UPDATE Ass_NO_DICT 
+			<set>
+				price = #{item.new_price}
+			</set> 
+			<where>
+				group_id = #{item.group_id} 
+					and hos_id = #{item.hos_id} 
+					and copy_code = #{item.copy_code}
+					and ass_id = #{item.ass_id}
+					and ass_no = #{item.ass_no} 
+					and ass_code = #{item.ass_code}
+			</where>
+		</foreach>		
+	</update>
+	
+	
+	<update id="updateBatchAssIsStop" parameterType="java.util.Map">
+		UPDATE ass_no_dict 
+			<trim prefix="SET"  suffixOverrides=","> 
+				<if test="is_stop != null and is_stop != ''">
+					is_stop = #{is_stop,jdbcType=INTEGER}, 
+				</if>
+			</trim>
+		<where>
+			<if test="group_id !=null and group_id !=''">
+				and group_id = #{group_id,jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and hos_id =#{hos_id,jdbcType=INTEGER}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				and copy_code =#{copy_code,jdbcType=VARCHAR}
+			</if>
+			<if test="ass_nos != null and ass_nos != ''">
+				and ass_no in (${ass_nos})
+			</if>
+		</where>
+	</update> 
+</mapper>

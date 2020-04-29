@@ -1,0 +1,248 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.chd.hrp.ass.dao.conference.AssConferenceMapper">
+<resultMap type="java.util.Map" id="querypersonelid">
+<result property="conp_personelid" column="conp_personelid"/>
+<result property="conp_personelname" column="conp_personelname"/>
+</resultMap>
+<resultMap type="java.util.Map" id="queryOtherPersonel">
+<result property="conp_type" column="conp_type"/>
+<result property="conp_supplier" column="conp_supplier"/>
+</resultMap>
+<resultMap type="java.util.Map" id="queryconferenceres">
+<result property="group_id" column="group_id"/>
+<result property="hos_id" column="hos_id"/>
+<result property="copy_code" column="copy_code"/>
+<result property="con_id" column="con_id"/>
+<result property="con_type" column="con_type"/>
+<result property="prj_name" column="prj_name"/>
+<result property="con_theme" column="con_theme"/>
+<result property="con_convener" column="con_convener"/>
+<result property="con_host" column="con_host"/>
+<result property="con_recorder" column="con_recorder"/>
+
+<result property="con_date" column="con_date"/>
+<result property="con_stime" column="con_stime"/>
+<result property="con_etime" column="con_etime"/>
+<result property="con_address" column="con_address"/>
+<result property="con_content" column="con_content"/>
+<result property="con_conclusion" column="con_conclusion"/>
+<result property="con_file" column="con_file"/>
+</resultMap>
+
+<resultMap type="com.chd.hrp.ass.entity.tend.AssTendFile" id="queryFile">
+<result column="group_id" property="group_id"/> 
+<result column="hos_id" property="hos_id"/> 
+<result column="copy_code" property="copy_code"/> 
+<result column="bid_id" property="bid_id"/> 
+<result column="file_path" property="file_path"/> 
+<result column="file_code" property="file_code"/> 
+<result column="file_name" property="file_name"/> 
+<result column="file_type" property="file_type"/> 
+</resultMap>
+
+
+<select id="queryAssConference" resultType="java.util.Map">
+select group_id, hos_id, copy_code, con_id, con_type, prj_name, con_theme, con_convener, con_host,
+ con_recorder, TO_CHAR(con_date,'yyyy-MM-dd') con_date, con_stime, con_etime, con_address, con_content, con_conclusion, con_file
+ from ass_conference
+ where  group_id = #{group_id,jdbcType=INTEGER}
+		AND hos_id = #{hos_id,jdbcType=INTEGER}
+		AND copy_code =#{copy_code,jdbcType=VARCHAR}
+  <if test="con_id!=null and con_id!=''">
+  and con_id=#{con_id}
+  </if>
+  
+  <if test="con_type!=null and con_type!=''">
+  and con_type=#{con_type}
+  </if>
+  
+  <if test="con_date!=null and con_date!=''">
+  and con_date=to_date(#{con_date},'yyyy-MM-dd')
+  </if>
+  
+   <if test="prj_name!=null and prj_name!=''">
+  and prj_name like '${prj_name}%'
+  </if>
+  
+</select>
+
+
+<select id="queryAssConferenceByID" resultMap="queryconferenceres" parameterType="java.util.Map">
+select group_id, hos_id, copy_code, con_id, con_type, prj_name, con_theme, con_convener, con_host,
+ con_recorder, TO_CHAR(con_date,'yyyy-MM-dd') con_date, con_stime, con_etime, con_address, con_content, con_conclusion, con_file
+ from ass_conference
+ where  group_id = #{group_id,jdbcType=INTEGER}
+		AND hos_id = #{hos_id,jdbcType=INTEGER}
+		AND copy_code =#{copy_code,jdbcType=VARCHAR}
+        and con_id=#{con_id}
+ 
+</select>
+
+ <select id="queryAssConferenceSequence" resultType="java.lang.Long">
+		select ASS_Conference_SEQ.currval val from dual
+ </select>
+ 
+<insert id="saveAssConference" parameterType="java.util.Map">
+ insert into ass_conference
+   (group_id, hos_id, copy_code, con_id,con_type, prj_name, con_theme, con_convener,
+    con_host, con_recorder, con_date, con_stime, con_etime, con_address, con_content,
+     con_conclusion, con_file)
+ values
+   (#{group_id},#{hos_id},#{copy_code},ASS_Conference_SEQ.nextval,#{con_type},#{prj_name},#{con_theme},
+   #{con_convener},#{con_host},#{con_recorder},TO_DATE(#{con_date},'yyyy-MM-dd'),#{con_stime},#{con_etime},
+   #{con_address},#{con_content},#{con_conclusion},#{con_file})
+</insert>
+
+<update id="updateAssConference" parameterType="java.util.Map">
+update ass_conference set con_type=#{con_type},prj_name=#{prj_name},con_theme=#{con_theme},
+con_convener=#{con_convener},con_host=#{con_host},con_recorder=#{con_recorder},con_date=TO_DATE(#{con_date},'yyyy-MM-dd'),
+con_stime=#{con_stime},con_etime=#{con_etime},con_address=#{con_address},con_content=#{con_content},
+con_conclusion=#{con_conclusion} where con_id=#{con_id} and 
+ group_id = #{group_id,jdbcType=INTEGER}
+ AND hos_id = #{hos_id,jdbcType=INTEGER}
+ AND copy_code =#{copy_code,jdbcType=VARCHAR}
+
+</update>
+
+<delete id="deleteAssConference" parameterType="java.util.Map">
+delete from ass_conference where 
+ con_id=#{con_id} and 
+ group_id = #{group_id,jdbcType=INTEGER}
+ AND hos_id = #{hos_id,jdbcType=INTEGER}
+ AND copy_code =#{copy_code,jdbcType=VARCHAR}
+</delete>
+
+<insert id="saveConferencePersonnel" parameterType="java.util.List">
+insert into ass_conference_personnel
+  (conp_id,group_id, hos_id, copy_code, con_id, conp_type, conp_personelid, conp_personelcode,conp_personelname)
+ select ASS_Conference_Personnel_SEQ.nextval conp_id,t.* from (
+<foreach collection="list" item="item" index="index" separator=" union">
+select #{item.group_id} group_id,#{item.hos_id} hos_id,#{item.copy_code} copy_code,#{item.con_id} con_id,
+'出席' conp_type,#{item.personelid} conp_personelid,e.emp_code,e.emp_name
+ from hos_emp e
+ where e.group_id=#{item.group_id} and e.hos_id=#{item.hos_id}
+ and e.emp_id=#{item.personelid}
+
+</foreach>
+) t
+</insert>
+<insert id="saveConferencePersonneln" parameterType="java.util.List">
+insert into ass_conference_personnel
+  (conp_id,group_id, hos_id, copy_code, con_id, conp_type, conp_personelid, conp_personelcode,conp_personelname)
+ select ASS_Conference_Personnel_SEQ.nextval conp_id,t.* from (
+<foreach collection="list" item="item" index="index" separator=" union">
+select #{item.group_id} group_id,#{item.hos_id} hos_id,#{item.copy_code} copy_code,#{item.con_id} con_id,
+'缺席' conp_type,#{item.personelidn} conp_personelid,e.emp_code,e.emp_name
+ from hos_emp e
+ where e.group_id=#{item.group_id} and e.hos_id=#{item.hos_id}
+and e.emp_id=#{item.personelidn}
+
+</foreach>
+) t
+</insert>
+<delete id="deleteConferencePersonnel" parameterType="java.util.Map">
+delete from ass_conference_personnel where 
+ con_id=#{con_id} and 
+ group_id = #{group_id,jdbcType=INTEGER}
+ AND hos_id = #{hos_id,jdbcType=INTEGER}
+ AND copy_code =#{copy_code,jdbcType=VARCHAR}
+</delete>
+
+
+<select id="querypersonelid" resultMap="querypersonelid" parameterType="java.util.Map">
+select conp_personelid,conp_personelid||'-'||conp_personelname conp_personelname  from ass_conference_personnel
+where con_id=#{con_id} and 
+ group_id = #{group_id,jdbcType=INTEGER}
+ AND hos_id = #{hos_id,jdbcType=INTEGER}
+ AND copy_code =#{copy_code,jdbcType=VARCHAR}
+ and conp_type='出席'
+</select>
+
+<select id="querypersonelidn" resultMap="querypersonelid" parameterType="java.util.Map">
+select conp_personelid,conp_personelid||'-'||conp_personelname conp_personelname from ass_conference_personnel
+where con_id=#{con_id} and 
+ group_id = #{group_id,jdbcType=INTEGER}
+ AND hos_id = #{hos_id,jdbcType=INTEGER}
+ AND copy_code =#{copy_code,jdbcType=VARCHAR}
+ and conp_type='缺席'
+</select>
+
+<delete id="deleteConferencePerson" parameterType="java.util.Map">
+delete from ass_conference_personnel where 
+ con_id=#{con_id} and 
+ group_id = #{group_id,jdbcType=INTEGER}
+ AND hos_id = #{hos_id,jdbcType=INTEGER}
+ AND copy_code =#{copy_code,jdbcType=VARCHAR}
+ and conp_personelid=#{conp_personelid} 
+ and conp_type=#{conp_type}
+</delete>
+
+<select id="queryOtherPersonel" resultMap="queryOtherPersonel" parameterType="java.util.Map">
+select conp_type,conp_supplier  from ass_conference_personnel
+where con_id=#{con_id} and 
+ group_id = #{group_id,jdbcType=INTEGER}
+ AND hos_id = #{hos_id,jdbcType=INTEGER}
+ AND copy_code =#{copy_code,jdbcType=VARCHAR}
+ and conp_type='其他参会'
+</select>
+
+<insert id="saveOtherPersonel" parameterType="java.util.Map">
+ insert into ass_conference_personnel
+  (conp_id,group_id, hos_id, copy_code, con_id, conp_type, conp_Supplier)
+ values(ASS_Conference_Personnel_SEQ.nextval,#{group_id},#{hos_id},#{copy_code},#{con_id},
+ '其他参会',#{conp_otherpersonel})
+</insert>
+
+
+
+<insert id="addAssTendFile" parameterType="java.util.Map">
+
+insert into  ASS_TEND_FILE(group_id,hos_id,copy_code,bid_id,file_path,file_name,file_type)
+values(#{group_id},#{hos_id},#{copy_code},#{con_id},#{file_path},#{file_name},'会议文件')
+</insert>
+
+<select id="queryAssTendFile" parameterType="java.util.Map" resultMap="queryFile">
+select group_id, hos_id, copy_code,bid_id,file_path,file_name,file_code,file_type from 
+ ASS_TEND_FILE where bid_id=#{con_id} 
+ and file_type='会议文件'
+
+ <if test="group_id != null and group_id != ''">
+		AND group_id = #{group_id}
+  </if>
+  <if test="hos_id != null and hos_id != ''">
+		AND hos_id = #{hos_id}
+  </if>
+  <if test="copy_code != null and copy_code != ''">
+		AND copy_code = #{copy_code}
+  </if>
+    <if test="file_path != null and file_path != ''">
+		AND file_path = #{file_path}
+  </if>
+  <if test="file_name != null and file_name != ''">
+		AND file_name = #{file_name}
+  </if>
+</select>
+
+<delete id="deleteTendFile" parameterType="java.util.Map">
+delete from ASS_TEND_FILE where bid_id=#{con_id} 
+ and file_type='会议文件'
+  <if test="group_id != null and group_id != ''">
+		AND group_id = #{group_id}
+  </if>
+  <if test="hos_id != null and hos_id != ''">
+		AND hos_id = #{hos_id}
+  </if>
+  <if test="copy_code != null and copy_code != ''">
+		AND copy_code = #{copy_code}
+  </if>
+   <if test="file_path != null and file_path != ''">
+		AND file_path = #{file_path}
+  </if>
+  <if test="file_name != null and file_name != ''">
+		AND file_name = #{file_name}
+  </if>
+
+</delete>
+</mapper>

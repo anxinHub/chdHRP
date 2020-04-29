@@ -1,0 +1,302 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.acc.dao.tell.AccBankCheckTellMapper">
+	<resultMap  id="accBankCheckTell" type="com.chd.hrp.acc.entity.AccBankCheckTell">
+		<result property="bank_id" column="bank_id"/>
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/> 
+		<result property="acc_year" column="acc_year"/> 
+		<result property="summary" column="summary"/>
+		<result property="debit" column="debit"/>
+		<result property="credit" column="credit"/>
+		<result property="bal" column="bal"/>
+		<result property="check_no" column="check_no"/>
+		<result property="occur_date" column="occur_date"/>
+		<result property="is_check" column="is_check"/> 
+		<result property="subj_id" column="subj_id"/>
+		<result property="pay_name" column="pay_name"/>
+		<result property="subj_name" column="subj_name"/>
+	</resultMap>
+	
+	<resultMap id="accBankCheckTellMap" type="java.util.Map">
+		
+	</resultMap>
+	
+	<!-- 银行对账单 -->
+	<select id="queryAccBankCheckTell" statementType="CALLABLE" parameterType="java.util.Map" >
+		<![CDATA[{call PROC_ACC_BANK_CHECK_QUERY( 
+			#{group_id,jdbcType=INTEGER}, 
+			#{hos_id,jdbcType=INTEGER}, 
+			#{copy_code,jdbcType=VARCHAR}, 
+			#{acc_year,jdbcType=VARCHAR}, 
+		    #{subj_code,jdbcType=VARCHAR}, 
+		    #{begin_date,jdbcType=VARCHAR}, 
+		    #{end_date,jdbcType=VARCHAR}, 
+			#{is_check,jdbcType=VARCHAR}, 
+			#{pagesize,jdbcType=INTEGER}, 
+			#{page,jdbcType=INTEGER}, 
+			#{tcount,mode=OUT,jdbcType=INTEGER}, 
+			#{rst,jdbcType=CURSOR,mode=OUT,resultMap=com.chd.hrp.acc.dao.tell.AccBankCheckTellMapper.accBankCheckTellMap,javaType=java.sql.ResultSet})}
+		]]>
+	</select>
+<select id="printAccBankCheckTell" statementType="CALLABLE" parameterType="java.util.Map" >
+		<![CDATA[{call PROC_ACC_BANK_CHECK_Print( 
+			#{group_id,jdbcType=INTEGER}, 
+			#{hos_id,jdbcType=INTEGER}, 
+			#{copy_code,jdbcType=VARCHAR}, 
+			#{acc_year,jdbcType=VARCHAR}, 
+		    #{subj_code,jdbcType=VARCHAR}, 
+		    #{begin_date,jdbcType=VARCHAR}, 
+		    #{end_date,jdbcType=VARCHAR}, 
+			#{is_check,jdbcType=VARCHAR}, 
+			#{pagesize,jdbcType=INTEGER}, 
+			#{page,jdbcType=INTEGER}, 
+			#{tcount,mode=OUT,jdbcType=INTEGER}, 
+			#{rst,jdbcType=CURSOR,mode=OUT,resultMap=com.chd.hrp.acc.dao.tell.AccBankCheckTellMapper.accBankCheckTellMap,javaType=java.sql.ResultSet})}
+		]]></select>
+	<!-- 银行对账单Old -->
+	<select id="queryAccBankCheckTellOld" parameterType="java.util.Map"
+	resultMap="accBankCheckTell">
+			<!-- 期初余额 -->
+	with a_table as(
+		  select 
+		     0 as bank_id,
+		     0 as group_id,
+		     0 as hos_id,
+		     '' as copy_code,
+		     '' as acc_year,
+		     '' as subj_code,
+		     '' as occur_date,
+		     '期初余额' as summary,
+		     '' as pay_code,
+		     '' as pay_name,
+		     '' as check_no,
+		     0 as debit,
+		     0 as credit,
+		     a.bal+b.bal as bal,
+		     '' as is_check 
+		            from
+		                (select nvl(abc.bal,0) as bal
+		                       from acc_bank_check abc
+		                       where abc.group_id = #{group_id}
+		                         and abc.hos_id = #{hos_id}
+		                         and abc.copy_code = #{copy_code}
+		                         and abc.acc_year = #{acc_year}
+		                         and abc.subj_code = #{subj_code}
+		                         and abc.is_init = 1
+		                         and abc.bal&lt;&gt;0
+		                )a,       
+		                (select   nvl(sum(abc.debit)-sum(abc.credit),0) as bal
+		                         from acc_bank_check abc
+		                         where abc.group_id = #{group_id}
+		                         and abc.hos_id = #{hos_id}
+		                         and abc.copy_code = #{copy_code}
+		                         and abc.acc_year = #{acc_year}
+		                         and abc.subj_code = #{subj_code}
+		                         and abc.is_init = 0
+		                         and abc.occur_date &lt; to_date(#{begin_date},'yyyy/MM/dd')  
+		                 )b     
+		  ),
+		<!--   银行对账单业务数据 -->
+		  b_table as(
+		     select 
+		         abc.bank_id,
+		         abc.group_id,
+		         abc.hos_id,
+		         abc.copy_code,
+		         abc.acc_year,
+		         abc.subj_code,
+		         to_char(abc.occur_date,'yyyy-MM-dd') as occur_date,
+		         abc.summary,
+		         apt.pay_code,
+		         apt.pay_name,
+		         abc.check_no,
+		         nvl(abc.debit,0) as debit,
+		         nvl(abc.credit,0) as credit,
+		         (select sum(bal) from a_table abc where abc.group_id = #{group_id}
+		                         and abc.hos_id = #{hos_id}
+		                         and abc.copy_code = #{copy_code}
+		                         and abc.acc_year = #{acc_year}
+		                         and abc.subj_code = #{subj_code}
+          
+          ) +sum(abc.debit-abc.credit) over(PARTITION BY 1 order by abc.occur_date,abc.bank_id,abc.debit desc) as bal,
+		         case when abv.bank_id is not null then '是' else '否' end as is_check
+		            from  
+		                 acc_bank_check abc 
+		                 left join acc_pay_type apt
+		            on abc.group_id = apt.group_id
+		               and abc.hos_id = apt.hos_id
+		               and abc.copy_code = apt.copy_code
+		               and abc.pay_type_code = apt.pay_code
+		                 left join acc_bank_veri abv
+		            on abc.group_id = abv.group_id
+		               and abc.hos_id = abv.hos_id
+		               and abc.copy_code = abv.copy_code
+		               and abc.acc_year = abv.acc_year
+		               and abc.bank_id = abv.bank_id
+		     where
+		         abc.group_id = #{group_id}
+		         and abc.hos_id = #{hos_id}
+		         and abc.copy_code = #{copy_code}
+		         and abc.acc_year = #{acc_year}
+		         and abc.subj_code = #{subj_code}
+		         and abc.is_init = 0
+		         and abc.occur_date between to_date(#{begin_date},'yyyy/MM/dd') and to_date(#{end_date},'yyyy/MM/dd')
+		         <if test="isN_check != null and isN_check !='' ">
+		         	and abv.bank_id IS NULL
+		         </if>
+		         <if test="isY_check != null and isY_check != '' ">
+		         	and abv.bank_id IS NOT NULL
+		         </if>
+		         order by abc.occur_date
+		  ), 
+      temp
+      as (
+    SELECT *
+    FROM (
+      SELECT 0 AS bank_id, 0 AS group_id, 0 AS hos_id, NULL AS copy_code, NULL AS acc_year
+        , null AS subj_code, NULL AS occur_date, '期初余额' AS summary, null as pay_code,null as pay_name, nulL AS check_no
+        , 0 AS debit, 0 AS credit, a.bal, NULL AS is_check
+      FROM a_table a
+      UNION ALL
+      SELECT b.bank_id, b.group_id, b.hos_id, b.copy_code, b.acc_year
+        , b.subj_code, b.occur_date, b.summary, b.pay_code,b.pay_name, b.check_no
+        , b.debit, b.credit, b.bal, b.is_check
+      FROM b_table b
+    
+    )
+    )select bank_id,group_id,hos_id,copy_code,acc_year,subj_code,occur_date,summary,pay_code,pay_name,check_no,debit,credit,bal,is_check from temp
+     union all
+     select 0,0,0,'','','','','合计','','','',sum(debit),sum(credit),sum(bal),'' from temp
+	
+	</select>
+	
+	<select id="queryAccBankCheckTellPrint" statementType="CALLABLE" parameterType="java.util.Map" >
+			<!-- 期初余额 -->
+<!-- 	with a_table as(
+		  select 
+		     0 as bank_id,
+		     0 as group_id,
+		     0 as hos_id,
+		     '' as copy_code,
+		     '' as acc_year,
+		     '' as subj_code,
+		     '' as occur_date,
+		     '期初余额' as summary,
+		     '' as pay_code,
+		     '' as pay_name,
+		     '' as check_no,
+		     0 as debit,
+		     0 as credit,
+		     a.bal+b.bal as bal,
+		     '' as is_check 
+		            from
+		                (select nvl(abc.bal,0) as bal
+		                       from acc_bank_check abc
+		                       where abc.group_id = #{group_id}
+		                         and abc.hos_id = #{hos_id}
+		                         and abc.copy_code = #{copy_code}
+		                         and abc.acc_year = #{acc_year}
+		                         and abc.subj_code = #{subj_code}
+		                         and abc.is_init = 1
+		                         and abc.bal&lt;&gt;0
+		                )a,       
+		                (select   nvl(sum(abc.debit)-sum(abc.credit),0) as bal
+		                         from acc_bank_check abc
+		                         where abc.group_id = #{group_id}
+		                         and abc.hos_id = #{hos_id}
+		                         and abc.copy_code = #{copy_code}
+		                         and abc.acc_year = #{acc_year}
+		                         and abc.subj_code = #{subj_code}
+		                         and abc.is_init = 0
+		                         and abc.occur_date &lt; to_date(#{begin_date},'yyyy/MM/dd')  
+		                 )b     
+		  ),
+		  银行对账单业务数据
+		  b_table as(
+		     select 
+		         abc.bank_id,
+		         abc.group_id,
+		         abc.hos_id,
+		         abc.copy_code,
+		         abc.acc_year,
+		         abc.subj_code,
+		         to_char(abc.occur_date,'yyyy-MM-dd') as occur_date,
+		         abc.summary,
+		         apt.pay_code,
+		         apt.pay_name,
+		         abc.check_no,
+		         nvl(abc.debit,0) as debit,
+		         nvl(abc.credit,0) as credit,
+		         (select sum(bal) from a_table abc where abc.group_id = #{group_id}
+		                         and abc.hos_id = #{hos_id}
+		                         and abc.copy_code = #{copy_code}
+		                         and abc.acc_year = #{acc_year}
+		                         and abc.subj_code = #{subj_code}
+          
+          ) +sum(abc.debit-abc.credit) over(PARTITION BY 1 order by abc.occur_date,abc.bank_id,abc.debit desc) as bal,
+		         case when abv.bank_id is not null then '是' else '否' end as is_check
+		            from  
+		                 acc_bank_check abc 
+		                 left join acc_pay_type apt
+		            on abc.group_id = apt.group_id
+		               and abc.hos_id = apt.hos_id
+		               and abc.copy_code = apt.copy_code
+		               and abc.pay_type_code = apt.pay_code
+		                 left join acc_bank_veri abv
+		            on abc.group_id = abv.group_id
+		               and abc.hos_id = abv.hos_id
+		               and abc.copy_code = abv.copy_code
+		               and abc.acc_year = abv.acc_year
+		               and abc.bank_id = abv.bank_id
+		     where
+		         abc.group_id = #{group_id}
+		         and abc.hos_id = #{hos_id}
+		         and abc.copy_code = #{copy_code}
+		         and abc.acc_year = #{acc_year}
+		         and abc.subj_code = #{subj_code}
+		         and abc.is_init = 0
+		         and abc.occur_date between to_date(#{begin_date},'yyyy/MM/dd') and to_date(#{end_date},'yyyy/MM/dd')
+		         <if test="isN_check != null and isN_check !='' ">
+		         	and abv.bank_id IS NULL
+		         </if>
+		         <if test="isY_check != null and isY_check != '' ">
+		         	and abv.bank_id IS NOT NULL
+		         </if>
+		         order by abc.occur_date
+		  ), 
+      temp
+      as (
+    SELECT *
+    FROM (
+      SELECT 0 AS bank_id, 0 AS group_id, 0 AS hos_id, NULL AS copy_code, NULL AS acc_year
+        , null AS subj_code, NULL AS occur_date, '期初余额' AS summary, null as pay_code,null as pay_name, nulL AS check_no
+        , 0 AS debit, 0 AS credit, a.bal, NULL AS is_check
+      FROM a_table a
+      UNION ALL
+      SELECT b.bank_id, b.group_id, b.hos_id, b.copy_code, b.acc_year
+        , b.subj_code, b.occur_date, b.summary, b.pay_code,b.pay_name, b.check_no
+        , b.debit, b.credit, b.bal, b.is_check
+      FROM b_table b
+    
+    )
+    )select bank_id,group_id,hos_id,copy_code,acc_year,subj_code,occur_date,summary,pay_code,pay_name,check_no,debit,credit,bal,is_check from temp
+     union all
+     select 0,0,0,'','','','','合计','','','',sum(debit),sum(credit),sum(bal),'' from temp -->
+	
+		<![CDATA[{call PROC_ACC_BANK_CHECK_PRINT( 
+			#{group_id,jdbcType=INTEGER}, 
+			#{hos_id,jdbcType=INTEGER}, 
+			#{copy_code,jdbcType=VARCHAR}, 
+			#{acc_year,jdbcType=VARCHAR}, 
+		    #{subj_code,jdbcType=VARCHAR}, 
+		    #{begin_date,jdbcType=VARCHAR}, 
+		    #{end_date,jdbcType=VARCHAR}, 
+			#{is_check,jdbcType=VARCHAR}, 
+			#{tcount,mode=OUT,jdbcType=INTEGER}, 
+			#{rst,jdbcType=CURSOR,mode=OUT,resultMap=com.chd.hrp.acc.dao.tell.AccBankCheckTellMapper.accBankCheckTellMap,javaType=java.sql.ResultSet})}
+		]]>
+	</select>
+</mapper>
+

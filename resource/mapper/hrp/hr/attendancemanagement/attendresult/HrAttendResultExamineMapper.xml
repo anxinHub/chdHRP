@@ -1,0 +1,401 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.hr.dao.attendancemanagement.attendresult.HrAttendResultExamineMapper">
+
+	<resultMap id="attendResultManageMap" type="java.util.Map">
+		
+	</resultMap>
+	
+	<!-- 考勤项目表头 -->
+	<select id="queryAttendItemCol" parameterType="java.util.Map" resultType="java.util.Map" >
+		SELECT attend_code, attend_name, attend_item, attend_shortname, attend_types 
+		FROM hr_attend_item
+		WHERE group_id =#{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND is_stop = 0
+		ORDER BY attend_types, attend_item
+	</select>
+	
+		<select id="queryEmp" parameterType="java.util.Map" resultType="java.util.Map" >
+		 select *
+from hr_attend_result_manage
+		where  group_id =#{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			and emp_id=#{emp_id,jdbcType=INTEGER}
+			and state!=0
+			AND year_month = #{year_month,jdbcType=VARCHAR}
+		</select>
+	<!-- 获取考勤数据 -->
+	<select id="queryResultData" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT a.dept_id_c as "dept_id_c", a.emp_id as "emp_id", c.dept_id as "dept_id_b", 
+			a.attend_code as "attend_code", b.attend_item as "attend_item", sum(a.attend_val) as "attend_val" 
+		FROM hr_attend_result_d a 
+		LEFT JOIN hr_attend_item b 
+			ON a.group_id = b.group_id 
+			AND a.hos_id = b.hos_id 
+			AND a.attend_code = b.attend_code 
+		LEFT JOIN hos_dept_dict c 
+			ON a.group_id = c.group_id 
+			AND a.hos_id = c.hos_id 
+			AND a.dept_id_c = c.dept_id 
+			AND c.is_stop = 0 
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND a.year_month = #{year_month,jdbcType=VARCHAR}
+			<!-- 过滤科室权限 -->
+			AND exists(
+				SELECT 1 FROM sys_user_perm_data v 
+				WHERE v.group_id = #{group_id,jdbcType=INTEGER} 
+					AND v.hos_id = #{hos_id,jdbcType=INTEGER} 
+					AND v.user_id = #{user_id,jdbcType=INTEGER} 
+					AND v.table_code = 'HOS_DEPT_DICT' 
+					AND a.dept_id_c = v.perm_code 
+					AND v.is_write = 1
+			)
+			<if test="dept_code !=null and dept_code != 0 ">
+				AND c.dept_code like '${dept_code}%'
+			</if>
+		GROUP BY a.dept_id_c, a.emp_id, c.dept_id, a.attend_code, b.attend_item 
+	</select>
+	
+	<!-- 查询 -->
+	<select id="queryAttendExamine" parameterType="java.util.Map" resultType="java.util.Map">
+	with
+      state0 as (
+        select ha.group_id, ha.hos_id, ha.dept_id_c, hd.dept_code, hd.dept_name,ha.state
+      , case 
+        when   ha.state = 0 then   '未上报'
+        when  ha.state= 1 then '已上报'
+     
+        when ha.state = 2 then '已审核'
+        
+        else '未提交'
+      end as state_name, e.user_name as oper, ha.oper_date , f.user_name as checker, ha.check_date 
+      from hr_attend_result_manage ha
+       left join hos_dept_dict hd on ha.group_id = hd.group_id
+    and hd.hos_id = ha.hos_id
+    and ha.dept_id_c = hd.dept_id 
+    left join sys_user e on ha.group_id = e.group_id
+    and ha.hos_id = e.hos_id
+    and ha.oper = e.user_id 
+      left join sys_user f on ha.group_id = f.group_id
+    and ha.hos_id = f.hos_id
+    and ha.checker = f.user_id 
+    WHERE ha.group_id = #{group_id,jdbcType=INTEGER}
+      AND ha.hos_id = #{hos_id,jdbcType=INTEGER} 
+      AND ha.state=0
+      AND ha.year_month = #{year_month,jdbcType=VARCHAR}
+  <!-- 过滤科室权限 -->
+      AND exists(
+        SELECT 1 FROM sys_user_perm_data v 
+        WHERE v.group_id = #{group_id,jdbcType=INTEGER} 
+          AND v.hos_id = #{hos_id,jdbcType=INTEGER} 
+          AND v.user_id = #{user_id,jdbcType=INTEGER} 
+          AND v.table_code = 'HOS_DEPT_DICT' 
+          AND ha.dept_id_c = v.perm_code 
+          AND v.is_write = 1
+      )
+<if test="dept_id !=null and dept_id != '' ">
+				AND ha.dept_id_c = #{dept_id,jdbcType=INTEGER}
+			</if>
+			<if test="state !=null and state != '' ">
+				AND ha.state = #{state,jdbcType=INTEGER}
+			</if>
+         group by  ha.group_id, ha.hos_id,ha.dept_id_c, hd.dept_code, ha.state, hd.dept_name,   e.user_name, ha.oper_date, f.user_name, ha.check_date
+    order by ha.dept_id_c
+      ), 
+      state1 as (
+        select ha.group_id, ha.hos_id, ha.dept_id_c, hd.dept_code, hd.dept_name,ha.state
+      , case 
+        when   ha.state = 0 then   '未提交'
+        when  ha.state= 1 then '已上报'
+     
+        when ha.state = 2 then '已审核'
+        
+        else '未提交'
+      end as state_name, e.user_name as oper, max(ha.oper_date) oper_date , f.user_name as checker, ha.check_date 
+      from hr_attend_result_manage ha
+       left join hos_dept_dict hd on ha.group_id = hd.group_id
+    and hd.hos_id = ha.hos_id
+    and ha.dept_id_c = hd.dept_id 
+    left join sys_user e on ha.group_id = e.group_id
+    and ha.hos_id = e.hos_id
+    and ha.oper = e.user_id 
+      left join sys_user f on ha.group_id = f.group_id
+    and ha.hos_id = f.hos_id
+    and ha.checker = f.user_id 
+      WHERE ha.group_id = #{group_id,jdbcType=INTEGER}
+      AND ha.hos_id = #{hos_id,jdbcType=INTEGER} 
+      AND ha.state=1
+      AND ha.year_month = #{year_month,jdbcType=VARCHAR}
+  <!-- 过滤科室权限 -->
+      AND exists(
+        SELECT 1 FROM sys_user_perm_data v 
+        WHERE v.group_id = #{group_id,jdbcType=INTEGER} 
+          AND v.hos_id = #{hos_id,jdbcType=INTEGER} 
+          AND v.user_id = #{user_id,jdbcType=INTEGER} 
+          AND v.table_code = 'HOS_DEPT_DICT' 
+          AND ha.dept_id_c = v.perm_code 
+          AND v.is_write = 1
+      )
+           and ha.dept_id_c not in(
+          select  b.dept_id_c from hr_attend_result_manage b 
+             where b.group_id = #{group_id,jdbcType=INTEGER}
+      AND b.hos_id = #{hos_id,jdbcType=INTEGER} 
+             and b.state!=1
+             AND b.year_month = #{year_month,jdbcType=VARCHAR}
+               group by b.dept_id_c
+          )
+     
+          <if test="dept_id !=null and dept_id != '' ">
+				AND ha.dept_id_c = #{dept_id,jdbcType=INTEGER}
+			</if>
+			<if test="state !=null and state != '' ">
+				AND ha.state = #{state,jdbcType=INTEGER}
+			</if>
+         group by ha.group_id, ha.hos_id,ha.dept_id_c, hd.dept_code, ha.state, hd.dept_name,   e.user_name, f.user_name, ha.check_date
+    order by ha.dept_id_c
+      ), 
+      state2 as (
+        select ha.group_id, ha.hos_id, ha.dept_id_c, hd.dept_code, hd.dept_name,ha.state
+      , case 
+        when   ha.state = 0 then   '未提交'
+        when  ha.state= 1 then '已上报'
+     
+        when ha.state = 2 then '已审核'
+        
+        else '未提交'
+      end as state_name, e.user_name as oper, max(ha.oper_date) oper_date , f.user_name as checker,max(ha.check_date)check_date 
+       from hr_attend_result_manage ha
+       left join hos_dept_dict hd on ha.group_id = hd.group_id
+    and hd.hos_id = ha.hos_id
+    and ha.dept_id_c = hd.dept_id 
+    left join sys_user e on ha.group_id = e.group_id
+    and ha.hos_id = e.hos_id
+    and ha.oper = e.user_id 
+      left join sys_user f on ha.group_id = f.group_id
+    and ha.hos_id = f.hos_id
+    and ha.checker = f.user_id 
+  WHERE ha.group_id = #{group_id,jdbcType=INTEGER}
+      AND ha.hos_id = #{hos_id,jdbcType=INTEGER} 
+      AND ha.state=2
+      AND ha.year_month = #{year_month,jdbcType=VARCHAR}
+  <!-- 过滤科室权限 -->
+      AND exists(
+        SELECT 1 FROM sys_user_perm_data v 
+        WHERE v.group_id = #{group_id,jdbcType=INTEGER} 
+          AND v.hos_id = #{hos_id,jdbcType=INTEGER} 
+          AND v.user_id = #{user_id,jdbcType=INTEGER} 
+          AND v.table_code = 'HOS_DEPT_DICT' 
+          AND ha.dept_id_c = v.perm_code 
+          AND v.is_write = 1
+      )
+           and ha.dept_id_c not in(
+          select  b.dept_id_c from hr_attend_result_manage b 
+             where b.group_id = #{group_id,jdbcType=INTEGER}
+      AND b.hos_id = #{hos_id,jdbcType=INTEGER} 
+             and b.state!=2
+              AND b.year_month = #{year_month,jdbcType=VARCHAR}
+               group by b.dept_id_c
+          )
+          <if test="dept_id !=null and dept_id != '' ">
+				AND ha.dept_id_c = #{dept_id,jdbcType=INTEGER}
+			</if>
+			<if test="state !=null and state != '' ">
+				AND ha.state = #{state,jdbcType=INTEGER}
+			</if>
+         group by ha.group_id, ha.hos_id,ha.dept_id_c, hd.dept_code, ha.state, hd.dept_name,   e.user_name, ha.oper_date, f.user_name
+    order by ha.dept_id_c
+      )
+        select t.* from (
+    select st0.dept_id_c, st0.dept_code,st0.state_name, st0.state, st0.dept_name,   st0.oper, st0.oper_date, st0.checker, st0.check_date from 
+    state0 st0 
+  
+   union all 
+   select st1.dept_id_c, st1.dept_code,st1.state_name, st1.state, st1.dept_name,   st1.oper, st1.oper_date, st1.checker, st1.check_date from state1 st1
+ 
+ union all 
+   select st2.dept_id_c, st2.dept_code,st2.state_name, st2.state, st2.dept_name,   st2.oper, st2.oper_date, st2.checker, st2.check_date from state2 st2
+)t 
+    order by t.dept_id_c
+ 
+ 
+		
+		
+	</select>
+	<select id="queryAttendResultManagePrint" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT a.group_id as "group_id", a.hos_id as "hos_id", a.year_month as "year_month", 
+			a.dept_id_c as "dept_id_c", c.dept_code || ' ' || c.dept_name as "dept_name_c", 
+			a.emp_id as "emp_id", b.emp_code as "emp_code", b.emp_name as "emp_name", 
+			a.dept_id_b as "dept_id_b", d.dept_code || ' ' || d.dept_name as "dept_name_b", 
+			case state when 0 then '未审核' when 1 then '已审核' when 2 then '已上报' end as "state", 
+			e.user_name as "oper", a.oper_date as "oper_date", f.user_name as "checker", 
+			a.check_date as "check_date", ${selectSql}
+		FROM hr_attend_result_manage a 
+		LEFT JOIN hos_emp_dict b 
+			ON a.group_id = b.group_id 
+			AND a.hos_id = b.hos_id 
+			AND a.emp_id = b.emp_id 
+			AND b.is_stop = 0 
+		LEFT JOIN hos_dept_dict c 
+			ON a.group_id = c.group_id 
+			AND a.hos_id = c.hos_id 
+			AND a.dept_id_c = c.dept_id 
+			AND c.is_stop = 0 
+		LEFT JOIN hos_dept_dict d 
+			ON a.group_id = d.group_id 
+			AND a.hos_id = d.hos_id 
+			AND a.dept_id_b = d.dept_id 
+			AND d.is_stop = 0 
+		LEFT JOIN sys_user e 
+			ON a.group_id = e.group_id 
+			AND a.hos_id = e.hos_id 
+			AND a.oper = e.user_id 
+		LEFT JOIN sys_user f 
+			ON a.group_id = f.group_id 
+			AND a.hos_id = f.hos_id 
+			AND a.checker = f.user_id 
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND a.year_month = #{year_month,jdbcType=VARCHAR}
+			<!-- 过滤科室权限 -->
+			AND exists(
+				SELECT 1 FROM sys_user_perm_data v 
+				WHERE v.group_id = #{group_id,jdbcType=INTEGER} 
+					AND v.hos_id = #{hos_id,jdbcType=INTEGER} 
+					AND v.user_id = #{user_id,jdbcType=INTEGER} 
+					AND v.table_code = 'HOS_DEPT_DICT' 
+					AND a.dept_id_c = v.perm_code 
+					AND v.is_write = 1
+			)
+			<if test="dept_id !=null and dept_id != '' ">
+				AND a.dept_id_c = #{dept_id,jdbcType=INTEGER}
+			</if>
+			<if test="emp_id != null and emp_id != ''">
+				AND a.emp_id = #{emp_id,jdbcType=INTEGER}
+			</if>
+			<if test="state != null and state != ''">
+				AND a.state = #{state,jdbcType=INTEGER}
+			</if>
+		ORDER BY a.dept_id_c, a.emp_id</select>
+	<!-- 加班查询 -->
+	<select id="queryResultManageJb" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT a.group_id as "group_id", a.hos_id as "hos_id", a.overtime_code as "attend_overtime_code", 
+			b.attend_name as "attend_name", a.begin_date as "begin_date", 
+			a.end_date as "end_date", a.days as "attend_accchadays" ,a.overtime_date as "overtime_date"
+		FROM HR_ATTEND_OVERTIME a 
+		LEFT JOIN hr_attend_item b 
+			ON a.group_id = b.group_id 
+			AND a.hos_id = b.hos_id 
+			AND a.attend_code = b.attend_code 
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER} 
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND #{year_month,jdbcType=VARCHAR} 
+				BETWEEN to_char(overtime_date, 'yyyyMM') 
+				AND to_char(overtime_date, 'yyyyMM') 
+			AND a.cdept_id = #{dept_id_c,jdbcType=INTEGER} 
+			AND a.emp_id = #{emp_id,jdbcType=INTEGER} 
+			AND a.attend_code = #{attend_code,jdbcType=VARCHAR}
+	</select>
+		<!-- 休假查询 -->
+	<select id="queryResultManageXj" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT a.group_id as "group_id", a.hos_id as "hos_id", a.attend_xjapply_code as "attend_overtime_code", 
+			b.attend_name as "attend_name", a.attend_xjbegdate as "begin_date", 
+			a.attend_xjenddate as "end_date", a.attend_xjdays as "attend_accchadays" 
+		FROM HR_ATTEND_XJAPPLY a 
+		LEFT JOIN hr_attend_item b 
+			ON a.group_id = b.group_id 
+			AND a.hos_id = b.hos_id 
+			AND a.attend_code = b.attend_code 
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER} 
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND #{year_month,jdbcType=VARCHAR} 
+				BETWEEN to_char(attend_xjbegdate, 'yyyyMM') 
+				AND to_char(attend_xjenddate, 'yyyyMM') 
+			<!-- AND a.dept_id = #{dept_id_c,jdbcType=INTEGER}  -->
+			AND a.emp_id = #{emp_id,jdbcType=INTEGER} 
+			AND a.attend_code = #{attend_code,jdbcType=VARCHAR}
+	</select>
+	<!-- 批量添加 -->
+	<insert id="addBatchResultManage" parameterType="java.util.Map">
+		INSERT INTO hr_attend_result_manage(
+			group_id, hos_id, year_month, state, dept_id_c, emp_id, dept_id_b, ${map.itemSql}
+		) 
+		SELECT 
+			#{map.group_id,jdbcType=INTEGER} group_id, 
+			#{map.hos_id,jdbcType=INTEGER} hos_id, 
+			#{map.year_month,jdbcType=VARCHAR} year_month, 
+			#{map.state,jdbcType=INTEGER} state, 
+			dept_id_c, emp_id, dept_id_b, ${map.itemSql}
+		FROM (
+			<foreach collection="list" item="item" index="index" separator=" union all " >
+				SELECT 		
+					#{item.dept_id_c,jdbcType=INTEGER} dept_id_c, 
+					#{item.emp_id,jdbcType=INTEGER} emp_id, 
+					#{item.dept_id_b,jdbcType=INTEGER} dept_id_b, 
+					${map.itemSqlVal}
+				from dual
+			</foreach>
+		) t
+	</insert>
+	
+	<!-- 检验状态 -->
+	<select id="existsByState" parameterType="java.util.Map" resultType="java.lang.Integer">
+		SELECT count(1) 
+		FROM hr_attend_result_manage
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND year_month = #{year_month,jdbcType=VARCHAR}
+			AND state &lt;&gt; #{exists_state,jdbcType=INTEGER}
+			
+			and	dept_id_c = #{dept_id_c,jdbcType=INTEGER}
+			
+	</select>
+	
+	<delete id="deleteResultManage" parameterType="java.util.Map">
+		DELETE FROM hr_attend_result_manage 
+		WHERE group_id = #{map.group_id,jdbcType=INTEGER} 
+			AND hos_id = #{map.hos_id,jdbcType=INTEGER} 
+			AND year_month = #{map.year_month,jdbcType=VARCHAR} 
+			<foreach collection="list" item="item" index="index" open="AND ((" separator=")or(" close="))">
+				dept_id_c = #{item.dept_id_c,jdbcType=INTEGER}
+				AND emp_id = #{item.emp_id,jdbcType=INTEGER}
+			</foreach>
+	</delete>
+	
+	<!-- 提交取消提交 -->
+	<update id="updateStateBySubmit" parameterType="java.util.Map">
+		UPDATE hr_attend_result_manage 
+		SET state = #{state,jdbcType=INTEGER}, 
+			oper = #{oper,jdbcType=INTEGER}, 
+			oper_date = #{oper_date,jdbcType=DATE} 
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND year_month = #{year_month,jdbcType=VARCHAR}
+			
+				and dept_id_c = #{dept_id_c,jdbcType=INTEGER}
+			
+	</update>
+	
+	<!-- 审核消审 -->
+	<update id="updateStateByCheck" parameterType="java.util.Map">
+		UPDATE hr_attend_result_manage 
+		SET state = #{state,jdbcType=INTEGER}, 
+			checker = #{checker,jdbcType=INTEGER}, 
+			check_date = #{check_date,jdbcType=DATE} 
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND year_month = #{year_month,jdbcType=VARCHAR}
+			
+			and	dept_id_c = #{dept_id_c,jdbcType=INTEGER}
+				
+	</update>
+	<delete id="deleteAttendExamineResult" parameterType="java.util.Map">
+		DELETE FROM hr_attend_result_manage 
+		WHERE group_id = #{group_id,jdbcType=INTEGER} 
+			AND hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND year_month = #{year_month,jdbcType=VARCHAR} 
+			
+			and	dept_id_c = #{dept_id_c,jdbcType=INTEGER}
+			</delete>
+</mapper>

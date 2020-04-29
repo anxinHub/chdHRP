@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8" ?>  
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.hpm.dao.AphiNatureReportMapper">
+	
+	<!-- 报表查询、本期、上期、同比 -->
+	<select id="queryHpmNatureReport" parameterType="java.util.Map" resultType="java.util.TreeMap">
+		select 
+			${bq_sql_column}
+			${sq_sql_column}
+			${tb_sql}
+			t.nature_name
+		from aphi_dept_nature t
+		left join(
+			<!-- 查询本期指标值 -->
+			select 
+				${bq_sql}
+				adtd.group_id,adtd.hos_id,adtd.copy_code,ad.nature_code,adn.nature_name
+		 	from aphi_dept_target_data adtd
+			left join aphi_dept_dict ad 
+			on
+		  		adtd.group_id = ad.group_id and adtd.hos_id = ad.hos_id and adtd.copy_code = ad.copy_code
+		  		and adtd.dept_id = ad.dept_id and adtd.dept_no= adtd.dept_no and ad.is_stop = 0
+		 	left join aphi_dept_nature adn
+			on
+				ad.group_id = adn.group_id and ad.hos_id = adn.hos_id and ad.copy_code = adn.copy_code
+				and ad.nature_code = adn.nature_code and adn.is_stop = 0
+			where adtd.acct_year ||'-'||adtd.acct_month between #{begin_date} and #{end_date}
+				and adtd.target_code in(${targetCode})
+				and adtd.group_id = #{group_id} 
+				and adtd.hos_id = #{hos_id} 
+				and adtd.copy_code = #{copy_code} 
+				and exists(
+					select 1 from v_user_data_perm a where a.group_id = #{group_id}
+					and a.hos_id = #{hos_id} and a.copy_code = #{copy_code}
+					and a.user_id = #{user_id}
+					and a.mod_code = '09' and a.table_code = 'APHI_DEPT_DICT'
+					and a.perm_code = ad.dept_id and a.is_read = 1 and a.is_write = 1
+				)
+		 	group by adtd.group_id,adtd.hos_id,adtd.copy_code,ad.nature_code,adn.nature_name
+		) bq 
+		ON 
+			t.group_id = bq.group_id and t.hos_id = bq.hos_id and t.copy_code = bq.copy_code
+			and t.nature_code = bq.nature_code
+		left join (
+			<!-- 查询上级指标值 -->
+		 	select 
+				${sq_sql}
+				adtd.group_id,adtd.hos_id,adtd.copy_code,ad.nature_code,adn.nature_name
+		 	from aphi_dept_target_data adtd
+		 	left join aphi_dept_dict ad 
+		 	on
+		  		adtd.group_id = ad.group_id and adtd.hos_id = ad.hos_id
+		  		and adtd.copy_code = ad.copy_code
+		  		and adtd.dept_id = ad.dept_id and adtd.dept_no = ad.dept_no  and ad.is_stop = 0
+		 	left join aphi_dept_nature adn
+			on
+				ad.group_id = adn.group_id and ad.hos_id = adn.hos_id
+				and ad.copy_code = adn.copy_code
+				and ad.nature_code = adn.nature_code and adn.is_stop = 0
+		 	where adtd.acct_year ||'-'||adtd.acct_month between #{pre_begin_date} and #{pre_end_date}
+			and adtd.target_code in(${targetCode})
+			and adtd.group_id = #{group_id} 
+			and adtd.hos_id = #{hos_id} 
+			and adtd.copy_code = #{copy_code} 
+			and exists(
+				select 1 from v_user_data_perm a where a.group_id = #{group_id}
+				and a.hos_id = #{hos_id} and a.copy_code = #{copy_code}
+				and a.user_id = #{user_id}
+				and a.mod_code = '09' and a.table_code = 'APHI_DEPT_DICT'
+				and a.perm_code = ad.dept_id and a.is_read = 1 and a.is_write = 1
+			)
+		 	group by adtd.group_id,adtd.hos_id,adtd.copy_code,ad.nature_code,adn.nature_name
+	 	) sq 
+	 	on
+			t.group_id = sq.group_id and t.hos_id = sq.hos_id
+			and t.copy_code = sq.copy_code
+			and t.nature_code = sq.nature_code
+		<where>
+			<if test="nature_code != null and nature_code != '' ">
+				t.nature_code = #{nature_code}
+			</if>
+			<if test="group_id != null and group_id != ''">
+				AND t.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and t.hos_id = #{hos_id} 
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				AND t.copy_code = #{copy_code}
+			</if>
+		</where>
+	</select>
+</mapper>

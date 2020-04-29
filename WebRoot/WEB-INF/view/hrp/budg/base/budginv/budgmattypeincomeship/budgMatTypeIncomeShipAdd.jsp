@@ -1,0 +1,216 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8"
+	pageEncoding="UTF-8"%>
+<%
+String path = request.getContextPath();
+%>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html style="overflow:hidden;">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <jsp:include page="${path}/inc_jquery_1.9.0.jsp"/>
+    <script type="text/javascript">
+     var grid;
+	 var gridManager = null;
+     var dataFormat;
+     var budg_year;
+     var subj_type ;
+     $(function (){
+    	loadHead(null);
+        loadDict();//加载下拉框
+        loadForm();
+    	
+    	budg_year = liger.get("budg_year").getValue();
+    	
+        $("body").keydown(function() {
+            if (event.keyCode == "9") {//keyCode=9是Tab
+             grid.addRowEdited({
+            	 mat_type_code: '' ,
+               	subj_code: ''
+         		});
+             }
+         });
+        $("#budg_year").change(function(){
+        	grid.deleteAllRows();
+        	budg_year = $("#budg_year").val();
+        	
+        	loadHead();
+        })
+       
+     });  
+     function loadHead(){
+	     grid = $("#maingrid").ligerGrid({ 
+			     columns : [ 
+							{display : '物资分类名称', name : 'mat_type_code', textField : 'mat_type_name', minWidth : 80, align : 'center',
+									editor : {
+										type : 'select',
+										valueField : 'mat_type_code',
+										textField : 'mat_type_name',
+										url : 'queryMatTypeIncome.do?isCheck=false',
+										keySupport : true,
+										autocomplete : true,
+									}
+								},
+								{display : '预算支出科目名称', name : 'subj_code', textField : 'text', minWidth : 80, align : 'center',
+									editor : {
+										type : 'select',
+										valueField : 'id',
+										textField : 'text',
+										url : '../../../queryBudgSubj.do?isCheck=false&subj_type=05&is_last=1&budg_year='+budg_year,
+										keySupport : true,
+										autocomplete : true,
+									}
+								}
+							],
+							dataAction: 'server',dataType: 'server',checkbox: true,usePager:true,
+		                    width: '100%', height: '100%',isAddRow:false,rownumbers:true,enabledEdit:true,
+		                    selectRowButtonOnly:true,//heightDiff: -10,
+		                    toolbar: { 
+		                    	items: [
+                   						{ text: '保存', id:'add', click: save , icon:'add' },
+                   	                	{ line:true },
+                   	                	{ text: '删除', id:'delete', click: del ,icon:'delete' },
+                   	               		{ line:true }
+                   				]},
+					});
+	     		gridManager = $("#maingrid").ligerGetGridManager();
+	 }
+     
+     function  save(){
+    	 
+    	 var data = gridManager.getData();
+    	 if (data.length == 0){
+         	$.ligerDialog.error('请添加行数据');
+         }else{
+        	 if(!validateGrid(data)){
+        		 return false;
+        	 }
+	    	 var ParamVo =[];
+	         $(data).each(function (){					
+	        	 ParamVo.push(
+					//表的主键
+	        			 budg_year	+"@"+
+	        			 this.subj_code   +"@"+ 
+	 					this.mat_type_code   +"@"+ 
+	 					this.mat_type_name   +"@"+ 
+	 					this.text 
+					)
+	         });
+	       
+	        ajaxJsonObjectByUrl("addBudgMatTypeIncomeShip.do?isCheck=false",{ParamVo : ParamVo.toString()},function(responseData){
+	            
+	            if(responseData.state=="true"){
+	                parent.query();
+	                grid.deleteAllRows();
+	                
+	            }
+	        });
+        }
+    }
+    
+     function del(){
+    	 var data = grid.getCheckedRows();
+   		 if(data.length == 0){
+   				$.ligerDialog.error('请选择行');
+                return;
+            }else{
+            	 for (var i = 0; i < data.length; i++){
+            		 grid.remove(data[i]);
+                 } 
+            }
+    }
+    function validateGrid(data) {  
+ 		var msg="";
+ 		var rowm = "";
+ 		//判断grid 中的数据是否重复或者为空
+ 		var targetMap = new HashMap();
+ 		$.each(data,function(i, v){
+ 			rowm = "";
+			if (v.mat_type_code == "" || v.mat_type_code == null || v.mat_type_code == 'undefined') {
+				rowm+="[会计科目名称]、";
+			}  
+			if (v.subj_code == "" || v.subj_code == null || v.subj_code == 'undefined') {
+				rowm+="[预算科目名称]、";
+			}  
+			if(rowm != ""){
+				rowm = "第"+(i+1)+"行" + rowm.substring(0, rowm.length-1) + "不能为空" + "\n\r";
+			}
+			msg += rowm;
+			var key=v.mat_type_code 
+			var value="第"+(i+1)+"行";
+			if(targetMap.get(key)== null || targetMap.get(key) == 'undefined' || targetMap.get(key) == ""){
+				targetMap.put(key ,value);
+			}else{
+				msg += targetMap.get(key)+"与"+value+"会计科目相同 ,多个预算科目 不允许对应同一会计科目!!" + "\n\r";
+			}
+ 		});
+ 		if(msg != ""){
+ 			$.ligerDialog.warn(msg);  
+			return false;  
+ 		}else{
+ 			return true;  
+ 		} 	
+ 	}
+	function loadForm(){
+	   
+	   $.metadata.setType("attr", "validate");
+	    var v = $("form").validate({
+	        errorPlacement: function (lable, element)
+	        {
+	            if (element.hasClass("l-textarea"))
+	            {
+	                element.ligerTip({ content: lable.html(), target: element[0] }); 
+	            }
+	            else if (element.hasClass("l-text-field"))
+	            {
+	                element.parent().ligerTip({ content: lable.html(), target: element[0] });
+	            }
+	            else
+	            {
+	                lable.appendTo(element.parents("td:first").next("td"));
+	            }
+	        },
+	        success: function (lable)
+	        {
+	            lable.ligerHideTip();
+	            lable.remove();
+	        },
+	        submitHandler: function ()
+	        {
+	            $("form .l-text,.l-textarea").ligerHideTip();
+	        }
+	    });
+	    $("form").ligerForm();
+	}       
+   
+   function saveBudgMatTypeIncomeShip(){
+        if($("form").valid()){
+            save();
+        }
+   }
+    function loadDict(){
+         //字典下拉框
+         
+         //预算年度下拉框
+    	 autocomplete("#budg_year","../../../queryBudgYear.do?isCheck=false","id","text",true,true,'',true);
+         
+     } 
+    </script>
+  
+  </head>
+  
+   <body>
+   <div id="pageloading" class="l-loading" style="display: none"></div>
+   <form name="form1" method="post"  id="form1" >
+        <table cellpadding="0" cellspacing="0" class="l-table-edit" >
+
+            <tr>
+               <td align="right" class="l-table-edit-td"  style="padding-left:20px;">预算年度：</td>
+            	<td align="left" class="l-table-edit-td"><input name="budg_year" type="text" id="budg_year" ltype="text" validate="{required:true,maxlength:20}" /></td>
+            	<td align="left"></td>
+            </tr>
+        </table>
+    </form>
+   	<div id="toptoolbar" ></div>
+   	<div id="maingrid"></div>
+    </body>
+</html>

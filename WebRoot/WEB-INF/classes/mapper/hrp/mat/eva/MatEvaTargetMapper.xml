@@ -1,0 +1,947 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.mat.dao.eva.MatEvaTargetMapper">
+	<!-- 定义指标类别数据集 -->
+	<resultMap id="matEvaTargetType" type="java.util.Map">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="target_type_code" column="target_type_code"/>
+		<result property="target_type_name" column="target_type_name"/>
+		<result property="target_type_text" column="target_type_text"/>
+		<result property="super_code" column="super_code"/>
+		<result property="super_name" column="super_name"/>
+		<result property="super_level" column="super_level"/>
+		<result property="type_level" column="type_level"/>
+		<result property="is_last" column="is_last"/>
+		<result property="is_stop" column="is_stop"/>
+		<result property="spell_code" column="spell_code"/>
+		<result property="wbx_code" column="wbx_code"/>
+		<result property="sort_code" column="sort_code"/>
+		<result property="note" column="note"/>
+	</resultMap>
+	<!-- 指标类别查询 -->
+	<select id="queryMatEvaTargetTypeList" parameterType="java.util.Map" resultMap="matEvaTargetType">
+		SELECT a.group_id, a.hos_id, a.copy_code, a.target_type_code, a.target_type_name, 
+			a.target_type_code || ' ' || a.target_type_name target_type_text, a.super_code, 
+			a.type_level, a.is_last, a.is_stop, a.spell_code, a.wbx_code, a.sort_code, a.note, 
+			case a.super_code when 'TOP' then 'TOP' else a.super_code || ' ' || b.target_type_name end super_name,
+			case a.super_code when 'TOP' then 0 else b.type_level end super_level
+		FROM mat_eva_target_type a
+		LEFT JOIN mat_eva_target_type b 
+			ON a.group_id = b.group_id 
+			AND a.hos_id = b.hos_id 
+			AND a.copy_code = b.copy_code 
+			AND a.super_code = b.target_type_code
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+		UNION ALL 
+		SELECT null, null, null, 'TOP', null, '指标分类', null, 0, null, null, null, null, null, null, null, 0 FROM DUAL
+		ORDER BY sort_code
+	</select>
+	<!-- 指标类别查询父级节点是否已维护指标 -->
+	<select id="queryMatEvaTargetBySuperType" parameterType="java.util.Map" resultType="java.lang.Integer">
+		SELECT count(1)
+		FROM mat_eva_target 
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND target_type_code = #{super_code,jdbcType=VARCHAR}
+	</select>
+	<!-- 指标类别新增 -->
+	<insert id="addMatEvaTargetType" parameterType="java.util.Map">
+		INSERT INTO mat_eva_target_type (
+			group_id, hos_id, copy_code, target_type_code, target_type_name, 
+			super_code, type_level, is_last, is_stop, spell_code, wbx_code, sort_code, note
+		)
+		VALUES(
+			#{group_id,jdbcType=INTEGER}, 
+			#{hos_id,jdbcType=INTEGER},
+			#{copy_code,jdbcType=VARCHAR}, 
+			#{target_type_code,jdbcType=VARCHAR}, 
+			#{target_type_name,jdbcType=VARCHAR}, 
+			#{super_code,jdbcType=VARCHAR}, 
+			#{type_level,jdbcType=INTEGER}, 
+			#{is_last,jdbcType=INTEGER}, 
+			#{is_stop,jdbcType=INTEGER}, 
+			#{spell_code,jdbcType=VARCHAR}, 
+			#{wbx_code,jdbcType=VARCHAR}, 
+			#{sort_code,jdbcType=INTEGER}, 
+			#{note,jdbcType=VARCHAR}
+		)
+	</insert>
+	<!-- 指标类别修改非末级 -->
+	<update id="updateMatEvaTargetTypeIsLast" parameterType="java.util.Map">
+		UPDATE mat_eva_target_type
+		SET is_last = (
+			SELECT case when count > 0 then 0 else 1 end 
+			FROM( 
+				SELECT count(1) count 
+				FROM mat_eva_target_type
+				WHERE group_id = #{group_id,jdbcType=INTEGER}
+					AND hos_id = #{hos_id,jdbcType=INTEGER}
+					AND copy_code = #{copy_code,jdbcType=VARCHAR}
+					AND super_code = #{super_code,jdbcType=VARCHAR}
+			)
+		)
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND target_type_code = #{super_code,jdbcType=VARCHAR}
+	</update>
+	<!-- 指标类别修改 -->
+	<update id="updateMatEvaTargetType" parameterType="java.util.Map">
+		UPDATE mat_eva_target_type
+		SET target_type_name = #{target_type_name,jdbcType=VARCHAR}, 
+			is_stop = #{is_stop,jdbcType=INTEGER}, 
+			spell_code = #{spell_code,jdbcType=VARCHAR}, 
+			wbx_code = #{wbx_code,jdbcType=VARCHAR}, 
+			sort_code = #{sort_code,jdbcType=INTEGER}, 
+			note = #{note,jdbcType=VARCHAR}
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND target_type_code = #{target_type_code,jdbcType=VARCHAR}
+	</update>
+	<!-- 指标类别删除 -->
+	<delete id="deleteMatEvaTargetType" parameterType="java.util.Map">
+		DELETE FROM mat_eva_target_type
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND target_type_code = #{target_type_code,jdbcType=VARCHAR}
+	</delete>
+	<!-- 查询指标类别用于导入 -->
+	<select id="queryMatEvaTargetTypeForImport" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT target_type_code, target_type_name 
+		FROM mat_eva_target_type
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND is_last = 1
+	</select>
+	
+	
+	<!-- 定义标准标度数据集 -->
+	<resultMap id="matEvaScale" type="java.util.Map">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="scale_code" column="scale_code"/>
+		<result property="scale_name" column="scale_name"/>
+		<result property="scale_content" column="scale_content"/>
+		<result property="scale_point" column="scale_point"/>
+		<result property="high_point" column="high_point"/>
+		<result property="low_point" column="low_point"/>
+		<result property="is_stop" column="is_stop"/>
+		<result property="is_stop_name" column="is_stop_name"/>
+		<result property="spell_code" column="spell_code"/>
+		<result property="wbx_code" column="wbx_code"/>
+		<result property="sort_code" column="sort_code"/>
+		<result property="note" column="note"/>
+	</resultMap>
+	<!-- 标准标度查询 -->
+	<select id="queryMatEvaScaleList" parameterType="java.util.Map" resultMap="matEvaScale">
+		SELECT group_id, hos_id, copy_code, scale_code, scale_name, scale_content, 
+			scale_point, high_point, low_point, is_stop, spell_code, wbx_code, sort_code, 
+			note, case is_stop when 1 then '是' else '否' end is_stop_name
+		FROM mat_eva_scale
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			<if test="is_stop != null and is_stop != ''">
+			AND is_stop = #{is_stop,jdbcType=INTEGER}
+			</if>
+		ORDER BY sort_code
+	</select>
+	<!-- 标准标度新增 -->
+	<insert id="addMatEvaScale" parameterType="java.util.Map">
+		INSERT INTO mat_eva_scale(
+			group_id, hos_id, copy_code, scale_code, scale_name, scale_content, 
+			scale_point, high_point, low_point, is_stop, spell_code, wbx_code, sort_code, note
+		)
+		VALUES(
+			#{group_id,jdbcType=INTEGER}, 
+			#{hos_id,jdbcType=INTEGER},
+			#{copy_code,jdbcType=VARCHAR}, 
+			#{scale_code,jdbcType=VARCHAR}, 
+			#{scale_name,jdbcType=VARCHAR}, 
+			#{scale_content,jdbcType=VARCHAR}, 
+			#{scale_point,jdbcType=NUMERIC}, 
+			#{high_point,jdbcType=NUMERIC}, 
+			#{low_point,jdbcType=NUMERIC}, 
+			#{is_stop,jdbcType=INTEGER},
+			#{spell_code,jdbcType=VARCHAR}, 
+			#{wbx_code,jdbcType=VARCHAR}, 
+			#{sort_code,jdbcType=INTEGER}, 
+			#{note,jdbcType=VARCHAR}
+		)
+	</insert>
+	<!-- 标准标度修改 -->
+	<update id="updateMatEvaScale" parameterType="java.util.Map">
+		UPDATE mat_eva_scale 
+		SET scale_name = #{scale_name,jdbcType=VARCHAR}, 
+			scale_content = #{scale_content,jdbcType=VARCHAR}, 
+			scale_point = #{scale_point,jdbcType=NUMERIC}, 
+			high_point = #{high_point,jdbcType=NUMERIC}, 
+			low_point = #{low_point,jdbcType=NUMERIC}, 
+			is_stop = #{is_stop,jdbcType=INTEGER}, 
+			spell_code = #{spell_code,jdbcType=VARCHAR}, 
+			wbx_code = #{wbx_code,jdbcType=VARCHAR}, 
+			sort_code = #{sort_code,jdbcType=INTEGER}, 
+			note = #{note,jdbcType=VARCHAR}
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND scale_code = #{scale_code,jdbcType=VARCHAR}
+	</update>
+	<!-- 标准标度删除 -->
+	<delete id="deleteMatEvaScale" parameterType="java.util.Map">
+		DELETE FROM mat_eva_scale
+		WHERE group_id = #{map.group_id,jdbcType=INTEGER}
+			AND hos_id = #{map.hos_id,jdbcType=INTEGER}
+			AND copy_code = #{map.copy_code,jdbcType=VARCHAR}
+			AND scale_code in(
+				<foreach collection="list" item="item" separator="union all">
+				SELECT #{item.scale_code,jdbcType=VARCHAR} scale_code FROM dual
+				</foreach>
+			)
+	</delete>
+	
+	
+	<!-- 定义评价指标数据集 -->
+	<resultMap id="matEvaTarget" type="java.util.Map">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="target_code" column="target_code"/>
+		<result property="target_name" column="target_name"/>
+		<result property="target_type_code" column="target_type_code"/>
+		<result property="target_type_name" column="target_type_name"/>
+		<result property="target_attr" column="target_attr"/>
+		<result property="target_attr_name" column="target_attr_name"/>
+		<result property="target_kind" column="target_kind"/>
+		<result property="target_kind_name" column="target_kind_name"/>
+		<result property="eva_method" column="eva_method"/>
+		<result property="eva_method_name" column="eva_method_name"/>
+		<result property="is_stop" column="is_stop"/>
+		<result property="is_stop_name" column="is_stop_name"/>
+		<result property="target_explain" column="target_explain"/>
+		<result property="eva_content" column="eva_content"/>
+		<result property="eva_principle" column="eva_principle"/>
+		<result property="spell_code" column="spell_code"/>
+		<result property="wbx_code" column="wbx_code"/>
+		<result property="sort_code" column="sort_code"/>
+		<result property="note" column="note"/>
+	</resultMap>
+	<!-- 评价指标查询 -->
+	<select id="queryMatEvaTargetList" parameterType="java.util.Map" resultMap="matEvaTarget">
+		SELECT a.group_id, a.hos_id, a.copy_code, a.target_code, a.target_name, 
+			a.target_type_code, b.target_type_name, a.target_attr, a.target_kind, 
+			a.eva_method, a.target_explain, a.eva_content, a.eva_principle, a.is_stop, 
+			a.spell_code, a.wbx_code, a.sort_code, a.note, 
+			case a.target_attr when 1 then '定性' else '定量' end target_attr_name, 
+			case a.target_kind when 1 then '主观' else '客观' end target_kind_name, 
+			case a.eva_method when 1 then '标度' else '打分' end eva_method_name, 
+			case a.is_stop when 1 then '是' else '否' end is_stop_name
+		FROM mat_eva_target a 
+		LEFT JOIN mat_eva_target_type b 
+			ON a.group_id = b.group_id 
+			AND a.hos_id = b.hos_id 
+			AND a.copy_code = b.copy_code 
+			AND a.target_type_code = b.target_type_code
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND a.target_type_code like #{target_type_code,jdbcType=VARCHAR} || '%'
+			<if test="target_name != null and target_name != ''">
+			AND (
+				a.target_code like '%' || #{target_name,jdbcType=VARCHAR} || '%'
+				or 
+				a.target_name like '%' || #{target_name,jdbcType=VARCHAR} || '%'
+			)
+			</if>
+			<if test="is_stop != null and is_stop != ''">
+			AND a.is_stop = #{is_stop,jdbcType=INTEGER}
+			</if>
+		ORDER BY b.sort_code, a.sort_code
+	</select>
+	<!-- 评价指标新增 -->
+	<insert id="addMatEvaTarget" parameterType="java.util.Map">
+		INSERT INTO mat_eva_target(
+			group_id, hos_id, copy_code, target_code, target_name, target_type_code, 
+			target_attr, target_kind, eva_method, target_explain, eva_content, 
+			eva_principle, is_stop, spell_code, wbx_code, sort_code, note
+		)
+		VALUES(
+			#{group_id,jdbcType=INTEGER}, 
+			#{hos_id,jdbcType=INTEGER},
+			#{copy_code,jdbcType=VARCHAR}, 
+			#{target_code,jdbcType=VARCHAR}, 
+			#{target_name,jdbcType=VARCHAR}, 
+			#{target_type_code,jdbcType=VARCHAR}, 
+			#{target_attr,jdbcType=INTEGER}, 
+			#{target_kind,jdbcType=INTEGER}, 
+			#{eva_method,jdbcType=INTEGER}, 
+			#{target_explain,jdbcType=VARCHAR}, 
+			#{eva_content,jdbcType=VARCHAR}, 
+			#{eva_principle,jdbcType=VARCHAR}, 
+			#{is_stop,jdbcType=INTEGER}, 
+			#{spell_code,jdbcType=VARCHAR}, 
+			#{wbx_code,jdbcType=VARCHAR}, 
+			#{sort_code,jdbcType=INTEGER}, 
+			#{note,jdbcType=VARCHAR}
+		)
+	</insert>
+	<!-- 评价指标修改 -->
+	<update id="updateMatEvaTarget" parameterType="java.util.Map">
+		UPDATE mat_eva_target 
+		SET target_name = #{target_name,jdbcType=VARCHAR}, 
+			target_type_code = #{target_type_code,jdbcType=VARCHAR}, 
+			target_attr = #{target_attr,jdbcType=INTEGER}, 
+			target_kind = #{target_kind,jdbcType=INTEGER}, 
+			eva_method = #{eva_method,jdbcType=INTEGER}, 
+			target_explain = #{target_explain,jdbcType=VARCHAR}, 
+			eva_content = #{eva_content,jdbcType=VARCHAR}, 
+			eva_principle = #{eva_principle,jdbcType=VARCHAR}, 
+			is_stop = #{is_stop,jdbcType=INTEGER}, 
+			spell_code = #{spell_code,jdbcType=VARCHAR}, 
+			wbx_code = #{wbx_code,jdbcType=VARCHAR}, 
+			sort_code = #{sort_code,jdbcType=INTEGER}, 
+			note = #{note,jdbcType=VARCHAR}
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND target_code = #{target_code,jdbcType=VARCHAR}
+	</update>
+	<!-- 评价指标删除 -->
+	<delete id="deleteMatEvaTarget" parameterType="java.util.Map">
+		DELETE FROM mat_eva_target
+		WHERE group_id = #{map.group_id,jdbcType=INTEGER}
+			AND hos_id = #{map.hos_id,jdbcType=INTEGER}
+			AND copy_code = #{map.copy_code,jdbcType=VARCHAR}
+			AND target_code in(
+				<foreach collection="list" item="item" separator="union all">
+				SELECT #{item.target_code,jdbcType=VARCHAR} target_code FROM dual
+				</foreach>
+			)
+	</delete>
+	<!-- 查询指标用于导入 -->
+	<select id="queryMatEvaTargetForImport" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT target_code, target_name
+		FROM mat_eva_target
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+	</select>
+	<!-- 评价指标导入 -->
+	<insert id="addMatEvaTargetByImp" parameterType="java.util.Map">
+		INSERT INTO mat_eva_target(
+			group_id, hos_id, copy_code, target_code, target_name, target_type_code, 
+			target_attr, target_kind, eva_method, target_explain, eva_content, 
+			eva_principle, is_stop, spell_code, wbx_code, sort_code, note
+		)
+		SELECT #{map.group_id,jdbcType=INTEGER} group_id, 
+			#{map.hos_id,jdbcType=INTEGER} hos_id, 
+			#{map.copy_code,jdbcType=VARCHAR} copy_code, 
+			target_code, target_name, target_type_code, 
+			target_attr, target_kind, eva_method, target_explain, eva_content, 
+			eva_principle, is_stop, spell_code, wbx_code, sort_code, note
+		FROM(
+			<foreach collection="list" item="item" separator="union all">
+				SELECT 
+					#{item.target_code,jdbcType=VARCHAR} target_code, 
+					#{item.target_name,jdbcType=VARCHAR} target_name, 
+					#{item.target_type_code,jdbcType=VARCHAR} target_type_code, 
+					#{item.target_attr,jdbcType=INTEGER} target_attr, 
+					#{item.target_kind,jdbcType=INTEGER} target_kind, 
+					#{item.eva_method,jdbcType=INTEGER} eva_method, 
+					#{item.target_explain,jdbcType=VARCHAR} target_explain, 
+					#{item.eva_content,jdbcType=VARCHAR} eva_content, 
+					#{item.eva_principle,jdbcType=VARCHAR} eva_principle, 
+					#{item.is_stop,jdbcType=INTEGER} is_stop, 
+					#{item.spell_code,jdbcType=VARCHAR} spell_code, 
+					#{item.wbx_code,jdbcType=VARCHAR} wbx_code, 
+					#{item.sort_code,jdbcType=INTEGER} sort_code, 
+					#{item.note,jdbcType=VARCHAR} note
+				FROM dual
+			</foreach>
+		) tmp 
+	</insert>
+	
+	
+	<!-- 定义指标标度数据集 -->
+	<resultMap id="matEvaTargetScale" type="java.util.Map">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="target_code" column="target_code"/>
+		<result property="target_name" column="target_name"/>
+		<result property="scale_code" column="scale_code"/>
+		<result property="scale_name" column="scale_name"/>
+		<result property="scale_content" column="scale_content"/>
+		<result property="scale_point" column="scale_point"/>
+		<result property="high_point" column="high_point"/>
+		<result property="low_point" column="low_point"/>
+		<result property="is_stop" column="is_stop"/>
+		<result property="is_stop_name" column="is_stop_name"/>
+		<result property="spell_code" column="spell_code"/>
+		<result property="wbx_code" column="wbx_code"/>
+		<result property="sort_code" column="sort_code"/>
+		<result property="note" column="note"/>
+		<result property="_code" column="_code"/>
+	</resultMap>
+	<!-- 指标标度查询 -->
+	<select id="queryMatEvaTargetScaleList" parameterType="java.util.Map" resultMap="matEvaTargetScale">
+		SELECT a.group_id, a.hos_id, a.copy_code, a.target_code, b.target_name, 
+			a.scale_code, a.scale_name, a.scale_content, a.scale_point, a.high_point, 
+			a.low_point, a.is_stop, a.spell_code, a.wbx_code, a.sort_code, a.note, 
+			case a.is_stop when 0 then '否' else '是' end is_stop_name, a.target_code "_code"
+		FROM mat_eva_target_scale a 
+		LEFT JOIN mat_eva_target b 
+			ON a.group_id = b.group_id 
+			AND a.hos_id = b.hos_id 
+			AND a.copy_code = b.copy_code 
+			AND a.target_code = b.target_code 
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND a.target_code = #{target_code,jdbcType=VARCHAR}
+		ORDER BY a.sort_code
+	</select>
+	<!-- 指标标度新增 -->
+	<insert id="addMatEvaTargetScale" parameterType="java.util.Map">
+		BEGIN 
+			<!-- 新增指标标度表 -->
+			INSERT INTO mat_eva_target_scale(
+				group_id, hos_id, copy_code, target_code, scale_code, scale_name, scale_content, 
+				scale_point, high_point, low_point, is_stop, spell_code, wbx_code, sort_code, note
+			)
+			SELECT 
+				#{map.group_id,jdbcType=INTEGER} group_id, 
+				#{map.hos_id,jdbcType=INTEGER} hos_id,
+				#{map.copy_code,jdbcType=VARCHAR} copy_code, 
+				#{map.target_code,jdbcType=VARCHAR} target_code, 
+				scale_code, scale_name, scale_content, scale_point, high_point, 
+				low_point, is_stop, spell_code, wbx_code, sort_code, note
+			FROM (
+				<foreach collection="list" item="item" separator="union all">
+					SELECT 
+						#{item.scale_code,jdbcType=VARCHAR} scale_code, 
+						#{item.scale_name,jdbcType=VARCHAR} scale_name, 
+						#{item.scale_content,jdbcType=VARCHAR} scale_content, 
+						#{item.scale_point,jdbcType=NUMERIC} scale_point, 
+						#{item.high_point,jdbcType=NUMERIC} high_point, 
+						#{item.low_point,jdbcType=NUMERIC} low_point, 
+						#{item.is_stop,jdbcType=INTEGER} is_stop,
+						#{item.spell_code,jdbcType=VARCHAR} spell_code, 
+						#{item.wbx_code,jdbcType=VARCHAR} wbx_code, 
+						#{item.sort_code,jdbcType=INTEGER} sort_code, 
+						#{item.note,jdbcType=VARCHAR} note
+					FROM DUAL
+				</foreach>
+			)tmp;
+			<!-- 修改已删除的历史标度为停用 -->
+			UPDATE mat_eva_target_scale_d 
+			SET is_new = 0, 
+				change_user = #{map.user_id,jdbcType=INTEGER}, 
+				change_date = sysdate, 
+				change_note = '已删除指标标度'
+			WHERE group_id = #{map.group_id,jdbcType=INTEGER}
+				AND hos_id = #{map.hos_id,jdbcType=INTEGER}
+				AND copy_code = #{map.copy_code,jdbcType=VARCHAR}
+				AND target_code = #{map.target_code,jdbcType=VARCHAR}
+				AND scale_code not in (
+					<foreach collection="list" item="item" separator="union all">
+						SELECT 
+							#{item.scale_code,jdbcType=VARCHAR} scale_code
+						FROM DUAL
+					</foreach>
+				);
+			<!-- 修改已存在的历史标度为停用 -->
+			UPDATE mat_eva_target_scale_d t1
+			SET is_new = 0
+			WHERE t1.group_id = #{map.group_id,jdbcType=INTEGER}
+				AND t1.hos_id = #{map.hos_id,jdbcType=INTEGER}
+				AND t1.copy_code = #{map.copy_code,jdbcType=VARCHAR}
+				AND t1.target_code = #{map.target_code,jdbcType=VARCHAR}
+				AND t1.scale_code in (
+					SELECT tmp.scale_code
+					FROM (
+						<foreach collection="list" item="item" separator="union all">
+							SELECT 
+								#{item.scale_code,jdbcType=VARCHAR} scale_code, 
+								#{item.scale_name,jdbcType=VARCHAR} scale_name, 
+								#{item.scale_content,jdbcType=VARCHAR} scale_content, 
+								#{item.scale_point,jdbcType=NUMERIC} scale_point, 
+								#{item.high_point,jdbcType=NUMERIC} high_point, 
+								#{item.low_point,jdbcType=NUMERIC} low_point, 
+								#{item.is_stop,jdbcType=INTEGER} is_stop,
+								#{item.spell_code,jdbcType=VARCHAR} spell_code, 
+								#{item.wbx_code,jdbcType=VARCHAR} wbx_code, 
+								#{item.sort_code,jdbcType=INTEGER} sort_code, 
+								#{item.note,jdbcType=VARCHAR} note
+							FROM DUAL
+						</foreach>
+					) tmp
+					WHERE not exists(
+						SELECT 1 
+						FROM mat_eva_target_scale_d t2
+						WHERE t2.group_id = #{map.group_id,jdbcType=INTEGER}
+							AND t2.hos_id = #{map.hos_id,jdbcType=INTEGER}
+							AND t2.copy_code = #{map.copy_code,jdbcType=VARCHAR}
+							AND t2.target_code = #{map.target_code,jdbcType=VARCHAR}
+							AND t2.scale_code = tmp.scale_code
+							AND t2.scale_name = tmp.scale_name
+							AND t2.scale_point = tmp.scale_point
+					)
+				);
+			<!-- 新增指标标度变更表 -->
+			INSERT INTO mat_eva_target_scale_d(
+				group_id, hos_id, copy_code, target_code, scale_no, scale_code, scale_name, 
+				scale_content, scale_point, high_point, low_point, is_stop, spell_code, 
+				wbx_code, sort_code, note, is_new, change_user, change_date, change_note
+			)
+			SELECT 
+				#{map.group_id,jdbcType=INTEGER} group_id, 
+				#{map.hos_id,jdbcType=INTEGER} hos_id,
+				#{map.copy_code,jdbcType=VARCHAR} copy_code, 
+				#{map.target_code,jdbcType=VARCHAR} target_code, 
+				getUUID() scale_no, scale_code, scale_name, scale_content, 
+				scale_point, high_point, low_point, is_stop, spell_code, wbx_code, 
+				sort_code, note, 1 is_new, #{map.user_id,jdbcType=INTEGER} change_user, 
+				sysdate change_date, '新增指标标度' change_note
+			FROM (
+				<foreach collection="list" item="item" separator="union all">
+					SELECT 
+						#{item.scale_code,jdbcType=VARCHAR} scale_code, 
+						#{item.scale_name,jdbcType=VARCHAR} scale_name, 
+						#{item.scale_content,jdbcType=VARCHAR} scale_content, 
+						#{item.scale_point,jdbcType=NUMERIC} scale_point, 
+						#{item.high_point,jdbcType=NUMERIC} high_point, 
+						#{item.low_point,jdbcType=NUMERIC} low_point, 
+						#{item.is_stop,jdbcType=INTEGER} is_stop,
+						#{item.spell_code,jdbcType=VARCHAR} spell_code, 
+						#{item.wbx_code,jdbcType=VARCHAR} wbx_code, 
+						#{item.sort_code,jdbcType=INTEGER} sort_code, 
+						#{item.note,jdbcType=VARCHAR} note
+					FROM DUAL
+				</foreach>
+			)tmp
+			WHERE not exists(
+				SELECT 1 
+				FROM mat_eva_target_scale_d t1
+				WHERE t1.group_id = #{map.group_id,jdbcType=INTEGER}
+					AND t1.hos_id = #{map.hos_id,jdbcType=INTEGER}
+					AND t1.copy_code = #{map.copy_code,jdbcType=VARCHAR}
+					AND t1.target_code = #{map.target_code,jdbcType=VARCHAR}
+					AND t1.scale_code = tmp.scale_code
+					AND t1.scale_name = tmp.scale_name
+					AND t1.scale_point = tmp.scale_point
+			);
+		END;
+	</insert>
+	<!-- 指标标度删除 -->
+	<delete id="deleteMatEvaTargetScale" parameterType="java.util.Map">
+		DELETE FROM mat_eva_target_scale
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND target_code = #{target_code,jdbcType=VARCHAR}
+	</delete>
+	<!-- 指标标度导入标准指标 -->
+	<insert id="addMatEvaTargetScaleByBZ" parameterType="java.util.Map">
+		BEGIN 
+			<!-- 新增指标标度表 -->
+			INSERT INTO mat_eva_target_scale(
+				group_id, hos_id, copy_code, target_code, scale_code, scale_name, scale_content, 
+				scale_point, high_point, low_point, is_stop, spell_code, wbx_code, sort_code, note
+			)
+			SELECT group_id, hos_id, copy_code, #{target_code,jdbcType=VARCHAR}, 
+				scale_code, scale_name, scale_content, scale_point, high_point, low_point, 
+				is_stop, spell_code, wbx_code, sort_code, note
+			FROM mat_eva_scale
+			WHERE group_id = #{group_id,jdbcType=INTEGER}
+				AND hos_id = #{hos_id,jdbcType=INTEGER}
+				AND copy_code = #{copy_code,jdbcType=VARCHAR}
+				AND is_stop = 0;
+			<!-- 修改已删除的历史标度为停用 -->
+			UPDATE mat_eva_target_scale_d
+			SET is_new = 0, change_date = sysdate, change_note = '已删除指标标度'
+			WHERE group_id = #{map.group_id,jdbcType=INTEGER}
+				AND hos_id = #{map.hos_id,jdbcType=INTEGER}
+				AND copy_code = #{map.copy_code,jdbcType=VARCHAR}
+				AND target_code = #{map.target_code,jdbcType=VARCHAR}
+				AND scale_code not in (
+					SELECT scale_code
+					FROM mat_eva_scale
+					WHERE group_id = #{group_id,jdbcType=INTEGER}
+						AND hos_id = #{hos_id,jdbcType=INTEGER}
+						AND copy_code = #{copy_code,jdbcType=VARCHAR}
+						AND is_stop = 0
+				);
+			<!-- 修改历史标度为停用 -->
+			UPDATE mat_eva_target_scale_d t1
+			SET is_new = 0
+			WHERE t1.group_id = #{group_id,jdbcType=INTEGER}
+				AND t1.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND t1.copy_code = #{copy_code,jdbcType=VARCHAR}
+				AND t1.target_code = #{target_code,jdbcType=VARCHAR}
+				AND t1.scale_code in (
+					SELECT tmp.scale_code
+					FROM mat_eva_scale tmp
+					WHERE tmp.group_id = #{group_id,jdbcType=INTEGER}
+						AND tmp.hos_id = #{hos_id,jdbcType=INTEGER}
+						AND tmp.copy_code = #{copy_code,jdbcType=VARCHAR}
+						AND tmp.is_stop = 0
+						AND not exists(
+							SELECT 1 
+							FROM mat_eva_target_scale_d t2
+							WHERE t2.group_id = #{group_id,jdbcType=INTEGER}
+								AND t2.hos_id = #{hos_id,jdbcType=INTEGER}
+								AND t2.copy_code = #{copy_code,jdbcType=VARCHAR}
+								AND t2.target_code = #{target_code,jdbcType=VARCHAR}
+								AND t2.scale_code = tmp.scale_code
+								AND t2.scale_name = tmp.scale_name
+								AND t2.scale_point = tmp.scale_point
+						)
+				);
+			<!-- 新增指标标度变更表 -->
+			INSERT INTO mat_eva_target_scale_d(
+				group_id, hos_id, copy_code, target_code, scale_no, scale_code, scale_name, 
+				scale_content, scale_point, high_point, low_point, is_stop, spell_code, 
+				wbx_code, sort_code, note, is_new, change_user, change_date, change_note
+			)
+			SELECT group_id, hos_id, copy_code, #{target_code,jdbcType=VARCHAR}, 
+				getUUID() scale_no, scale_code, scale_name, scale_content, scale_point, 
+				high_point, low_point, is_stop, spell_code, wbx_code, sort_code, note,
+				1 is_new, #{user_id,jdbcType=INTEGER} change_user, sysdate change_date, 
+				'导入标准标度' change_note 
+			FROM mat_eva_scale
+			WHERE group_id = #{group_id,jdbcType=INTEGER}
+				AND hos_id = #{hos_id,jdbcType=INTEGER}
+				AND copy_code = #{copy_code,jdbcType=VARCHAR}
+				AND is_stop = 0
+				AND not exists(
+					SELECT 1 
+					FROM mat_eva_target_scale_d t1
+					WHERE t1.group_id = #{group_id,jdbcType=INTEGER}
+						AND t1.hos_id = #{hos_id,jdbcType=INTEGER}
+						AND t1.copy_code = #{copy_code,jdbcType=VARCHAR}
+						AND t1.target_code = #{target_code,jdbcType=VARCHAR}
+						AND t1.scale_code = mat_eva_scale.scale_code
+						AND t1.scale_name = mat_eva_scale.scale_name
+						AND t1.scale_point = mat_eva_scale.scale_point
+				);
+		END;
+	</insert>
+	<!-- 批量指标标度删除 -->
+	<delete id="deleteMatEvaTargetScaleBatch" parameterType="java.util.Map">
+		DELETE FROM mat_eva_target_scale
+		WHERE group_id = #{map.group_id,jdbcType=INTEGER}
+			AND hos_id = #{map.hos_id,jdbcType=INTEGER}
+			AND copy_code = #{map.copy_code,jdbcType=VARCHAR}
+			AND target_code in(
+				<foreach collection="list" item="item" separator="union all">
+					SELECT #{item.target_code,jdbcType=VARCHAR} target_code FROM DUAL
+				</foreach>
+			)
+	</delete>
+	<!-- 批量删除指标后应修改指标变更表为停用 -->
+	<delete id="updateMatEvaTargetScaleDBatchByStop" parameterType="java.util.Map">
+		UPDATE mat_eva_target_scale_d
+		SET is_new = 0
+		WHERE group_id = #{map.group_id,jdbcType=INTEGER}
+			AND hos_id = #{map.hos_id,jdbcType=INTEGER}
+			AND copy_code = #{map.copy_code,jdbcType=VARCHAR}
+			AND target_code in(
+				<foreach collection="list" item="item" separator="union all">
+					SELECT #{item.target_code,jdbcType=VARCHAR} target_code FROM DUAL
+				</foreach>
+			)
+	</delete>
+	<!-- 批量设置指标标度保存 -->
+	<insert id="addMatEvaTargetScaleBatch" parameterType="java.util.Map">
+		BEGIN 
+			<!-- 新增指标标度表 -->
+			INSERT INTO mat_eva_target_scale(
+				group_id, hos_id, copy_code, target_code, scale_code, scale_name, scale_content, 
+				scale_point, high_point, low_point, is_stop, spell_code, wbx_code, sort_code, note
+			)
+			SELECT 
+				#{map.group_id,jdbcType=INTEGER} group_id, 
+				#{map.hos_id,jdbcType=INTEGER} hos_id,
+				#{map.copy_code,jdbcType=VARCHAR} copy_code, 
+				tmp1.target_code, tmp2.scale_code, tmp2.scale_name, 
+				tmp2.scale_content, tmp2.scale_point, tmp2.high_point, 
+				tmp2.low_point, tmp2.is_stop, tmp2.spell_code, 
+				tmp2.wbx_code, tmp2.sort_code, tmp2.note
+			FROM (
+				<foreach collection="targetList" item="targetItem" separator="union all">
+					SELECT #{targetItem.target_code} target_code FROM DUAL
+				</foreach>
+			) tmp1
+			LEFT JOIN (
+				<foreach collection="list" item="item" separator="union all">
+					SELECT 
+						#{item.scale_code,jdbcType=VARCHAR} scale_code, 
+						#{item.scale_name,jdbcType=VARCHAR} scale_name, 
+						#{item.scale_content,jdbcType=VARCHAR} scale_content, 
+						#{item.scale_point,jdbcType=NUMERIC} scale_point, 
+						#{item.high_point,jdbcType=NUMERIC} high_point, 
+						#{item.low_point,jdbcType=NUMERIC} low_point, 
+						#{item.is_stop,jdbcType=INTEGER} is_stop,
+						#{item.spell_code,jdbcType=VARCHAR} spell_code, 
+						#{item.wbx_code,jdbcType=VARCHAR} wbx_code, 
+						#{item.sort_code,jdbcType=INTEGER} sort_code, 
+						#{item.note,jdbcType=VARCHAR} note
+					FROM DUAL
+				</foreach>
+			)tmp2
+				ON 1 = 1;
+			<!-- 修改已删除的历史标度为停用 -->
+			UPDATE mat_eva_target_scale_d tmp1
+			SET is_new = 0, 
+				change_user = #{map.user_id,jdbcType=INTEGER}, 
+				change_date = sysdate, 
+				change_note = '已删除指标标度'
+			WHERE group_id = #{map.group_id,jdbcType=INTEGER}
+				AND hos_id = #{map.hos_id,jdbcType=INTEGER}
+				AND copy_code = #{map.copy_code,jdbcType=VARCHAR}
+				AND target_code in (
+					<foreach collection="targetList" item="targetItem" separator="union all">
+						SELECT #{targetItem.target_code} target_code FROM DUAL
+					</foreach>
+				)
+				AND not exists (
+					SELECT 1 FROM(
+						<foreach collection="targetList" item="targetItem" separator="union all">
+							SELECT #{targetItem.target_code} target_code FROM DUAL
+						</foreach>
+					) tmp2
+					LEFT JOIN(
+						<foreach collection="list" item="item" separator="union all">
+							SELECT 
+								#{item.scale_code,jdbcType=VARCHAR} scale_code
+							FROM DUAL
+						</foreach>
+					) tmp3 
+						ON 1 = 1 
+					WHERE tmp1.target_code = tmp2.target_code 
+						AND tmp1.scale_code = tmp3.scale_code 
+				);
+			<!-- 修改已存在的历史标度为停用 -->
+			UPDATE mat_eva_target_scale_d t1
+			SET is_new = 0
+			WHERE t1.group_id = #{map.group_id,jdbcType=INTEGER}
+				AND t1.hos_id = #{map.hos_id,jdbcType=INTEGER}
+				AND t1.copy_code = #{map.copy_code,jdbcType=VARCHAR}
+				AND exists (
+					SELECT 1
+					FROM (
+						<foreach collection="targetList" item="targetItem" separator="union all">
+							SELECT #{targetItem.target_code} target_code FROM DUAL
+						</foreach>
+					) tmp1
+					LEFT JOIN (
+						<foreach collection="list" item="item" separator="union all">
+							SELECT 
+								#{item.scale_code,jdbcType=VARCHAR} scale_code, 
+								#{item.scale_name,jdbcType=VARCHAR} scale_name, 
+								#{item.scale_content,jdbcType=VARCHAR} scale_content, 
+								#{item.scale_point,jdbcType=NUMERIC} scale_point, 
+								#{item.high_point,jdbcType=NUMERIC} high_point, 
+								#{item.low_point,jdbcType=NUMERIC} low_point, 
+								#{item.is_stop,jdbcType=INTEGER} is_stop,
+								#{item.spell_code,jdbcType=VARCHAR} spell_code, 
+								#{item.wbx_code,jdbcType=VARCHAR} wbx_code, 
+								#{item.sort_code,jdbcType=INTEGER} sort_code, 
+								#{item.note,jdbcType=VARCHAR} note
+							FROM DUAL
+						</foreach>
+					) tmp2 
+						ON 1 = 1
+					WHERE not exists(
+							SELECT 1 
+							FROM mat_eva_target_scale_d t2
+							WHERE t2.group_id = #{map.group_id,jdbcType=INTEGER}
+								AND t2.hos_id = #{map.hos_id,jdbcType=INTEGER}
+								AND t2.copy_code = #{map.copy_code,jdbcType=VARCHAR}
+								AND t2.target_code = tmp1.target_code
+								AND t2.scale_code = tmp2.scale_code
+								AND t2.scale_name = tmp2.scale_name
+								AND t2.scale_point = tmp2.scale_point
+						)
+					AND t1.target_code = tmp1.target_code 
+					AND t1.scale_code = tmp2.scale_code 
+				);
+			<!-- 新增指标标度变更表 -->
+			INSERT INTO mat_eva_target_scale_d(
+				group_id, hos_id, copy_code, target_code, scale_no, scale_code, scale_name, 
+				scale_content, scale_point, high_point, low_point, is_stop, spell_code, 
+				wbx_code, sort_code, note, is_new, change_user, change_date, change_note
+			)
+			SELECT 
+				#{map.group_id,jdbcType=INTEGER} group_id, 
+				#{map.hos_id,jdbcType=INTEGER} hos_id,
+				#{map.copy_code,jdbcType=VARCHAR} copy_code, 
+				tmp1.target_code, getUUID() scale_no, tmp2.scale_code, 
+				tmp2.scale_name, tmp2.scale_content, tmp2.scale_point, 
+				tmp2.high_point, tmp2.low_point, tmp2.is_stop, tmp2.spell_code, 
+				tmp2.wbx_code, tmp2.sort_code, tmp2.note, 1 is_new, 
+				#{map.user_id,jdbcType=INTEGER} change_user, 
+				sysdate change_date, '新增指标标度' change_note
+			FROM (
+				<foreach collection="targetList" item="targetItem" separator="union all">
+					SELECT #{targetItem.target_code} target_code FROM DUAL
+				</foreach>
+			) tmp1
+			LEFT JOIN(
+				<foreach collection="list" item="item" separator="union all">
+					SELECT 
+						#{item.scale_code,jdbcType=VARCHAR} scale_code, 
+						#{item.scale_name,jdbcType=VARCHAR} scale_name, 
+						#{item.scale_content,jdbcType=VARCHAR} scale_content, 
+						#{item.scale_point,jdbcType=NUMERIC} scale_point, 
+						#{item.high_point,jdbcType=NUMERIC} high_point, 
+						#{item.low_point,jdbcType=NUMERIC} low_point, 
+						#{item.is_stop,jdbcType=INTEGER} is_stop,
+						#{item.spell_code,jdbcType=VARCHAR} spell_code, 
+						#{item.wbx_code,jdbcType=VARCHAR} wbx_code, 
+						#{item.sort_code,jdbcType=INTEGER} sort_code, 
+						#{item.note,jdbcType=VARCHAR} note
+					FROM DUAL
+				</foreach>
+			)tmp2
+				ON 1 = 1
+			WHERE not exists(
+				SELECT 1 
+				FROM mat_eva_target_scale_d t1
+				WHERE t1.group_id = #{map.group_id,jdbcType=INTEGER}
+					AND t1.hos_id = #{map.hos_id,jdbcType=INTEGER}
+					AND t1.copy_code = #{map.copy_code,jdbcType=VARCHAR}
+					AND t1.target_code = tmp1.target_code
+					AND t1.scale_code = tmp2.scale_code
+					AND t1.scale_name = tmp2.scale_name
+					AND t1.scale_point = tmp2.scale_point
+			);
+		END;
+	</insert>
+	
+	<!-- 定义指标扣分项数据集 -->
+	<resultMap id="matEvaTargetDeduct" type="java.util.Map">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="target_code" column="target_code"/>
+		<result property="target_name" column="target_name"/>
+		<result property="deduct_code" column="deduct_code"/>
+		<result property="deduct_name" column="deduct_name"/>
+		<result property="high_point" column="high_point"/>
+		<result property="deduct_desc" column="deduct_desc"/>
+		<result property="is_stop" column="is_stop"/>
+		<result property="is_stop_name" column="is_stop_name"/>
+		<result property="spell_code" column="spell_code"/>
+		<result property="wbx_code" column="wbx_code"/>
+		<result property="sort_code" column="sort_code"/>
+		<result property="note" column="note"/>
+	</resultMap>
+	<!-- 指标扣分项查询 -->
+	<select id="queryMatEvaTargetDeductList" parameterType="java.util.Map" resultMap="matEvaTargetDeduct">
+		SELECT a.group_id, a.hos_id, a.copy_code, a.target_code, b.target_name, 
+			a.deduct_code, a.deduct_name, a.high_point, a.deduct_desc, 
+			a.is_stop, a.spell_code, a.wbx_code, a.sort_code, a.note, 
+			case a.is_stop when 0 then '否' else '是' end is_stop_name
+		FROM mat_eva_target_deduct a 
+		LEFT JOIN mat_eva_target b 
+			ON a.group_id = b.group_id 
+			AND a.hos_id = b.hos_id 
+			AND a.copy_code = b.copy_code 
+			AND a.target_code = b.target_code 
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND a.target_code = #{target_code,jdbcType=VARCHAR}
+		ORDER BY a.sort_code
+	</select>
+	<!-- 指标扣分项新增 -->
+	<insert id="addMatEvaTargetDeduct" parameterType="java.util.Map">
+		INSERT INTO mat_eva_target_deduct(
+			group_id, hos_id, copy_code, target_code, deduct_code, deduct_name, 
+			high_point, deduct_desc, is_stop, spell_code, wbx_code, sort_code, note
+		)
+		VALUES(
+			#{group_id,jdbcType=INTEGER}, 
+			#{hos_id,jdbcType=INTEGER},
+			#{copy_code,jdbcType=VARCHAR}, 
+			#{target_code,jdbcType=VARCHAR}, 
+			#{deduct_code,jdbcType=VARCHAR}, 
+			#{deduct_name,jdbcType=VARCHAR}, 
+			#{high_point,jdbcType=NUMERIC}, 
+			#{deduct_desc,jdbcType=VARCHAR}, 
+			#{is_stop,jdbcType=INTEGER},
+			#{spell_code,jdbcType=VARCHAR}, 
+			#{wbx_code,jdbcType=VARCHAR}, 
+			#{sort_code,jdbcType=INTEGER}, 
+			#{note,jdbcType=VARCHAR}
+		)
+	</insert>
+	<!-- 指标扣分项修改 -->
+	<update id="updateMatEvaTargetDeduct" parameterType="java.util.Map">
+		UPDATE mat_eva_target_deduct 
+		SET deduct_name = #{deduct_name,jdbcType=VARCHAR}, 
+			high_point = #{high_point,jdbcType=NUMERIC}, 
+			deduct_desc = #{deduct_desc,jdbcType=VARCHAR}, 
+			is_stop = #{is_stop,jdbcType=INTEGER}, 
+			spell_code = #{spell_code,jdbcType=VARCHAR}, 
+			wbx_code = #{wbx_code,jdbcType=VARCHAR}, 
+			sort_code = #{sort_code,jdbcType=INTEGER}, 
+			note = #{note,jdbcType=VARCHAR}
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND target_code = #{target_code,jdbcType=VARCHAR}
+			AND deduct_code = #{deduct_code,jdbcType=VARCHAR}
+	</update>
+	<!-- 指标扣分项删除 -->
+	<delete id="deleteMatEvaTargetDeduct" parameterType="java.util.Map">
+		DELETE FROM mat_eva_target_deduct
+		WHERE group_id = #{map.group_id,jdbcType=INTEGER}
+			AND hos_id = #{map.hos_id,jdbcType=INTEGER}
+			AND copy_code = #{map.copy_code,jdbcType=VARCHAR}
+			AND target_code = #{map.target_code,jdbcType=VARCHAR}
+			AND deduct_code in(
+				<foreach collection="list" item="item" separator="union all">
+				SELECT #{item.deduct_code,jdbcType=VARCHAR} deduct_code FROM dual
+				</foreach>
+			)
+	</delete>
+	<!-- 指标扣分项删除 -->
+	<delete id="deleteMatEvaTargetDeductBatch" parameterType="java.util.Map">
+		DELETE FROM mat_eva_target_deduct
+		WHERE group_id = #{map.group_id,jdbcType=INTEGER}
+			AND hos_id = #{map.hos_id,jdbcType=INTEGER}
+			AND copy_code = #{map.copy_code,jdbcType=VARCHAR}
+			AND target_code in(
+				<foreach collection="list" item="item" separator="union all">
+				SELECT #{item.target_code,jdbcType=VARCHAR} target_code FROM dual
+				</foreach>
+			)
+	</delete>
+	<!-- 判断扣分项是否被供应商评价引用 -->
+	<select id="existsMatEvaSupDeductByTargetDeduct" parameterType="java.util.Map" resultType="java.lang.Integer">
+		SELECT count(1)
+		FROM mat_eva_sup_deduct 
+		WHERE group_id = #{map.group_id,jdbcType=INTEGER}
+			AND hos_id = #{map.hos_id,jdbcType=INTEGER}
+			AND copy_code = #{map.copy_code,jdbcType=VARCHAR}
+			AND target_code = #{map.target_code,jdbcType=VARCHAR}
+			AND deduct_code in(
+				<foreach collection="list" item="item" separator="union all">
+				SELECT #{item.deduct_code,jdbcType=VARCHAR} deduct_code FROM dual
+				</foreach>
+			)
+	</select>
+</mapper>
+

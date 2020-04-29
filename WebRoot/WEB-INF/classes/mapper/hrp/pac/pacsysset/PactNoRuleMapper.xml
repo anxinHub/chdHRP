@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper
+	namespace="com.chd.hrp.pac.dao.pacsysset.PactNoRuleMapper">
+	<resultMap id="pactNoRules"
+		type="com.chd.hrp.pac.entity.pactsysset.PactNoRuleEntity">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="table_code" column="table_code" />
+		<result property="table_name" column="table_name" />
+		<result property="prefixe" column="prefixe" />
+		<result property="is_type" column="is_type" />
+		<result property="is_year" column="is_year" />
+		<result property="is_month" column="is_month" />
+		<result property="seq_no" column="seq_no" />
+		<result property="code_colume" column="code_colume" />
+	</resultMap>
+
+	<select id="query" parameterType="java.util.Map"
+		resultMap="pactNoRules">
+		select
+		table_code,table_name,prefixe,is_type,is_year,is_month,seq_no,code_colume
+		from PACT_NO_RULE 
+		where 
+		group_id=#{group_id,jdbcType=NUMERIC}
+		and hos_id=#{hos_id,jdbcType=NUMERIC} 
+		and copy_code=#{copy_code,jdbcType=VARCHAR}
+	</select>
+	
+	<select id="queryByCode" parameterType="java.util.Map"
+		resultType="com.chd.hrp.pac.entity.pactsysset.PactNoRuleEntity">
+		select
+		group_id,hos_id,copy_code,table_code,table_name,prefixe,is_type,is_year,is_month,seq_no,code_colume
+		from PACT_NO_RULE 
+		where 
+		group_id=#{group_id,jdbcType=NUMERIC}
+		and hos_id=#{hos_id,jdbcType=NUMERIC} 
+		and copy_code=#{copy_code,jdbcType=VARCHAR}
+		and table_code = upper(#{table_code,jdbcType=VARCHAR})
+	</select>
+	
+	<select id="queryPactNoRuleUsing" parameterType="java.util.Map"  resultType="java.lang.Integer">
+		select count(1) from ${table_code} 
+		where 
+		group_id=#{group_id,jdbcType=NUMERIC}
+		and hos_id=#{hos_id,jdbcType=NUMERIC}
+		and copy_code=#{copy_code,jdbcType=VARCHAR}
+	</select>
+	
+	<select id="queryMaxId" parameterType="java.util.Map" resultType="java.lang.String">
+		SELECT
+		max(substr(${column_code}, length(${column_code}) - ${code_length} + 1, length(${column_code})))
+		FROM
+		${table_code} where
+		group_id=#{group_id,jdbcType=NUMERIC}
+		and hos_id=#{hos_id,jdbcType=NUMERIC}
+		and copy_code=#{copy_code,jdbcType=VARCHAR}
+		and substr(${column_code}, 0 ,length(${column_code}) - ${code_length}) = #{no}
+	</select>
+	
+	<select id="queryTypeCodeByPactCode" parameterType="java.util.Map" resultType="java.lang.String">
+		SELECT
+		pact_type_code
+		FROM
+		${main_table_name} where
+		group_id=#{group_id,jdbcType=NUMERIC}
+		and hos_id=#{hos_id,jdbcType=NUMERIC}
+		and copy_code=#{copy_code,jdbcType=VARCHAR}
+		and pact_code=#{pact_code,jdbcType=VARCHAR}
+	</select>
+	
+	<select id="queryPactTypeByCode" parameterType="java.util.Map" resultType="java.util.Map">
+		select
+		type_code as "type_code" , type_name as "type_name" , mark as "mark"
+		from ${table_code}
+		where
+		group_id = #{group_id,jdbcType=NUMERIC}
+		and hos_id = #{hos_id,jdbcType=NUMERIC}
+		and copy_code = #{copy_code,jdbcType=VARCHAR}
+		and type_code = #{type_code,jdbcType=VARCHAR}
+		and type_code in (
+			SELECT PERM_CODE FROM SYS_USER_PERM_DATA
+			WHERE GROUP_ID = #{group_id,jdbcType=NUMERIC}
+			and HOS_ID = #{hos_id,jdbcType=NUMERIC} 
+			and COPY_CODE = #{copy_code,jdbcType=VARCHAR}
+			and MOD_CODE = 11
+			and USER_ID = #{user_id,jdbcType=VARCHAR} 
+			and table_code = #{table_code,jdbcType=VARCHAR}
+			and is_read = 1
+			UNION 
+			SELECT PERM_CODE FROM SYS_ROLE_PERM_DATA rpd 
+			LEFT JOIN SYS_ROLE_USER ru on rpd.GROUP_ID = ru.GROUP_ID and rpd.HOS_ID = ru.HOS_ID and rpd.ROLE_ID =ru.ROLE_ID
+			WHERE rpd.GROUP_ID = #{group_id,jdbcType=NUMERIC} 
+			and rpd.HOS_ID = #{hos_id,jdbcType=NUMERIC} 
+			and rpd.COPY_CODE = #{copy_code,jdbcType=VARCHAR} 
+			and rpd.MOD_CODE = 11
+			and ru.USER_ID = #{user_id,jdbcType=VARCHAR} 
+			and rpd.table_code = #{table_code,jdbcType=VARCHAR}
+			and rpd.is_read = 1 
+		)
+	</select>
+	
+	<select id="queryPreExists"  resultType="int">
+		select count(prefixe) from  PACT_NO_RULE where 
+		group_id=#{group_id,jdbcType=NUMERIC}
+	    and hos_id=#{hos_id,jdbcType=NUMERIC}
+	    and copy_code=#{copy_code,jdbcType=VARCHAR}
+		and table_code != #{table_code,jdbcType=VARCHAR}
+	    and prefixe= #{prefixe,jdbcType=VARCHAR}
+	 </select>
+	 
+	<update id="update" parameterType="java.util.Map">
+		UPDATE PACT_NO_RULE SET
+		table_name = #{table_name,jdbcType=VARCHAR},
+		prefixe = #{prefixe,jdbcType=VARCHAR},
+		is_type = #{is_type,jdbcType=NUMERIC},
+		is_year = #{is_year,jdbcType=NUMERIC},
+		is_month = #{is_month,jdbcType=NUMERIC},
+		seq_no = #{seq_no,jdbcType=NUMERIC}
+		
+		WHERE 
+		group_id=#{group_id,jdbcType=NUMERIC}
+		and hos_id=#{hos_id,jdbcType=NUMERIC} 
+		and copy_code=#{copy_code,jdbcType=VARCHAR}
+		and table_code = #{table_code,jdbcType=VARCHAR}
+	</update>
+</mapper>

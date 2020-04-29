@@ -1,0 +1,769 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper
+	namespace="com.chd.hrp.hr.dao.attendancemanagement.scheduling.HrSchedulingMapper">
+
+	<!-- 删除排班表 -->
+	<delete id="deletePB" parameterType="java.util.Map">
+		begin
+		
+			delete from hr_pb_check 
+			where group_id = #{group_id} and hos_id=#{hos_id} and pb_qj in(${pb_qj_str});
+			
+			delete from hr_pb 
+			where group_id = #{group_id} and hos_id=#{hos_id} and attend_areacode = #{attend_areacode}
+			and pb_date between to_date(#{begin_date},'yyyy_mm_dd') and to_date(#{end_date},'yyyy_mm_dd')
+			and emp_id in(${emp_id}) and dept_id in(${dept_id}); 
+			
+		end;	
+	</delete>
+	
+	<!-- 添加排班审核表 -->
+	<insert id="insertPBCheck" parameterType="java.util.Map">
+	
+		insert into hr_pb_check(pb_qj,group_id,hos_id,attend_areacode,begin_date,end_date,
+		create_user,create_date,pb_gz,db_gz,is_cq,is_gd,state,note)
+		values(#{pb_qj},#{group_id},#{hos_id},#{attend_areacode},to_date(#{begin_date},'yyyy-MM-dd'),to_date(#{end_date},'yyyy-MM-dd'),
+		#{user_id},to_date(#{create_date},'yyyy-MM-dd hh24:mi:ss'),#{pb_gz},#{db_gz},0,0,0,#{note})
+		
+	</insert>
+	
+	<!-- 添加排班明细表 -->
+	<insert id="insertPB" parameterType="java.util.List">
+		INSERT INTO hr_pb (pb_qj,group_id,hos_id,attend_areacode,
+		emp_id,pb_date,attend_classcode,dept_id,cq_dept_id,sort_code,note,bc_no)
+		<foreach collection="list" item="item" index="index" separator=" union all ">
+			select
+				#{map.pb_qj},#{map.group_id},#{map.hos_id},#{map.attend_areacode},
+				#{item.emp_id},to_date(#{item.pb_date},'yyyy-MM-dd'),#{item.attend_classcode},#{item.dept_id},#{item.cq_dept_id},#{item.sort_code},#{item.note},#{item.bc_no}
+			from dual
+		</foreach>
+	</insert>
+	
+	
+	<select id="queryPbIsCheck"  parameterType="java.util.Map" resultType="java.lang.Integer">
+
+		select count(1) from hr_pb_check where group_id = #{group_id} and hos_id=#{hos_id} and pb_qj in(${pb_qj_str}) and state=#{state}
+		
+	</select>
+	
+	<delete id="deleteSchedulingEmp"  parameterType="java.util.Map">
+		begin
+			delete from hr_pb
+			where group_id = #{group_id} and hos_id=#{hos_id} and attend_areacode = #{attend_areacode} 
+			and pb_date between to_date(#{begin_date},'yyyy-MM-dd') and to_date(#{end_date},'yyyy-MM-dd')
+			and emp_id in(${emp_id});
+			
+			
+			delete from hr_pb_check a where a.pb_qj 
+			not in(
+				select b.pb_qj from hr_pb b where a.group_id=b.group_id and a.hos_id=b.hos_id and a.pb_qj=b.pb_qj
+			)
+			and a.group_id=#{group_id} and a.hos_id=#{hos_id} and a.pb_qj=#{pb_qj};
+		end;	
+	</delete>
+	
+
+	<resultMap type="java.util.Map" id="hrpDeptSelectMap">
+		<result property="id" column="id" />
+		<result property="name" column="text" />
+		<result property="pId" column="pId" />
+	</resultMap>
+	
+	
+	<resultMap id="hrSequestrationMap" type="java.util.Map">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="attend_pbisfile" column="attend_pbisfile" />
+		<result property="attend_pbfile_set" column="attend_pbfile_set" />
+		<result property="attend_pbfle_val" column="attend_pbfle_val" />
+		<result property="attend_pbrule" column="attend_pbrule" />
+	</resultMap>
+	<select id="queryset" parameterType="java.util.Map" resultMap="hrSequestrationMap">
+	
+		select attend_pbisfile, attend_pbfile_set ,attend_pbfle_val, attend_pbrule
+		from HR_ATTEND_PBFILE
+		where group_id = #{group_id,jdbcType=INTEGER} and hos_id =#{hos_id,jdbcType=INTEGER}
+		and attend_pbrule=#{pb_gz,jdbcType=INTEGER}
+
+	</select>
+	
+
+	
+	<!-- 查询排班审签表 -->
+	<select id="queryPBCheck" parameterType="java.util.Map" resultType="java.util.Map">
+	
+		select
+		pb.pb_gz "pb_gz",pb.db_gz "db_gz",pb.state "state",pb.is_cq "is_cq",
+		pb.check_user "check_user_id",u.user_name "check_user_name",to_char(pb.check_date,'yyyy-MM-dd hh24:mi:ss') "check_date",
+		pb.create_user "create_user_id",u1.user_name "create_user_name",to_char(pb.create_date,'yyyy-MM-dd hh24:mi:ss') "create_date",
+		pb.note "note",pb.pb_qj "pb_qj"
+		from hr_pb_check pb
+		left join sys_user u on pb.group_id=u.group_id and pb.hos_id=u.hos_id and pb.check_user=u.user_id
+		left join sys_user u1 on pb.group_id=u1.group_id and pb.hos_id=u1.hos_id and pb.create_user=u1.user_id	
+		where pb.group_id = #{group_id,jdbcType=INTEGER} and pb.hos_id =#{hos_id,jdbcType=INTEGER}
+		and pb.attend_areacode=#{attend_areacode,jdbcType=VARCHAR}
+		and pb.begin_date=to_date(#{begin_date},'yyyy_mm_dd') and pb.end_date=to_date(#{end_date},'yyyy_mm_dd')
+	
+	</select>
+	
+	<!-- 查询排班明细表 -->
+	<select id="queryPB" parameterType="java.util.Map" resultType="java.util.Map">
+		select
+		pb.dept_id "dept_id",hd.dept_name "dept_name",he.emp_name "emp_name",pb.emp_id "emp_id",
+		to_char(pb.pb_date,'yyyy-MM-dd') "pb_date",pb.pb_qj "pb_qj",pb.sort_code "sort_code",
+		pb.attend_classcode "attend_classcode",ha.attend_classsname "attend_classsname",
+		pb.cq_dept_id "cq_dept_id",cq.dept_name "cq_dept_name",pb.note "note",pb.bc_no "bc_no"
+		from hr_pb pb
+		left join hos_emp he on  pb.group_id=he.group_id and pb.hos_id=he.hos_id and pb.emp_id=he.emp_id and he.is_attend = 1 
+		<if test="dept_source == 1">
+		left join hr_dept hd on pb.group_id=hd.group_id and pb.hos_id=hd.hos_id and pb.dept_id=hd.dept_id
+		left join hr_dept cq on pb.group_id=cq.group_id and pb.hos_id=cq.hos_id and pb.cq_dept_id =cq.dept_id
+		</if>
+		<if test="dept_source == 2">
+		left join hos_dept hd on pb.group_id=hd.group_id and pb.hos_id=hd.hos_id and pb.dept_id=hd.dept_id
+		left join hos_dept cq on pb.group_id=cq.group_id and pb.hos_id=cq.hos_id and pb.cq_dept_id =cq.dept_id
+		</if>
+		left join hr_attend_class ha on pb.group_id=ha.group_id and pb.hos_id=ha.hos_id and pb.attend_classcode=ha.attend_classcode	
+		where pb.group_id = #{group_id,jdbcType=INTEGER} and pb.hos_id =#{hos_id,jdbcType=INTEGER}
+		and pb.attend_areacode=#{attend_areacode,jdbcType=VARCHAR}
+		and pb.pb_date between to_date(#{begin_date},'yyyy_mm_dd') and to_date(#{end_date},'yyyy_mm_dd')
+		and he.is_attend = 1 
+		<!-- and  he.yh_code=(select YH_CODE　　from hos_emp he left join sys_user sy on he.group_id=sy.group_id and he.hos_id=sy.hos_id and he.emp_id=sy.emp_code
+where 
+ sy.user_id=#{user_id,jdbcType=VARCHAR}) -->
+			and exists (
+			select 1
+			from sys_user_perm_data b
+			where pb.group_id = b.group_id
+			and pb.hos_id = b.hos_id
+			and to_char(pb.dept_id) = b.perm_code
+			and user_id =#{user_id,jdbcType=VARCHAR}
+			<if test="dept_source == 1">
+			and TABLE_CODE = 'HR_DEPT_DICT'
+			</if>
+			<if test="dept_source == 2">
+			and TABLE_CODE = 'HOS_DEPT_DICT'
+			</if>
+			and (b.is_read = 1 or b.is_write = 1)
+		)	<!-- and exists (
+			select 1
+			from sys_user_perm_data b
+			where pb.group_id = b.group_id
+			and pb.hos_id = b.hos_id
+			and to_char(he.YH_CODE) = b.perm_code
+			and user_id =#{user_id,jdbcType=VARCHAR}
+			and TABLE_CODE = 'HOS_EMP_YH'
+			and (b.is_read = 1 or b.is_write = 1)
+		) -->
+			order by he.emp_code,pb.sort_code,pb.bc_no
+		
+	</select>
+	
+	<!-- 根据选择的日期查询排班数据-->
+	<select id="queryPBCopy" parameterType="java.util.Map" resultType="java.util.Map">
+	
+		select
+		he.dept_id "dept_id",hd.dept_name "dept_name",he.emp_name "emp_name",pb.emp_id "emp_id",
+		to_char(pb.pb_date,'yyyy-MM-dd') "pb_date", pb.sort_code "sort_code",
+		pb.attend_classcode "attend_classcode",ha.attend_classsname "attend_classsname",
+		pb.cq_dept_id "cq_dept_id",cq.dept_name "cq_dept_name",pb.bc_no "bc_no"
+		from hr_pb pb
+		left join hos_emp he on  pb.group_id=he.group_id and pb.hos_id=he.hos_id and pb.emp_id=he.emp_id
+		 <if test="dept_source == 1">
+		left join hr_dept hd on pb.group_id=hd.group_id and pb.hos_id=hd.hos_id and pb.dept_id=hd.dept_id
+		left join hr_dept cq on pb.group_id=cq.group_id and pb.hos_id=cq.hos_id and pb.cq_dept_id =cq.dept_id
+		</if>
+		<if test="dept_source == 2">
+		left join hos_dept hd on pb.group_id=hd.group_id and pb.hos_id=hd.hos_id and pb.dept_id=hd.dept_id
+		left join hos_dept cq on pb.group_id=cq.group_id and pb.hos_id=cq.hos_id and pb.cq_dept_id =cq.dept_id
+		</if>
+		left join hr_attend_class ha on pb.group_id=ha.group_id and pb.hos_id=ha.hos_id and pb.attend_classcode=ha.attend_classcode
+		
+		where pb.group_id = #{group_id,jdbcType=INTEGER} and pb.hos_id =#{hos_id,jdbcType=INTEGER}
+		and pb.pb_date between to_date(#{sel_begin_date},'yyyy_mm_dd') and to_date(#{sel_end_date},'yyyy_mm_dd')
+		and pb.emp_id in(${emp_id})
+			and exists (
+			select 1
+			from sys_user_perm_data b
+			where pb.group_id = b.group_id
+			and pb.hos_id = b.hos_id
+			and to_char(pb.dept_id) = b.perm_code
+			and user_id =#{user_id,jdbcType=VARCHAR}
+			<if test="dept_source == 1">
+			and TABLE_CODE = 'HR_DEPT_DICT'
+			</if>
+			<if test="dept_source == 2">
+			and TABLE_CODE = 'HOS_DEPT_DICT'
+			</if>
+			and (b.is_read = 1 or b.is_write = 1)
+		)
+		order by pb.emp_id,pb.sort_code
+		
+	</select>
+	
+	<!-- 检查职工一天班次是否重复 -->
+	<select id="queryPbExisits" parameterType="java.util.Map" resultType="string">
+	
+	  select distinct c.emp_name||'：'||to_char(a.pb_date,'yyyy-MM-dd')||'('||area.ATTEND_AREA_name||')'
+	  from hr_pb a
+	  left join hos_emp c  on a.emp_id = c.emp_id and a.group_id = c.group_id and a.hos_id = c.hos_id
+	  left join HR_ATTEND_AREA area on  area.group_id=a.group_id and area.hos_id=a.hos_id and area.attend_areacode=a.attend_areacode
+	  where a.group_id = #{group_id} and a.hos_id = #{hos_id} and a.pb_qj != #{pb_qj} and a.attend_classcode!='0'
+	   and exists (select 1
+	          from hr_pb b
+	         where b.pb_qj =#{pb_qj}
+	           and a.group_id = b.group_id
+	           and a.hos_id = b.hos_id
+	           and a.emp_id = b.emp_id
+	           and a.pb_date = b.pb_date           
+	           and a.attend_classcode = b.attend_classcode
+	          )
+		
+	</select>
+		<!-- 检查本周或本月是否有排班 -->
+	<select id="queryCount" parameterType="java.util.Map" resultType="string">
+	
+	  select distinct c.emp_name||'：'||to_char(a.pb_date,'yyyy-MM-dd')||'('||area.ATTEND_AREA_name||')'
+	  from hr_pb a
+	  left join hos_emp c  on a.emp_id = c.emp_id and a.group_id = c.group_id and a.hos_id = c.hos_id
+	  left join HR_ATTEND_AREA area on  area.group_id=a.group_id and area.hos_id=a.hos_id and area.attend_areacode=a.attend_areacode
+	  where a.group_id = #{group_id} and a.hos_id = #{hos_id} <!-- and a.pb_qj != #{pb_qj} --> 
+	  	and a.attend_classcode!='0'
+		and a.pb_date between to_date(#{begin_date},'yyyy_mm_dd') and to_date(#{end_date},'yyyy_mm_dd')
+		and a.attend_areacode=#{attend_areacode}
+	</select>
+	<select id="queryinsertPBCheck" parameterType="java.util.Map" resultType="string">
+	  select distinct pb_qj||'：'||to_char(a.create_date,'yyyy-MM-dd')
+    from hr_pb_check a
+	  where a.group_id = #{group_id} and a.hos_id = #{hos_id} and a.pb_qj = #{pb_qj} 
+	</select>
+	<!-- 审签 -->
+	<update id="auditCountersign" parameterType="java.util.Map">
+		
+		update hr_pb_check set state =#{state},note=#{note}
+		<if test='state == "0"'>
+			,check_user=null
+			,check_date=null
+		</if>
+		<if test='state == "1"'>
+			,check_user=#{user_id}
+			,check_date=to_date(#{check_date},'yyyy-MM-dd hh24:mi:ss')
+		</if>
+		where group_id = #{group_id} and hos_id = #{hos_id} and pb_qj = #{pb_qj}
+		
+	</update>
+		
+		
+	<!-- 添加人员-按区域查科室 -->
+	<select id="queryDeptTreeByArea" resultMap="hrpDeptSelectMap">
+		select * from (
+		select t1.dept_id dept_id, t1.dept_code id, t1.is_last,
+		t1.dept_code || ' ' || t1.dept_name as text,
+		nvl(t1.super_code, '0') as pId
+		from 
+		<if test=" dept_source == 1"> 
+		HR_DEPT_dict t1
+		</if>
+		<if test=" dept_source == 2"> 
+		HOS_DEPT_dict t1
+		</if>
+		
+		where t1.group_id = #{group_id} and t1.hos_id = #{hos_id} and  t1.is_stop=0
+		
+		and exists (
+			select 1
+			from sys_user_perm_data b
+			where t1.group_id = b.group_id
+			and t1.hos_id = b.hos_id
+			and to_char(t1.dept_id) = b.perm_code
+			and user_id =#{user_id,jdbcType=VARCHAR}
+			<if test=" dept_source == 1"> 
+			and TABLE_CODE = 'HR_DEPT_DICT'
+			</if>
+			<if test=" dept_source == 2"> 
+			and TABLE_CODE = 'HOS_DEPT_DICT'
+			</if>
+			and (b.is_read = 1 or b.is_write = 1)
+		)
+		) t
+		<where>
+			<if test="attend_areacode != null and attend_areacode != '' and dept_source == 1">
+				and exists(
+					select t2.dept_id from HR_ATTEND_AREA_dept t2 
+					inner join hr_dept d on t2.group_id = d.group_id and t2.hos_id = d.hos_id and t2.dept_id=d.dept_id
+					where t2.group_id = #{group_id} and t2.hos_id = #{hos_id} 
+					and t2.attend_areacode=#{attend_areacode} and  d.dept_code like  t.id||'%'
+				)
+			</if>
+			<if test="attend_areacode != null and attend_areacode != '' and dept_source == 2">
+				and exists(
+					select t2.dept_id from HR_ATTEND_AREA_dept t2 
+					inner join hos_dept d on t2.group_id = d.group_id and t2.hos_id = d.hos_id and t2.dept_id=d.dept_id
+					where t2.group_id = #{group_id} and t2.hos_id = #{hos_id} 
+					and t2.attend_areacode=#{attend_areacode} and  d.dept_code like  t.id||'%'
+				)
+			</if>
+		</where>
+		order by t.id
+	</select>
+	
+	<!-- 添加人员-按区域查职工 -->
+	<select id="queryEmpByArea" parameterType="java.util.Map" resultType="java.util.Map">
+		select he.emp_id "emp_id",he.emp_code "emp_code",he.emp_name "emp_name",hde.dept_id "dept_id", hde.dept_name "dept_name", 
+		t.field_col_name "level_name", ht.title_name "title_name", hd.duty_name "duty_name",yh.field_col_name "yh_name"
+		from hos_emp he
+		<if test=" dept_source == 1"> 
+		left join hr_dept_dict hde on  he.group_id=hde.group_id and he.hos_id=hde.hos_id and he.dept_id = hde.dept_id and hde.is_stop=0 
+		</if>
+		<if test=" dept_source == 2"> 
+		left join hos_dept_dict hde on  he.group_id=hde.group_id and he.hos_id=hde.hos_id and he.dept_id = hde.dept_id and hde.is_stop=0 
+		</if>
+		left join HR_HOS_DUTY hhd on he.emp_id=hhd.emp_id and
+		he.group_id=hhd.group_id and he.hos_id=hhd.hos_id
+		left join hos_duty hd on hhd.duty_code=hd.duty_code and
+		hd.group_id=hhd.group_id and hd.hos_id=hhd.hos_id
+		left join HR_EMP_TECHNOLOGY_TITLE het on he.emp_id =het.emp_id and
+		he.group_id=het.group_id and he.hos_id=het.hos_id
+		left join HR_TITLE ht on het.title_code=ht.title_code and
+		ht.group_id=het.group_id and ht.hos_id=het.hos_id
+		left join HR_EMP_PROMOTION hep on he.emp_id = hep.emp_id and
+		he.group_id=hep.group_id and he.hos_id=hep.hos_id
+		left join hr_fiied_data t on t.group_id=hep.group_id and t.hos_id=hep.hos_id and t.field_tab_code = 'DIC_LEVEL' and hep.level_code =t.field_col_code
+		left join hr_fiied_data yh on yh.group_id=he.group_id and yh.hos_id=he.hos_id and yh.field_tab_code = 'HOS_EMP_YH' and yh.field_col_code =he.yh_code
+		where he.group_id=#{group_id} and he.hos_id=#{hos_id}
+		<!--   and  he.yh_code=(select YH_CODE　　from hos_emp he left join sys_user sy on he.group_id=sy.group_id and he.hos_id=sy.hos_id and he.emp_id=sy.emp_code
+where 
+
+ sy.user_id=#{user_id,jdbcType=VARCHAR}) -->
+			<if test="dept_code !=null and dept_code !=''">
+				and hde.dept_code like '${dept_code}%'
+			</if>
+			<if test="emp_code !=null and emp_code !=''">
+				and he.emp_code like '%${emp_code}%'
+			</if>
+			<if test="emp_name !=null and emp_name !=''">
+				and he.emp_name like '%${emp_name}%'
+			</if>
+			<if test="duty_code !=null and duty_code !=''">
+				and hhd.duty_code =#{duty_code}
+			</if>
+			<if test="title_code !=null and title_code !=''">
+				and het.title_code =#{title_code}
+			</if>
+			<if test="level_code !=null and level_code !=''">
+				and t.field_col_code =#{level_code}
+			</if>
+			<if test="yh_code !=null and yh_code !=''">
+				and he.yh_code =#{yh_code}
+			</if>
+			and he.is_attend = 1
+			<if test="attend_areacode != null and attend_areacode != '' and dept_source == 1">
+				and exists(
+					select t2.dept_id from HR_ATTEND_AREA_dept t2 
+					inner join hr_dept d on t2.group_id = d.group_id and t2.hos_id = d.hos_id and t2.dept_id=d.dept_id
+					where t2.group_id = hde.group_id and t2.hos_id = hde.hos_id
+					and t2.attend_areacode=#{attend_areacode} and  d.dept_code like  hde.dept_code||'%'
+				)
+			</if>
+			<if test="attend_areacode != null and attend_areacode != '' and dept_source == 2">
+				and exists(
+					select t2.dept_id from HR_ATTEND_AREA_dept t2 
+					inner join hos_dept d on t2.group_id = d.group_id and t2.hos_id = d.hos_id and t2.dept_id=d.dept_id
+					where t2.group_id = hde.group_id and t2.hos_id = hde.hos_id
+					and t2.attend_areacode=#{attend_areacode} and  d.dept_code like  hde.dept_code||'%'
+				)
+			</if>
+				and exists (
+			select 1
+			from sys_user_perm_data b
+			where he.group_id = b.group_id
+			and he.hos_id = b.hos_id
+			and to_char(he.dept_id) = b.perm_code
+			and user_id =#{user_id,jdbcType=VARCHAR}
+			<if test=" dept_source == 1"> 
+			and TABLE_CODE = 'HR_DEPT_DICT'
+			</if>
+			<if test=" dept_source == 2"> 
+			and TABLE_CODE = 'HOS_DEPT_DICT'
+			</if>
+			and (b.is_read = 1 or b.is_write = 1)
+		)
+	<!-- 	and exists (
+			select 1
+			from sys_user_perm_data b
+			where he.group_id = b.group_id
+			and he.hos_id = b.hos_id
+			and to_char(he.YH_CODE) = b.perm_code
+			and user_id =#{user_id,jdbcType=VARCHAR}
+			and TABLE_CODE = 'HOS_EMP_YH'
+			and (b.is_read = 1 or b.is_write = 1)
+		) -->
+		order by he.emp_code
+	</select>
+	
+	
+	<!-- 按科室查询排班数据 -->
+	<select id="queryPbByDept" parameterType="java.util.Map" resultType="java.util.Map">
+		select
+		hd.dept_name "dept_name",pb.dept_id "dept_id",he.emp_name "emp_name",pb.emp_id "emp_id",
+		to_char(pb.pb_date,'yyyy-MM-dd') "pb_date",pb.pb_qj "pb_qj",pb.sort_code "sort_code",
+		pb.attend_classcode "attend_classcode",ha.attend_classsname "attend_classsname",
+		pb.cq_dept_id "cq_dept_id",cq.dept_name "cq_dept_name",pb.note "note",pb.bc_no "bc_no"
+		from hr_pb pb
+		left join hos_emp he on  pb.group_id=he.group_id and pb.hos_id=he.hos_id and pb.emp_id=he.emp_id  and he.is_attend = 1
+		<if test="dept_source == 1">
+		left join hr_dept hd on pb.group_id=hd.group_id and pb.hos_id=hd.hos_id and pb.dept_id=hd.dept_id
+		left join hr_dept cq on pb.group_id=cq.group_id and pb.hos_id=cq.hos_id and pb.cq_dept_id=cq.dept_id		
+		</if>
+		<if test="dept_source == 2">
+		left join hos_dept hd on pb.group_id=hd.group_id and pb.hos_id=hd.hos_id and pb.dept_id=hd.dept_id		
+		left join hos_dept cq on pb.group_id=cq.group_id and pb.hos_id=cq.hos_id and pb.cq_dept_id=cq.dept_id
+		</if>
+		left join hr_attend_class ha on pb.group_id=ha.group_id and pb.hos_id=ha.hos_id and pb.attend_classcode=ha.attend_classcode
+		where pb.group_id = #{group_id,jdbcType=INTEGER} and pb.hos_id =#{hos_id,jdbcType=INTEGER}
+		and pb.pb_date between to_date(#{begin_date},'yyyy_mm_dd') and to_date(#{end_date},'yyyy_mm_dd')
+		<if test="attend_areacode !=null and attend_areacode !=''">
+			and pb.attend_areacode=#{attend_areacode,jdbcType=VARCHAR}
+		</if>
+			<if test="attend_classcode !=null and attend_classcode !=''">
+			and pb.attend_classcode =#{attend_classcode}
+		</if>
+		<if test="emp_code !=null and emp_code !=''">
+			and (he.emp_code like '${emp_code}%' or he.emp_name like '%${emp_code}%')
+		</if>
+		<if test="yh_code !=null and yh_code !=''">
+			and he.yh_code =#{yh_code}
+		</if>
+
+		<if test='is_cq_dept == "0"'>
+			<if test="dept_code !=null and dept_code !=''">
+				and hd.dept_code like '${dept_code}%'
+			</if>
+		</if>
+		
+		<if test='is_cq_dept == "1"'>
+			<if test="dept_code !=null and dept_code !=''">
+				and cq.dept_code like '${dept_code}%'
+			</if>
+		</if>
+		and he.is_attend = 1
+			and exists (
+			select 1
+			from sys_user_perm_data b
+			where pb.group_id = b.group_id
+			and pb.hos_id = b.hos_id
+			and to_char(pb.dept_id) = b.perm_code
+			and user_id =#{user_id,jdbcType=VARCHAR}
+			<if test="dept_source == 1">
+			and TABLE_CODE = 'HR_DEPT_DICT'
+			</if>
+			<if test="dept_source == 2">
+			and TABLE_CODE = 'HOS_DEPT_DICT'
+			</if>
+			
+			and (b.is_read = 1 or b.is_write = 1)
+		)
+		order by he.emp_code,pb.sort_code,pb.bc_no
+		
+	</select>
+	<insert id="extendBh" parameterType="java.util.List">
+		INSERT INTO hr_pb(
+			pb_qj,group_id,hos_id,attend_areacode,
+		pb_date,emp_id,attend_classcode,dept_id,cq_dept_id,sort_code,note,bc_no
+		) SELECT  #{map.pb_qj_str,jdbcType=INTEGER}  ,
+			#{map.group_id,jdbcType=INTEGER} , 
+			#{map.hos_id,jdbcType=INTEGER} , 
+			#{map.attend_areacode,jdbcType=VARCHAR} , 
+			pb_date ,emp_id,attend_classcode,dept_id,cq_dept_id,sort_code,note,bc_no
+		FROM(
+	
+		<foreach collection="list" item="item" index="index1" separator=" union ">
+	
+			SELECT to_date(#{item.pb_date,jdbcType=DATE},'yyyy_mm_dd')  pb_date
+		
+		,emp_id,attend_classcode,dept_id,cq_dept_id,sort_code,note,bc_no from hr_pb pb
+			where
+			 pb.group_id = #{map.group_id,jdbcType=INTEGER} and pb.hos_id =#{map.hos_id,jdbcType=INTEGER}
+		 	
+		and pb.pb_date = to_date(#{item.sel_pb_date},'yyyy_mm_dd') 
+		and pb.ATTEND_AREACODE=#{map.attend_areacode,jdbcType=VARCHAR} 
+		 AND PB.EMP_ID NOT IN(SELECT EMP_ID from hr_pb pb1
+  where  pb1.group_id = #{map.group_id,jdbcType=INTEGER} and pb1.hos_id =#{map.hos_id,jdbcType=INTEGER}
+		 	
+		and pb1.pb_date = to_date(#{item.pb_date},'yyyy_mm_dd')
+		 and pb1.attend_classcode!=0
+		 and exists (
+			select 1
+			from sys_user_perm_data b
+			where pb.group_id = b.group_id
+			and pb.hos_id = b.hos_id
+			and to_char(pb.dept_id) = b.perm_code
+			and user_id =#{map.user_id,jdbcType=VARCHAR}
+			<if test="dept_source == 1">
+			and TABLE_CODE = 'HR_DEPT_DICT'
+			</if>
+			<if test="dept_source == 2">
+			and TABLE_CODE = 'HOS_DEPT_DICT'
+			</if>
+			and (b.is_read = 1 or b.is_write = 1)
+		)
+		 )
+		</foreach>
+			) tmp
+	
+	
+	</insert>
+	
+	<insert id="extendNotBh" parameterType="java.util.List">
+		INSERT INTO hr_pb(
+			pb_qj,group_id,hos_id,attend_areacode,
+		pb_date,emp_id,attend_classcode,dept_id,sort_code,note,bc_no
+		) SELECT  #{map.pb_qj_str,jdbcType=INTEGER}  ,
+			#{map.group_id,jdbcType=INTEGER} , 
+			#{map.hos_id,jdbcType=INTEGER} , 
+			#{map.attend_areacode,jdbcType=VARCHAR} , 
+			pb_date ,emp_id,attend_classcode,dept_id,sort_code,note,bc_no
+		FROM(
+		<foreach collection="list" item="item" index="index1" separator=" union ">
+			SELECT to_date(#{item.pb_date,jdbcType=DATE},'yyyy_mm_dd')  pb_date
+		
+		,emp_id,'0' attend_classcode,dept_id,#{index1} sort_code,'' note, '1' bc_no from hr_pb pb
+			where
+			 pb.group_id = #{map.group_id,jdbcType=INTEGER} and pb.hos_id =#{map.hos_id,jdbcType=INTEGER}
+		 	
+		and pb.pb_date = to_date(#{item.sel_pb_date},'yyyy_mm_dd') 
+		and pb.ATTEND_AREACODE=#{map.attend_areacode,jdbcType=VARCHAR} 
+		  AND PB.EMP_ID NOT IN(SELECT EMP_ID from hr_pb pb1
+  where  pb1.group_id = #{map.group_id,jdbcType=INTEGER} and pb.hos_id =#{map.hos_id,jdbcType=INTEGER}
+		 	
+		and pb1.pb_date = to_date(#{item.pb_date},'yyyy_mm_dd'))
+		    group by emp_id,dept_id
+		</foreach>
+			) tmp
+	
+	</insert>
+	
+	<!-- 查询排班情况 年月职工 -->
+	<select id="queryPBStatisticsEmpPB" parameterType="java.util.Map" resultType="java.util.Map">
+		select to_char(t1.pb_date, 'yyyy') pb_year,
+		       to_char(t1.pb_date, 'mm') pb_month,
+		       t1.emp_id,
+		       to_char(t1.pb_date, 'yyyymm') || t1.emp_id as row_flag
+		from hr_pb t1
+		left join hos_emp_dict t2
+		       on t2.group_id = t1.group_id
+		      and t2.hos_id = t1.hos_id
+		      and t2.emp_id = t1.emp_id
+		      and t2.is_stop = 0
+		<if test="dept_source == 1">
+		left join hr_dept_dict t3
+		       on t3.group_id = t1.group_id
+		      and t3.hos_id = t1.hos_id
+		      and t3.dept_id = t2.dept_id
+		      and t3.is_stop = 0
+		 </if>
+		 <if test="dept_source == 2">
+		left join hos_dept_dict t3
+		       on t3.group_id = t1.group_id
+		      and t3.hos_id = t1.hos_id
+		      and t3.dept_id = t2.dept_id
+		      and t3.is_stop = 0
+		 </if>
+		where t1.group_id = #{group_id, jdbcType=INTEGER} 
+		  and t1.hos_id = #{hos_id, jdbcType=INTEGER}
+		  <if test="emp_name != null and emp_name != ''">
+		      and (
+		          t2.emp_name like '%${emp_name}%' or
+		          t2.emp_code like '%${emp_name}%'
+		      )
+		  </if>
+		  <if test="dept_id != null and dept_id != ''">
+		      and t3.dept_id = #{dept_id, jdbcType=INTEGER}
+		  </if>
+		  <if test="start_date != null and start_date != ''">
+		      and t1.pb_date &gt;= #{start_date, jdbcType=DATE}
+		  </if>
+		  <if test="end_date != null and end_date != ''">
+		      and t1.pb_date &lt;= #{end_date, jdbcType=DATE}
+		  </if>
+		group by to_char(t1.pb_date, 'yyyy'), to_char(t1.pb_date, 'mm'), 
+				 t1.emp_id, to_char(t1.pb_date, 'yyyymm') || t1.emp_id
+		order by pb_year, pb_month
+	</select>
+	
+	<!-- 查询排班情况统计 -->
+	<select id="queryPBStatistics" parameterType="java.util.Map" resultType="java.util.Map">
+		<!-- select t1.pb_date,
+		       to_char(t1.pb_date, 'yyyy') as pb_year,
+		       to_char(t1.pb_date, 'mm') as pb_month,
+		       to_char(t1.pb_date, 'dd') as pb_day,
+		       t2.emp_name,
+		       t3.dept_name,
+		       t4.dept_name as pb_dept,
+		       t5.dept_name as cq_dept,
+		       to_char(t1.pb_date, 'yyyymm') || t1.emp_id as row_group
+		from hr_pb t1
+		left join hos_emp_dict t2
+		       on t2.group_id = t1.group_id
+		      and t2.hos_id = t1.hos_id
+		      and t2.emp_id = t1.emp_id
+		      and t2.is_stop = 0
+		left join hos_dept_dict t3
+		       on t3.group_id = t1.group_id
+		      and t3.hos_id = t1.hos_id
+		      and t3.dept_id = t2.dept_id
+		      and t3.is_stop = 0
+		left join hos_dept_dict t4
+		       on t4.group_id = t1.group_id
+		      and t4.hos_id = t1.hos_id
+		      and t4.dept_id = t1.dept_id
+		      and t4.is_stop = 0
+		left join hos_dept_dict t5
+		       on t5.group_id = t1.group_id
+		      and t5.hos_id = t1.hos_id
+		      and t5.dept_id = t1.cq_dept_id
+		      and t5.is_stop = 0
+		where t1.group_id = #{group_id, jdbcType=INTEGER} 
+		  and t1.hos_id = #{hos_id, jdbcType=INTEGER}
+		  <if test="emp_name != null and emp_name != ''">
+		      and (
+		          t2.emp_name like '%${emp_name}%' or
+		          t2.emp_code like '%${emp_name}%'
+		      )
+		  </if>
+		  <if test="dept_id != null and dept_id != ''">
+		      and t2.dept_id = #{dept_id, jdbcType=INTEGER}
+		  </if>
+		  <if test="start_date != null and start_date != ''">
+		      and t1.pb_date &gt;= #{start_date, jdbcType=DATE}
+		  </if>
+		  <if test="end_date != null and end_date != ''">
+		      and t1.pb_date &lt;= #{end_date, jdbcType=DATE}
+		  </if>
+		order by pb_year, pb_month, pb_day -->
+		
+		with temp_table as(
+			select to_char(t1.pb_date, 'yyyy') as pb_year,
+				   to_char(t1.pb_date, 'mm') as pb_month,
+				   to_char(t1.pb_date, 'dd') as pb_day,
+				   t2.emp_name,
+				   t3.dept_name,
+				   t4.dept_name as pb_dept,
+				   t5.dept_name as cq_dept,
+				   to_char(t1.pb_date, 'yyyymm') || t1.emp_id as row_group
+			from hr_pb t1
+			left join hos_emp t2
+				   on t2.group_id = t1.group_id
+				  and t2.hos_id = t1.hos_id
+				  and t2.emp_id = t1.emp_id
+				  and t2.is_stop = 0
+				  and t2.is_attend = 1
+			<if test="dept_source == 1">
+			left join hr_dept_dict t3
+				   on t3.group_id = t1.group_id
+				  and t3.hos_id = t1.hos_id
+				  and t3.dept_id = t2.dept_id
+				  and t3.is_stop = 0
+			left join hr_dept_dict t4
+				   on t4.group_id = t1.group_id
+				  and t4.hos_id = t1.hos_id
+				  and t4.dept_id = t1.dept_id
+				  and t4.is_stop = 0
+			left join hr_dept_dict t5
+				   on t5.group_id = t1.group_id
+				  and t5.hos_id = t1.hos_id
+				  and t5.dept_id = t1.cq_dept_id
+				  and t5.is_stop = 0
+		   </if>
+		   <if test="dept_source == 2">
+			left join hos_dept_dict t3
+				   on t3.group_id = t1.group_id
+				  and t3.hos_id = t1.hos_id
+				  and t3.dept_id = t2.dept_id
+				  and t3.is_stop = 0
+			left join hos_dept_dict t4
+				   on t4.group_id = t1.group_id
+				  and t4.hos_id = t1.hos_id
+				  and t4.dept_id = t1.dept_id
+				  and t4.is_stop = 0
+			left join hos_dept_dict t5
+				   on t5.group_id = t1.group_id
+				  and t5.hos_id = t1.hos_id
+				  and t5.dept_id = t1.cq_dept_id
+				  and t5.is_stop = 0
+		   </if>
+			
+			where t1.group_id = #{group_id, jdbcType=INTEGER} 
+			  and t1.hos_id = #{hos_id, jdbcType=INTEGER}
+			  <if test="emp_name != null and emp_name != ''">
+			      and (
+			          t2.emp_name like '%${emp_name}%' or
+		              t2.emp_code like '%${emp_name}%'
+		          )
+		      </if>
+		      <if test="dept_id != null and dept_id != ''">
+		          and t2.dept_id = #{dept_id, jdbcType=INTEGER}
+		      </if>
+		      <if test="start_date != null and start_date != ''">
+		          and t1.pb_date &gt;= #{start_date, jdbcType=DATE}
+		      </if>
+		     
+		      <if test="end_date != null and end_date != ''">
+		          and t1.pb_date &lt;= #{end_date, jdbcType=DATE}  
+		      </if>
+		      and t2.is_attend = 1
+		      and exists (
+			select 1
+			from sys_user_perm_data b
+			where t1.group_id = b.group_id
+			and t1.hos_id = b.hos_id
+			and to_char(t1.dept_id) = b.perm_code
+			and user_id =#{user_id,jdbcType=VARCHAR}
+			<if test="dept_source == 1">
+			and TABLE_CODE = 'HR_DEPT_DICT'
+			</if>
+			<if test="dept_source == 2">
+			and TABLE_CODE = 'HOS_DEPT_DICT'
+			</if>
+			
+			and (b.is_read = 1 or b.is_write = 1)
+		)<!-- and exists (
+			select 1
+			from sys_user_perm_data b
+			where t1.group_id = b.group_id
+			and t1.hos_id = b.hos_id
+			and to_char(t2.YH_CODE) = b.perm_code
+			and user_id =#{user_id,jdbcType=VARCHAR}
+			and TABLE_CODE = 'HOS_EMP_YH'
+			and (b.is_read = 1 or b.is_write = 1)
+		) -->
+		)
+		select a1.*,
+		       a2.cq_dept_1, a2.cq_dept_2, a2.cq_dept_3, a2.cq_dept_4, a2.cq_dept_5, a2.cq_dept_6, a2.cq_dept_7,
+		       a2.cq_dept_8, a2.cq_dept_9, a2.cq_dept_10, a2.cq_dept_11, a2.cq_dept_12, a2.cq_dept_13, a2.cq_dept_14,
+		       a2.cq_dept_15, a2.cq_dept_16, a2.cq_dept_17, a2.cq_dept_18, a2.cq_dept_19, a2.cq_dept_20, a2.cq_dept_21,
+		       a2.cq_dept_22, a2.cq_dept_23, a2.cq_dept_24, a2.cq_dept_25, a2.cq_dept_26, a2.cq_dept_27, a2.cq_dept_28,
+		       a2.cq_dept_29, a2.cq_dept_30, a2.cq_dept_31
+		from (select pb_year, pb_month, pb_day, emp_name, dept_name, pb_dept, row_group from temp_table)
+		     pivot(max(pb_dept) for pb_day in ('01' as pb_dept_1, '02' as pb_dept_2, '03' as pb_dept_3, '04' as pb_dept_4,
+		                                       '05' as pb_dept_5, '06' as pb_dept_6, '07' as pb_dept_7, '08' as pb_dept_8, 
+		                                       '09' as pb_dept_9, '10' as pb_dept_10, '11' as pb_dept_11, '12' as pb_dept_12,
+		                                       '13' as pb_dept_13, '14' as pb_dept_14, '15' as pb_dept_15, '16' as pb_dept_16,
+		                                       '17' as pb_dept_17, '18' as pb_dept_18, '19' as pb_dept_19, '20' as pb_dept_20,
+		                                       '21' as pb_dept_21, '22' as pb_dept_22, '23' as pb_dept_23, '24' as pb_dept_24,
+		                                       '25' as pb_dept_25, '26' as pb_dept_26, '27' as pb_dept_27, '28' as pb_dept_28,
+		                                       '29' as pb_dept_29, '30' as pb_dept_30, '31' as pb_dept_31)) a1
+		left join (select pb_day, cq_dept, row_group from temp_table)
+		          pivot(max(cq_dept) for pb_day in ('01' as cq_dept_1, '02' as cq_dept_2, '03' as cq_dept_3, '04' as cq_dept_4,
+		                                            '05' as cq_dept_5, '06' as cq_dept_6, '07' as cq_dept_7, '08' as cq_dept_8,
+		                                            '09' as cq_dept_9, '10' as cq_dept_10, '11' as cq_dept_11, '12' as cq_dept_12,
+		                                            '13' as cq_dept_13, '14' as cq_dept_14, '15' as cq_dept_15, '16' as cq_dept_16,
+		                                            '17' as cq_dept_17, '18' as cq_dept_18, '19' as cq_dept_19, '20' as cq_dept_20,
+		                                            '21' as cq_dept_21, '22' as cq_dept_22, '23' as cq_dept_23, '24' as cq_dept_24,
+		                                            '25' as cq_dept_25, '26' as cq_dept_26, '27' as cq_dept_27, '28' as cq_dept_28,
+		                                            '29' as cq_dept_29, '30' as cq_dept_30, '31' as cq_dept_31)) a2 
+		       on a1.row_group = a2.row_group
+		order by a1.pb_year, a1.pb_month
+	</select>
+</mapper>

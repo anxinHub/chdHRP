@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.hr.dao.attendancemanagement.accrest.HrAccRestInitMapper">
+
+	<resultMap type="com.chd.hrp.hr.entity.attendancemanagement.accrest.HrAccRestInit" id="accRestInit">
+	    <result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="emp_id" column="emp_id" />
+		<result property="emp_code" column="emp_code" />
+		<result property="emp_name" column="emp_name" />
+		<result property="dept_id" column="dept_id" />
+		<result property="attend_accdays" column="attend_accdays" />
+		<result property="attend_accnote" column="attend_accnote" />
+	</resultMap>
+	
+	<resultMap id="emp" type="com.chd.hrp.sys.entity.Emp">
+        <result property="group_id" column="group_id"/>
+        <result property="hos_id" column="hos_id"/>
+        <result property="emp_id" column="emp_id"/>
+        <result property="emp_no" column="emp_no"/>
+        <result property="emp_code" column="emp_code"/>
+        <result property="emp_name" column="emp_name"/>
+        <result property="dept_no" column="dept_no"/>
+        <result property="dept_id" column="dept_id"/>
+        <result property="dept_name" column="dept_name"/>
+        <result property="dept_code" column="dept_code"/>
+        <result property="kind_code" column="kind_code"/>
+        <result property="kind_name" column="kind_name"/>
+        <result property="sort_code" column="sort_code"/>
+        <result property="spell_code" column="spell_code"/>
+        <result property="wbx_code" column="wbx_code"/>
+        <result property="is_stop" column="is_stop"/>
+        <result property="note" column="note"/>
+        <result property="is_disable" column="is_disable"/>
+	</resultMap>
+	
+	<insert id="add" useGeneratedKeys="true" >
+		INSERT INTO HR_ATTEND_ACCTOP (
+			<trim suffix="" suffixOverrides=",">
+				group_id,
+				hos_id,
+				attend_year,
+				attend_acc_isnot,
+				attend_acctop
+			</trim>
+		) VALUES (
+			<trim suffix="" suffixOverrides=",">
+				#{group_id,jdbcType=INTEGER},
+				#{hos_id,jdbcType=INTEGER},
+				#{attend_year,jdbcType=VARCHAR},
+				#{attend_acc_isnot,jdbcType=INTEGER},
+				#{attend_acctop,jdbcType=INTEGER}
+			</trim>		
+		)
+	</insert>
+	
+   	<insert id="addBatch" parameterType="java.util.List" >
+		INSERT INTO HR_ATTEND_ACCINIT (
+			group_id,
+			hos_id,
+			emp_id,
+			dept_id,
+			attend_accdays,
+			attend_accnote
+		)(
+		<foreach collection="list" item="item" index="index" separator=" union all " >
+			select 		
+				#{item.group_id,jdbcType=INTEGER},
+				#{item.hos_id,jdbcType=INTEGER},
+				#{item.emp_id,jdbcType=INTEGER},
+				(
+					select dept_id from hos_emp
+					where group_id = #{item.group_id,jdbcType=INTEGER}
+					  and hos_id = #{item.hos_id,jdbcType=INTEGER}
+					  and emp_id = #{item.emp_id,jdbcType=INTEGER}
+				),
+				#{item.attend_accdays,jdbcType=INTEGER},
+				#{item.attend_accnote,jdbcType=VARCHAR}
+		    from dual
+		</foreach>
+		)
+	</insert>
+	
+	<delete id="deleteAccRest" parameterType="java.util.List">
+		DELETE FROM HR_ATTEND_ACCINIT 
+		<where>
+			<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+				(
+					group_id = #{item.group_id,jdbcType=INTEGER}
+				AND hos_id = #{item.hos_id,jdbcType=INTEGER}
+				AND emp_id = #{item.emp_id,jdbcType=INTEGER}
+				)
+			</foreach>
+	    </where>  
+	</delete>
+	
+	<delete id="delete" parameterType="java.util.Map">
+		DELETE FROM HR_ATTEND_ACCTOP 
+		WHERE group_id = #{group_id} 
+			and hos_id = #{hos_id} 
+			and attend_year = #{attend_year}
+	</delete>
+	
+	<select id="query" parameterType="java.util.Map" resultMap="accRestInit">
+		select hd.dept_name, he.emp_code, he.emp_id,he.emp_name, haa.attend_accdays, haa.attend_accnote 
+		from hos_emp he
+		 <if test="dept_source == 1">
+		left join hr_dept hd on he.dept_id = hd.dept_id
+			and he.group_id = hd.group_id
+			and he.hos_id = hd.hos_id
+		</if>	
+		 <if test="dept_source == 2">
+		left join hos_dept hd on he.dept_id = hd.dept_id
+			and he.group_id = hd.group_id
+			and he.hos_id = hd.hos_id
+		</if>	
+		left join HR_ATTEND_ACCINIT haa on haa.emp_id = he.emp_id
+			and haa.group_id = he.group_id
+			and haa.hos_id = he.hos_id 
+   		<where>
+			<if test="group_id != null and group_id != ''">
+				AND hd.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND hd.hos_id = #{hos_id}
+			</if>
+			<if test="dept_id != null and dept_id != ''">
+				AND hd.dept_id = #{dept_id}
+			</if>
+			<if test="emp_id != null and emp_id != ''">
+				AND he.emp_id = #{emp_id}
+			</if>
+			<if test="super_code != null and super_code != ''">
+				AND hd.super_code like '%${super_code}%'
+			</if>
+			and he.is_attend = 1
+		</where>
+		order by he.emp_id
+	</select>
+
+	<!-- 判断本年度是否存在结账记录 -->
+	<select id="existsTermendByYear" parameterType="java.util.Map" resultType="java.lang.Integer">
+		SELECT count(0) 
+		FROM hr_period 
+		WHERE group_id = #{group_id,jdbcType=INTEGER} 
+			AND hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND attend_year = #{attend_year,jdbcType=INTEGER} 
+			AND hr_flag = 1 
+	</select>
+	
+	<resultMap type="java.util.Map" id="hrAttendAcctopMap">
+	    <result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="attend_year" column="attend_year" />
+		<result property="attend_acc_isnot" column="attend_acc_isnot" />
+		<result property="attend_acctop" column="attend_acctop" />
+	</resultMap>
+	<!-- 查询积休额度上限 -->
+	<select id="queryAttendCodeByPK" parameterType="java.util.Map" resultMap="hrAttendAcctopMap">
+		select attend_acctop from HR_ATTEND_ACCTOP
+		where group_id = #{group_id} and hos_id = #{hos_id} and attend_year = #{attend_year}
+	</select>
+	
+	<select id="queryinit" parameterType="java.util.Map" resultType="java.lang.Integer">
+	select nvl(sum(haa.ATTEND_ACCDAYS), 0)  ATTEND_ACCDAYS
+		from HR_ATTEND_ACCINIT haa
+   		<where>
+			<if test="group_id != null and group_id != ''">
+				AND haa.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND haa.hos_id = #{hos_id}
+			</if>
+			<if test="emp_id != null and emp_id != ''">
+				AND haa.emp_id = #{emp_id}
+			</if>
+		</where>
+	
+	</select>
+	<select id="queryOverTime"  parameterType="java.util.Map" resultType="java.lang.Integer">
+	select nvl(sum(haa.DAYS), 0)  DAYS
+		from HR_ATTEND_OVERTIME haa
+   		<where>
+			<if test="group_id != null and group_id != ''">
+				AND haa.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND haa.hos_id = #{hos_id}
+			</if>
+			<if test="emp_id != null and emp_id != ''">
+				AND haa.emp_id = #{emp_id}
+			</if>
+			<if test="attend_year != null and attend_year != ''">
+				AND haa.attend_year = #{attend_year}
+			</if>
+			
+		</where>
+	</select>
+	
+	<select id="queryByCode"  parameterType="java.util.Map" resultMap="emp">
+		select emp_id
+		from hos_emp haa
+   		<where>
+			<if test="group_id != null and group_id != ''">
+				AND haa.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND haa.hos_id = #{hos_id}
+			</if>
+			<if test="emp_code != null and emp_code != ''">
+				AND haa.emp_code = #{emp_code}
+			</if>
+			<if test="emp_name != null and emp_name != ''">
+				AND haa.emp_name = #{emp_name}
+			</if>
+			
+		</where>
+	</select>
+	<select id="queryInitByCode"  parameterType="java.util.Map" resultType="java.lang.Integer">
+		select count(*)
+		from HR_ATTEND_ACCINIT 
+   		<where>
+			<if test="group_id != null and group_id != ''">
+				AND group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND hos_id = #{hos_id}
+			</if>
+			<if test="emp_id != null and emp_id != ''">
+				AND emp_id = #{emp_id}
+			</if>
+			
+		</where>
+		</select>
+	
+</mapper>

@@ -1,0 +1,266 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.sup.dao.base.SupBaseMapper">
+
+	<resultMap id="supMap" type="java.util.Map">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="sup_id" column="sup_id" />
+		<result property="sup_no" column="sup_no" />
+		<result property="sup_code" column="sup_code" />
+		<result property="sup_name" column="sup_name" />
+
+	</resultMap>
+	<resultMap id="matInv" type="java.util.Map">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="inv_id" column="inv_id" />
+		<result property="inv_no" column="inv_no" />
+		<result property="inv_code" column="inv_code" />
+		<result property="inv_name" column="inv_name" />
+		<result property="alias" column="alias" />
+		<result property="mat_type_id" column="mat_type_id" />
+		<result property="mat_type_code" column="mat_type_code" />
+		<result property="mat_type_name" column="mat_type_name" />
+		<result property="inv_model" column="inv_model" />
+		<result property="unit_code" column="unit_code" />
+		<result property="unit_name" column="unit_name" />
+		<result property="fac_id" column="fac_id" />
+		<result property="fac_no" column="fac_no" />
+		<result property="fac_code" column="fac_code" />
+		<result property="fac_name" column="fac_name" />
+		<result property="plan_price" column="plan_price" />
+		<result property="sell_price" column="sell_price" />
+		<result property="pack_code" column="pack_code" />
+		<result property="pack_name" column="pack_name" />
+		<result property="num_exchange" column="num_exchange" />
+		<result property="map_amount" column="map_amount" />
+		<result property="last_extends" column="last_extends" />
+		<result property="last_plan" column="last_plan" />
+		<result property="this_plan" column="this_plan" />
+		<result property="cur_amount" column="cur_amount" />
+		<result property="cur_money" column="cur_money" />
+		<result property="imme_amount" column="imme_amount" />
+		<result property="cert_code" column="cert_code" />
+		<result property="brand_name" column="brand_name" />
+		<result property="price" column="price" />
+		<result property="location_id" column="location_id" />
+		<result property="location_code" column="location_code" />
+		<result property="location_name" column="location_name" />
+		<result property="is_com" column="is_com" />
+		<result property="is_single_ven" column="is_single_ven" />
+		<result property="is_charge" column="is_charge" />
+		<result property="is_highvalue" column="is_highvalue" />
+		<result property="is_batch" column="is_batch" />
+		<result property="is_bar" column="is_bar" />
+		<result property="is_per_bar" column="is_per_bar" />
+		<result property="is_dual" column="is_dual" />
+		<result property="is_quality" column="is_quality" />
+		<result property="is_disinfect" column="is_disinfect" />
+		<result property="is_cert" column="is_cert" />
+		<result property="is_sec_whg" column="is_sec_whg" />
+		<result property="is_shel_make" column="is_shel_make" />
+		<result property="sup_id" column="sup_id" />
+		<result property="sup_no" column="sup_no" />
+		<result property="sup_name" column="sup_name" />
+		<result property="batch_no" column="batch_no" />
+		<result property="batch_sn" column="batch_sn" />
+		<result property="bar_code" column="bar_code" />
+		<result property="inva_date" column="inva_date" />
+		<result property="cert_id" column="cert_id" />
+		<result property="cert_code" column="cert_code" />
+		<result property="is_default" column="is_default" />
+	</resultMap>
+
+	<!-- 业务数据选择物资材料所用 -->
+	<select id="queryMatInvList" parameterType="java.util.Map"
+		resultMap="matInv">
+		WITH inv_tmp AS(
+		SELECT
+		group_id, hos_id, copy_code, inv_id, inv_no, inv_code, inv_name, mat_type_id,
+		mat_type_no, inv_model, unit_code,
+		is_com, is_highvalue, is_batch, is_bar, is_per_bar, is_quality,
+		is_single_ven, is_disinfect, fac_id, plan_price, sell_price
+		FROM mat_inv_dict
+		WHERE group_id =#{group_id,jdbcType=INTEGER}
+		and hos_id =#{hos_id,jdbcType=INTEGER}
+		and copy_code =#{copy_code,jdbcType=VARCHAR}
+		and use_state = 1
+		and is_stop = 0
+		<if test="is_com != null and is_com != ''">
+			and is_com = #{is_com,jdbcType=INTEGER}
+		</if>
+		<if test="key != null and key != ''">
+			and (
+			inv_code like '%${key}%' or
+			inv_name like '%${key}%'
+			or
+			spell_code like '%${key}%' or
+			wbx_code like '%${key}%' or
+			alias like '%${key}%'
+			)
+		</if>
+		), inv_cert_tmp as(
+		select inv_id, group_id, hos_id, copy_code,min(cert_id) cert_id
+		from mat_inv_cert_rela
+		where group_id = #{group_id,jdbcType=INTEGER}
+		and hos_id = #{hos_id,jdbcType=INTEGER}
+		and copy_code = #{copy_code,jdbcType=VARCHAR}
+		group by inv_id, group_id, hos_id, copy_code
+		)
+		<if
+			test="by_sup_inv != null and by_sup_inv == 1 and sup_id != null and sup_id != ''">
+			, sup_inv_tmp AS(
+			SELECT inv_id FROM mat_inv_sup
+			WHERE group_id =
+			#{group_id,jdbcType=INTEGER}
+			and hos_id = #{hos_id,jdbcType=INTEGER}
+			and copy_code = #{copy_code,jdbcType=VARCHAR}
+			and sup_id = #{sup_id,jdbcType=INTEGER}
+			)
+		</if>
+		SELECT
+		a.inv_id, a.inv_no, a.inv_code, a.inv_name, a.mat_type_id, b.mat_type_name,
+		a.inv_model, a.unit_code, c.unit_name,
+		a.is_com, a.is_highvalue, a.is_batch, a.is_bar, a.is_per_bar, a.is_quality,
+		a.is_single_ven, a.is_disinfect, f.pack_code,
+		g.pack_name pack_name, f.map_amount num_exchange, a.fac_id, e.fac_no, e.fac_name,
+		a.plan_price, a.sell_price,
+		nvl(mih.cur_amount, 0) cur_amount, a.plan_price as price, mld.location_id,
+		mld.location_code, mld.location_name
+		,mic.cert_id,mic.cert_code
+		from inv_tmp a
+		left join mat_type_dict b
+		on a.group_id = b.group_id
+		and a.hos_id = b.hos_id
+		and a.copy_code = b.copy_code
+		and a.mat_type_id = b.mat_type_id
+		and a.mat_type_no = b.mat_type_no
+		left join hos_unit c
+		on a.group_id = c.group_id
+		and a.hos_id = c.hos_id
+		and a.unit_code = c.unit_code
+		left join hos_fac_dict e
+		on a.group_id = e.group_id
+		and a.hos_id = e.hos_id
+		and a.fac_id = e.fac_id
+		and e.is_stop = 0
+		left join mat_inv_unit_map f
+		on a.group_id = f.group_id
+		and a.hos_id = f.hos_id
+		and a.copy_code = f.copy_code
+		and a.inv_id = f.inv_id
+		left join hos_package g
+		on f.group_id = g.group_id
+		and f.hos_id = g.hos_id
+		and f.pack_code = g.pack_code
+		left join mat_inv_hold mih
+		on a.group_id = mih.group_id
+		and a.hos_id = mih.hos_id
+		and a.copy_code = mih.copy_code
+		and mih.store_id = #{store_id,jdbcType=INTEGER}
+		and a.inv_id = mih.inv_id
+		left join mat_location_inv mli
+		on a.group_id = mli.group_id
+		and a.hos_id = mli.hos_id
+		and a.copy_code = mli.copy_code
+		and a.inv_id = mli.inv_id
+		left join mat_location_dict mld
+		on mli.group_id = mld.group_id
+		and mli.hos_id = mld.hos_id
+		and mli.copy_code = mld.copy_code
+		and mli.location_id = mld.location_id
+		and mld.is_stop = 0
+		left join inv_cert_tmp ict
+		on ict.group_id = a.group_id
+		and ict.hos_id = a.hos_id
+		and ict.copy_code = a.copy_code
+		and ict.inv_id = a.inv_id
+		left join mat_inv_cert mic
+		on mic.group_id = ict.group_id
+		and mic.hos_id = ict.hos_id
+		and mic.copy_code = ict.copy_code
+		and mic.cert_id = ict.cert_id
+		and mic.cert_state = 1
+		where
+		<if
+			test="by_sup_inv != null and by_sup_inv == 1 and sup_id != null and sup_id != ''">
+			( not exists(select inv_id from mat_inv_sup where mat_inv_sup.inv_id =
+			a.inv_id)
+			or exists(select inv_id from sup_inv_tmp where sup_inv_tmp.inv_id =
+			a.inv_id)
+			)
+		</if>
+	</select>
+
+	<!-- 供应商字典含变更号 -->
+	<select id="querySupDict" resultMap="supMap">
+		SELECT
+		sup_id,sup_no , sup_code,sup_name text
+		FROM HOS_SUP_DICT
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="sup_id != null  and sup_id != ''">
+				and sup_id = #{sup_id}
+			</if>
+			and is_stop = 0
+
+		</where>
+		order by sup_code
+	</select>
+<!-- 判断批号有效日期是否一致 -->
+	<select id="queryMatInvBatchInva" parameterType="java.util.Map"
+		resultType="java.util.Date">
+		SELECT inva_date
+		FROM MAT_BATCH_VALIDITY
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND inv_id = #{inv_id,jdbcType=INTEGER}
+			AND batch_no = #{batch_no,jdbcType=VARCHAR}
+	</select>
+
+	<!-- 判断批号灭菌日期是否一致 -->
+	<select id="queryMatInvBatchDisinfect" parameterType="java.util.Map"
+		resultType="java.util.Date">
+		SELECT disinfect_date
+		FROM MAT_BATCH_DISINFECT
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND inv_id = #{inv_id,jdbcType=INTEGER}
+			AND batch_no = #{batch_no,jdbcType=VARCHAR}
+	</select>
+	
+	<!-- 判断批号单价是否一致 -->
+	<select id="queryMatInvBatchPrice" parameterType="java.util.Map"
+		resultType="java.lang.Double">
+		select price from mat_fifo_balance 
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND inv_id = #{inv_id,jdbcType=INTEGER}
+			AND batch_no = #{batch_no,jdbcType=VARCHAR}
+			AND rownum = 1
+	</select>
+	
+	<!-- 判断批号单价是否一致（代销） -->
+	<select id="queryMatAffiInvBatchPrice" parameterType="java.util.Map"
+		resultType="java.lang.Double">
+		select price from mat_affi_fifo
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND inv_id = #{inv_id,jdbcType=INTEGER}
+			AND batch_no = #{batch_no,jdbcType=VARCHAR}
+			AND rownum = 1
+	</select>
+</mapper>
+

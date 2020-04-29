@@ -1,0 +1,2277 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.cost.dao.director.CostProfitandlossMapper">
+
+		<select id="queryCostShare" parameterType="java.util.Map" resultType="java.util.Map"> 
+		       with dept as (
+		    select hdd.dept_id,  hdd.dept_code, hdd.dept_name,ada.natur_code
+		    from hos_dept_dict hdd
+		      left join acc_dept_attr ada on hdd.group_id = ada.group_id
+		    and hdd.hos_id = ada.hos_id
+		    and hdd.dept_id = ada.dept_id 
+		    where hdd.group_id = #{group_id}
+		      and hdd.hos_id = #{hos_id}
+		      and ada.natur_code in ('01','02')
+		      and hdd.is_stop = '0'
+		      and hdd.is_last = '1'
+		    <if test="dept_code != null and dept_code != ''">
+              and hdd.dept_code like #{dept_code}||'%'
+            </if>
+		  ),dept_cost as(
+			     select 
+		          dept_id, 
+					sum(dir_amount + dir_ass_amount + dir_med_amount + indir_med_ass_amount + 
+					dir_man_amount + indir_ass_man_amount + indir_med_man_amount + indir_ass_med_man_amount) cost_amount,
+          sum(dir_amount) dir_amount,
+          sum(dir_man_amount + indir_ass_man_amount + indir_med_man_amount +indir_ass_med_man_amount)dir_man_amount,
+          sum(dir_ass_amount + indir_med_ass_amount) dir_ass_amount,
+          sum(dir_med_amount) dir_med_amount
+        from cost_dept_cost cdc
+          left join cost_item_dict_no cidn on cdc.group_id = cidn.group_id
+				and cdc.hos_id = cidn.hos_id
+				and cdc.copy_code = cidn.copy_code
+				and cdc.cost_item_id = cidn.cost_item_id
+				and cidn.is_stop=0
+				where cdc.group_id = #{group_id}
+					and cdc.hos_id = #{hos_id}
+					and cdc.copy_code = #{copy_code}
+					
+					and to_char(dept_id) in (
+				                select b.perm_code
+				                from v_user_data_perm b
+				                where b.group_id = #{group_id}
+					            and b.hos_id = #{hos_id}
+					            and b.user_id = #{user_id}
+					            and b.table_code = 'HOS_DEPT_DICT'
+					            and (b.is_write = 1
+						        or b.is_read = 1)
+			                    )
+					
+					and cdc.source_id = '1'
+					and cdc.acc_year || cdc.acc_month between #{year_month_begin} and #{year_month_end}
+				group by dept_id
+	 )select 
+	     '01' natur_code,
+	     '' dept_code,
+		 '门诊' dept_name,
+		 sum(t1.cost_amount) t_1,
+		 sum(t1.dir_amount) t_2,
+		 divide(sum(t1.dir_amount),sum(t1.cost_amount)) * 100 t_3,
+		 sum(t1.dir_man_amount) t_4,
+		 divide(sum(t1.dir_man_amount),sum(t1.cost_amount)) * 100 t_5,
+		 sum(t1.dir_ass_amount) t_6,
+		 divide(sum(t1.dir_ass_amount),sum(t1.cost_amount)) * 100 t_7,
+		 sum(t1.dir_med_amount) t_8,
+		 divide(sum(t1.dir_med_amount),sum(t1.cost_amount)) * 100  t_9
+	 from dept  t
+	 left join dept_cost t1
+	 on t.dept_id = t1.dept_id
+	 where natur_code = '01'  and nvl(t1.cost_amount,0) != 0
+	 union all
+	 select 
+	     '' natur_code,
+	     t.dept_code,
+		 t.dept_name,
+		 t1.cost_amount,
+		 t1.dir_amount,
+		 divide(t1.dir_amount,t1.cost_amount) * 100,
+		 t1.dir_man_amount,
+		 divide(t1.dir_man_amount,t1.cost_amount) * 100,
+		 t1.dir_ass_amount,
+		 divide(t1.dir_ass_amount,t1.cost_amount) * 100,
+		 t1.dir_med_amount,
+		 divide(t1.dir_med_amount,t1.cost_amount) * 100
+	 from dept  t
+	 left join dept_cost t1
+	 on t.dept_id = t1.dept_id
+	 where natur_code = '01' and nvl(t1.cost_amount,0) != 0
+	 union all
+	 select 
+	     '02' natur_code,
+	     '' dept_code,
+		 '住院' dept_name,
+		 sum(t1.cost_amount),
+		 sum(t1.dir_amount),
+		 divide(sum(t1.dir_amount),sum(t1.cost_amount)) * 100,
+		 sum(t1.dir_man_amount),
+		 divide(sum(t1.dir_man_amount),sum(t1.cost_amount)) * 100,
+		 sum(t1.dir_ass_amount),
+		 divide(sum(t1.dir_ass_amount),sum(t1.cost_amount)) * 100,
+		 sum(t1.dir_med_amount),
+		 divide(sum(t1.dir_med_amount),sum(t1.cost_amount)) * 100 
+	 from dept  t
+	 left join dept_cost t1
+	 on t.dept_id = t1.dept_id
+	 where natur_code = '02'  and nvl(t1.cost_amount,0) != 0
+	 union all
+	 select 
+	     '' natur_code,
+	     t.dept_code,
+		 t.dept_name,
+		 t1.cost_amount t_1,
+		 t1.dir_amount t_2,
+		 divide(t1.dir_amount,t1.cost_amount) * 100 t_3,
+		 t1.dir_man_amount t_4,
+		 divide(t1.dir_man_amount,t1.cost_amount) * 100 t_5,
+		 t1.dir_ass_amount t_6,
+		 divide(t1.dir_ass_amount,t1.cost_amount) * 100 t_7,
+		 t1.dir_med_amount t_8,
+		 divide(t1.dir_med_amount,t1.cost_amount) * 100 t_9
+	 from dept  t
+	 left join dept_cost t1
+	 on t.dept_id = t1.dept_id
+	 where natur_code = '02' and nvl(t1.cost_amount,0) != 0
+	 union all
+	 select 
+	     '',
+	     '',
+		 '合计',
+		 sum(t1.cost_amount),
+		 sum(t1.dir_amount),
+		 divide(sum(t1.dir_amount),sum(t1.cost_amount)) * 100,
+		 sum(t1.dir_man_amount),
+		 divide(sum(t1.dir_man_amount),sum(t1.cost_amount)) * 100,
+		 sum(t1.dir_ass_amount),
+		 divide(sum(t1.dir_ass_amount),sum(t1.cost_amount)) * 100,
+		 sum(t1.dir_med_amount),
+		 divide(sum(t1.dir_med_amount),sum(t1.cost_amount)) * 100 
+	 from dept  t
+	 left join dept_cost t1
+	 on t.dept_id = t1.dept_id
+		</select>
+		
+	<select id="queryCostSharePrint" parameterType="java.util.Map" resultType="java.util.Map"> 
+		       with dept as (
+		    select hdd.dept_id, hdd.dept_no, hdd.dept_code, hdd.dept_name,ada.natur_code
+		    from hos_dept_dict hdd
+		      left join acc_dept_attr ada on hdd.group_id = ada.group_id
+		    and hdd.hos_id = ada.hos_id
+		    and hdd.dept_id = ada.dept_id 
+		    where hdd.group_id = #{group_id}
+		      and hdd.hos_id = #{hos_id}
+		      and ada.natur_code in ('01','02')
+		      and hdd.is_stop = '0'
+		      and hdd.is_last = '1'
+		    <if test="dept_code != null and dept_code != ''">
+              and hdd.dept_code like #{dept_code}||'%'
+            </if>
+		  ),dept_cost as(
+			     select 
+		          dept_id, 
+		          dept_no,
+					sum(dir_amount + dir_ass_amount + dir_med_amount + indir_med_ass_amount + 
+					dir_man_amount + indir_ass_man_amount + indir_med_man_amount + indir_ass_med_man_amount) cost_amount,
+          sum(dir_amount) dir_amount,
+          sum(dir_man_amount + indir_ass_man_amount + indir_med_man_amount +indir_ass_med_man_amount)dir_man_amount,
+          sum(dir_ass_amount + indir_med_ass_amount) dir_ass_amount,
+          sum(dir_med_amount) dir_med_amount
+        from cost_dept_cost cdc
+          left join cost_item_dict_no cidn on cdc.group_id = cidn.group_id
+				and cdc.hos_id = cidn.hos_id
+				and cdc.copy_code = cidn.copy_code
+				and cdc.cost_item_id = cidn.cost_item_id
+				and cdc.cost_item_no = cidn.cost_item_no 
+				where cdc.group_id = #{group_id}
+					and cdc.hos_id = #{hos_id}
+					and cdc.copy_code = #{copy_code}
+					
+					and to_char(dept_id) in (
+				                select b.perm_code
+				                from v_user_data_perm b
+				                where b.group_id = #{group_id}
+					            and b.hos_id = #{hos_id}
+					            and b.user_id = #{user_id}
+					            and b.table_code = 'HOS_DEPT_DICT'
+					            and (b.is_write = 1
+						        or b.is_read = 1)
+			                    )
+					
+					and cdc.source_id = '1'
+					and cdc.acc_year || cdc.acc_month between #{year_month_begin} and #{year_month_end}
+				group by dept_id, dept_no
+	 )select 
+	     '01' natur_code,
+	     '' dept_code,
+		 '门诊' dept_name,
+		 to_char(nvl(sum(t1.cost_amount),0),'fm9999990.00') t_1, <!-- 总成本 -->
+		 to_char(nvl(sum(t1.dir_amount),0),'fm9999990.00') t_2, <!-- 直接成本-直接计入 -->
+		 to_char(nvl(divide(sum(t1.dir_amount),sum(t1.cost_amount)),0) * 100,'fm9999990.00') || '%' t_3, <!-- 直接成本-比例 -->
+		 to_char(nvl(sum(t1.dir_man_amount),0),'fm9999990.00') t_4, <!-- 间接成本-分摊管理成本-金额 -->
+		 to_char(nvl(divide(sum(t1.dir_man_amount),sum(t1.cost_amount)),0) * 100,'fm9999990.00') || '%' t_5, <!-- 间接成本-分摊管理成本-比例 -->
+		 to_char(nvl(sum(t1.dir_ass_amount),0),'fm9999990.00') t_6,<!-- 间接成本-分摊医辅成本 -金额-->
+		 to_char(nvl(divide(sum(t1.dir_ass_amount),sum(t1.cost_amount)),0) * 100,'fm9999990.00') || '%' t_7,<!-- 间接成本-分摊医辅成本 -比例 -->
+		 to_char(nvl(sum(t1.dir_med_amount),0),'fm9999990.00') t_8,<!-- 间接成本-分摊医技成本-金额 -->
+		 to_char(nvl(divide(sum(t1.dir_med_amount),sum(t1.cost_amount)),0) * 100,'fm9999990.00') || '%'  t_9<!-- 间接成本-分摊医技成本-比例 -->
+	 from dept  t
+	 left join dept_cost t1
+	 on t.dept_id = t1.dept_id
+	 and t.dept_no = t1.dept_no
+	 where natur_code = '01'  and nvl(t1.cost_amount,0) != 0
+	 union all
+	 select 
+	     '' natur_code,
+	     t.dept_code,
+		 t.dept_name,
+		 to_char(nvl(t1.cost_amount,0),'fm9999990.00'),
+		 to_char(nvl(t1.dir_amount,0),'fm9999990.00'),
+		 to_char(nvl(divide(t1.dir_amount,t1.cost_amount),0) * 100,'fm9999990.00') || '%',
+		 to_char(nvl(t1.dir_man_amount,0),'fm9999990.00'),
+		 to_char(nvl(divide(t1.dir_man_amount,t1.cost_amount),0) * 100,'fm9999990.00') || '%',
+		 to_char(nvl(t1.dir_ass_amount,0),'fm9999990.00'),
+		 to_char(nvl(divide(t1.dir_ass_amount,t1.cost_amount),0) * 100,'fm9999990.00') || '%',
+		 to_char(nvl(t1.dir_med_amount,0),'fm9999990.00'),
+		 to_char(nvl(divide(t1.dir_med_amount,t1.cost_amount),0) * 100,'fm9999990.00') || '%'
+	 from dept  t
+	 left join dept_cost t1
+	 on t.dept_id = t1.dept_id
+	 and t.dept_no = t1.dept_no
+	 where natur_code = '01' and nvl(t1.cost_amount,0) != 0
+	 union all
+	 select 
+	     '02' natur_code,
+	     '' dept_code,
+		 '住院' dept_name,
+		 to_char(nvl(sum(t1.cost_amount),0),'fm9999990.00'),
+		 to_char(nvl(sum(t1.dir_amount),0),'fm9999990.00'),
+		 to_char(nvl(divide(sum(t1.dir_amount),sum(t1.cost_amount)),0) * 100,'fm9999990.00') || '%',
+		 to_char(nvl(sum(t1.dir_man_amount),0),'fm9999990.00'),
+		 to_char(nvl(divide(sum(t1.dir_man_amount),sum(t1.cost_amount)),0) * 100,'fm9999990.00') || '%',
+		 to_char(nvl(sum(t1.dir_ass_amount),0),'fm9999990.00'),
+		 to_char(nvl(divide(sum(t1.dir_ass_amount),sum(t1.cost_amount)),0) * 100,'fm9999990.00') || '%',
+		 to_char(nvl(sum(t1.dir_med_amount),0),'fm9999990.00'),
+		 to_char(nvl(divide(sum(t1.dir_med_amount),sum(t1.cost_amount)),0) * 100,'fm9999990.00') || '%' 
+	 from dept  t
+	 left join dept_cost t1
+	 on t.dept_id = t1.dept_id
+	 and t.dept_no = t1.dept_no
+	 where natur_code = '02'  and nvl(t1.cost_amount,0) != 0
+	 union all
+	 select 
+	     '' natur_code,
+	     t.dept_code,
+		 t.dept_name,
+		 to_char(nvl(t1.cost_amount,0),'fm9999990.00') t_1,
+		 to_char(nvl(t1.dir_amount,0),'fm9999990.00') t_2,
+		 to_char(nvl(divide(t1.dir_amount,t1.cost_amount),0) * 100,'fm9999990.00') || '%' t_3,
+		 to_char(nvl(t1.dir_man_amount,0),'fm9999990.00') t_4,
+		 to_char(nvl(divide(t1.dir_man_amount,t1.cost_amount),0) * 100,'fm9999990.00') || '%' t_5,
+		 to_char(nvl(t1.dir_ass_amount,0),'fm9999990.00') t_6,
+		 to_char(nvl(divide(t1.dir_ass_amount,t1.cost_amount),0) * 100,'fm9999990.00') || '%' t_7,
+		 to_char(nvl(t1.dir_med_amount,0),'fm9999990.00') t_8,
+		 to_char(nvl(divide(t1.dir_med_amount,t1.cost_amount),0) * 100,'fm9999990.00') || '%' t_9
+	 from dept  t
+	 left join dept_cost t1
+	 on t.dept_id = t1.dept_id
+	 and t.dept_no = t1.dept_no
+	 where natur_code = '02' and nvl(t1.cost_amount,0) != 0
+	 union all
+	 select 
+	     '',
+	     '',
+		 '合计',
+		 to_char(nvl(sum(t1.cost_amount),0),'fm9999990.00'),
+		 to_char(nvl(sum(t1.dir_amount),0),'fm9999990.00'),
+		 to_char(nvl(divide(sum(t1.dir_amount),sum(t1.cost_amount)),0) * 100,'fm9999990.00') || '%',
+		 to_char(nvl(sum(t1.dir_man_amount),0),'fm9999990.00'),
+		 to_char(nvl(divide(sum(t1.dir_man_amount),sum(t1.cost_amount)),0) * 100,'fm9999990.00') || '%',
+		 to_char(nvl(sum(t1.dir_ass_amount),0),'fm9999990.00'),
+		 to_char(nvl(divide(sum(t1.dir_ass_amount),sum(t1.cost_amount)),0) * 100,'fm9999990.00') || '%',
+		 to_char(nvl(sum(t1.dir_med_amount),0),'fm9999990.00'),
+		 to_char(nvl(divide(sum(t1.dir_med_amount),sum(t1.cost_amount)),0) * 100,'fm9999990.00') || '%' 
+	 from dept  t
+	 left join dept_cost t1
+	 on t.dept_id = t1.dept_id
+	 and t.dept_no = t1.dept_no
+		</select>	
+		
+	<select id="querycostShareCost" parameterType="java.util.Map" resultType="java.util.Map">
+	          with dept_cost as(    
+	     select cidn.cost_item_code, cidn.cost_item_name
+	          , sum(dir_amount + dir_ass_amount + dir_med_amount + indir_med_ass_amount + 
+						  dir_man_amount + indir_ass_man_amount + indir_med_man_amount + indir_ass_med_man_amount) as cost_amount
+	          , sum(dir_amount) as dir_amount
+	          , sum(dir_man_amount + indir_ass_man_amount + indir_med_man_amount + indir_ass_med_man_amount) as dir_man_amount
+	          , sum(dir_ass_amount + indir_med_ass_amount) as dir_ass_amount
+	          , sum(dir_med_amount) as dir_med_amount
+	        from cost_dept_cost cdc
+	        left join cost_item_dict_no cidn on cdc.group_id = cidn.group_id
+	        and cdc.hos_id = cidn.hos_id
+	        and cdc.copy_code = cidn.copy_code
+	        and cdc.cost_item_id = cidn.cost_item_id
+	        and cidn.is_stop=0
+					left join hos_dept_dict hdd
+					on hdd.group_id = cdc.group_id
+					and hdd.hos_id = cdc.hos_id
+					and hdd.dept_id = cdc.dept_id
+					and hdd.is_stop=0
+	        where cdc.group_id = #{group_id}
+	          and cdc.hos_id = #{hos_id}
+	          and cdc.copy_code = #{copy_code}
+	          and cdc.source_id = '1'
+	          and cdc.acc_year || cdc.acc_month between  #{year_month_begin} and  #{year_month_end}
+			  and hdd.dept_code = #{dept_code}
+	        group by cidn.cost_item_code, cidn.cost_item_name
+			)select 
+			  cost_item_code,
+				cost_item_name,
+				cost_amount t_1,
+				dir_amount t_2,
+				divide(dir_amount,cost_amount) * 100 t_3,
+				dir_man_amount t_4,
+				divide(dir_man_amount,cost_amount) * 100 t_5,
+				dir_ass_amount t_6,
+				divide(dir_ass_amount,cost_amount) * 100 t_7,
+				dir_med_amount t_8,
+				divide(dir_med_amount,cost_amount) * 100 t_9
+			 from dept_cost
+			 union all
+			 select 
+			  '',
+				'合计',
+				sum(cost_amount),
+				sum(dir_amount),
+				divide(sum(dir_amount),sum(cost_amount)) * 100,
+				sum(dir_man_amount),
+				divide(sum(dir_man_amount),sum(cost_amount)) * 100,
+				sum(dir_ass_amount),
+				divide(sum(dir_ass_amount),sum(cost_amount)) * 100,
+				sum(dir_med_amount),
+				divide(sum(dir_med_amount),sum(cost_amount)) * 100
+			 from dept_cost
+			 order by cost_item_code
+	
+	</select>
+	
+	<select id="queryCostShareCostDir" parameterType="java.util.Map" resultType="java.util.Map">
+	      	with dept_cost as (
+				select 
+				      cidn.cost_item_code,
+					  cidn.cost_item_name,
+					  sum(dir_amount) as dir_amount
+				from cost_dept_cost cdc
+				left join cost_item_dict_no cidn on cdc.group_id = cidn.group_id
+				and cdc.hos_id = cidn.hos_id
+				and cdc.copy_code = cidn.copy_code
+				and cdc.cost_item_id = cidn.cost_item_id
+				and cidn.is_stop=0
+					left join hos_dept_dict hdd on hdd.group_id = cdc.group_id
+				and hdd.hos_id = cdc.hos_id
+				and hdd.dept_id = cdc.dept_id 
+				and hdd.is_stop=0
+					left join acc_dept_attr ada
+				on ada.group_id = hdd.group_id
+				and ada.hos_id = hdd.hos_id
+				and ada.dept_id = hdd.dept_id
+				    where cdc.group_id = #{group_id}
+					and cdc.hos_id = #{hos_id}
+					and cdc.copy_code = #{copy_code}
+					and cdc.source_id = '1'
+					and cdc.acc_year || cdc.acc_month  between  #{year_month_begin} and  #{year_month_end}
+					and ada.natur_code in ('01','02')
+					<if test="dept_code != null and dept_code != ''">
+		              and hdd.dept_code = #{dept_code}
+		            </if>
+		            <if test="natur_code != null and natur_code != ''">
+		              and ada.natur_code = #{natur_code}
+		            </if>
+					and dir_amount !=0
+				    group by cidn.cost_item_code, cidn.cost_item_name
+						)
+					select 
+					 cost_item_code, 
+					 cost_item_name,
+					 dir_amount
+			    from dept_cost
+					union all
+					select 
+					 '', 
+					 '合计',
+					 sum(dir_amount)
+			    from dept_cost
+	</select>
+	
+	
+	<select id="queryCostShareCostAss" parameterType="java.util.Map" resultType="java.util.Map">
+	
+	           with pree_cost as (
+               select 
+                   t.group_id,
+                   t.hos_id,
+                   t.copy_code,
+                   t.acc_year,
+                   t.acc_month,
+                   t.dept_id,
+                   t.dept_code,
+                   t.dept_name,
+                   t.cost_item_id,
+                   t.cost_item_code,
+                   t.cost_item_name,
+                   t.source_id,
+                   t.source_code,
+                   t.source_name,
+                   t.dir_amount,
+                   t.type_code,
+                   t.type_name,
+                   t.natur_code,
+                   t.para_code,
+                   t.para_name,
+                   t.para_type_code,
+                   t.type_name para_type_name,
+                   t.para_value,
+                   t.peer_flag
+                  from v_cost_dept_cost t
+                  where t.group_id = #{group_id}
+                  and t.hos_id = #{hos_id}
+                  and t.copy_code = #{copy_code}
+                  and t.acc_year || t.acc_month  between  #{year_month_begin} and  #{year_month_end}
+                  and t.type_code = '03'
+            ),server_dept_para as (                      
+                select 
+                     t1.group_id
+                    ,t1.hos_id
+                    ,t1.copy_code
+                    ,t1.acc_year
+                    ,t1.acc_month
+                    ,t1.dept_id
+                    ,t1.server_dept_id
+                    ,t1.para_code
+                    ,t1.para_type_code
+                    ,t1.para_value
+                    ,decode(
+                      nvl(sum(t2.para_amount) over(
+                      partition by  t1.group_id,
+                                    t1.hos_id,
+                                    t1.copy_code,
+                                    t1.acc_year,
+                                    t1.acc_month,
+                                    t1.dept_id
+                      ),0),0,t3.para_amount,t2.para_amount) as para_amount
+                 from v_cost_para_server_dept t1
+                 left join (
+                  select 
+                          t.group_id,
+                          t.hos_id,
+                          t.copy_code,
+                          t.acc_year,
+                          t.acc_month,
+                          t.dept_id,
+                          t.server_dept_id,
+                          t.para_type_code,
+                          t.para_code,
+                          t.para_value,
+                          sum(t1.para_amount) para_amount
+                        from v_cost_para_server_dept t
+                        left join v_cost_para_value_data t1
+                        on t.group_id = t1.group_id
+                        and t.hos_id = t1.hos_id
+                        and t.copy_code = t1.copy_code
+                        and t.acc_year = t1.acc_year
+                        and t.acc_month = t1.acc_month
+                        and t.server_dept_id = t1.server_dept_id
+                        and t.para_value = t1.para_value
+                        where t.group_id = #{group_id} 
+                        and t.hos_id = #{hos_id} 
+                        and t.copy_code = #{copy_code} 
+                        and t.acc_year || t.acc_month between  #{year_month_begin} and  #{year_month_end}
+                        and t.type_code = '03'
+                        and t.bill_type = '02'
+                        and t.para_value not in ('05', '06')
+                        and t1.server_dept_id = t1.dept_id
+                         group by t.group_id
+                                 ,t.hos_id
+                                 ,t.copy_code
+                                 ,t.acc_year
+                                 ,t.acc_month
+                                 ,t.dept_id
+                                 ,t.server_dept_id
+                                 ,t.para_type_code
+                                 ,t.para_code
+                                 ,t.para_value
+                        union all
+                        select 
+                          t.group_id
+                          ,t.hos_id
+                          ,t.copy_code
+                          ,t.acc_year
+                          ,t.acc_month
+                          ,t.dept_id
+                          ,t.server_dept_id
+                          ,t.para_type_code
+                          ,t.para_code
+                          ,t.para_value
+                          ,SUM(t1.para_amount) para_amount
+                        from v_cost_para_server_dept t
+                        left join v_cost_para_value_data t1
+                        on t.group_id = t1.group_id
+                        and t.hos_id = t1.hos_id
+                        and t.copy_code = t1.copy_code
+                        and t.acc_year = t1.acc_year
+                        and t.acc_month = t1.acc_month
+                        and t.dept_id = t1.dept_id
+                        and t.server_dept_id = t1.server_dept_id
+                        and t.para_value = t1.para_value
+                        where t.group_id =  #{group_id}
+                        and t.hos_id =  #{hos_id}
+                        and t.copy_code =  #{copy_code}
+                        and t.acc_year || t.acc_month between  #{year_month_begin} and  #{year_month_end}
+                        and t.type_code = '03'
+                        and t.bill_type = '02'
+                        and t.para_value  in ('05', '06')
+                        group by t.group_id
+                                ,t.hos_id
+                                ,t.copy_code
+                                ,t.acc_year
+                                ,t.acc_month
+                                ,t.dept_id
+                                ,t.server_dept_id
+                                ,t.para_type_code
+                                ,t.para_code
+                                ,t.para_value
+                 )t2 on t1.group_id = t2.group_id
+                 and  t1.hos_id = t2.hos_id
+                 and  t1.copy_code = t2.copy_code
+                 and  t1.acc_year = t2.acc_year
+                 and  t1.acc_month = t2.acc_month
+                 and  t1.dept_id = t2.dept_id
+                 and  t1.server_dept_id = t2.server_dept_id
+                 and  t1.para_type_code = t2.para_type_code
+                 and  t1.para_code = t2.para_code
+                 and  t1.para_value = t2.para_value
+                 left join (
+                    select 
+                          t.group_id,
+                          t.hos_id,
+                          t.copy_code,
+                          t.acc_year,
+                          t.acc_month,
+                          t.dept_id,
+                          t.server_dept_id,
+                          t.para_type_code,
+                          t.para_code,
+                          t.para_value,
+                          sum(t1.para_amount) para_amount
+                        from v_cost_para_server_dept t
+                        left join v_cost_para_value_data t1
+                        on t.group_id = t1.group_id
+                        and t.hos_id = t1.hos_id
+                        and t.copy_code = t1.copy_code
+                        and t.acc_year = t1.acc_year
+                        and t.acc_month = t1.acc_month
+                        and t.server_dept_id = t1.server_dept_id
+                        where t.group_id = #{group_id}
+                        and t.hos_id = #{hos_id}
+                        and t.copy_code = #{copy_code}
+                        and t.acc_year || t.acc_month  between  #{year_month_begin} and  #{year_month_end}
+                        and t.type_code = '03'
+                        and t.bill_type = '02'
+                        and t1.para_value = 01
+                        and t1.server_dept_id = t1.dept_id
+                        group by t.group_id
+                                ,t.hos_id
+                                ,t.copy_code
+                                ,t.acc_year
+                                ,t.acc_month
+                                ,t.dept_id
+                                ,t.server_dept_id
+                                ,t.para_type_code
+                                ,t.para_code
+                                ,t.para_value
+                 )t3 on t1.group_id = t3.group_id
+                 and  t1.hos_id = t3.hos_id
+                 and  t1.copy_code = t3.copy_code
+                 and  t1.acc_year = t3.acc_year
+                 and  t1.acc_month = t3.acc_month
+                 and  t1.dept_id = t3.dept_id
+                 and  t1.server_dept_id = t3.server_dept_id
+                 and  t1.para_type_code = t3.para_type_code
+                 and  t1.para_code = t3.para_code
+                 where t1.group_id = #{group_id}
+                 and t1.hos_id = #{hos_id}
+                 and t1.copy_code = #{copy_code}
+                 and t1.acc_year || t1.acc_month  between  #{year_month_begin} and  #{year_month_end}
+                 and t1.type_code = '03'
+                 and t1.bill_type = '02'
+          ), server_dept_para_sum as (                    
+               select 
+               t.group_id
+              ,t.hos_id
+              ,t.copy_code
+              ,t.acc_year
+              ,t.acc_month
+              ,t.dept_id
+              ,t.para_code
+              ,t.para_type_code
+              ,t.para_value
+              ,sum(t.para_amount) para_amount
+            from (
+              select 
+                     t1.group_id
+                    ,t1.hos_id
+                    ,t1.copy_code
+                    ,t1.acc_year
+                    ,t1.acc_month
+                    ,t1.dept_id
+                    ,t1.para_code
+                    ,t1.para_type_code
+                    ,t1.para_value
+                    ,decode(
+                      nvl(sum(t2.para_amount) over(
+                      partition by  t1.group_id,
+                                    t1.hos_id,
+                                    t1.copy_code,
+                                    t1.acc_year,
+                                    t1.acc_month,
+                                    t1.dept_id
+                      ),0),0,t3.para_amount,t2.para_amount) as para_amount
+                 from v_cost_para_server_dept t1
+                 left join (
+                  select 
+                          t.group_id,
+                          t.hos_id,
+                          t.copy_code,
+                          t.acc_year,
+                          t.acc_month,
+                          t.dept_id,
+                          t.server_dept_id,
+                          t.para_type_code,
+                          t.para_code,
+                          t.para_value,
+                          sum(t1.para_amount) para_amount
+                        from v_cost_para_server_dept t
+                        left join v_cost_para_value_data t1
+                        on t.group_id = t1.group_id
+                        and t.hos_id = t1.hos_id
+                        and t.copy_code = t1.copy_code
+                        and t.acc_year = t1.acc_year
+                        and t.acc_month = t1.acc_month
+                        and t.server_dept_id = t1.server_dept_id
+                        and t.para_value = t1.para_value
+                        where t.group_id = #{group_id}
+                        and t.hos_id = #{hos_id}
+                        and t.copy_code = #{copy_code}
+                        and t.acc_year || t.acc_month between  #{year_month_begin} and  #{year_month_end}
+                        and t.type_code = '03'
+                        and t.bill_type = '02'
+                        and t.para_value not in ('05', '06')
+                        and t1.server_dept_id = t1.dept_id
+                         group by t.group_id
+                                 ,t.hos_id
+                                 ,t.copy_code
+                                 ,t.acc_year
+                                 ,t.acc_month
+                                 ,t.dept_id
+                                 ,t.server_dept_id
+                                 ,t.para_type_code
+                                 ,t.para_code
+                                 ,t.para_value
+                        union all
+                        select 
+                          t.group_id
+                          ,t.hos_id
+                          ,t.copy_code
+                          ,t.acc_year
+                          ,t.acc_month
+                          ,t.dept_id
+                          ,t.server_dept_id
+                          ,t.para_type_code
+                          ,t.para_code
+                          ,t.para_value
+                          ,SUM(t1.para_amount) para_amount
+                        from v_cost_para_server_dept t
+                        left join v_cost_para_value_data t1
+                        on t.group_id = t1.group_id
+                        and t.hos_id = t1.hos_id
+                        and t.copy_code = t1.copy_code
+                        and t.acc_year = t1.acc_year
+                        and t.acc_month = t1.acc_month
+                        and t.dept_id = t1.dept_id
+                        and t.server_dept_id = t1.server_dept_id
+                        and t.para_value = t1.para_value
+                        where t.group_id = #{group_id}
+                        and t.hos_id = #{hos_id}
+                        and t.copy_code = #{copy_code}
+                        and t.acc_year || t.acc_month between  #{year_month_begin} and  #{year_month_end}
+                        and t.type_code = '03'
+                        and t.bill_type = '02'
+                        and t.para_value  in ('05', '06')
+                        group by t.group_id
+                                ,t.hos_id
+                                ,t.copy_code
+                                ,t.acc_year
+                                ,t.acc_month
+                                ,t.dept_id
+                                ,t.server_dept_id
+                                ,t.para_type_code
+                                ,t.para_code
+                                ,t.para_value
+                 )t2 on t1.group_id = t2.group_id
+                 and  t1.hos_id = t2.hos_id
+                 and  t1.copy_code = t2.copy_code
+                 and  t1.acc_year = t2.acc_year
+                 and  t1.acc_month = t2.acc_month
+                 and  t1.dept_id = t2.dept_id
+                 and  t1.server_dept_id = t2.server_dept_id
+                 and  t1.para_type_code = t2.para_type_code
+                 and  t1.para_code = t2.para_code
+                 and  t1.para_value = t2.para_value
+                 left join (
+                    select 
+                          t.group_id,
+                          t.hos_id,
+                          t.copy_code,
+                          t.acc_year,
+                          t.acc_month,
+                          t.dept_id,
+                          t.server_dept_id,
+                          t.para_type_code,
+                          t.para_code,
+                          t.para_value,
+                          sum(t1.para_amount) para_amount
+                        from v_cost_para_server_dept t
+                        left join v_cost_para_value_data t1
+                        on t.group_id = t1.group_id
+                        and t.hos_id = t1.hos_id
+                        and t.copy_code = t1.copy_code
+                        and t.acc_year = t1.acc_year
+                        and t.acc_month = t1.acc_month
+                        and t.server_dept_id = t1.server_dept_id
+                        where t.group_id = #{group_id}
+                        and t.hos_id = #{hos_id}
+                        and t.copy_code = #{copy_code}
+                        and t.acc_year || t.acc_month between  #{year_month_begin} and  #{year_month_end}
+                        and t.type_code = '03'
+                        and t.bill_type = '02'
+                        and t1.para_value = 01
+                        and t1.server_dept_id = t1.dept_id
+                        group by t.group_id
+                                ,t.hos_id
+                                ,t.copy_code
+                                ,t.acc_year
+                                ,t.acc_month
+                                ,t.dept_id
+                                ,t.server_dept_id
+                                ,t.para_type_code
+                                ,t.para_code
+                                ,t.para_value
+                 )t3 on t1.group_id = t3.group_id
+                 and  t1.hos_id = t3.hos_id
+                 and  t1.copy_code = t3.copy_code
+                 and  t1.acc_year = t3.acc_year
+                 and  t1.acc_month = t3.acc_month
+                 and  t1.dept_id = t3.dept_id
+                 and  t1.server_dept_id = t3.server_dept_id
+                 and  t1.para_type_code = t3.para_type_code
+                 and  t1.para_code = t3.para_code
+                 where t1.group_id = #{group_id}
+                 and t1.hos_id = #{hos_id}
+                 and t1.copy_code = #{copy_code}
+                 and t1.acc_year || t1.acc_month between  #{year_month_begin} and  #{year_month_end}
+                 and t1.type_code = '03'
+                 and t1.bill_type = '02'
+            )t group by 
+                   t.group_id
+                  ,t.hos_id
+                  ,t.copy_code
+                  ,t.acc_year
+                  ,t.acc_month
+                  ,t.dept_id
+                  ,t.para_code
+                  ,t.para_type_code
+                  ,t.para_value       
+             ) ,temp as(
+              select
+                 t.group_id,
+                 t.hos_id,
+                 t.copy_code,
+                 t.acc_year,
+                 t.acc_month,
+                 t.dept_id,
+                 t.cost_item_id,
+                 t.source_id,
+                 sum(t.dir_amount) dir_amount
+               from (
+               select 
+                 t.group_id,
+                 t.hos_id,
+                 t.copy_code,
+                 t.acc_year,
+                 t.acc_month,
+                 t1.server_dept_id dept_id,
+                 t.cost_item_id,
+                 t.source_id,
+                 divide(t1.para_amount * t.dir_amount ,t2.para_amount) dir_amount
+               from pree_cost t
+               left join server_dept_para t1
+               on t.group_id = t1.group_id  
+               and t.hos_id = t1.hos_id            
+               and t.copy_code = t1.copy_code
+               and t.acc_year = t1.acc_year
+               and t.acc_month = t1.acc_month
+               and t.dept_id = t1.dept_id
+               and t.para_type_code = t1.para_type_code
+               and t.para_code = t1.para_code
+               and t.para_value = t1.para_value
+               left join server_dept_para_sum t2
+               on t.group_id = t2.group_id  
+               and t.hos_id = t2.hos_id            
+               and t.copy_code = t2.copy_code
+               and t.acc_year = t2.acc_year
+               and t.acc_month = t2.acc_month
+               and t.dept_id = t2.dept_id
+               and t.para_type_code = t2.para_type_code
+               and t.para_code = t2.para_code
+               and t.para_value = t2.para_value
+               where t.peer_flag = 1
+               union all
+               select 
+                 t.group_id,
+                 t.hos_id,
+                 t.copy_code,
+                 t.acc_year,
+                 t.acc_month,
+                 t.dept_id,
+                 t.cost_item_id,
+                 t.source_id,
+                 t.dir_amount
+               from pree_cost t
+               where t.peer_flag = 0
+              )t where t.dir_amount!=0
+                group by  t.group_id,
+                           t.hos_id,
+                           t.copy_code,
+                           t.acc_year,
+                           t.acc_month,
+                           t.dept_id,
+                           t.cost_item_id,
+                           t.source_id
+          ), dept_cost as (
+             select 
+               cdc.group_id,
+               cdc.hos_id,
+               cdc.copy_code,
+               cdc.acc_year,
+               cdc.acc_month,
+               cdc.dept_id,
+               hdd.dept_code,
+               hdd.dept_name,
+               cdc.cost_item_id,
+               cidn.cost_item_code,
+               cidn.cost_item_name,
+               cdc.source_id,
+               hs.source_code,
+               hs.source_name,
+               dir_amount,
+               adt.type_code,
+               adt.type_name,
+               ada.natur_code,
+               cpn.para_code,
+               cpn.para_name,
+               cidn.para_type_code,
+               cpt.type_name para_type_name,
+               cps.para_value
+            from temp cdc
+            left join hos_dept_dict hdd
+            on cdc.group_id = hdd.group_id
+            and cdc.hos_id = hdd.hos_id
+            and cdc.dept_id = hdd.dept_id
+            and hdd.is_stop=0
+            left join acc_dept_attr ada
+            on ada.group_id = hdd.group_id
+            and ada.hos_id = hdd.hos_id
+            and ada.dept_id = hdd.dept_id
+            left join cost_item_dict_no cidn
+            on cidn.group_id = cdc.group_id
+            and cidn.hos_id = cdc.hos_id
+            and cidn.copy_code = cdc.copy_code
+            and cidn.cost_item_id = cdc.cost_item_id
+            and cidn.is_stop=0
+            left join hos_source hs
+            on hs.group_id = cdc.group_id
+            and hs.hos_id = cdc.hos_id
+            and hs.source_id = cdc.source_id
+            left join acc_dept_type adt
+            on adt.type_code = ada.type_code
+            left join cost_para_natur cpn
+            on cpn.group_id = ada.group_id
+            and cpn.hos_id = ada.hos_id
+            and cpn.para_code = ada.para_code
+            left join cost_para_type cpt
+            on cpt.group_id = cidn.group_id
+            and cpt.hos_id = cidn.hos_id
+            and cpt.type_code = cidn.para_type_code
+            left join cost_para_set cps
+           on cdc.group_id = cps.group_id
+           and cdc.hos_id = cps.hos_id
+           and cdc.copy_code = cps.copy_code
+           and cdc.acc_year = cps.acc_year
+           and cdc.acc_month = cps.acc_month
+           and cpn.para_code = cps.natur_code
+           and cidn.para_type_code = cps.type_code
+      ),med as(
+			  select 
+           t.group_id,
+					 t.hos_id,
+					 t.copy_code,
+					 t.acc_year,
+					 t.acc_month,
+					 t.dept_id,
+					 dept.dept_id server_dept_id,
+					 ada.type_code,
+					 t.cost_item_id,
+					 t.source_id,
+					 sum(divide(t1.para_amount * t.dir_amount,t2.para_amount)) dir_amount
+         from dept_cost t
+         left join server_dept_para t1
+         on t.group_id = t1.group_id  
+         and t.hos_id = t1.hos_id            
+         and t.copy_code = t1.copy_code
+         and t.acc_year = t1.acc_year
+         and t.acc_month = t1.acc_month
+         and t.dept_id = t1.dept_id
+         and t.para_type_code = t1.para_type_code
+         and t.para_code = t1.para_code
+         and t.para_value = t1.para_value
+         left join server_dept_para_sum t2
+         on t.group_id = t2.group_id  
+         and t.hos_id = t2.hos_id            
+         and t.copy_code = t2.copy_code
+         and t.acc_year = t2.acc_year
+         and t.acc_month = t2.acc_month
+         and t.dept_id = t2.dept_id
+         and t.para_type_code = t2.para_type_code
+         and t.para_code = t2.para_code
+         and t.para_value = t2.para_value
+				 left join hos_dept_dict dept
+				 on dept.group_id = t.group_id
+				 and dept.hos_id = t.hos_id
+				 and dept.dept_id = t1.server_dept_id
+				 and dept.is_stop=0
+				 left join acc_dept_attr ada
+				 on ada.group_id = dept.group_id
+				 and ada.hos_id = dept.hos_id
+				 and ada.dept_id = dept.dept_id
+				 where divide(t1.para_amount * t.dir_amount,t2.para_amount) != 0
+				 group by  t.group_id,
+									 t.hos_id,
+									 t.copy_code,
+									 t.acc_year,
+									 t.acc_month,
+									 t.dept_id,
+									 dept.dept_id,
+									 ada.type_code,
+									 t.cost_item_id,
+									 t.source_id
+			),t as(
+			  select 
+           t.group_id,
+					 t.hos_id,
+					 t.copy_code,
+					 t.acc_year,
+					 t.acc_month,
+					 dept.dept_id,
+					 ada.type_code,
+					 t.cost_item_id,
+					 t.source_id,
+					 sum(divide(t1.para_amount * t.dir_amount,t2.para_amount)) dir_amount
+         from dept_cost t
+         left join server_dept_para t1
+         on t.group_id = t1.group_id  
+         and t.hos_id = t1.hos_id            
+         and t.copy_code = t1.copy_code
+         and t.acc_year = t1.acc_year
+         and t.acc_month = t1.acc_month
+         and t.dept_id = t1.dept_id
+         and t.para_type_code = t1.para_type_code
+         and t.para_code = t1.para_code
+         and t.para_value = t1.para_value
+         left join server_dept_para_sum t2
+         on t.group_id = t2.group_id  
+         and t.hos_id = t2.hos_id            
+         and t.copy_code = t2.copy_code
+         and t.acc_year = t2.acc_year
+         and t.acc_month = t2.acc_month
+         and t.dept_id = t2.dept_id
+         and t.para_type_code = t2.para_type_code
+         and t.para_code = t2.para_code
+         and t.para_value = t2.para_value
+				 left join hos_dept_dict dept
+				 on dept.group_id = t.group_id
+				 and dept.hos_id = t.hos_id
+				 and dept.dept_id = t1.server_dept_id
+				 and dept.is_stop=0
+				 left join acc_dept_attr ada
+				 on ada.group_id = dept.group_id
+				 and ada.hos_id = dept.hos_id
+				 and ada.dept_id = dept.dept_id
+				 where divide(t1.para_amount * t.dir_amount,t2.para_amount) != 0
+				 group by  t.group_id,
+									 t.hos_id,
+									 t.copy_code,
+									 t.acc_year,
+									 t.acc_month,
+									 t.dept_id,
+									 dept.dept_id,
+									 ada.type_code,
+									 t.cost_item_id,
+									 t.source_id
+			),dept_code_med_ass as (
+			   select  cdc.group_id,
+               cdc.hos_id,
+               cdc.copy_code,
+               cdc.acc_year,
+               cdc.acc_month,
+               cdc.dept_id,
+               hdd.dept_code,
+               hdd.dept_name,
+               cdc.cost_item_id,
+               cidn.cost_item_code,
+               cidn.cost_item_name,
+               cdc.source_id,
+               hs.source_code,
+               hs.source_name,
+               dir_amount,
+               adt.type_code,
+               adt.type_name,
+               ada.natur_code,
+               cpn.para_code,
+               cpn.para_name,
+               cidn.para_type_code,
+               cpt.type_name para_type_name,
+               cps.para_value,
+							 decode(t.dept_id, null, 0, 1) peer_flag
+            from t cdc
+            left join hos_dept_dict hdd
+            on cdc.group_id = hdd.group_id
+            and cdc.hos_id = hdd.hos_id
+            and cdc.dept_id = hdd.dept_id
+            and hdd.is_stop=0
+            left join acc_dept_attr ada
+            on ada.group_id = hdd.group_id
+            and ada.hos_id = hdd.hos_id
+            and ada.dept_id = hdd.dept_id
+            left join cost_item_dict_no cidn
+            on cidn.group_id = cdc.group_id
+            and cidn.hos_id = cdc.hos_id
+            and cidn.copy_code = cdc.copy_code
+            and cidn.cost_item_id = cdc.cost_item_id
+            and cidn.is_stop=0
+            left join hos_source hs
+            on hs.group_id = cdc.group_id
+            and hs.hos_id = cdc.hos_id
+            and hs.source_id = cdc.source_id
+            left join acc_dept_type adt
+            on adt.type_code = ada.type_code
+            left join cost_para_natur cpn
+            on cpn.group_id = ada.group_id
+            and cpn.hos_id = ada.hos_id
+            and cpn.para_code = ada.para_code
+            left join cost_para_type cpt
+            on cpt.group_id = cidn.group_id
+            and cpt.hos_id = cidn.hos_id
+            and cpt.type_code = cidn.para_type_code
+            left join cost_para_set cps
+           on cdc.group_id = cps.group_id
+           and cdc.hos_id = cps.hos_id
+           and cdc.copy_code = cps.copy_code
+           and cdc.acc_year = cps.acc_year
+           and cdc.acc_month = cps.acc_month
+           and cpn.para_code = cps.natur_code
+           and cidn.para_type_code = cps.type_code
+					 left join (
+									select distinct 
+										cpd.group_id,
+										cpd.hos_id,
+										cpd.copy_code,
+										cpd.acc_year,
+										cpd.acc_month,
+										cpd.dept_id
+									from cost_para_dept cpd
+									inner join  cost_para_server_dept cpsd
+									on cpd.group_id = cpsd.group_id
+									 and cpd.hos_id = cpsd.hos_id
+									 and cpd.copy_code = cpsd.copy_code
+									 and cpd.acc_year = cpsd.acc_year
+									 and cpd.acc_month = cpsd.acc_month
+									 and cpd.bill_code = cpsd.bill_code
+									 and cpd.type_code = cpsd.type_code)t
+									 on cdc.group_id = t.group_id
+									 and cdc.hos_id = t.hos_id
+									 and cdc.copy_code = t.copy_code
+									 and cdc.acc_year = t.acc_year
+									 and cdc.acc_month = t.acc_month
+									 and cdc.dept_id = t.dept_id
+           where cdc.type_code = 02
+			),server_dept_para_med as (                      
+								select 
+									 t1.group_id
+									,t1.hos_id
+									,t1.copy_code
+									,t1.acc_year
+									,t1.acc_month
+									,t1.dept_id
+									,t1.server_dept_id
+									,t1.para_code
+									,t1.para_type_code
+									,t1.para_value
+									,decode(
+										nvl(sum(t2.para_amount) over(
+										partition by  t1.group_id,
+																	t1.hos_id,
+																	t1.copy_code,
+																	t1.acc_year,
+																	t1.acc_month,
+																	t1.dept_id
+										),0),0,t3.para_amount,t2.para_amount) as para_amount
+							 from v_cost_para_server_dept t1
+							 left join (
+				            select 
+								t.group_id,
+								t.hos_id,
+								t.copy_code,
+								t.acc_year,
+								t.acc_month,
+								t.dept_id,
+								t.server_dept_id,
+								t.para_type_code,
+								t.para_code,
+								t.para_value,
+								sum(t1.para_amount) para_amount
+							from v_cost_para_server_dept t
+							left join v_cost_para_value_data t1
+							on t.group_id = t1.group_id
+							and t.hos_id = t1.hos_id
+							and t.copy_code = t1.copy_code
+							and t.acc_year = t1.acc_year
+							and t.acc_month = t1.acc_month
+							and t.server_dept_id = t1.server_dept_id
+							and t.para_value = t1.para_value
+							where t.group_id = #{group_id}
+							and t.hos_id = #{hos_id}
+							and t.copy_code = #{copy_code}
+							and t.acc_year || t.acc_month between  #{year_month_begin} and  #{year_month_end}
+							and t.type_code = '02'
+							and t.bill_type = '03'
+							and t.para_value not in ('05', '06')
+							and t1.server_dept_id = t1.dept_id
+							 group by t.group_id
+											 ,t.hos_id
+											 ,t.copy_code
+											 ,t.acc_year
+											 ,t.acc_month
+											 ,t.dept_id
+											 ,t.server_dept_id
+											 ,t.para_type_code
+											 ,t.para_code
+											 ,t.para_value
+							union all
+							select 
+								t.group_id
+								,t.hos_id
+								,t.copy_code
+								,t.acc_year
+								,t.acc_month
+								,t.dept_id
+								,t.server_dept_id
+								,t.para_type_code
+								,t.para_code
+								,t.para_value
+								,SUM(t1.para_amount) para_amount
+							from v_cost_para_server_dept t
+							left join v_cost_para_value_data t1
+							on t.group_id = t1.group_id
+							and t.hos_id = t1.hos_id
+							and t.copy_code = t1.copy_code
+							and t.acc_year = t1.acc_year
+							and t.acc_month = t1.acc_month
+							and t.dept_id = t1.dept_id
+							and t.server_dept_id = t1.server_dept_id
+							and t.para_value = t1.para_value
+							where t.group_id =  #{group_id}
+							and t.hos_id =  #{hos_id}
+							and t.copy_code =  #{copy_code}
+							and t.acc_year || t.acc_month between  #{year_month_begin} and  #{year_month_end}
+							and t.type_code = '02'
+							and t.bill_type = '03'
+							and t.para_value  in ('05', '06')
+							group by t.group_id
+											,t.hos_id
+											,t.copy_code
+											,t.acc_year
+											,t.acc_month
+											,t.dept_id
+											,t.server_dept_id
+											,t.para_type_code
+											,t.para_code
+											,t.para_value
+							 )t2 on t1.group_id = t2.group_id
+							 and  t1.hos_id = t2.hos_id
+							 and  t1.copy_code = t2.copy_code
+							 and  t1.acc_year = t2.acc_year
+							 and  t1.acc_month = t2.acc_month
+							 and  t1.dept_id = t2.dept_id
+							 and  t1.server_dept_id = t2.server_dept_id
+							 and  t1.para_type_code = t2.para_type_code
+							 and  t1.para_code = t2.para_code
+							 and  t1.para_value = t2.para_value
+							 left join (
+									select 
+												t.group_id,
+												t.hos_id,
+												t.copy_code,
+												t.acc_year,
+												t.acc_month,
+												t.dept_id,
+												t.server_dept_id,
+												t.para_type_code,
+												t.para_code,
+												t.para_value,
+												sum(t1.para_amount) para_amount
+											from v_cost_para_server_dept t
+											left join v_cost_para_value_data t1
+											on t.group_id = t1.group_id
+											and t.hos_id = t1.hos_id
+											and t.copy_code = t1.copy_code
+											and t.acc_year = t1.acc_year
+											and t.acc_month = t1.acc_month
+											and t.server_dept_id = t1.server_dept_id
+											where t.group_id =  #{group_id}
+											and t.hos_id =  #{hos_id}
+											and t.copy_code =  #{copy_code}
+											and t.acc_year || t.acc_month between  #{year_month_begin} and  #{year_month_end}
+											and t.type_code = '02'
+											and t.bill_type = '03'
+											and t1.para_value = 01
+											and t1.server_dept_id = t1.dept_id
+											group by t.group_id
+															,t.hos_id
+															,t.copy_code
+															,t.acc_year
+															,t.acc_month
+															,t.dept_id
+															,t.server_dept_id
+															,t.para_type_code
+															,t.para_code
+															,t.para_value
+							 )t3 on t1.group_id = t3.group_id
+							 and  t1.hos_id = t3.hos_id
+							 and  t1.copy_code = t3.copy_code
+							 and  t1.acc_year = t3.acc_year
+							 and  t1.acc_month = t3.acc_month
+							 and  t1.dept_id = t3.dept_id
+							 and  t1.server_dept_id = t3.server_dept_id
+							 and  t1.para_type_code = t3.para_type_code
+							 and  t1.para_code = t3.para_code
+							 where t1.group_id = #{group_id}
+							 and t1.hos_id = #{hos_id}
+							 and t1.copy_code = #{copy_code}
+							 and t1.acc_year || t1.acc_month  between  #{year_month_begin} and  #{year_month_end}
+							 and t1.type_code = '02'
+							 and t1.bill_type = '03'
+				), server_dept_para_med_sum as (                    
+						      select 
+               t.group_id
+              ,t.hos_id
+              ,t.copy_code
+              ,t.acc_year
+              ,t.acc_month
+              ,t.dept_id
+              ,t.para_code
+              ,t.para_type_code
+              ,t.para_value
+              ,sum(t.para_amount) para_amount
+            from (
+              select 
+                     t1.group_id
+                    ,t1.hos_id
+                    ,t1.copy_code
+                    ,t1.acc_year
+                    ,t1.acc_month
+                    ,t1.dept_id
+                    ,t1.para_code
+                    ,t1.para_type_code
+                    ,t1.para_value
+                    ,decode(
+                      nvl(sum(t2.para_amount) over(
+                      partition by  t1.group_id,
+                                    t1.hos_id,
+                                    t1.copy_code,
+                                    t1.acc_year,
+                                    t1.acc_month,
+                                    t1.dept_id
+                      ),0),0,t3.para_amount,t2.para_amount) as para_amount
+                 from v_cost_para_server_dept t1
+                 left join (
+                  select 
+                          t.group_id,
+                          t.hos_id,
+                          t.copy_code,
+                          t.acc_year,
+                          t.acc_month,
+                          t.dept_id,
+                          t.server_dept_id,
+                          t.para_type_code,
+                          t.para_code,
+                          t.para_value,
+                          sum(t1.para_amount) para_amount
+                        from v_cost_para_server_dept t
+                        left join v_cost_para_value_data t1
+                        on t.group_id = t1.group_id
+                        and t.hos_id = t1.hos_id
+                        and t.copy_code = t1.copy_code
+                        and t.acc_year = t1.acc_year
+                        and t.acc_month = t1.acc_month
+                        and t.server_dept_id = t1.server_dept_id
+                        and t.para_value = t1.para_value
+                        where t.group_id =  #{group_id}
+                        and t.hos_id =  #{hos_id}
+                        and t.copy_code =  #{copy_code}
+                        and t.acc_year || t.acc_month  between  #{year_month_begin} and  #{year_month_end}
+                        and t.type_code = '02'
+                        and t.bill_type = '03'
+                        and t.para_value not in ('05', '06')
+                        and t1.server_dept_id = t1.dept_id
+                         group by t.group_id
+                                 ,t.hos_id
+                                 ,t.copy_code
+                                 ,t.acc_year
+                                 ,t.acc_month
+                                 ,t.dept_id
+                                 ,t.server_dept_id
+                                 ,t.para_type_code
+                                 ,t.para_code
+                                 ,t.para_value
+                        union all
+                        select 
+                          t.group_id
+                          ,t.hos_id
+                          ,t.copy_code
+                          ,t.acc_year
+                          ,t.acc_month
+                          ,t.dept_id
+                          ,t.server_dept_id
+                          ,t.para_type_code
+                          ,t.para_code
+                          ,t.para_value
+                          ,SUM(t1.para_amount) para_amount
+                        from v_cost_para_server_dept t
+                        left join v_cost_para_value_data t1
+                        on t.group_id = t1.group_id
+                        and t.hos_id = t1.hos_id
+                        and t.copy_code = t1.copy_code
+                        and t.acc_year = t1.acc_year
+                        and t.acc_month = t1.acc_month
+                        and t.dept_id = t1.dept_id
+                        and t.server_dept_id = t1.server_dept_id
+                        and t.para_value = t1.para_value
+                        where t.group_id = #{group_id}
+                        and t.hos_id = #{hos_id}
+                        and t.copy_code = #{copy_code}
+                        and t.acc_year || t.acc_month between  #{year_month_begin} and  #{year_month_end}
+                        and t.type_code = '02'
+                        and t.bill_type = '03'
+                        and t.para_value  in ('05', '06')
+                        group by t.group_id
+                                ,t.hos_id
+                                ,t.copy_code
+                                ,t.acc_year
+                                ,t.acc_month
+                                ,t.dept_id
+                                ,t.server_dept_id
+                                ,t.para_type_code
+                                ,t.para_code
+                                ,t.para_value
+                 )t2 on t1.group_id = t2.group_id
+                 and  t1.hos_id = t2.hos_id
+                 and  t1.copy_code = t2.copy_code
+                 and  t1.acc_year = t2.acc_year
+                 and  t1.acc_month = t2.acc_month
+                 and  t1.dept_id = t2.dept_id
+                 and  t1.server_dept_id = t2.server_dept_id
+                 and  t1.para_type_code = t2.para_type_code
+                 and  t1.para_code = t2.para_code
+                 and  t1.para_value = t2.para_value
+                 left join (
+                    select 
+                          t.group_id,
+                          t.hos_id,
+                          t.copy_code,
+                          t.acc_year,
+                          t.acc_month,
+                          t.dept_id,
+                          t.server_dept_id,
+                          t.para_type_code,
+                          t.para_code,
+                          t.para_value,
+                          sum(t1.para_amount) para_amount
+                        from v_cost_para_server_dept t
+                        left join v_cost_para_value_data t1
+                        on t.group_id = t1.group_id
+                        and t.hos_id = t1.hos_id
+                        and t.copy_code = t1.copy_code
+                        and t.acc_year = t1.acc_year
+                        and t.acc_month = t1.acc_month
+                        and t.server_dept_id = t1.server_dept_id
+                        where t.group_id = #{group_id}
+                        and t.hos_id = #{hos_id}
+                        and t.copy_code = #{copy_code}
+                        and t.acc_year || t.acc_month between  #{year_month_begin} and  #{year_month_end}
+                        and t.type_code = '02'
+                        and t.bill_type = '03'
+                        and t1.para_value = 01
+                        and t1.server_dept_id = t1.dept_id
+                        group by t.group_id
+                                ,t.hos_id
+                                ,t.copy_code
+                                ,t.acc_year
+                                ,t.acc_month
+                                ,t.dept_id
+                                ,t.server_dept_id
+                                ,t.para_type_code
+                                ,t.para_code
+                                ,t.para_value
+                 )t3 on t1.group_id = t3.group_id
+                 and  t1.hos_id = t3.hos_id
+                 and  t1.copy_code = t3.copy_code
+                 and  t1.acc_year = t3.acc_year
+                 and  t1.acc_month = t3.acc_month
+                 and  t1.dept_id = t3.dept_id
+                 and  t1.server_dept_id = t3.server_dept_id
+                 and  t1.para_type_code = t3.para_type_code
+                 and  t1.para_code = t3.para_code
+                 where t1.group_id = #{group_id} 
+                 and t1.hos_id = #{hos_id} 
+                 and t1.copy_code = #{copy_code} 
+                 and t1.acc_year || t1.acc_month between  #{year_month_begin} and  #{year_month_end}
+                 and t1.type_code = '02'
+                 and t1.bill_type = '03'
+            )t group by 
+                   t.group_id
+                  ,t.hos_id
+                  ,t.copy_code
+                  ,t.acc_year
+                  ,t.acc_month
+                  ,t.dept_id
+                  ,t.para_code
+                  ,t.para_type_code
+                  ,t.para_value 
+				), temp_med as(
+				 select
+						 t.group_id,
+						 t.hos_id,
+						 t.copy_code,
+						 t.acc_year,
+						 t.acc_month,
+						 t.dept_id,
+						 t.cost_item_id,
+						 t.source_id,
+						 sum(t.dir_amount) dir_amount
+					 from (
+				   select 
+						 t.group_id,
+						 t.hos_id,
+						 t.copy_code,
+						 t.acc_year,
+						 t.acc_month,
+						 t1.server_dept_id dept_id,
+						 t.cost_item_id,
+						 t.source_id,
+						 divide(t1.para_amount * t.dir_amount ,t2.para_amount) dir_amount
+					 from dept_code_med_ass t
+					 left join server_dept_para_med t1
+					 on t.group_id = t1.group_id  
+					 and t.hos_id = t1.hos_id            
+					 and t.copy_code = t1.copy_code
+					 and t.acc_year = t1.acc_year
+					 and t.acc_month = t1.acc_month
+					 and t.dept_id = t1.dept_id
+					 and t.para_type_code = t1.para_type_code
+					 and t.para_code = t1.para_code
+					 and t.para_value = t1.para_value
+					 left join server_dept_para_med_sum t2
+					 on t.group_id = t2.group_id  
+					 and t.hos_id = t2.hos_id            
+					 and t.copy_code = t2.copy_code
+					 and t.acc_year = t2.acc_year
+					 and t.acc_month = t2.acc_month
+					 and t.dept_id = t2.dept_id
+					 and t.para_type_code = t2.para_type_code
+					 and t.para_code = t2.para_code
+					 and t.para_value = t2.para_value
+					 where t.peer_flag = 1
+					 union all
+					 select 
+						 t.group_id,
+						 t.hos_id,
+						 t.copy_code,
+						 t.acc_year,
+						 t.acc_month,
+						 t.dept_id,
+						 t.cost_item_id,
+						 t.source_id,
+						 t.dir_amount
+					 from dept_code_med_ass t
+					 where t.peer_flag = 0
+					)t  where t.dir_amount!=0
+					group by  t.group_id,
+										 t.hos_id,
+										 t.copy_code,
+										 t.acc_year,
+										 t.acc_month,
+										 t.dept_id,
+										 t.cost_item_id,
+										 t.source_id
+				),dept_cost_med as (
+				  select 
+				   cdc.group_id,
+					 cdc.hos_id,
+					 cdc.copy_code,
+					 cdc.acc_year,
+					 cdc.acc_month,
+					 cdc.dept_id,
+					 hdd.dept_code,
+					 hdd.dept_name,
+					 cdc.cost_item_id,
+					 cidn.cost_item_code,
+					 cidn.cost_item_name,
+					 cdc.source_id,
+					 hs.source_code,
+					 hs.source_name,
+					 dir_amount,
+					 adt.type_code,
+					 adt.type_name,
+					 ada.natur_code,
+					 cpn.para_code,
+					 cpn.para_name,
+					 cidn.para_type_code,
+					 cpt.type_name para_type_name,
+					 cps.para_value
+				 from temp_med cdc
+				 left join hos_dept_dict hdd
+					on cdc.group_id = hdd.group_id
+					and cdc.hos_id = hdd.hos_id
+					and cdc.dept_id = hdd.dept_id
+					and hdd.is_stop=0
+					left join acc_dept_attr ada
+					on ada.group_id = hdd.group_id
+					and ada.hos_id = hdd.hos_id
+					and ada.dept_id = hdd.dept_id
+					left join cost_item_dict_no cidn
+					on cidn.group_id = cdc.group_id
+					and cidn.hos_id = cdc.hos_id
+					and cidn.copy_code = cdc.copy_code
+					and cidn.cost_item_id = cdc.cost_item_id
+					and cidn.is_stop=0
+					left join hos_source hs
+					on hs.group_id = cdc.group_id
+					and hs.hos_id = cdc.hos_id
+					and hs.source_id = cdc.source_id
+					left join acc_dept_type adt
+					on adt.type_code = ada.type_code
+					left join cost_para_natur cpn
+					on cpn.group_id = ada.group_id
+					and cpn.hos_id = ada.hos_id
+					and cpn.para_code = ada.para_code
+					left join cost_para_type cpt
+					on cpt.group_id = cidn.group_id
+					and cpt.hos_id = cidn.hos_id
+					and cpt.type_code = cidn.para_type_code
+					left join cost_para_set cps
+					 on cdc.group_id = cps.group_id
+					 and cdc.hos_id = cps.hos_id
+					 and cdc.copy_code = cps.copy_code
+					 and cdc.acc_year = cps.acc_year
+					 and cdc.acc_month = cps.acc_month
+					 and cpn.para_code = cps.natur_code
+					 and cidn.para_type_code = cps.type_code
+		 ),res as(select 
+					 t.group_id,
+					 t.hos_id,
+					 t.copy_code,
+					 t.acc_year,
+					 t.acc_month,
+					 t.dept_id,
+					 dept.dept_id server_dept_id,
+					 ada.type_code,
+					 t.cost_item_id,
+					 t.source_id,
+					 divide(t1.para_amount * t.dir_amount,t2.para_amount) dir_amount
+		   from dept_cost_med t
+		   left join server_dept_para_med t1
+			 on t.group_id = t1.group_id  
+			 and t.hos_id = t1.hos_id            
+			 and t.copy_code = t1.copy_code
+			 and t.acc_year = t1.acc_year
+			 and t.acc_month = t1.acc_month
+			 and t.dept_id = t1.dept_id
+			 and t.para_type_code = t1.para_type_code
+			 and t.para_code = t1.para_code
+			 and t.para_value = t1.para_value
+			 left join server_dept_para_med_sum t2
+			 on t.group_id = t2.group_id  
+			 and t.hos_id = t2.hos_id            
+			 and t.copy_code = t2.copy_code
+			 and t.acc_year = t2.acc_year
+			 and t.acc_month = t2.acc_month
+			 and t.dept_id = t2.dept_id
+			 and t.para_type_code = t2.para_type_code
+			 and t.para_code = t2.para_code
+			 and t.para_value = t2.para_value
+			 left join hos_dept_dict hdd
+			 on hdd.group_id = t.group_id
+			 and hdd.hos_id = t.hos_id
+			 and hdd.dept_id = t.dept_id
+			 and hdd.is_stop=0
+			 left join hos_dept_dict dept
+			 on dept.group_id = t.group_id
+			 and dept.hos_id = t.hos_id
+			 and dept.dept_id = t1.server_dept_id
+			 and dept.is_stop=0
+			 left join acc_dept_attr ada
+			 on ada.group_id = dept.group_id
+			 and ada.hos_id = dept.hos_id
+			 and ada.dept_id = dept.dept_id
+			 where divide(t1.para_amount * t.dir_amount,t2.para_amount) != 0
+	  	     <if test="dept_code != null and dept_code != ''">
+              and dept.dept_code = #{dept_code}
+	         </if>
+	          <if test="natur_code != null and natur_code != ''">
+	            and ada.natur_code = #{natur_code}
+	          </if>
+			 union all
+			 select 
+			     med.group_id,
+					 med.hos_id,
+					 med.copy_code,
+					 med.acc_year,
+					 med.acc_month,
+					 med.dept_id,
+					 med.server_dept_id,
+					 med.type_code,
+					 med.cost_item_id,
+					 med.source_id,
+					 med.dir_amount
+			 from med med
+			 left join hos_dept_dict dept_med
+			 on dept_med.group_id = med.group_id
+			 and dept_med.hos_id = med.hos_id
+			 and dept_med.dept_id = med.server_dept_id
+			 and dept_med.is_stop=0
+			 left join acc_dept_attr ada_med
+			 on ada_med.group_id = dept_med.group_id
+			 and ada_med.hos_id = dept_med.hos_id
+			 and ada_med.dept_id = dept_med.dept_id
+			 where med.type_code = '01'
+			  <if test="dept_code != null and dept_code != ''">
+              and dept_med.dept_code = #{dept_code}
+	         </if>
+	          <if test="natur_code != null and natur_code != ''">
+	            and ada_med.natur_code = #{natur_code}
+	          </if>
+		),result as (
+		 select 
+		    hdd.dept_code,
+			hdd.dept_name,
+		  sum(t.dir_amount) dir_amount
+		 from res t
+		 left join hos_dept_dict hdd
+		 on hdd.group_id = t.group_id
+		 and hdd.hos_id = t.hos_id
+		 and hdd.dept_id = t.dept_id
+		 and hdd.is_stop=0
+		 left join acc_dept_attr ada
+		 on ada.group_id = hdd.group_id
+		 and ada.hos_id = hdd.hos_id
+		 and ada.dept_id = hdd.dept_id
+		 group by hdd.dept_code,hdd.dept_name
+	   )select 
+			t.dept_code,
+			decode(grouping(t.dept_name),1,'合计',t.dept_name) dept_name,
+			sum(t.dir_amount) t_1,
+			sum(divide(t.dir_amount,t1.dir_amount) *100) t_2
+		 from result t
+		 left join 
+		 (
+			select sum(dir_amount) dir_amount from result
+		 )t1 on 1=1
+		 group by grouping sets ((dept_code,dept_name),null)
+		 
+	</select>
+	
+	<select id="queryCostShareCostMed" parameterType="java.util.Map" resultType="java.util.Map">
+	        with pree_cost as (
+               select 
+                   t.group_id,
+                   t.hos_id,
+                   t.copy_code,
+                   t.acc_year,
+                   t.acc_month,
+                   t.dept_id,
+                   t.dept_code,
+                   t.dept_name,
+                   t.cost_item_id,
+                   t.cost_item_code,
+                   t.cost_item_name,
+                   t.source_id,
+                   t.source_code,
+                   t.source_name,
+                   t.dir_amount,
+                   t.type_code,
+                   t.type_name,
+                   t.natur_code,
+                   t.para_code,
+                   t.para_name,
+                   t.para_type_code,
+                   t.type_name para_type_name,
+                   t.para_value,
+                   t.peer_flag
+                  from v_cost_dept_cost t
+                  where t.group_id = #{group_id}
+                  and t.hos_id = #{hos_id}
+                  and t.copy_code = #{copy_code}
+                  and t.acc_year || t.acc_month between  #{year_month_begin} and  #{year_month_end}
+                  and t.type_code = '02'
+            ),server_dept_para as (                      
+                                select 
+                     t1.group_id
+                    ,t1.hos_id
+                    ,t1.copy_code
+                    ,t1.acc_year
+                    ,t1.acc_month
+                    ,t1.dept_id
+                    ,t1.server_dept_id
+                    ,t1.para_code
+                    ,t1.para_type_code
+                    ,t1.para_value
+                    ,decode(
+                      nvl(sum(t2.para_amount) over(
+                      partition by  t1.group_id,
+                                    t1.hos_id,
+                                    t1.copy_code,
+                                    t1.acc_year,
+                                    t1.acc_month,
+                                    t1.dept_id
+                      ),0),0,t3.para_amount,t2.para_amount) as para_amount
+                 from v_cost_para_server_dept t1
+                 left join (
+                  select 
+                          t.group_id,
+                          t.hos_id,
+                          t.copy_code,
+                          t.acc_year,
+                          t.acc_month,
+                          t.dept_id,
+                          t.server_dept_id,
+                          t.para_type_code,
+                          t.para_code,
+                          t.para_value,
+                          sum(t1.para_amount) para_amount
+                        from v_cost_para_server_dept t
+                        left join v_cost_para_value_data t1
+                        on t.group_id = t1.group_id
+                        and t.hos_id = t1.hos_id
+                        and t.copy_code = t1.copy_code
+                        and t.acc_year = t1.acc_year
+                        and t.acc_month = t1.acc_month
+                        and t.server_dept_id = t1.server_dept_id
+                        and t.para_value = t1.para_value
+                        where t.group_id = #{group_id}
+                        and t.hos_id = #{hos_id}
+                        and t.copy_code = #{copy_code}
+                        and t.acc_year || t.acc_month between  #{year_month_begin} and  #{year_month_end}
+                        and t.type_code = '02'
+                        and t.bill_type = '03'
+                        and t.para_value not in ('05', '06')
+                        and t1.server_dept_id = t1.dept_id
+                         group by t.group_id
+                                 ,t.hos_id
+                                 ,t.copy_code
+                                 ,t.acc_year
+                                 ,t.acc_month
+                                 ,t.dept_id
+                                 ,t.server_dept_id
+                                 ,t.para_type_code
+                                 ,t.para_code
+                                 ,t.para_value
+                        union all
+                        select 
+                          t.group_id
+                          ,t.hos_id
+                          ,t.copy_code
+                          ,t.acc_year
+                          ,t.acc_month
+                          ,t.dept_id
+                          ,t.server_dept_id
+                          ,t.para_type_code
+                          ,t.para_code
+                          ,t.para_value
+                          ,SUM(t1.para_amount) para_amount
+                        from v_cost_para_server_dept t
+                        left join v_cost_para_value_data t1
+                        on t.group_id = t1.group_id
+                        and t.hos_id = t1.hos_id
+                        and t.copy_code = t1.copy_code
+                        and t.acc_year = t1.acc_year
+                        and t.acc_month = t1.acc_month
+                        and t.dept_id = t1.dept_id
+                        and t.server_dept_id = t1.server_dept_id
+                        and t.para_value = t1.para_value
+                        where t.group_id = #{group_id}
+                        and t.hos_id = #{hos_id}
+                        and t.copy_code = #{copy_code}
+                        and t.acc_year || t.acc_month between  #{year_month_begin} and  #{year_month_end}
+                        and t.type_code = '02'
+                        and t.bill_type = '03'
+                        and t.para_value  in ('05', '06')
+                        group by t.group_id
+                                ,t.hos_id
+                                ,t.copy_code
+                                ,t.acc_year
+                                ,t.acc_month
+                                ,t.dept_id
+                                ,t.server_dept_id
+                                ,t.para_type_code
+                                ,t.para_code
+                                ,t.para_value
+                 )t2 on t1.group_id = t2.group_id
+                 and  t1.hos_id = t2.hos_id
+                 and  t1.copy_code = t2.copy_code
+                 and  t1.acc_year = t2.acc_year
+                 and  t1.acc_month = t2.acc_month
+                 and  t1.dept_id = t2.dept_id
+                 and  t1.server_dept_id = t2.server_dept_id
+                 and  t1.para_type_code = t2.para_type_code
+                 and  t1.para_code = t2.para_code
+                 and  t1.para_value = t2.para_value
+                 left join (
+                    select 
+                          t.group_id,
+                          t.hos_id,
+                          t.copy_code,
+                          t.acc_year,
+                          t.acc_month,
+                          t.dept_id,
+                          t.server_dept_id,
+                          t.para_type_code,
+                          t.para_code,
+                          t.para_value,
+                          sum(t1.para_amount) para_amount
+                        from v_cost_para_server_dept t
+                        left join v_cost_para_value_data t1
+                        on t.group_id = t1.group_id
+                        and t.hos_id = t1.hos_id
+                        and t.copy_code = t1.copy_code
+                        and t.acc_year = t1.acc_year
+                        and t.acc_month = t1.acc_month
+                        and t.server_dept_id = t1.server_dept_id
+                        where t.group_id = #{group_id}
+                        and t.hos_id = #{hos_id}
+                        and t.copy_code = #{copy_code}
+                        and t.acc_year || t.acc_month between  #{year_month_begin} and  #{year_month_end}
+                        and t.type_code = '02'
+                        and t.bill_type = '03'
+                        and t1.para_value = 01
+                        and t1.server_dept_id = t1.dept_id
+                        group by t.group_id
+                                ,t.hos_id
+                                ,t.copy_code
+                                ,t.acc_year
+                                ,t.acc_month
+                                ,t.dept_id
+                                ,t.server_dept_id
+                                ,t.para_type_code
+                                ,t.para_code
+                                ,t.para_value
+                 )t3 on t1.group_id = t3.group_id
+                 and  t1.hos_id = t3.hos_id
+                 and  t1.copy_code = t3.copy_code
+                 and  t1.acc_year = t3.acc_year
+                 and  t1.acc_month = t3.acc_month
+                 and  t1.dept_id = t3.dept_id
+                 and  t1.server_dept_id = t3.server_dept_id
+                 and  t1.para_type_code = t3.para_type_code
+                 and  t1.para_code = t3.para_code
+                 where t1.group_id = #{group_id}
+                 and t1.hos_id = #{hos_id}
+                 and t1.copy_code = #{copy_code}
+                 and t1.acc_year || t1.acc_month between  #{year_month_begin} and  #{year_month_end}
+                 and t1.type_code = '02'
+                 and t1.bill_type = '03'
+          ), server_dept_para_sum as (                    
+               select 
+               t.group_id
+              ,t.hos_id
+              ,t.copy_code
+              ,t.acc_year
+              ,t.acc_month
+              ,t.dept_id
+              ,t.para_code
+              ,t.para_type_code
+              ,t.para_value
+              ,sum(t.para_amount) para_amount
+            from (
+              select 
+                     t1.group_id
+                    ,t1.hos_id
+                    ,t1.copy_code
+                    ,t1.acc_year
+                    ,t1.acc_month
+                    ,t1.dept_id
+                    ,t1.para_code
+                    ,t1.para_type_code
+                    ,t1.para_value
+                    ,decode(
+                      nvl(sum(t2.para_amount) over(
+                      partition by  t1.group_id,
+                                    t1.hos_id,
+                                    t1.copy_code,
+                                    t1.acc_year,
+                                    t1.acc_month,
+                                    t1.dept_id
+                      ),0),0,t3.para_amount,t2.para_amount) as para_amount
+                 from v_cost_para_server_dept t1
+                 left join (
+                  select 
+                          t.group_id,
+                          t.hos_id,
+                          t.copy_code,
+                          t.acc_year,
+                          t.acc_month,
+                          t.dept_id,
+                          t.server_dept_id,
+                          t.para_type_code,
+                          t.para_code,
+                          t.para_value,
+                          sum(t1.para_amount) para_amount
+                        from v_cost_para_server_dept t
+                        left join v_cost_para_value_data t1
+                        on t.group_id = t1.group_id
+                        and t.hos_id = t1.hos_id
+                        and t.copy_code = t1.copy_code
+                        and t.acc_year = t1.acc_year
+                        and t.acc_month = t1.acc_month
+                        and t.server_dept_id = t1.server_dept_id
+                        and t.para_value = t1.para_value
+                        where t.group_id = #{group_id} 
+                        and t.hos_id = #{hos_id} 
+                        and t.copy_code = #{copy_code} 
+                        and t.acc_year || t.acc_month between  #{year_month_begin} and  #{year_month_end}
+                        and t.type_code = '02'
+                        and t.bill_type = '03'
+                        and t.para_value not in ('05', '06')
+                        and t1.server_dept_id = t1.dept_id
+                         group by t.group_id
+                                 ,t.hos_id
+                                 ,t.copy_code
+                                 ,t.acc_year
+                                 ,t.acc_month
+                                 ,t.dept_id
+                                 ,t.server_dept_id
+                                 ,t.para_type_code
+                                 ,t.para_code
+                                 ,t.para_value
+                        union all
+                        select 
+                          t.group_id
+                          ,t.hos_id
+                          ,t.copy_code
+                          ,t.acc_year
+                          ,t.acc_month
+                          ,t.dept_id
+                          ,t.server_dept_id
+                          ,t.para_type_code
+                          ,t.para_code
+                          ,t.para_value
+                          ,SUM(t1.para_amount) para_amount
+                        from v_cost_para_server_dept t
+                        left join v_cost_para_value_data t1
+                        on t.group_id = t1.group_id
+                        and t.hos_id = t1.hos_id
+                        and t.copy_code = t1.copy_code
+                        and t.acc_year = t1.acc_year
+                        and t.acc_month = t1.acc_month
+                        and t.dept_id = t1.dept_id
+                        and t.server_dept_id = t1.server_dept_id
+                        and t.para_value = t1.para_value
+                        where t.group_id = #{group_id}
+                        and t.hos_id = #{hos_id}
+                        and t.copy_code = #{copy_code}
+                        and t.acc_year || t.acc_month between  #{year_month_begin} and  #{year_month_end}
+                        and t.type_code = '02'
+                        and t.bill_type = '03'
+                        and t.para_value  in ('05', '06')
+                        group by t.group_id
+                                ,t.hos_id
+                                ,t.copy_code
+                                ,t.acc_year
+                                ,t.acc_month
+                                ,t.dept_id
+                                ,t.server_dept_id
+                                ,t.para_type_code
+                                ,t.para_code
+                                ,t.para_value
+                 )t2 on t1.group_id = t2.group_id
+                 and  t1.hos_id = t2.hos_id
+                 and  t1.copy_code = t2.copy_code
+                 and  t1.acc_year = t2.acc_year
+                 and  t1.acc_month = t2.acc_month
+                 and  t1.dept_id = t2.dept_id
+                 and  t1.server_dept_id = t2.server_dept_id
+                 and  t1.para_type_code = t2.para_type_code
+                 and  t1.para_code = t2.para_code
+                 and  t1.para_value = t2.para_value
+                 left join (
+                    select 
+                          t.group_id,
+                          t.hos_id,
+                          t.copy_code,
+                          t.acc_year,
+                          t.acc_month,
+                          t.dept_id,
+                          t.server_dept_id,
+                          t.para_type_code,
+                          t.para_code,
+                          t.para_value,
+                          sum(t1.para_amount) para_amount
+                        from v_cost_para_server_dept t
+                        left join v_cost_para_value_data t1
+                        on t.group_id = t1.group_id
+                        and t.hos_id = t1.hos_id
+                        and t.copy_code = t1.copy_code
+                        and t.acc_year = t1.acc_year
+                        and t.acc_month = t1.acc_month
+                        and t.server_dept_id = t1.server_dept_id
+                        where t.group_id = #{group_id}
+                        and t.hos_id = #{hos_id}
+                        and t.copy_code = #{copy_code}
+                        and t.acc_year || t.acc_month between  #{year_month_begin} and  #{year_month_end}
+                        and t.type_code = '02'
+                        and t.bill_type = '03'
+                        and t1.para_value = 01
+                        and t1.server_dept_id = t1.dept_id
+                        group by t.group_id
+                                ,t.hos_id
+                                ,t.copy_code
+                                ,t.acc_year
+                                ,t.acc_month
+                                ,t.dept_id
+                                ,t.server_dept_id
+                                ,t.para_type_code
+                                ,t.para_code
+                                ,t.para_value
+                 )t3 on t1.group_id = t3.group_id
+                 and  t1.hos_id = t3.hos_id
+                 and  t1.copy_code = t3.copy_code
+                 and  t1.acc_year = t3.acc_year
+                 and  t1.acc_month = t3.acc_month
+                 and  t1.dept_id = t3.dept_id
+                 and  t1.server_dept_id = t3.server_dept_id
+                 and  t1.para_type_code = t3.para_type_code
+                 and  t1.para_code = t3.para_code
+                 where t1.group_id = #{group_id}
+                 and t1.hos_id = #{hos_id}
+                 and t1.copy_code = #{copy_code}
+                 and t1.acc_year || t1.acc_month between  #{year_month_begin} and  #{year_month_end}
+                 and t1.type_code = '02'
+                 and t1.bill_type = '03'
+            )t group by 
+                   t.group_id
+                  ,t.hos_id
+                  ,t.copy_code
+                  ,t.acc_year
+                  ,t.acc_month
+                  ,t.dept_id
+                  ,t.para_code
+                  ,t.para_type_code
+                  ,t.para_value       
+             ) ,temp as(
+              select
+                 t.group_id,
+                 t.hos_id,
+                 t.copy_code,
+                 t.acc_year,
+                 t.acc_month,
+                 t.dept_id,
+                 t.cost_item_id,
+                 t.source_id,
+                 sum(t.dir_amount) dir_amount
+               from (
+               select 
+                 t.group_id,
+                 t.hos_id,
+                 t.copy_code,
+                 t.acc_year,
+                 t.acc_month,
+                 t1.server_dept_id dept_id,
+                 t.cost_item_id,
+                 t.source_id,
+                 divide(t1.para_amount * t.dir_amount ,t2.para_amount) dir_amount
+               from pree_cost t
+               left join server_dept_para t1
+               on t.group_id = t1.group_id  
+               and t.hos_id = t1.hos_id            
+               and t.copy_code = t1.copy_code
+               and t.acc_year = t1.acc_year
+               and t.acc_month = t1.acc_month
+               and t.dept_id = t1.dept_id
+               and t.para_type_code = t1.para_type_code
+               and t.para_code = t1.para_code
+               and t.para_value = t1.para_value
+               left join server_dept_para_sum t2
+               on t.group_id = t2.group_id  
+               and t.hos_id = t2.hos_id            
+               and t.copy_code = t2.copy_code
+               and t.acc_year = t2.acc_year
+               and t.acc_month = t2.acc_month
+               and t.dept_id = t2.dept_id
+               and t.para_type_code = t2.para_type_code
+               and t.para_code = t2.para_code
+               and t.para_value = t2.para_value
+               where t.peer_flag = 1
+               union all
+               select 
+                 t.group_id,
+                 t.hos_id,
+                 t.copy_code,
+                 t.acc_year,
+                 t.acc_month,
+                 t.dept_id,
+                 t.cost_item_id,
+                 t.source_id,
+                 t.dir_amount
+               from pree_cost t
+               where t.peer_flag = 0
+              )t where t.dir_amount!=0
+                group by  t.group_id,
+                           t.hos_id,
+                           t.copy_code,
+                           t.acc_year,
+                           t.acc_month,
+                           t.dept_id,
+                           t.cost_item_id,
+                           t.source_id
+          ), dept_cost as (
+             select 
+              cdc.group_id,
+               cdc.hos_id,
+               cdc.copy_code,
+               cdc.acc_year,
+               cdc.acc_month,
+               cdc.dept_id,
+               hdd.dept_code,
+               hdd.dept_name,
+               cdc.cost_item_id,
+               cidn.cost_item_code,
+               cidn.cost_item_name,
+               cdc.source_id,
+               hs.source_code,
+               hs.source_name,
+               dir_amount,
+               adt.type_code,
+               adt.type_name,
+               ada.natur_code,
+               cpn.para_code,
+               cpn.para_name,
+               cidn.para_type_code,
+               cpt.type_name para_type_name,
+               cps.para_value
+            from temp cdc
+            left join hos_dept_dict hdd
+            on cdc.group_id = hdd.group_id
+            and cdc.hos_id = hdd.hos_id
+            and cdc.dept_id = hdd.dept_id
+            and hdd.is_stop=0
+            left join acc_dept_attr ada
+            on ada.group_id = hdd.group_id
+            and ada.hos_id = hdd.hos_id
+            and ada.dept_id = hdd.dept_id
+            left join cost_item_dict_no cidn
+            on cidn.group_id = cdc.group_id
+            and cidn.hos_id = cdc.hos_id
+            and cidn.copy_code = cdc.copy_code
+            and cidn.cost_item_id = cdc.cost_item_id
+            and cidn.is_stop=0
+            left join hos_source hs
+            on hs.group_id = cdc.group_id
+            and hs.hos_id = cdc.hos_id
+            and hs.source_id = cdc.source_id
+            left join acc_dept_type adt
+            on adt.type_code = ada.type_code
+            left join cost_para_natur cpn
+            on cpn.group_id = ada.group_id
+            and cpn.hos_id = ada.hos_id
+            and cpn.para_code = ada.para_code
+            left join cost_para_type cpt
+            on cpt.group_id = cidn.group_id
+            and cpt.hos_id = cidn.hos_id
+            and cpt.type_code = cidn.para_type_code
+            left join cost_para_set cps
+           on cdc.group_id = cps.group_id
+           and cdc.hos_id = cps.hos_id
+           and cdc.copy_code = cps.copy_code
+           and cdc.acc_year = cps.acc_year
+           and cdc.acc_month = cps.acc_month
+           and cpn.para_code = cps.natur_code
+           and cidn.para_type_code = cps.type_code
+      ),t as( select 
+           hdd.dept_code,
+					 hdd.dept_name,
+					 sum(divide(t1.para_amount * t.dir_amount,t2.para_amount)) dir_amount
+         from dept_cost t
+         left join server_dept_para t1
+         on t.group_id = t1.group_id  
+         and t.hos_id = t1.hos_id            
+         and t.copy_code = t1.copy_code
+         and t.acc_year = t1.acc_year
+         and t.acc_month = t1.acc_month
+         and t.dept_id = t1.dept_id
+         and t.para_type_code = t1.para_type_code
+         and t.para_code = t1.para_code
+         and t.para_value = t1.para_value
+         left join server_dept_para_sum t2
+         on t.group_id = t2.group_id  
+         and t.hos_id = t2.hos_id            
+         and t.copy_code = t2.copy_code
+         and t.acc_year = t2.acc_year
+         and t.acc_month = t2.acc_month
+         and t.dept_id = t2.dept_id
+         and t.para_type_code = t2.para_type_code
+         and t.para_code = t2.para_code
+         and t.para_value = t2.para_value
+				 left join hos_dept_dict hdd
+				 on hdd.group_id = t.group_id
+				 and hdd.hos_id = t.hos_id
+				 and hdd.dept_id = t.dept_id
+				 and hdd.is_stop=0
+				 left join hos_dept_dict dept
+				 on dept.group_id = t.group_id
+				 and dept.hos_id = t.hos_id
+				 and dept.dept_id = t1.server_dept_id
+				 and dept.is_stop=0
+				 left join acc_dept_attr ada
+				 on ada.group_id = dept.group_id
+				 and ada.hos_id = dept.hos_id
+				 and ada.dept_id = dept.dept_id
+				 where divide(t1.para_amount * t.dir_amount,t2.para_amount) != 0
+			 	<if test="dept_code != null and dept_code != ''">
+	              and dept.dept_code = #{dept_code}
+	            </if>
+	            <if test="natur_code != null and natur_code != ''">
+	              and ada.natur_code = #{natur_code}
+	            </if>
+				 group by hdd.dept_code,hdd.dept_name
+				 order by hdd.dept_code,hdd.dept_name
+			)select 
+			    t.dept_code,
+				decode(grouping(t.dept_name),1,'合计',t.dept_name) dept_name,
+				sum(t.dir_amount) t_1,
+				sum(divide(t.dir_amount,t1.dir_amount) *100) t_2
+			 from t
+			 left join 
+			 (
+			  select sum(dir_amount) dir_amount from t
+			 )t1 on 1=1
+			 group by grouping sets ((dept_code,dept_name),null)
+	</select>
+
+</mapper>
+

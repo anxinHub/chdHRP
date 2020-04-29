@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.hr.dao.salarymanagement.socialsecuritymanagement.AreatopayMapper">
+
+	<!-- 查询社保险种下拉框 -->
+	<select id="queryAreatopayInsurtypeSelect" resultType="java.util.Map">
+		SELECT
+			 FIELD_COL_CODE "id",
+			 FIELD_COL_NAME "label"
+		FROM
+			HR_FIIED_DATA
+		WHERE
+			FIELD_TAB_CODE='DIC_INSURE_TYPE'
+			AND GROUP_ID = #{group_id,jdbcType=INTEGER}
+			AND HOS_ID = #{hos_id,jdbcType=INTEGER}
+			AND IS_STOP = 0
+	</select>
+	
+	<!-- 条件查询社保险种下拉框 -->
+	<select id="queryAreatopayInsurtypeSelects" resultType="java.util.Map">
+		SELECT
+			 FIELD_COL_CODE "id",
+			 FIELD_COL_NAME "text"
+		FROM
+			HR_FIIED_DATA
+		WHERE
+			FIELD_TAB_CODE='DIC_INSURE_TYPE'
+			AND GROUP_ID = #{group_id,jdbcType=INTEGER}
+			AND HOS_ID = #{hos_id,jdbcType=INTEGER}
+			AND IS_STOP = 0
+	</select>
+	
+	<!-- 全局新增先删除所有数据 -->
+	<select id="deleteFromAreapay">
+		DELETE FROM HR_WAGE_INSUR_RATE
+	</select>
+	
+	<!-- 批量添加缴费金额 -->
+	<insert id="addAreapay">
+		INSERT INTO
+			HR_WAGE_INSUR_RATE(GROUP_ID,HOS_ID,AREA,INSUR_TYPE,UNIT_RATE,INDIVIDUAL_RATE,REMARK)
+			<foreach collection="list" open=" ( " close=" ) " item="item" separator=" UNION ALL " >
+			SELECT
+				#{vo.group_id,jdbcType=INTEGER},
+				#{vo.hos_id,jdbcType=INTEGER},
+				#{item.area,jdbcType=VARCHAR},
+				#{item.insur_type,jdbcType=VARCHAR},
+				#{item.unit_rate,jdbcType=INTEGER},
+				#{item.individual_rate,jdbcType=INTEGER},
+				#{item.remark,jdbcType=VARCHAR}
+			FROM
+				DUAL
+			</foreach>
+	</insert>
+	
+	<!-- 缴费金额查询 -->
+	<select id="queryAreatopay" resultType="java.util.Map">
+		SELECT
+			P1.AREA,
+			P1.INSUR_TYPE,
+			P2.FIELD_COL_NAME INSUR_TYPES,
+			P1.UNIT_RATE||'%' UNIT_RATE,
+			P1.INDIVIDUAL_RATE||'%' INDIVIDUAL_RATE,
+			P1.REMARK
+		FROM
+			HR_WAGE_INSUR_RATE P1
+			LEFT JOIN HR_FIIED_DATA P2
+			ON P1.GROUP_ID = P2.GROUP_ID
+			AND P1.HOS_ID = P2.HOS_ID
+			AND P1.INSUR_TYPE = P2.FIELD_COL_CODE
+		WHERE
+			P1.GROUP_ID = #{group_id,jdbcType=INTEGER}
+			AND P1.HOS_ID = #{hos_id,jdbcType=INTEGER}
+			AND P2.FIELD_TAB_CODE = 'DIC_INSURE_TYPE'
+			<if test="area != null and area != '' "> AND P1.AREA LIKE '%${area}%' </if>
+			<if test="insur_type != null and insur_type != '' "> AND P1.INSUR_TYPE = #{insur_type,jdbcType=VARCHAR} </if>
+	</select>
+	
+	<!-- 查询是否有存在的重复数据 -->
+	<select id="queryImportAreatopay" resultType="com.chd.hrp.hr.entity.salarymanagement.socialsecuritymanagement.HrAreatopay">
+		SELECT
+			AREA,
+			INSUR_TYPE
+		FROM
+			HR_WAGE_INSUR_RATE
+		WHERE
+			GROUP_ID = #{group_id,jdbcType=INTEGER}
+			AND HOS_ID = #{hos_id,jdbcType=INTEGER}
+			AND AREA = #{area,jdbcType=VARCHAR}
+			AND INSUR_TYPE = #{insur_type,jdbcType=VARCHAR}
+	</select>
+	
+</mapper>

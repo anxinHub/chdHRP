@@ -1,0 +1,40 @@
+﻿/** 
+ * @Description:
+ * @Copyright: Copyright (c) 2015-9-16 下午9:54:34
+ * @Company: 杭州亦童科技有限公司
+ * @网站：www.s-chd.com
+ */
+ 
+package com.chd.hrp.ass.service.bill;
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.dao.DataAccessException;
+
+import com.chd.base.SqlService;
+/**
+ * 
+ * @Description:
+ * tabledesc
+ * @Table:
+ * ASS_PRE_BILL_MAIN
+ * @Author: bell
+ * @email:  bell@e-tonggroup.com
+ * @Version: 1.0
+ */
+ 
+
+public interface AssPreBillMainService extends SqlService {
+
+	String queryAssPreBilldetail(Map<String, Object> mapVo);
+
+	String checkAssPreBillMain(List<Map<String, Object>> listVo);
+//预付款发票打印
+	Map<String, Object> queryAssPreBillDY(Map<String, Object> map)
+			throws DataAccessException;
+
+	String updateNotToExamineAssPreBillMain(List<Map<String, Object>> listVo);
+
+	List<String> queryAssPreBillState(Map<String, Object> mapVo)throws DataAccessException;
+
+}

@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.mat.dao.account.statistics.MatAccountStatisticsSumByBusMapper">
+	<select id="queryMatAccountStatisticsSumByBus" parameterType="java.util.Map"  resultType="java.util.TreeMap">
+		with t_in as(
+			select a.bus_type_code, sum(nvl(b.amount_money, 0)) as in_money
+			from mat_in_main a
+			left join mat_in_detail b
+				on a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code
+				and a.in_id = b.in_id
+			left join mat_inv_dict c
+				on a.group_id = c.group_id
+				and a.hos_id = c.hos_id
+				and a.copy_code = c.copy_code
+				and b.inv_id = c.inv_id
+				and b.inv_no = c.inv_no
+			left join mat_inv_dict d
+				on a.group_id = d.group_id
+				and a.hos_id = d.hos_id
+				and a.copy_code = d.copy_code
+				and b.inv_id = d.inv_id
+				and b.inv_no = d.inv_no
+			LEFT JOIN mat_type_dict mtd 
+		  	ON mtd.group_id = d.group_id
+		    AND mtd.hos_id = d.hos_id
+		    AND mtd.copy_code = d.copy_code
+		    AND mtd.mat_type_id = d.mat_type_id
+		    AND mtd.mat_type_no = d.mat_type_no 
+			where a.group_id = #{group_id,jdbcType=INTEGER}
+				and a.hos_id = #{hos_id,jdbcType=INTEGER}
+				and a.copy_code = #{copy_code,jdbcType=VARCHAR}
+				and a.store_id = #{store_id,jdbcType=INTEGER}
+				and a.state = 3
+				<!-- 只显示有权限的库房信息 -->
+				and to_char(a.store_id) in (
+					select perm_code from v_user_data_perm  
+					where group_id = #{group_id,jdbcType=INTEGER}
+						and hos_id = #{hos_id,jdbcType=INTEGER}
+						and table_code = 'HOS_STORE_DICT'
+						and user_id = #{user_id,jdbcType=INTEGER}
+						and is_read = 1 and is_write = 1 
+				)
+				<if test="inv_id != null and inv_id != ''">
+					and (c.inv_id like '%${inv_id}%' 
+					  	or  c.inv_code like '%${inv_id}%' 
+						or upper(c.inv_name)  like '%${inv_id}%' 
+						or upper(c.inv_model)  like '%${inv_id}%' 
+						or upper(c.spell_code)  like '%${inv_id}%' 
+						or upper(c.wbx_code)  like '%${inv_id}%' 
+						or lower(c.spell_code)  like '%${inv_id}%' 
+						or lower(c.wbx_code)  like '%${inv_id}%' 
+						or lower(c.inv_name)  like '%${inv_id}%' )
+				</if>
+				<if test="mat_type_code != null and mat_type_code != ''">
+				and mtd.mat_type_code like '${mat_type_code}%'
+			</if>
+				<![CDATA[
+					and a.year || a.month >= #{begin_year,jdbcType=VARCHAR} || #{begin_month,jdbcType=VARCHAR}
+					and a.year || a.month <= #{end_year,jdbcType=VARCHAR} || #{end_month,jdbcType=VARCHAR}
+				]]>
+			group by a.bus_type_code
+		),
+		t_out as(
+			select a.bus_type_code, sum(nvl(b.amount_money, 0)) as out_money
+			from mat_out_main a
+			left join mat_out_detail b
+				on a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code
+				and a.out_id = b.out_id
+			left join mat_inv_dict c
+				on a.group_id = c.group_id
+				and a.hos_id = c.hos_id
+				and a.copy_code = c.copy_code
+				and b.inv_id = c.inv_id
+				and b.inv_no = c.inv_no
+			left join mat_inv_dict d
+				on a.group_id = d.group_id
+				and a.hos_id = d.hos_id
+				and a.copy_code = d.copy_code
+				and b.inv_id = d.inv_id
+				and b.inv_no = d.inv_no
+			LEFT JOIN mat_type_dict mtd 
+		  	ON mtd.group_id = d.group_id
+		    AND mtd.hos_id = d.hos_id
+		    AND mtd.copy_code = d.copy_code
+		    AND mtd.mat_type_id = d.mat_type_id
+		    AND mtd.mat_type_no = d.mat_type_no 
+			where a.group_id = #{group_id,jdbcType=INTEGER}
+				and a.hos_id = #{hos_id,jdbcType=INTEGER}
+				and a.copy_code = #{copy_code,jdbcType=VARCHAR}
+				and a.store_id = #{store_id,jdbcType=INTEGER}
+				and a.state = 3
+				<!-- 只显示有权限的库房信息 -->
+				and to_char(a.store_id) in (
+					select perm_code from v_user_data_perm  
+					where group_id = #{group_id,jdbcType=INTEGER}
+						and hos_id = #{hos_id,jdbcType=INTEGER}
+						and table_code = 'HOS_STORE_DICT'
+						and user_id = #{user_id,jdbcType=INTEGER}
+						and is_read = 1 and is_write = 1 
+				)
+				<if test="inv_id != null and inv_id != ''">
+					and (c.inv_id like '%${inv_id}%' 
+					  	or  c.inv_code like '%${inv_id}%' 
+						or upper(c.inv_name)  like '%${inv_id}%' 
+						or upper(c.inv_model)  like '%${inv_id}%' 
+						or upper(c.spell_code)  like '%${inv_id}%' 
+						or upper(c.wbx_code)  like '%${inv_id}%' 
+						or lower(c.spell_code)  like '%${inv_id}%' 
+						or lower(c.wbx_code)  like '%${inv_id}%' 
+						or lower(c.inv_name)  like '%${inv_id}%' )
+				</if>
+				<if test="mat_type_id != null and mat_type_id != ''">
+					and d.mat_type_id = #{mat_type_id,jdbcType=INTEGER}
+				</if>
+				<if test="mat_type_code != null and mat_type_code != ''">
+					and mtd.mat_type_code  like '${mat_type_code}%'
+				</if>
+				<![CDATA[
+					and a.year || a.month >= #{begin_year,jdbcType=VARCHAR} || #{begin_month,jdbcType=VARCHAR}
+					and a.year || a.month <= #{end_year,jdbcType=VARCHAR} || #{end_month,jdbcType=VARCHAR}
+				]]>
+			group by a.bus_type_code
+		)
+		select a.bus_type_code, to_char(a.bus_type_name) as bus_type_name , b.in_money, c.out_money
+		from mat_bus_type a
+		left join t_in b
+			on a.bus_type_code = b.bus_type_code
+		left join t_out c
+			on a.bus_type_code = c.bus_type_code
+		where <![CDATA[nvl(b.in_money, 0) <> 0 or nvl(c.out_money, 0) <> 0]]>
+		union all
+		select null,to_char('合计'), sum(b.in_money), sum(c.out_money)
+		from mat_bus_type a
+		left join t_in b
+			on a.bus_type_code = b.bus_type_code
+		left join t_out c
+			on a.bus_type_code = c.bus_type_code
+	</select>
+</mapper>
+

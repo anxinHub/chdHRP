@@ -1,0 +1,1528 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root>
+	<sql id="PRC_ACC_VERI_REANALYSIS" type="proc"><![CDATA[
+		/*-------------------------------------------------------------------------
+		|| 过程名称 ：应付账龄分析
+		|| 参数描述 ：
+		||            -------------------------------------------------------------
+		|| 作    者 ：               完成日期 ：
+		||-------------------------------------------------------------------------
+		|| 修改记录 ：
+		||-------------------------------------------------------------------------*/
+		CREATE OR REPLACE PROCEDURE PRC_ACC_VERI_REANALYSIS
+		(/*应付账龄分析*/
+		  v_group_id number,     --集团ID
+		  v_hos_id    number,      --医院ID
+		  v_copy_code varchar2,  --帐套编码
+		  v_acc_year varchar2,     --会计年度
+		  subj_code   varchar2,         --应收科目id
+		  check_type varchar2,    --往来类型
+		  check_type_id number, --往来id
+		  proj1 number,             --往来科目1
+		  proj2 number,             --往来科目2
+		  analysisDates varchar2,  --分析日期
+		  end_date varchar2,       --截止日期
+		  showItem number,       --是否显示百分比
+		  is_check number,          --是否记账
+		  
+		  check_table varchar2 , --辅助核算名
+		  column_no varchar2,  --辅助核算ID
+		  column_id varchar2,  --辅助核算NO
+		  column_code varchar2, -- --辅助核算code
+		  column_name varchar2, --辅助核算name
+		  column_check varchar2,  --辅助核算列
+		  is_change number,
+		  p_pagesize INTEGER,--每页显示数量
+			p_page INTEGER,--当前显示页
+			p_tcount out INTEGER,
+		  p_result_data OUT acc_ver.recursor
+		 
+		)
+		is
+		
+		  ddl_sql varchar2(4000);
+		  ddl_sql1 varchar2(2000);
+		  ddl_sql2 varchar2(2000);
+		  ddl_sqlCol varchar2(200);
+		  sql_subjwhere varchar2(100);
+		  num number;
+		  counts number;
+		  count_sql varchar2(4000);
+		  subj_codes varchar2(100);         --科目条件
+		  state varchar2(200);             --是否记账条件sql
+		  checkTable varchar2(200);    --往来类型  表名
+		  columnName varchar2(200); --查询出列
+		  checkId varchar2(100);          --往来项目ID
+		  checkCol varchar2(200);        --查询显示出的列
+		  checkCode varchar2(20);
+		  checkWhere varchar2(400);   --往来类型条件
+		  projWhere varchar2(200);     --往来类型范围
+		  groupCol varchar2(200);       --分组条件
+		   
+		  is_showItem   number;         --是否显示百分比
+		  date_check varchar2(200);   --分析条件
+		  analysisDate varchar2(200);    --分析条件
+		  end_days varchar2(200);         --截止日期
+		  
+		  
+		 BEGIN
+		   
+		        select count(1) into num from user_tables where table_name=upper('t_accAcountRange_t');
+		        if num=0 then
+		           execute immediate 'Create Global Temporary Table t_accAcountRange_t(
+		               check_code varchar2(100),
+		               check_name varchar2(100),
+		               end_os numeric(19,2)
+		           ) On COMMIT Delete ROWS';
+		           --execute immediate ddl_sql;
+		        end if;  
+		 
+		        /*条件以及查询条件拼接 -------------------------------------begin*/
+		 
+		            is_showItem := showItem;
+		            end_days :=end_date;
+		            --分析日期
+		            if analysisDates='due_date' then
+		               date_check := ' and a.due_date <= to_date('''||end_days||''',''yyyy/mm/dd'')';
+		            elsif analysisDates='occur_date' then
+		               date_check := ' and a.occur_date <= to_date('''||end_days||''',''yyyy/mm/dd'')';
+		            else
+		              date_check :='';
+		            end if;
+		         
+		          --往来类型
+		          if check_type='ACC_CHECK_ITEM' then
+		              checkTable:=check_table;
+		              checkId:=' b.'||column_id||' ';
+		              checkCode:=' b.'||column_code||' ';
+		              columnName:=' b.'||column_code||' as check_code,b.'||column_name||' as check_name , ';
+		              checkCol:=' b.'||column_code||' ,b.'||column_name||' ';
+		              checkWhere:=' and a.'||column_check||'=b.'||column_code||' and b.is_stop=0  ';
+		              groupCol:=' b.'||column_code||' ,b.'||column_name||' ';
+		              
+		          elsif check_type='HOS_SOURCE' then
+		             checkTable:=check_table;
+		              checkId:=' b.'||column_id||' ';
+		              checkCode:=' b.'||column_code||' ';
+		              columnName:=' b.'||column_code||' as check_code,b.'||column_name||' as check_name , ';
+		              checkCol:=' b.'||column_code||' ,b.'||column_name||' ';
+		              checkWhere:=' and a.'||column_check||'_ID= b.source_id and b.is_stop=0  ';
+		              groupCol:=' b.'||column_code||' ,b.'||column_name||' ';
+		          else
+		              checkTable:=check_table;
+		              checkId:=' b.'||column_id||' ';
+		              checkCode:=' b.'||column_code||' ';
+		              columnName:=' b.'||column_code||' as check_code,b.'||column_name||' as check_name , ';
+		              checkCol:=' b.'||column_code||' ,b.'||column_name||' ';
+		              checkWhere:=' and a.'||column_check||'_NO=b.'||column_no||' and a.'||column_check||'_ID=b.'||column_id||' and b.is_stop=0  ';
+		              groupCol:=' b.'||column_code||' ,b.'||column_name||' ';
+		          end if;
+		          
+		         /* if check_type='HOS_DEPT_DICT' then
+		               checkTable := 'hos_dept_dict';
+		               checkId :=' b.dept_id ';
+		               checkCode:=' b.dept_code ';
+		               columnName :=' b.dept_code as check_code, b.dept_name as check_name , ';
+		               checkCol :=' b.dept_code,b.dept_name  ';
+		               checkWhere := '  and a.check1_no = b.dept_no and a.check1_id = b.dept_id and b.is_stop = 0 and b.is_last = 1 ';
+		               groupCol :=' b.dept_code,b.dept_name ';
+		               
+		                
+		           elsif check_type='HOS_EMP_DICT' then
+		               checkTable := ' HOS_EMP_DICT ';
+		               checkId :=' b.emp_id ';
+		               checkCode :=' b.emp_code ';
+		               columnName :=' b.emp_code as check_code, b.emp_name as check_name ,';
+		               checkCol :=' b.emp_code,b.emp_name ';
+		               checkWhere :='  and a.check2_no = b.emp_no and a.check2_id = b.emp_id and b.is_stop = 0  ';
+		               groupCol :=' b.emp_code,b.emp_name ';
+		               
+		           elsif check_type = 'HOS_PROJ_DICT' then
+		               checkTable := ' HOS_PROJ_DICT ';
+		               checkId :=' b.proj_id ';
+		               checkCode :=' b.proj_code ';
+		               columnName :=' b.proj_code as check_code, b.proj_name as check_name ,';
+		               checkCol :=' b.proj_code,b.proj_name ';
+		               checkWhere :='  and a.check3_no = b.proj_no and a.check3_id = b.proj_id and b.is_stop = 0 ';
+		               groupCol :='  b.proj_code,b.proj_name  ';
+		                 
+		           elsif check_type = 'HOS_SUP_DICT' then
+		               checkTable := ' HOS_SUP_DICT ';
+		               checkId :=' b.sup_id ';
+		               checkCode :=' b.sup_code ';
+		               columnName :=' b.sup_code as check_code, b.sup_name as check_name ,';
+		               checkCol :=' b.sup_code,b.sup_name ';
+		               checkWhere :='  and a.check4_no = b.sup_no and a.check4_id = b.sup_id and b.is_stop = 0 ';
+		               groupCol :='  b.sup_code,b.sup_name  ';
+		                 
+		            elsif check_type = 'HOS_CUS_DICT' then
+		               checkTable := ' HOS_CUS_DICT ';
+		               checkId :=' b.cus_id ';
+		               checkCode :=' b.cus_code ';
+		               columnName :=' b.cus_code as check_code, b.cus_name as check_name ,';
+		               checkCol :=' b.cus_code,b.cus_name ';
+		               checkWhere :='  and a.check5_no = b.cus_no and a.check5_id = b.cus_id and b.is_stop = 0 ';
+		               groupCol :='  b.cus_code,b.cus_name  ';
+		                 
+		            elsif check_type = 'HOS_STORE_DICT' then
+		               checkTable := ' HOS_STORE_DICT ';
+		               checkId :=' b.store_id ';
+		               checkCode :='b.store_code ';
+		               columnName :=' b.store_code as check_code, b.store_name as check_name ,';
+		               checkCol :=' b.store_code,b.store_name ';
+		               checkWhere :='  and a.check6_no = b.store_no and a.check6_id = b.store_id and b.is_stop = 0 ';
+		               groupCol :='  b.store_code,b.store_name  ';
+		                 
+		            elsif check_type='HOS_SOURCE' then
+		               checkTable := ' HOS_SOURCE ';
+		               checkId :=' b.source_id ';
+		               checkCode :=' b.source_code ';
+		               columnName :=' b.source_code as check_code, b.source_name as check_name ,';
+		               checkCol :=' b.source_code,b.source_name ';
+		               checkWhere :=' and  a.check7_id = b.source_id and b.is_stop = 0 ';
+		               groupCol :='  b.store_code,b.store_name  ';
+		            else 
+						       checkTable := ' ACC_CHECK_ITEM ';
+		               checkId :=zcheck ;
+		               checkCode :=' b.check_item_code ';
+		               columnName :=' b.check_item_code as check_code, b.check_item_name as check_name ,';
+		               checkCol :=' b.check_item_code,b.check_item_name  ';
+		               checkWhere :=' and  a.'||zcheck||' = b.check_item_code and b.is_stop = 0 ';
+		               groupCol :='  b.check_item_code,b.check_item_name  ';
+		            end if;*/
+		        
+		            --往来项目范围
+		             if proj1 is null then
+		                      projWhere:='';
+		             elsif proj2 is null then
+		                     projWhere:='';
+		              else 
+		                     projWhere:=' and '||checkId||' between '||proj1||' and '||proj2||' ';
+		             end if;
+		       
+		         /*条件判断*/
+		         if subj_code is null then
+		            sql_subjwhere:='';
+		         else
+		              subj_codes:=subj_code;
+		              sql_subjwhere :=' and a.subj_code  = '||subj_codes||' ';
+		         end if;
+		         
+		         --状态
+		         if is_check ='1' then
+		            state :=' and av.state >= 1  ';
+		         else
+		           state:=' and av.state = 99  ';
+		         end if;
+		          /*条件以及查询条件拼接 -------------------------------------end*/
+		    
+		     
+		    /*插入明细行的余额到 t_accAcountRange_t 临时表中*/
+		    ddl_sql :='
+		    insert into t_accAcountRange_t(check_code,check_name,end_os)
+		    select '||checkCol||' ,sum(abs(nvl(a.debit,0) - nvl(a.credit,0)) - nvl(a.bal_amt,0)) as balance
+		    from acc_vouch_check a
+		    left join '||checkTable||'  b on  b.hos_id = a.hos_id and b.group_id = a.group_id '||checkWhere||' '||projWhere||'
+		    left join acc_vouch av on av.vouch_id = a.vouch_id and av.copy_code = a.copy_code and av.acc_year = a.acc_year
+		         and av.group_id = a.group_id  and av.hos_id = a.hos_id
+		    WHERE a.group_id = '||v_group_id||' and a.hos_id = '||v_hos_id||'
+		            and a.copy_code = '||v_copy_code||'  and a.acc_year = '||v_acc_year||'
+		            '||date_check||'
+		            '||state||'
+		            '||sql_subjwhere||'
+		            and '||checkCode||' is not null 
+		          group by '||checkCol||'
+		          order by '||checkCol||'
+		     ';
+		      dbms_output.put_line(ddl_sql);
+		      execute immediate ddl_sql;
+		
+		  /*插入金额行*/
+		      ddl_sql:='
+		             insert into T_ACC_VERI_REANALYSIS(id,check_name)
+		             select 1,''金额'' from dual
+		      ';
+		      --dbms_output.put_line(ddl_sql);
+		      execute immediate ddl_sql;
+		
+		      /*插入数量行*/
+		      ddl_sql:='
+		             insert into T_ACC_VERI_REANALYSIS(id,check_name)
+		             select 0,''数量''from dual
+		      ';
+		      --dbms_output.put_line(ddl_sql);
+		      execute immediate ddl_sql;
+		
+		  /*插入明细行*/
+		declare
+		
+		    v_note varchar2(200);  --acc_budg_range 中note
+		    i integer;
+		    TYPE cur_range IS REF CURSOR;  --定义游标指针
+		    v_cursor cur_range;  --定义游标变量
+		    begin
+		     ddl_sql1 :=' ';
+		     i :=1;
+		     counts :=1;
+		     OPEN v_cursor FOR
+		         select note from acc_budg_range 
+		         where group_id =v_group_id 
+		             and hos_id =v_hos_id 
+		             and copy_code =v_copy_code 
+		         order by range_id;
+		        loop
+		         FETCH v_cursor into v_note;  --从游标中取一条记录，存放到变量中
+		                EXIT WHEN v_cursor%NOTFOUND;
+		               
+		               -- ddl_sql1:=ddl_sql1||'  ,sum(decode(note,'''||v_note||''',end_os,null)) "'||v_note||'"' ||'';
+		                ddl_sql1:=ddl_sql1||'  ,sum(decode(note,'''||v_note||''',end_os,null)) "col_'||i||'" ';
+		                ddl_sqlCol :=ddl_sqlCol||' ,col_'||i||'';
+		                ddl_sql2 :=ddl_sql2||' ,col_'||i||' , case when nvl(end_os,0) > 0 then col_'||i||' / nvl(end_os,0)*100 else 0 end as col_bal_'||i||'';
+		                --dbms_output.put_line(ddl_sql1);
+		                
+		                i :=i+1;
+		                counts := counts+1;
+		               
+		               
+		        end loop;
+		    CLOSE v_cursor;--关闭游标
+		end;
+		
+		
+		
+		    /*插入明细行*/
+		    /*ddl_sql:='
+		         insert into T_ACC_VERI_REANALYSIS(id,check_code,check_name)
+		         select 2, check_code,check_name from t_accAcountRange_t
+		    ';*/
+		    dbms_output.put_line(ddl_sql);
+		       ddl_sql :='
+		          insert into T_ACC_VERI_REANALYSIS(id,check_code,check_name '||ddl_sqlCol||')
+		          select 2 as id,check_code,check_name '||ddl_sql1||' from (
+		                    select cc.range_id,cc.note,dd.check_code,dd.check_name,end_os,counts
+		                    from acc_budg_range cc
+		                    left join(
+		                            select check_code ,check_name, begin_days, end_days, note, sum(end_os) end_os, count(*) counts, range_id
+		                            from (
+		                                   select '||columnName||'  round(to_number('||analysisDates||' - to_date('''||end_days||''',''yyyy/mm/dd''))) as days,
+		                                   abs(nvl(a.debit,0) - nvl(a.credit,0)) - nvl(a.bal_amt,0) as end_os
+		                                   from acc_vouch_check a
+		                                   left join '||checkTable||'  b on  b.hos_id = a.hos_id and b.group_id = a.group_id '||checkWhere||' '||projWhere||'
+		                                   left join acc_vouch av on av.vouch_id = a.vouch_id
+		                                       and av.copy_code = a.copy_code
+		                                       and av.acc_year = a.acc_year
+		                                       and av.group_id = a.group_id
+		                                       and av.hos_id = a.hos_id
+		                                   WHERE a.group_id = '||v_group_id||'
+		                                        and a.hos_id = '||v_hos_id||'
+		                                        and a.copy_code = '||v_copy_code||'
+		                                        and a.acc_year = '||v_acc_year||'
+		                                        '||date_check||'
+		                                        '||state||'
+		                                        '||sql_subjwhere||'
+		                              ) aa left join (
+		                                   select range_id,begin_days,end_days,note from acc_budg_range a
+		                              ) bb on ((aa.days < 0 and (-1)*aa.days   between bb.begin_days and bb.end_days) or (aa.days>0 and bb.end_days=0))
+		                              group by check_code,check_name,begin_days,end_days,note,range_id
+		                     ) dd on dd.range_id = cc.range_id
+		                    order by cc.range_id
+		            )
+		            where check_code is not null
+		            group by check_code,check_name
+		            order by check_code,check_name
+		          ';
+		   
+		    execute immediate ddl_sql;
+		
+		/*/*更新余额列*/
+		     declare 
+		      v_check_code varchar2(200);
+		      v_check_bal numeric(19,2);
+		      TYPE c_number IS REF CURSOR;  --定义游标指针
+		      v_cursor c_number;  --定义游标变量
+		      begin
+		      open v_cursor FOR
+		         select check_code,end_os from t_accAcountRange_t order by check_code;
+		         loop
+		             fetch v_cursor  into v_check_code,v_check_bal;
+		             exit when v_cursor%notfound;
+		             dbms_output.put_line(' update T_ACC_VERI_REANALYSIS set end_os ='||v_check_bal||'
+		                     where id=2 AND check_code='''||v_check_code||''' ');
+		                   execute immediate '
+		                     update T_ACC_VERI_REANALYSIS set end_os ='||v_check_bal||'
+		                     where id=2 AND check_code='''||v_check_code||'''
+		                   ';
+		         end loop;
+		          CLOSE v_cursor;
+		      end;
+		      
+		      /*更新数量行*/
+		      DECLARE
+		      x number;
+		      BEGIN
+		        x:=1;
+		        WHILE x<counts+1 LOOP
+		            
+		            execute immediate '
+		            update T_ACC_VERI_REANALYSIS set col_'||x||' = (
+		            select count(*) as num from T_ACC_VERI_REANALYSIS where id =2 and col_'||x||' >0)
+		            where id = 0 ';
+		            
+		            execute immediate '
+		            update T_ACC_VERI_REANALYSIS set col_'||x||' = (
+		            select sum(nvl(col_'||x||',0))  from T_ACC_VERI_REANALYSIS where id =2 )
+		            where id = 1 ';
+		             dbms_output.put_line('
+		              update T_ACC_VERI_REANALYSIS set col_'||x||' = (
+		            select sum(nvl(col_'||x||',0))  from T_ACC_VERI_REANALYSIS where id =2 )
+		            where id = 1
+		             ');
+		           /* execute immediate '
+		            update T_ACC_VERI_REANALYSIS set col_bal_'||x||' = (
+		            select sum(nvl(col_bal_'||x||',0))  from T_ACC_VERI_REANALYSIS where id =2 )
+		            where id = 1 ';*/
+		            
+		            x:=x+1;
+		        END LOOP;
+		      END;
+		      
+		       execute immediate '
+		            update T_ACC_VERI_REANALYSIS set end_os = (
+		            select sum(nvl(end_os,0))  from T_ACC_VERI_REANALYSIS where id =2 )
+		            where id = 1 ';
+		            
+		      execute immediate '
+		            update T_ACC_VERI_REANALYSIS set end_os = (
+		            select count(0)  from T_ACC_VERI_REANALYSIS where id =2 )
+		            where id = 0 ';
+		            
+		    /*查询结果*/
+		    if is_showItem = '0'
+		      then
+		        --不显示百分比
+		       /* ddl_sql :='
+		            select  * from T_ACC_VERI_REANALYSIS
+		        ';*/
+		        ddl_sql :='select * from (
+		                           select rownum rn, ab.* from(
+		                                  select check_code,check_name,end_os '||ddl_sqlCol||'
+		                                  from T_ACC_VERI_REANALYSIS
+		                                  order by id,check_code
+		                           ) ab )
+		        ';
+		      else
+		        --显示百分比
+		         ddl_sql :='select * from (
+		                           select rownum rn, ab.* from(
+		                                  select check_code,check_name,end_os '||ddl_sql2||'
+		                                  from T_ACC_VERI_REANALYSIS
+		                                  order by id,check_code
+		                           ) ab )
+		        ';
+		
+		      end if;
+		      
+		        if p_pagesize>0 then
+		           ddl_sql:=ddl_sql||' where rn >'||(p_page-1)*p_pagesize||' and rn<='||p_page*p_pagesize;
+		        end if;
+		                  
+		         open p_result_data for ddl_sql;
+		         p_tcount:=0;
+		         count_sql:=' select count(*) from T_ACC_VERI_REANALYSIS';
+		
+		         EXECUTE IMMEDIATE count_sql INTO p_tcount;
+		  
+		
+		END PRC_ACC_VERI_REANALYSIS;
+		
+	]]></sql>
+	
+	
+	<sql id="PRC_ACC_VERI_DETAILQUERY" type="proc"><![CDATA[
+		/*-------------------------------------------------------------------------
+		|| 过程名称 ：往来核销明细账查询
+		|| 参数描述 ：
+		||            -------------------------------------------------------------
+		|| 作    者 ：               完成日期 ：
+		||-------------------------------------------------------------------------
+		|| 修改记录 ：
+		||-------------------------------------------------------------------------*/
+		
+		create or replace procedure PRC_ACC_VERI_DETAILQUERY(
+      p_group_id number,
+      p_hos_id number,
+      p_copy_code varchar2,
+      p_acc_year varchar2,
+      subj_code varchar2,--往来科目编码
+      p_acc_year_b varchar2,--会计期间1
+      p_acc_month_b varchar2,
+      p_acc_year_e varchar2,--会计期间2
+      p_acc_month_e varchar2,
+      check_type varchar2,--往来类型
+      check_type_id number,--往来类型ID
+      p_acc_vouch_b varchar2,--凭证序号1
+      p_acc_vouch_e varchar2,--凭证序号2
+      zcheckName varchar2,--自定义辅助核算项
+      check_type1 number,--往来项目1
+      check_type2 number,--往来项目2
+      veriState integer,--核销状态
+      is_check integer,--是否含未记账
+      check_table varchar2,-- 辅助核算表 table
+      column_no varchar2,-- 辅助核算 no
+      column_id varchar2,-- 辅助核算 id
+      column_code varchar2,-- 辅助核算 code
+      column_name varchar2,-- 辅助核算 name
+      column_check varchar2,--自定义辅助核算名
+      is_change varchar2,
+      p_pagesize INTEGER,--每页显示数量
+      p_page INTEGER,--当前显示页
+      p_tcount out INTEGER,
+      p_result_data OUT acc_ver.recursor
+      )is
+        ddl_sql varchar2(4000);
+        table_name varchar2(200);--动态表名称
+        count_sql varchar2(4000);
+        -- obj_code_where_field varchar2(200);--查询所用的动态字段名称
+        join_sql varchar2(200);--历史记录动态条件
+        checkId_sql varchar2(200);
+        groupBy_col varchar2(200);--要显示的动态字段
+        showColum varchar2(100);
+        oShowColum varchar2(100);
+        obj_where_field varchar2(200);--id关联动态条件
+        idWhere_sql varchar2(200);
+        obj_code_begin varchar2(200);--开始项目编码
+        obj_code_end varchar2(200);--结束项目编码
+        vouch_b varchar2(50);
+        vouch_e varchar2(100);
+        vouchNo_sql varchar2(100);--凭证范围sql
+        veriState_sql varchar2(100);--核销状态sql
+        state_name varchar2(20);
+        subj_wheresql varchar2(200);--科目查询
+        checkState_sql varchar2(100);
+        summary varchar2(20);
+        num number;
+        checkName varchar2(20);-- 自定义辅助核算名
+        p_subj_code varchar2(50);
+      begin
+              /*条件判断开始  begin--------------*/
+              oShowColum:=' t1.check_code,t1.check_name, ';
+
+               /*  拼装表 */
+            if check_type is not null then
+                 /*  普通的辅助核算 带变更表的  begin*/
+                 if is_change ='1' then
+                    showColum:=' hd.'||column_code||' as check_code, hd.'||column_name||' as check_name,';
+                    groupBy_col :=' hd.'||column_code||',hd.'||column_name||',';
+                    join_sql:=' left join '||check_table||' hd on hd.group_id = avc.group_id and hd.hos_id = avc.hos_id and hd.'||column_id||' = avc.'||column_check||'_id and hd.'||column_no||' = avc.'||column_check||'_no ';
+                    /*  项目范围  begin*/
+                    if check_type1 is null then
+                          checkId_sql:='';
+                    elsif check_type2 is null then
+                         checkId_sql:='';
+                    else
+                         checkId_sql:=' and hd.'||column_id||' between '||check_type1||' and '||check_type2||' ';
+                    end if;
+                    /*  项目范围  end*/
+                 end if;
+                 /*  普通的辅助核算 带变更表的  end*/
+
+                /*  不带变更表的  begin*/
+                if is_change ='0' then
+                   if check_type='ACC_CHECK_ITEM' then
+                     /*  自定义辅助核算  begin*/
+                     showColum:=' aci.check_item_code as check_code, aci.check_item_name as check_name,';
+                     groupBy_col :=' aci.check_item_code,aci.check_item_name,';
+                      join_sql:=' left join acc_check_item aci on aci.group_id = avc.group_id and aci.hos_id = avc.hos_id and aci.copy_code = avc.copy_code and aci.'||column_id||' = avc.'||column_check||'';
+                      if check_type1 is null then
+                          checkId_sql:='';
+                      elsif check_type2 is null then
+                         checkId_sql:='';
+                      else
+                         checkId_sql:=' and aci.check_item_id  between '||check_type1||' and '||check_type2||' ';
+                      end if;
+                     /*  自定义辅助核算 end*/
+                   else
+                      /*  不带变更表的辅助核算  begin*/
+                      showColum:=' hd.'||column_code||' as check_code, hd.'||column_name||' as check_name,';
+                      groupBy_col :=' hd.'||column_code||',hd.'||column_name||',';
+                      join_sql:=' left join '||check_table||' hd on hd.group_id = avc.group_id and hd.hos_id = avc.hos_id and hd.'||column_id||' = avc.'||column_check||'_id';
+                    /*  项目范围  begin*/
+                    if check_type1 is null then
+                          checkId_sql:='';
+                    elsif check_type2 is null then
+                         checkId_sql:='';
+                    else
+                         checkId_sql:=' and hd.'||column_id||'  between '||check_type1||' and '||check_type2||' ';
+                    end if;
+
+                     /*  不带变更表的辅助核算 end*/
+                   end if;
+                end if;
+            else
+
+                  groupBy_col := '  ';
+                  join_sql := '  ';
+                  checkId_sql:=' ';
+                  showColum:=' '' as check_code, '' as check_name,  ';
+
+            end if;
+
+          /*2、科目、时间查询范围*/
+              --subj_wheresql:=' and hs.subj_code like '''||subj_code||'%'' ';
+                p_subj_code:=subj_code;
+                subj_wheresql:=' and hs.subj_code ='||p_subj_code ;
+
+
+              /*4、凭证序号范围*/
+          if p_acc_vouch_b is null then
+             vouchNo_sql:='';
+          end if;
+          if p_acc_vouch_e is null then
+             vouchNo_sql:='';
+          end if;
+          if p_acc_vouch_b is not null and p_acc_vouch_e is not null then
+            vouch_b :=p_acc_vouch_b;
+            vouch_e :=p_acc_vouch_e;
+            vouchNo_sql:=' and  av.vouch_no between ' ||vouch_b||' and '||vouch_e||' ';
+          end if;
+
+              /*4、核算类型*/
+              -- 0：全部   1：未核销  2：已核销
+              if veriState='2' then
+                  veriState_sql:=' and (nvl(avv.veri_money,0) != 0) ';
+              elsif veriState='1' then
+                  veriState_sql:=' and (nvl(avv.veri_money,0) = 0)';
+              else
+                  veriState_sql:='';
+              end if;
+
+              /*5、是否含未记账*/
+              if is_check='1' then
+                 checkState_sql:=' and av.state>0 and av.state<99 ';
+              else
+                 checkState_sql:=' and av.state=99 ';
+              end if;
+
+              /*条件判断 end -----------------------*/
+
+          if p_acc_month_b='01' then
+             /*年初余额*/
+             if check_type!='ACC_CHECK_ITEM' and check_type is not null  then
+            /* 带辅助核算的科目 */
+            execute immediate 'insert into T_ACC_VERI_DETAILQUERY(id,acc_year,acc_month,subj_code,check_code,check_name,summary,subj_dire,end_os,vouch_id)
+            select 1,''0000'',''00'',hs.subj_code,'||showColum||' ''上年结转'',hs.subj_dire,avc.bal_os,0 vouch_id
+            from  acc_leder_check avc
+            left join acc_subj hs on avc.group_id = hs.group_id and avc.hos_id = hs.hos_id and avc.copy_code=hs.copy_code
+              and avc.acc_year = hs.acc_year and avc.subj_code=hs.subj_code
+            '||join_sql||'
+            where avc.group_id=:p_group_id and avc.hos_id=:p_hos_id and avc.copy_code=:p_copy_code and avc.acc_year=:p_acc_year_b
+              and avc.acc_month=''00'' '||subj_wheresql||' '||checkId_sql||'
+            order by '||groupBy_col||' hs.subj_code,hs.subj_dire '
+            using p_group_id,p_hos_id,p_copy_code,p_acc_year_b;
+
+          elsif check_type='ACC_CHECK_ITEM' then
+
+            /* 自定义辅助核算 */
+            execute immediate 'insert into T_ACC_VERI_DETAILQUERY(id,acc_year,acc_month,subj_code,check_code,check_name,summary,subj_dire,end_os,vouch_id)
+            select 1,''0000'',''00'',hs.subj_code,aci.check_item_code,aci.check_item_name,''上年结转'',hs.subj_dire,avc.bal_os,0 vouch_id
+            from  acc_leder_check avc
+            '||join_sql||'
+            left join acc_subj hs on avc.group_id = hs.group_id and avc.hos_id = hs.hos_id and avc.copy_code=hs.copy_code
+              and avc.acc_year = hs.acc_year and avc.subj_code=hs.subj_code
+            where avc.group_id=:p_group_id and avc.hos_id=:p_hos_id and avc.copy_code=:p_copy_code and avc.acc_year=:p_acc_year_b
+                        and avc.acc_month=''00'' '||subj_wheresql||' and aci.check_type_id =:check_type_id '||checkId_sql||'
+            order by aci.check_item_code,hs.subj_code,hs.subj_dire '
+            using p_group_id,p_hos_id,p_copy_code,p_acc_year_b,check_type_id;
+
+          else
+
+            /* 不带辅助核算的科目 */
+            execute immediate 'insert into T_ACC_VERI_DETAILQUERY(
+                    id,acc_year,acc_month,subj_code,check_code,check_name,summary,subj_dire,end_os,vouch_id)
+            select 1,''0000'',''00'',hs.subj_code,'''' as check_code,'''' as check_name, ''上年结转'',hs.subj_dire,avc.bal_os,0 vouch_id
+            from  acc_leder_check avc
+            left join acc_subj hs on avc.group_id = hs.group_id and avc.hos_id = hs.hos_id and avc.copy_code=hs.copy_code
+              and avc.acc_year = hs.acc_year and avc.subj_code=hs.subj_code
+            where avc.group_id=:p_group_id and avc.hos_id=:p_hos_id and avc.copy_code=:p_copy_code and avc.acc_year=:p_acc_year_b
+              and avc.acc_month=''00'' '||subj_wheresql||'
+            order by hs.subj_code,hs.subj_dire '
+            using p_group_id,p_hos_id,p_copy_code,p_acc_year_b;
+          end if;
+          end if;
+
+          if p_acc_month_b!='01' then
+             /*期初余额*/
+             /* 带辅助核算的科目 */
+             if check_type!='ACC_CHECK_ITEM' and check_type is not null  then
+             execute immediate '
+            insert into T_ACC_VERI_DETAILQUERY(id,acc_year,acc_month,subj_code,check_code,check_name,summary,subj_dire,end_os,vouch_id)
+            select 1,''0000'',''00'',t1.subj_code,'||oShowColum||' ''期初余额'',t1.subj_dire,sum(t1.balance), 0 vouch_id
+            from (
+                        select hs.subj_code,hs.subj_dire,0 debit,0 credit,'||showColum||' avc.end_os balance
+                        from acc_leder_check avc
+                        left join acc_subj hs on hs.group_id = avc.group_id and hs.hos_id = avc.hos_id and hs.copy_code=avc.copy_code
+                            and hs.acc_year = avc.acc_year and hs.subj_code=avc.subj_code
+                        '||join_sql||'
+                        where avc.group_id=:p_group_id and avc.hos_id=:p_hos_id and avc.copy_code=:p_copy_code
+                              and avc.acc_year=:p_acc_year_b and avc.acc_month=''00'' '||subj_wheresql||' '||checkId_sql||'
+                        union
+                        select hs.subj_code,hs.subj_dire,sum(avc.debit) debit,sum(avc.credit) credit,'||showColum||'
+                               sum(case when hs.subj_dire=0 then avc.debit-avc.credit else avc.credit-avc.debit end) balance
+                        from acc_vouch_check avc
+                        left join acc_vouch av on av.group_id = avc.group_id and av.hos_id=avc.hos_id and av.copy_code=avc.copy_code
+                            and av.acc_year = avc.acc_year and av.vouch_id=avc.vouch_id
+                        left join acc_subj hs on hs.group_id =avc.group_id and hs.hos_id = avc.hos_id and hs.copy_code=avc.copy_code
+                            and hs.acc_year=avc.acc_year and hs.subj_code=avc.subj_code
+                        '||join_sql||'
+                        where av.group_id=:p_group_id and av.hos_id=:p_hos_id and av.copy_code=:p_copy_code '||checkState_sql||'
+                            and av.acc_year=:p_acc_year_b and av.acc_month<:p_acc_month_b '||subj_wheresql||''||checkId_sql||'
+                        group by hs.subj_code,'||groupBy_col||' hs.subj_dire
+            )  t1
+            group by t1.subj_code,'||oShowColum||' t1.subj_dire
+            order by t1.subj_code, t1.subj_dire'
+            using p_group_id,p_hos_id,p_copy_code,p_acc_year_b,p_group_id,p_hos_id,p_copy_code,p_acc_year_b,p_acc_month_b;
+
+          elsif check_type='ACC_CHECK_ITEM' then
+            /*  自定义辅助核算   */
+            execute immediate 'insert into T_ACC_VERI_DETAILQUERY(id,acc_year,acc_month,subj_code,check_code,check_name,summary,subj_dire,end_os,vouch_id)
+            select 1,''0000'',''00'',t1.subj_code,t1.check_item_code,t1.check_item_name, ''期初余额'',t1.subj_dire,sum(t1.balance) , 0 vouch_id
+            from (
+                        select hs.subj_code,hs.subj_dire,0 debit,0 credit,aci.check_item_code,aci.check_item_name, avc.end_os balance
+                        from acc_leder_check avc
+                        '||join_sql||'
+                        left join acc_subj hs on hs.group_id = avc.group_id and hs.hos_id = avc.hos_id and hs.copy_code=avc.copy_code
+                            and hs.acc_year = avc.acc_year and hs.subj_code=avc.subj_code
+                        where avc.group_id=:p_group_id and avc.hos_id=:p_hos_id and avc.copy_code=:p_copy_code
+                            and avc.acc_year=:p_acc_year_b and avc.acc_month=''00'' '||subj_wheresql||' and aci.check_type_id =:check_type_id'||checkId_sql||'
+                        union
+                        select hs.subj_code,hs.subj_dire,sum(avc.debit) debit,sum(avc.credit) credit,aci.check_item_code,aci.check_item_name,
+                               sum(case when hs.subj_dire=0 then avc.debit-avc.credit else avc.credit-avc.debit end) balance
+                        from acc_vouch_check avc
+                        '||join_sql||'
+                        left join acc_vouch av on av.group_id = avc.group_id and av.hos_id=avc.hos_id and av.copy_code=avc.copy_code
+                            and av.acc_year = avc.acc_year and av.vouch_id=avc.vouch_id
+                        left join acc_subj hs on hs.group_id =avc.group_id and hs.hos_id = avc.hos_id and hs.copy_code=avc.copy_code
+                            and hs.acc_year=avc.acc_year and hs.subj_code=avc.subj_code
+                        where av.group_id=:p_group_id and av.hos_id=:p_hos_id and av.copy_code=:p_copy_code '||checkState_sql||'
+                            and av.acc_year=:p_acc_year_b and av.acc_month<:p_acc_month_b '||subj_wheresql||' and aci.check_type_id =:check_type_id'||checkId_sql||'
+                        group by hs.subj_code,aci.check_item_code,aci.check_item_name, hs.subj_dire
+            )  t1
+            group by t1.subj_code,t1.check_item_code,t1.check_item_name, t1.subj_dire
+            order by t1.subj_code, t1.subj_dire'
+            using p_group_id,p_hos_id,p_copy_code,p_acc_year_b,check_type_id,p_group_id,p_hos_id,p_copy_code,p_acc_year_b,p_acc_month_b,check_type_id;
+
+          else
+            /*  不带辅助核算   */
+            ---dbms_output.put_line(subj_wheresql);
+            --dbms_output.put_line(checkState_sql);
+            --dbms_output.put_line(subj_wheresql);
+            --dbms_output.put_line(oShowColum);
+            execute immediate '
+              insert into T_ACC_VERI_DETAILQUERY(id,acc_year,acc_month,subj_code,check_code,check_name,summary,subj_dire,end_os,vouch_id)
+              select 1,''0000'',''00'',t1.subj_code,t1.check_code,t1.check_name, ''期初余额'',t1.subj_dire,sum(t1.balance),0 vouch_id
+              from (
+                select hs.subj_code,hs.subj_dire,0 debit,0 credit,'''' as check_code ,'''' as check_name,avc.end_os balance
+                from acc_leder_check avc
+                left join acc_subj hs on hs.group_id = avc.group_id and hs.hos_id = avc.hos_id and hs.copy_code=avc.copy_code
+                  and hs.acc_year = avc.acc_year and hs.subj_code=avc.subj_code
+                where avc.group_id=:p_group_id and avc.hos_id=:p_hos_id and avc.copy_code=:p_copy_code
+                                and avc.acc_year=:p_acc_year_b and avc.acc_month=''00'' '||subj_wheresql||'
+                union
+                select hs.subj_code,hs.subj_dire,sum(avc.debit) debit,sum(avc.credit) credit,'''' as check_code,'''' as check_name,
+                  sum(case when hs.subj_dire=0 then avc.debit-avc.credit else avc.credit-avc.debit end) balance
+                from acc_vouch_check avc
+                left join acc_vouch av on av.group_id = avc.group_id and av.hos_id=avc.hos_id and av.copy_code=avc.copy_code
+                  and av.acc_year = avc.acc_year and av.vouch_id=avc.vouch_id
+                left join acc_subj hs on hs.group_id =avc.group_id and hs.hos_id = avc.hos_id and hs.copy_code=avc.copy_code
+                  and hs.acc_year=avc.acc_year and hs.subj_code=avc.subj_code
+                where av.group_id=:p_group_id and av.hos_id=:p_hos_id and av.copy_code=:p_copy_code '||checkState_sql||'
+                                and av.acc_year=:p_acc_year_b and av.acc_month<:p_acc_month_b '||subj_wheresql||'
+                group by hs.subj_code,hs.subj_dire
+              )  t1
+              group by t1.subj_code,'||oShowColum||' t1.subj_dire
+              order by t1.subj_code, t1.subj_dire'
+              using p_group_id,p_hos_id,p_copy_code,p_acc_year_b,p_group_id,p_hos_id,p_copy_code,p_acc_year_b,p_acc_month_b;
+            end if;
+          end if;
+          ------------------------------------------------------------------------------------------------
+        /*  本期发生 */
+        if check_type!='ACC_CHECK_ITEM' and check_type is not null  then
+          /* 带辅助核算的科目 */
+          execute immediate 'insert into T_ACC_VERI_DETAILQUERY(
+                       id,check_id,acc_year,acc_month,vouch_date,subj_code,vouch_no,check_code,check_name,summary,state,con_no,
+                       business_no,occur_date,due_date,debit,crebit,subj_dire,end_os,rowIds,vouch_id)
+          select id,check_id,acc_year,acc_month,vouch_date,subj_code,vouch_no,check_code,check_name,summary,state,con_no,
+                       business_no,occur_date,due_date,debit,credit,subj_dire,balance,rownum ,vouch_id
+          from  (
+            select distinct 2 as id,avc.vouch_check_id as check_id,av.acc_year as acc_year,av.acc_month as acc_month,av.vouch_date as vouch_date,
+              hs.subj_code as subj_code,substr(avt.vouch_type_name,0,1)||''-''||av.vouch_no as vouch_no,
+              '||showColum||' avd.summary as summary,
+              case when nvl(avv.veri_money,0)-nvl(avc.debit,0)-nvl(avc.credit,0)=0  then ''已核销''
+                else case  when nvl(avv.veri_money,0)=0 then ''未核销''
+                                   else ''''
+                                   end
+                       end as state, avc.con_no as con_no,avc.business_no as business_no,to_char(avc.occur_date,''YYYY-MM-DD'') as occur_date,
+                       to_char(avc.due_date,''YYYY-MM-DD'') as due_date, nvl(avc.debit,0) as debit,nvl(avc.credit,0) as credit,hs.subj_dire,
+                       case when hs.subj_dire=0 then (nvl(avc.debit,0)-nvl(avc.credit,0)) else (nvl(avc.credit,0)-nvl(avc.debit,0)) end as balance,av.vouch_no as vouch_nos,avc.vouch_id
+            from  acc_vouch_check avc
+            left join acc_subj hs on hs.group_id = avc.group_id and hs.hos_id = avc.hos_id and hs.copy_code = avc.copy_code
+              and hs.acc_year = avc.acc_year and hs.subj_code=avc.subj_code
+            '||join_sql||'
+            left join acc_vouch_detail avd on avd.group_id = avc.group_id and avd.hos_id = avc.hos_id
+              and avd.copy_code = avc.copy_code and avd.acc_year = avc.acc_year
+              and avd.vouch_id=avc.vouch_id and avd.subj_code=hs.subj_code
+            left join acc_vouch av on av.group_id=avd.group_id and av.hos_id=avd.hos_id and av.copy_code=avd.copy_code
+              and av.acc_year=avd.acc_year and av.vouch_id=avd.vouch_id
+            left join acc_vouch_type avt on av.group_id=avt.group_id and av.hos_id=avt.hos_id and av.copy_code=avt.copy_code
+              and av.vouch_type_code=avt.vouch_type_code
+            left join (
+              select check_id,group_id,hos_id,copy_code,acc_year,sum(veri_money) as veri_money from (
+                select credit_check_id as check_id,group_id,hos_id,copy_code,acc_year,nvl(veri_money,0) veri_money
+                from acc_vouch_veri
+                where  nvl(credit_check_id,0)!=0
+                union
+                select debit_check_id as check_id, group_id,hos_id,copy_code,acc_year,nvl(veri_money,0) veri_money
+                from acc_vouch_veri
+                where nvl(debit_check_id,0)!=0
+              ) aa  group by check_id,group_id,hos_id,copy_code,acc_year
+            ) avv on avv.group_id = avc.group_id and avv.hos_id = avc.hos_id and avv.copy_code=avc.copy_code
+              and avv.acc_year=avc.acc_year and avv.check_id = avc.vouch_check_id
+            where avc.group_id=:p_group_id and avc.hos_id=:p_hos_id and avc.copy_code=:p_copy_code
+              and TO_NUMBER(av.acc_year||''''||av.acc_month) between TO_NUMBER(:p_acc_year_b||''''||:p_acc_month_b) and TO_NUMBER(:p_acc_year_e||''''||:p_acc_month_e)
+              '||vouchNo_sql||' '||subj_wheresql||''||veriState_sql||''||checkId_sql||'
+            order by '||groupBy_col||'hs.subj_code,vouch_nos
+          )AA'
+          using p_group_id,p_hos_id,p_copy_code,p_acc_year_b,p_acc_month_b,p_acc_year_e,p_acc_month_e;
+
+        elsif check_type='ACC_CHECK_ITEM' then
+               /*  自定义辅助核算  */
+                execute immediate 'insert into T_ACC_VERI_DETAILQUERY(
+                    id,check_id,acc_year,acc_month,vouch_date,subj_code,vouch_no,check_code,check_name,summary,state,con_no,
+                    business_no,occur_date,due_date,debit,crebit,subj_dire,end_os,rowIds,vouch_id)
+                select id,check_id,acc_year,acc_month,vouch_date,subj_code,vouch_no,check_code,check_name,summary,state,con_no,
+                    business_no,occur_date,due_date,debit,credit,subj_dire,balance,rownum,vouch_id
+                    from  (
+                        select distinct 2 as id,avc.vouch_check_id as check_id,av.acc_year as acc_year,av.acc_month as acc_month,av.vouch_date as vouch_date,
+                hs.subj_code as subj_code,substr(avt.vouch_type_name,0,1)||''-''||av.vouch_no as vouch_no,
+                aci.check_item_code as check_code ,aci.check_item_name as check_name, avd.summary as summary,
+                case when nvl(avv.veri_money,0)-nvl(avc.debit,0)-nvl(avc.credit,0)=0  then ''已核销''
+                  else case  when nvl(avv.veri_money,0)=0 then ''未核销''
+                    else ''''
+                    end
+                end as state, avc.con_no as con_no,avc.business_no as business_no,to_char(avc.occur_date,''YYYY-MM-DD'') as occur_date,
+                to_char(avc.due_date,''YYYY-MM-DD'') as due_date, nvl(avc.debit,0) as debit,nvl(avc.credit,0) as credit,hs.subj_dire,
+                case when hs.subj_dire=0 then (nvl(avc.debit,0)-nvl(avc.credit,0)) else (nvl(avc.credit,0)-nvl(avc.debit,0)) end as balance,av.vouch_no as vouch_nos,avc.vouch_id
+                        from  acc_vouch_check avc
+                        left join acc_subj hs on hs.group_id = avc.group_id and hs.hos_id = avc.hos_id and hs.copy_code = avc.copy_code
+                            and hs.acc_year = avc.acc_year and hs.subj_code=avc.subj_code
+                        '||join_sql||'
+                        left join acc_vouch_detail avd on avd.group_id = avc.group_id and avd.hos_id = avc.hos_id
+                            and avd.copy_code = avc.copy_code and avd.acc_year = avc.acc_year
+                            and avd.vouch_id=avc.vouch_id and  avd.vouch_detail_id=avc.vouch_detail_id and avd.subj_code=hs.subj_code
+                        left join acc_vouch av on av.group_id=avd.group_id and av.hos_id=avd.hos_id and av.copy_code=avd.copy_code
+                            and av.acc_year=avd.acc_year and av.vouch_id=avd.vouch_id
+                        left join acc_vouch_type avt on av.group_id=avt.group_id and av.hos_id=avt.hos_id and av.copy_code=avt.copy_code
+                            and av.vouch_type_code=avt.vouch_type_code
+                        left join (
+                            select check_id,group_id,hos_id,copy_code,acc_year,sum(veri_money) as veri_money from (
+                                select credit_check_id as check_id,group_id,hos_id,copy_code,acc_year,nvl(veri_money,0) veri_money
+                                from acc_vouch_veri
+                                where  nvl(credit_check_id,0)!=0
+                                union
+                                select debit_check_id as check_id, group_id,hos_id,copy_code,acc_year,nvl(veri_money,0) veri_money
+                                from acc_vouch_veri
+                                where nvl(debit_check_id,0)!=0
+                            ) aa  group by check_id,group_id,hos_id,copy_code,acc_year
+                        ) avv on avv.group_id = avc.group_id and avv.hos_id = avc.hos_id and avv.copy_code=avc.copy_code
+                            and avv.acc_year=avc.acc_year and avv.check_id = avc.vouch_check_id
+                        where avc.group_id=:p_group_id and avc.hos_id=:p_hos_id and avc.copy_code=:p_copy_code
+                            and TO_NUMBER(av.acc_year||''''||av.acc_month) between TO_NUMBER(:p_acc_year_b||''''||:p_acc_month_b) and TO_NUMBER(:p_acc_year_e||''''||:p_acc_month_e)
+                            '||vouchNo_sql||' '||subj_wheresql||''||veriState_sql||' and aci.check_type_id =:check_type_id'||checkId_sql||'
+                        order by aci.check_item_code,aci.check_item_name,hs.subj_code,vouch_nos
+                    )AA'
+                    using p_group_id,p_hos_id,p_copy_code,p_acc_year_b,p_acc_month_b,p_acc_year_e,p_acc_month_e,check_type_id;
+               
+        else
+          /* 不带辅助核算的科目 */
+          execute immediate 'insert into T_ACC_VERI_DETAILQUERY(
+                    id,check_id,acc_year,acc_month,vouch_date,subj_code,vouch_no,check_code,check_name,summary,state,con_no,
+                    business_no,occur_date,due_date,debit,crebit,subj_dire,end_os,rowIds,vouch_id)
+            select id,check_id,acc_year,acc_month,vouch_date,subj_code,vouch_no,check_code,check_name,summary,state,con_no,
+                    business_no,occur_date,due_date,debit,credit,subj_dire,balance,rownum,vouch_id
+            from  (
+              select distinct 2 as id,avc.vouch_check_id as check_id,av.acc_year as acc_year,av.acc_month as acc_month,av.vouch_date as vouch_date,
+                        hs.subj_code as subj_code,substr(avt.vouch_type_name,0,1)||''-''||av.vouch_no as vouch_no,
+                        '''' as check_code,'''' as check_name, avd.summary as summary,
+                        case when nvl(avv.veri_money,0)-nvl(avc.debit,0)-nvl(avc.credit,0)=0  then ''已核销''
+                            else case  when nvl(avv.veri_money,0)=0 then ''未核销''
+                                else ''''
+                                end
+                           end as state, avc.con_no as con_no,avc.business_no as business_no,to_char(avc.occur_date,''YYYY-MM-DD'') as occur_date,
+                           to_char(avc.due_date,''YYYY-MM-DD'') as due_date, nvl(avc.debit,0) as debit,nvl(avc.credit,0) as credit,hs.subj_dire,
+                           case when hs.subj_dire=0 then (nvl(avc.debit,0)-nvl(avc.credit,0)) else (nvl(avc.credit,0)-nvl(avc.debit,0)) end as balance as balance,av.vouch_no as vouch_nos,avc.vouch_id
+              from  acc_vouch_check avc
+              left join acc_subj hs on hs.group_id = avc.group_id and hs.hos_id = avc.hos_id and hs.copy_code = avc.copy_code
+                and hs.acc_year = avc.acc_year and hs.subj_code=avc.subj_code
+              left join acc_vouch_detail avd on avd.group_id = avc.group_id and avd.hos_id = avc.hos_id
+                and avd.copy_code = avc.copy_code and avd.acc_year = avc.acc_year
+                and avd.vouch_id=avc.vouch_id and avd.subj_code=hs.subj_code
+              left join acc_vouch av on av.group_id=avd.group_id and av.hos_id=avd.hos_id and av.copy_code=avd.copy_code
+                and av.acc_year=avd.acc_year and av.vouch_id=avd.vouch_id
+              left join acc_vouch_type avt on av.group_id=avt.group_id and av.hos_id=avt.hos_id and av.copy_code=avt.copy_code
+                and av.vouch_type_code=avt.vouch_type_code
+              left join (
+                select check_id,group_id,hos_id,copy_code,acc_year,sum(veri_money) as veri_money from (
+                                select credit_check_id as check_id,group_id,hos_id,copy_code,acc_year,nvl(veri_money,0) veri_money
+                                from acc_vouch_veri
+                                where  nvl(credit_check_id,0)!=0
+                                union
+                                select debit_check_id as check_id, group_id,hos_id,copy_code,acc_year,nvl(veri_money,0) veri_money
+                                from acc_vouch_veri
+                                where nvl(debit_check_id,0)!=0
+                            ) aa  group by check_id,group_id,hos_id,copy_code,acc_year
+              ) avv on avv.group_id = avc.group_id and avv.hos_id = avc.hos_id and avv.copy_code=avc.copy_code
+                            and avv.acc_year=avc.acc_year and avv.check_id = avc.vouch_check_id
+              where avc.group_id=:p_group_id and avc.hos_id=:p_hos_id and avc.copy_code=:p_copy_code
+                            and TO_NUMBER(av.acc_year||''''||av.acc_month) between TO_NUMBER(:p_acc_year_b||''''||:p_acc_month_b) and TO_NUMBER(:p_acc_year_e||''''||:p_acc_month_e)
+                            '||vouchNo_sql||' '||subj_wheresql||''||veriState_sql||'
+              order by hs.subj_code,vouch_nos
+            ) AA'
+            using p_group_id,p_hos_id,p_copy_code,p_acc_year_b,p_acc_month_b,p_acc_year_e,p_acc_month_e;
+          end if;
+
+          /*本月合计数据*/
+          ddl_sql:='insert into T_ACC_VERI_DETAILQUERY(
+               id,acc_year,acc_month,subj_code,check_code,check_name,summary,debit,crebit,subj_dire,end_os,vouch_id)
+          select 3,acc_year,acc_month,subj_code,check_code,check_name,''本月合计'',sum(debit),sum(crebit),subj_dire,0 end_os,0 vouch_id
+          from T_ACC_VERI_DETAILQUERY
+          where id=2
+          group by acc_year,acc_month,subj_code,check_code,check_name,subj_dire';
+          execute immediate ddl_sql;
+          
+           /* 计算本期发生凭证、本月合计余额  */
+          execute immediate '
+          declare balance_sum numeric(19,2);
+          balance_month numeric(19,2);
+          this_end numeric(19,2);
+          subj_code varchar2(50);
+          check_code varchar2(50);
+          id integer;
+          i number;
+          j number;
+          begin
+            i:=1;
+            j:=1;
+            subj_code:=0;
+            balance_month:=0;
+            for tt in (
+              select distinct check_code,subj_code from T_ACC_VERI_DETAILQUERY s
+              order by s.subj_code,s.check_code
+            )loop
+              --行余额
+              this_end:=0;
+              --月余额
+              balance_month:=0;
+              --月总发生额
+              balance_sum:=0;
+             
+              for cr in (
+                select r.id,r.subj_code,r.check_code,r.end_os,r.acc_year,r.vouch_date,r.check_name,r.acc_month,r.debit,r.crebit,r.vouch_no,rowIds,r.subj_dire
+                from T_ACC_VERI_DETAILQUERY r
+                where r.id<4 and r.check_code=tt.check_code and r.subj_code=tt.subj_code
+                order by r.subj_code asc,r.check_code,r.acc_year asc ,r.acc_month asc,r.id asc,r.vouch_date,r.vouch_no,rowIds
+              ) loop
+
+              --新的科目从0开始计算
+                if subj_code<>cr.subj_code then
+                  this_end:=0;
+                  balance_month:=0;
+                  --有发生数据没有期初余额新增加一条期初余额
+                  if (cr.id=2 and cr.id<>id) or (i=1 and cr.id>1) then
+                    insert into T_ACC_VERI_DETAILQUERY(id,acc_year,acc_month,subj_code,check_code,check_name,summary,end_os)
+                    values( 1,''0000'',''00'',cr.subj_code,cr.check_code,cr.check_name,'''||summary||''',0);
+                  end if;
+                end if;
+
+              
+                balance_month:=balance_month+cr.end_os;
+                
+                this_end:=this_end+cr.end_os;
+                
+
+                --  本期发生凭证余额
+                if cr.id=2 then
+                  update T_ACC_VERI_DETAILQUERY set end_os=this_end
+                  where check_code = cr.check_code
+                    and id=2
+                    and subj_code=cr.subj_code
+                    and vouch_date=cr.vouch_date
+                    and vouch_no=cr.vouch_no
+                    and rowIds = cr.rowIds ;
+                end if;
+                
+                -- 本月合计余额
+                if cr.id=3 then
+                  update T_ACC_VERI_DETAILQUERY set end_os=balance_month
+                  where id=3
+                    and acc_year = cr.acc_year
+                    and check_code=cr.check_code
+                    and acc_month=cr.acc_month;
+                   
+                    insert into T_ACC_VERI_DETAILQUERY(
+                     id,acc_year,acc_month,subj_code,check_code,check_name,summary,debit,crebit,subj_dire,end_os,vouch_id)
+                    select 4,acc_year,cr.acc_month,subj_code,check_code,check_name,''本年累计'',sum(debit),sum(crebit),subj_dire,balance_month end_os,0 vouch_id
+                    from T_ACC_VERI_DETAILQUERY
+                    where id=3 and acc_year = cr.acc_year
+                          and check_code=cr.check_code and acc_month=cr.acc_month
+                    group by acc_year,subj_code,check_code,check_name,subj_dire;
+                end if;
+                
+                i:=i+1;
+                subj_code:=cr.subj_code;
+                check_code:=cr.check_code;
+                id:=cr.id;
+              end loop;
+
+                  j:=j+1;
+                  check_code:=tt.check_code;
+              end loop;
+          end;
+          ';
+
+       /* execute immediate ' update T_ACC_VERI_DETAILQUERY set (T_ACC_VERI_DETAILQUERY.Debit,T_ACC_VERI_DETAILQUERY.Crebit,T_ACC_VERI_DETAILQUERY.End_Os)=(
+              select  T_ACC_VERI_DETAILQUERY.debit+aa.debit,T_ACC_VERI_DETAILQUERY.Crebit+aa.crebit,
+              case when aa.subj_dire =0 then aa.end_os1+aa.debit-aa.crebit else aa.end_os1+aa.crebit-aa.debit end
+              from (
+                  select a.acc_year,a.acc_month,a.subj_code,a.check_code,a.debit ,a.crebit,a.end_os,b.end_os1,a.subj_dire
+                    from T_ACC_VERI_DETAILQUERY  a
+            left join (
+                        select subj_code,check_code,debit,crebit,end_os as end_os1
+                        from T_ACC_VERI_DETAILQUERY
+                        where id=1
+                  ) b on  a.subj_code=b.subj_code and a.check_code=b.check_code
+                  where id=3
+              ) aa
+          where  T_ACC_VERI_DETAILQUERY.acc_year=aa.acc_year and T_ACC_VERI_DETAILQUERY.acc_month=aa.acc_month
+            and T_ACC_VERI_DETAILQUERY.subj_code=aa.subj_code
+            and T_ACC_VERI_DETAILQUERY.check_code=aa.check_code
+            and T_ACC_VERI_DETAILQUERY.id=4
+          ) where T_ACC_VERI_DETAILQUERY.id=4 ';*/
+          /*返回结果集游标*/
+
+       ddl_sql:='select  * from (
+                               select rownum rn, ab.* from(
+                                      select replace(t.acc_year,''0000'','''') as acc_year,
+                                             case when t.acc_month=''00'' then ''''
+                                                     when t.summary=''本年累计'' then ''''
+                                             else t.acc_month end acc_month,
+                                            -- replace(t.acc_month,''00'','''') as acc_month,
+                                             to_char(t.vouch_date,''dd'') as acc_day,t.vouch_no as vouch_no,
+                                             case when t.summary=''本月合计'' or t.summary=''本年累计'' then  '''' else t.check_code end  as check_code,
+                                             case when t.summary=''本月合计'' or t.summary=''本年累计'' then  '''' else t.check_name end  as check_name,
+                                             t.summary,t.state,t.con_no,t.business_no,occur_date,due_date, t.debit,t.crebit as credit,
+                                             case when t.end_os=0 then 2 else t.subj_dire end subj_dire,t.end_os ,t.vouch_id
+                                      from T_ACC_VERI_DETAILQUERY t
+                                      where t.check_code is not null
+                                      order by t.subj_code asc,t.check_code,t.acc_year asc,t.acc_month asc,to_char(t.vouch_date,''dd'') asc,t.vouch_no,t.id asc
+                                      ,rowIds
+                               ) ab
+                      ) ';
+          -- ddl_sql:='select * from T_ACC_VERI_DETAILQUERY t order by t.subj_code asc,t.check_code,t.acc_year asc,t.acc_month asc,rowIds';
+            if p_pagesize>0 then
+               ddl_sql:=ddl_sql||' where rn >'||(p_page-1)*p_pagesize||' and rn<='||p_page*p_pagesize;
+            end if;
+
+             open p_result_data for ddl_sql;
+             p_tcount:=0;
+             count_sql:=' select count(*) from T_ACC_VERI_DETAILQUERY';
+
+             EXECUTE IMMEDIATE count_sql INTO p_tcount;
+
+      end PRC_ACC_VERI_DETAILQUERY;
+	
+	]]></sql>
+	
+	
+	<sql id="prc_acount_badDebtsExtract" type="proc"><![CDATA[
+		/*-------------------------------------------------------------------------
+		|| 过程名称 ：坏账计提  生成凭证
+		|| 参数描述 ：
+		||            -------------------------------------------------------------
+		|| 作    者 ：               完成日期 ：
+		||-------------------------------------------------------------------------
+		|| 修改记录 ：
+		||-------------------------------------------------------------------------*/
+		CREATE OR REPLACE PROCEDURE prc_acount_badDebtsExtract (
+			  p_group_id number,  --集团ID
+			  p_hos_id number,  --医院ID
+			  p_copy_code varchar2,  --帐套编码
+			  p_user_id number,  --当前操作用户
+			  p_acc_years varchar2,--当前年
+			  p_subj_code varchar2, --应收科目
+			  p_acc_year varchar2,  --会计年度
+			  p_acc_month varchar2,  --会计期间
+			  p_bad_subj_code varchar2, --坏账科目
+			  p_fy_subj_code varchar2 ,  --管理科目
+			  p_range_type number ,--计提方式
+			  p_fix_rate number,       --固定计提比例
+			  p_subj_endOs  number, --应收科目期末余额
+			  p_vouch_no varchar2,  --凭证号
+			  msg OUT varchar  --返回值格式："msg":"···","state":"true/false","vouch_id":"···"
+		)
+		IS
+			  range_type number(18,0); --计提方式
+			  range_rate number(18,2); --计提比例
+			  end_os_last number(16,4); --余额
+			  bad_end_os number(19,4);-- 坏账提取科目的期末余额
+		
+			  z_debit number(19,4); --辅助账中余额
+			  z_debit_main varchar2(20); --到期日期
+			  z_rate number(10,2);--账龄分析中的比例
+			  num number;
+			  p_summary varchar2(200);  --凭证摘要
+			  p_vouch_id number;  --凭证id
+			  p_check number;
+			  
+			  p_is_acc number ;--查看当前会计期间是否结账
+		
+			  last_range_type number; --提取方式
+			  last_range_rate number; --提取比例
+			  p_range_id number;--坏账提取表id
+			  p_vouch_detail_id number;  --凭证分录id
+			  p_vouch_check_id number; --辅助核算表id
+			   p_row number;  --分录行号
+			  sys_date date;  --当前系统时间(用于同步表里的时间)
+			  n_subj_code varchar2(200);--科目
+
+		BEGIN
+	  		/*获取当前系统时间*/
+			  sys_date := sysdate;
+			  p_row := 1;
+			  p_check :=0;
+			  
+			  select replace(p_subj_code,'-',',') into n_subj_code  from dual;
+			  select  '('||n_subj_code||')' into n_subj_code from dual;
+			  
+			  /*1 查看当前会计期间是否结账 */
+			  select acc_flag into p_is_acc
+			  from acc_year_month
+			  where hos_id = p_hos_id
+			        and group_id  = p_group_id
+			        and copy_code = p_copy_code
+			        and acc_year = p_acc_year
+			        and acc_month = p_acc_month;
+	  
+	  		if p_is_acc=1 then
+	      		msg := '{"error":"当前会计期间已经结账，不能进行计提!"}';
+	      		return;
+	   		end if;
+	  		
+	  		/* 查看当前的管理科目是否挂有辅助核算*/
+			select count(1) into p_check
+			from acc_subj
+			where subj_code = p_fy_subj_code
+			        and hos_id = p_hos_id
+			        and group_id = p_group_id
+			        and copy_code = p_copy_code
+			        and instr(1, check1||','||check2||','||check3||','||check4||','||check5||','||check6||','||check7||','||check8||','||check9||','||check10)>0;
+
+			  /*获取计提方式*/
+			  if p_range_type ='0'
+			    /* 0 为余额分析法，余额=（固定计提比例/100*期末余额的和）+坏账提取科目的期末余额*/
+			    then
+			      /*坏账提取科目的期末余额*/
+			      select sum(nvl(end_os,0))
+			      into bad_end_os
+			      from acc_leder
+			      where subj_code = p_bad_subj_code
+			            and copy_code = p_copy_code
+			            and hos_id = p_hos_id
+			            and group_id = p_group_id
+			            and acc_year = p_acc_year;
+			            --and acc_month =
+			      end_os_last := p_fix_rate/100 * p_subj_endOs + bad_end_os;
+			      last_range_type :=0;
+			      last_range_rate := p_fix_rate;
+			  else
+			      /* 1 为账龄分析法，余额= 区间的计提比例 /100 * 余额*/
+			       select  count(1)
+			       into num
+			       from ACC_BUDG_RANGE
+			       where copy_code =p_copy_code
+			             and hos_id = p_hos_id
+			             and group_id = p_group_id;
+			        if num=0 then
+			          msg := '{"error":"请维护账龄区间表!"}';
+			          return;
+			        end if;
+		
+			      /* 根据游标取日期，然后确定最后提取比例  */
+			      declare
+			        v_bal_amt number(19,4);
+			        v_due_date varchar2(20);
+			        v_date integer;
+		
+			        TYPE cur_range IS REF CURSOR;  --定义游标指针
+			        v_cursor cur_range;  --定义游标变量
+			        begin
+			         OPEN v_cursor FOR
+			             select  nvl(a.debit,0) - nvl(a.bal_amt,0) as bal_amt,a.due_date
+			             from acc_vouch_check  a
+			             left join acc_subj b on a.subj_code = b.subj_code
+			                   and a.acc_year = b.acc_year
+			                   and a.copy_code = b.copy_code
+			                   and a.hos_id = b.hos_id
+			                   and a.group_id = b.group_id
+			             left join acc_vouch_detail c on a.vouch_detail_id = a.vouch_detail_id
+			                  and a.copy_code = c.copy_code
+			                  and a.hos_id = c.hos_id
+			                  and a.group_id = c.group_id
+			                  and a.acc_year = c.acc_year
+			              left join acc_vouch d on c.vouch_id = d.vouch_id
+			                   and d.copy_code = c.copy_code
+			                   and d.hos_id = c.hos_id
+			                   and d.group_id = c.group_id
+			                   and d.acc_year = c.acc_year
+			               where a.group_id = p_group_id
+			                     and a.copy_code = p_copy_code
+			                     and a.hos_id = p_hos_id
+			                     and b.subj_code in n_subj_code
+			                     and (nvl(a.debit,0)-nvl(a.bal_amt,0)>0)
+			                     and (a.is_init =1 or (a.is_init=0 and d.state=0))
+			              order by b.subj_code;
+			            loop
+			             FETCH v_cursor into v_bal_amt,v_due_date;  --从游标中取一条记录，存放到变量中
+			                    EXIT WHEN v_cursor%NOTFOUND;
+			                    v_date := round(to_number(to_date(v_due_date,'yyyy/mm/dd') - to_date(sys_date,'yyyy/mm/dd') ));
+			                    z_rate := 0 ;
+			                    select RANGE_PRO
+			                    into z_rate
+			                    from acc_budg_range
+			                    where copy_code = p_copy_code
+			                          and hos_id = p_hos_id and group_id = p_group_id
+			                          and begin_days <= v_date and end_days >= v_date;
+			                    if z_rate=0 and z_rate<0
+			                      then
+			                                select range_pro into z_rate
+			                                from acc_budg_range
+			                                where copy_code = p_copy_code and hos_id = p_hos_id and group_id = p_group_id
+			                                      and begin_days = 0;
+			                    end if;
+		
+			                    z_debit_main := z_debit_main + z_rate/100 * v_bal_amt;
+		
+			            end loop;
+			        CLOSE v_cursor;--关闭游标
+			    end;
+		
+			        end_os_last := z_debit_main;
+			        last_range_type := 1 ;
+			  end if;
+		
+		
+			  /*获取凭证ID*/
+			  select acc_vouch_seq.nextval into p_vouch_id from dual;
+			  /* 获取坏账表中id*/
+			  select  acc_budg_leder_seq.nextval into p_range_id from dual;
+			  /*  生成凭证格式  */
+			  if end_os_last /100+p_subj_endOs >=0
+			    then
+			      /*计算出来的金额>0，借“管理费用科目”，贷“坏账提取科目”，摘要“计提坏账准备”*/
+			      p_summary  := '计提坏账准备';
+		
+			      --插入凭证主表
+			      insert into acc_vouch(acc_year, acc_month, vouch_no,vouch_date,vouch_att_num,copy_code,hos_id,group_id,vouch_type_code,vouch_id_cx,create_user,state,create_date)
+			      values(p_acc_year,p_acc_month,p_vouch_no,p_acc_year||'-'||p_acc_month||'-01',0,p_copy_code,p_hos_id,p_group_id,'01',0,p_user_id,'-1',sysdate);
+		
+			      --插入凭证明细表
+			       /*获取凭证分录ID*/
+			       --借方
+			      select acc_vouch_detail_seq.nextval into p_vouch_detail_id from dual;
+			      insert into acc_vouch_detail(vouch_detail_id,vouch_id,group_id,hos_id,copy_code,acc_year,subj_code,vouch_row,summary,debit,credit,debit_w,credit_w)
+			      values(p_vouch_detail_id,p_vouch_id,p_group_id,p_hos_id,p_copy_code,p_acc_year,p_fy_subj_code,p_row,p_summary,(end_os_last /100+p_subj_endOs),0,0,0);
+			      p_row := p_row+1;
+		
+			      if p_check =1
+			        then
+			              --select acc_vouch_check_seq.nextval into p_vouch_check_id from dual;
+			              /*  根据科室比例来向辅助核算表中插入数据   */
+			              insert into acc_vouch_check(vouch_check_id,vouch_id,vouch_detail_id,group_id,hos_id,copy_code,acc_year,subj_code,summary,debit,is_init,check1_id,check1_no)
+			              select acc_vouch_check_seq.nextval, aa.* from (
+			                    select p_vouch_id,p_vouch_detail_id,p_group_id,p_hos_id,p_copy_code,p_acc_year,p_fy_subj_code,p_summary,(end_os_last /100+p_subj_endOs)*nvl(dd.dept_rate,0) as debit,
+			                    0 as is_init,dd.dept_id , dd.dept_no
+			                    from (
+			                            select a.dept_id as dept_id ,a.dept_no as dept_no,(person_count/all_count) as dept_rate from (
+			                             select  emp.person_count,sd.dept_no,sd.dept_id
+			                                from hos_dept_dict  sd
+			                                left join (
+			                                  select dept_id as dept_id ,dept_no as dept_no ,count(*) as person_count from hos_emp_dict
+			                                  where group_id = p_group_id and hos_id = p_hos_id  and is_stop = 0
+			                                  group by dept_id,dept_no
+		
+			                                ) emp on sd.dept_id=emp.dept_id and sd.dept_no = emp.dept_no
+		
+			                                where sd.is_last=0 and sd.group_id = p_group_id and sd.hos_id = p_hos_id  and sd.is_last=1 and sd.is_stop=0 
+			                                and emp.person_count>0
+			                          ) a inner join(
+			                                select sum(emp.person_count) all_count
+			                                from hos_dept_dict sd
+			                                left join (
+			                                  select dept_id as dept_id ,dept_no as dept_no ,count(*) as person_count from hos_emp_dict
+			                                  where group_id = p_group_id and hos_id = p_hos_id and is_stop = 0 
+			                                  group by dept_id,dept_no
+			                                ) emp on sd.dept_id=emp.dept_id and sd.dept_no = emp.dept_no
+			                                where  sd.is_last=0 and sd.group_id =p_group_id and sd.hos_id =p_hos_id and sd.is_last=1 and sd.is_stop=0 
+		
+			                            ) b on 1=1
+			                  )dd    where dd.dept_rate>0
+			             ) aa;
+		
+			     end if;
+		
+		
+			      --贷方
+			      select acc_vouch_detail_seq.nextval into p_vouch_detail_id from dual;
+		
+			      insert into acc_vouch_detail(vouch_detail_id,vouch_id,group_id,hos_id,copy_code,acc_year,subj_code,vouch_row,summary,debit,credit,debit_w,credit_w)
+			      values(p_vouch_detail_id,p_vouch_id,p_group_id,p_hos_id,p_copy_code,p_acc_year,p_bad_subj_code,p_row,p_summary,0,(end_os_last /100+p_subj_endOs),0,0);
+		
+		
+			  else
+			    /*计算出来的金额<0，贷“管理费用科目”，借“坏账提取科目”，摘要“冲减坏账准备”*/
+			     p_summary  := '冲减坏账准备';
+		
+			    --插入凭证主表
+			      insert into acc_vouch(acc_year, acc_month, vouch_no,vouch_date,vouch_att_num,copy_code,hos_id,group_id,vouch_type_code,vouch_id_cx,create_user,state,create_date)
+			      values(p_acc_year,p_acc_month,p_vouch_no,p_acc_year||'-'||p_acc_month||'-01',0,p_copy_code,p_bad_subj_code,p_group_id,'01',0,p_user_id,'-1',sysdate);
+		
+			      --插入凭证明细表
+			       /*获取凭证分录ID*/
+			       --借方
+			      select acc_vouch_detail_seq.nextval into p_vouch_detail_id from dual;
+			      insert into acc_vouch_detail(vouch_detail_id,vouch_id,group_id,hos_id,copy_code,acc_year,subj_code,vouch_row,summary,debit,credit,debit_w,credit_w)
+			      values(p_vouch_detail_id,p_vouch_id,p_group_id,p_hos_id,p_copy_code,p_acc_year,p_bad_subj_code,p_row,p_summary,(end_os_last /100+p_subj_endOs),0,0,0);
+			      p_row := p_row+1;
+		
+		
+		
+		
+			      --贷方
+			      select acc_vouch_detail_seq.nextval into p_vouch_detail_id from dual;
+		
+			      insert into acc_vouch_detail(vouch_detail_id,vouch_id,group_id,hos_id,copy_code,acc_year,subj_code,vouch_row,summary,debit,credit,debit_w,credit_w)
+			      values(p_vouch_detail_id,p_vouch_id,p_group_id,p_hos_id,p_copy_code,p_acc_year,p_fy_subj_code,p_row,p_summary,0,(end_os_last /100+p_subj_endOs),0,0);
+		
+			     if p_check =1
+			        then
+			              --select acc_vouch_check_seq.nextval into p_vouch_check_id from dual;
+			              /*  根据科室比例来向辅助核算表中插入数据   */
+			              insert into acc_vouch_check(vouch_check_id,vouch_id,vouch_detail_id,group_id,hos_id,copy_code,acc_year,subj_code,summary,debit,credit,is_init,check1_id,check1_no)
+			              select acc_vouch_check_seq.nextval, aa.* from (
+			                    select p_vouch_id,p_vouch_detail_id,p_group_id,p_hos_id,p_copy_code,p_acc_year,p_fy_subj_code,p_summary,0,(end_os_last /100+p_subj_endOs)*nvl(dd.dept_rate,0) as credit,
+			                    0 as is_init,dd.dept_id , dd.dept_no
+			                    from (
+			                            select a.dept_id as dept_id ,a.dept_no as dept_no,(person_count/all_count) as dept_rate from (
+			                             select  emp.person_count,sd.dept_no,sd.dept_id
+			                                from hos_dept_dict  sd
+			                                left join (
+			                                  select dept_id as dept_id ,dept_no as dept_no ,count(*) as person_count from hos_emp_dict
+			                                  where group_id = p_group_id and hos_id = p_hos_id  and is_stop = 0
+			                                  group by dept_id,dept_no
+		
+			                                ) emp on sd.dept_id=emp.dept_id and sd.dept_no = emp.dept_no
+		
+			                                where sd.is_last=0 and sd.group_id = p_group_id and sd.hos_id = p_hos_id  and sd.is_last=1 and sd.is_stop=0 
+			                                and emp.person_count>0
+			                          ) a inner join(
+			                                select sum(emp.person_count) all_count
+			                                from hos_dept_dict sd
+			                                left join (
+			                                  select dept_id as dept_id ,dept_no as dept_no ,count(*) as person_count from hos_emp_dict
+			                                  where group_id = p_group_id and hos_id = p_hos_id and is_stop = 0 
+			                                  group by dept_id,dept_no
+			                                ) emp on sd.dept_id=emp.dept_id and sd.dept_no = emp.dept_no
+			                                where  sd.is_last=0 and sd.group_id =p_group_id and sd.hos_id =p_hos_id and sd.is_last=1 and sd.is_stop=0 
+		
+			                            ) b on 1=1
+			                  )dd    where dd.dept_rate>0
+			             ) aa;
+		
+			     end if;
+		
+		
+			  end if;
+		
+			  	/*添加凭证来源*/
+			    insert into acc_vouch_source(group_id, hos_id, copy_code, acc_year, acc_month, vouch_id, BUSI_TYPE_CODE)
+			    values(p_group_id, p_hos_id, p_copy_code, p_acc_year, p_acc_month, p_vouch_id, 'A0101');
+		
+			  /*将坏账提取科目、管理费用科目、计提方式（余额百分比法0、账龄分析法1）、固定计提比例（账龄分析法不需要存）存坏账提取表ACC_BUDG_LEDER*/
+			  if last_range_type =1
+			    then
+		
+			    insert into acc_budg_leder(range_id,group_id,hos_id,copy_code,acc_year,acc_month,subj_code_hz,subj_code_gl,range_type,vouch_id)
+			    values(p_range_id,p_group_id,p_hos_id,p_copy_code,p_acc_year,p_acc_month,p_bad_subj_code,p_range_type,1,p_vouch_id);
+		
+			  else
+		
+			    insert into acc_budg_leder(range_id,group_id,hos_id,copy_code,acc_year,acc_month,subj_code_hz,subj_code_gl,range_type,range_pro,vouch_id)
+			    values(p_range_id,p_group_id,p_hos_id,p_copy_code,p_acc_year,p_acc_month,p_bad_subj_code,p_range_type,0,last_range_rate,p_vouch_id);
+		
+			  end if;
+			  
+			  
+			  /* 将应收科目插入到acc_budg_subj表中去*/
+			  insert into acc_budg_subj (range_subj_id,range_id,hos_id,group_id,copy_code,acc_year,acc_month,subj_code)
+			  select acc_budg_subj_seq.nextval,aa.* from (
+			         select p_range_id,p_hos_id,p_group_id,p_copy_code,p_acc_year,p_acc_month,subj_code from acc_subj 
+			         where copy_code = p_copy_code
+			            and hos_id = p_hos_id
+			            and group_id = p_group_id
+			            and acc_year = p_acc_years
+			            and subj_code in n_subj_code
+			            order by subj_code
+			    )aa;
+		
+			  /*返回信息*/
+			  msg := '{"state":"true","vouch_id":"'||p_vouch_id||'"}';
+			
+			END prc_acount_badDebtsExtract;
+
+	]]></sql>
+	
+	<sql id="prc_acount_DelDebtsExtract" type="proc"><![CDATA[
+		/*-------------------------------------------------------------------------
+		|| 过程名称 ：坏账计提  撤销凭证
+		|| 参数描述 ：
+		||            -------------------------------------------------------------
+		|| 作    者 ：               完成日期 ：
+		||-------------------------------------------------------------------------
+		|| 修改记录 ：
+		||-------------------------------------------------------------------------*/
+		CREATE OR REPLACE PROCEDURE prc_acount_DelDebtsExtract
+		(
+		  p_group_id number,  --集团ID
+		  p_hos_id number,  --医院ID
+		  p_copy_code varchar2,  --帐套编码
+		  p_subj_code varchar2, --应收科目
+		  p_acc_year varchar2,  --会计年度
+		  p_acc_month varchar2,  --会计期间
+		  p_vouch_id varchar2, --凭证ID
+	
+		  msg OUT varchar  --返回值格式："msg":"···","state":"true/false","vouch_id":"···"
+		)
+		IS
+	  		subj_code varchar2(100);--应收科目
+	  		vouch_id varchar2(100); --凭证ID
+	  		num number;--是否是手工录入标志
+	  		is_check number; --是否已审核、已冲销的凭证标志
+		BEGIN
+		 	select replace(p_subj_code,'-',',') into subj_code  from dual;
+		 	select  '('||subj_code||')' into subj_code from dual;
+		 	select replace(p_vouch_id,'-',',') into vouch_id from dual;
+		  	select  '('||vouch_id||')' into vouch_id from dual;
+		  	/*select count(1)
+		  	into num
+		  	from ACC_VOUCH_SOURCE
+		  	where vouch_source_code = '01' 
+		    	and vouch_id in vouch_id
+		        and copy_code = p_copy_code
+		        and hos_id = p_hos_id
+		        and group_id = p_group_id
+		        and acc_year = p_acc_year;
+	
+		   if num=1 then
+		          msg := '{"error":"手工录入不能在此删除!"}';
+		      return;
+		   end if;*/
+
+		  select count(1)
+		  into is_check
+		  from acc_vouch
+		  where vouch_id in vouch_id
+		         and note in(2,3,99)
+		         and copy_code = p_copy_code
+		         and hos_id = p_hos_id
+		         and group_id = p_group_id
+		         and acc_year = p_acc_year;
+
+		   if is_check=1 then
+		          msg := '{"error":"已审核、已冲销凭证不能删除!"}';
+		      return;
+		   end if;
+	
+		   /*1、删除坏账提取应收科目关系表*/
+	
+		   delete from acc_budg_subj where range_id in (
+		          select distinct range_id from acc_budg_leder
+		          where vouch_id in vouch_id
+		                and acc_year = p_acc_year
+		                and acc_month = p_acc_month
+		                and hos_id = p_hos_id
+		                and group_id = p_group_id
+		                and copy_code = p_copy_code
+		   ) and copy_code = p_copy_code
+		     and hos_id = p_hos_id
+		     and group_id = p_group_id;
+	
+	
+		   /* 2、删除辅助核算 表*/
+		   delete from acc_vouch_check
+		   where vouch_id in vouch_id
+		         and group_id = p_vouch_id
+		         and hos_id = p_hos_id
+		         and acc_year = p_acc_year;
+	
+	
+		   /*3、删除资金来源表*/
+		   delete from acc_vouch_source
+		   where vouch_id in vouch_id
+		         and group_id = p_group_id
+		         and hos_id = p_hos_id
+		         and copy_code = p_copy_code
+		         and acc_year = p_acc_year;
+	
+		    /* 4、删除acc_cash_flow*/
+		    delete from acc_cash_flow   
+		    where vouch_detail_id in (
+		          select vouch_detail_id from acc_vouch_detail 
+		          where vouch_id in vouch_id
+		                and hos_id = p_hos_id
+		                and group_id = p_group_id 
+		                and copy_code = p_copy_code
+		    );
+		    
+		    
+		   /*5、删除凭证明细表*/
+		   delete from acc_vouch_detail
+		   where vouch_id in vouch_id
+		         and group_id = p_group_id
+		         and hos_id =p_hos_id
+		         and copy_code= p_hos_id
+		         and acc_year = p_acc_year;
+	
+		   /*6 、删除坏账提取表 */
+		   delete from acc_budg_leder
+		   where vouch_id in vouch_id
+		         and group_id = p_group_id
+		         and hos_id = p_hos_id
+		         and acc_year = p_acc_year
+		         and acc_month = p_acc_month;
+	
+		   /*7、删除凭证表*/
+		   delete from acc_vouch 
+		   where vouch_id in vouch_id
+		         and group_id = p_group_id
+		         and hos_id = p_hos_id
+		         and acc_year = p_acc_year
+		         and acc_month = p_acc_month;
+
+	  		/*返回信息*/
+	  		msg := '{"state":"true","vouch_id":"'||p_vouch_id||'"}';
+	  		
+		END prc_acount_DelDebtsExtract;
+
+	]]></sql>
+	
+	
+</root>

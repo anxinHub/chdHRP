@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.budg.dao.business.execStatistic.BudgDeptExecStatisticMapper">
+	<resultMap id="budgDeptExecStatisticMap" type="java.util.Map">
+    	<result property="group_id" column="group_id"/>
+    	<result property="hos_id" column="hos_id"/>
+    	<result property="copy_code" column="copy_code"/>
+    	<result property="year" column="year"/>
+    	<result property="index_code" column="index_code"/>
+        <result property="dept_code" column="dept_code"/>
+    	<result property="month" column="month"/>
+    	<result property="budg_value" column="budg_value"/>
+    	<result property="execute_value" column="execute_value"/>
+    	<result property="month_execute_rate" column="month_execute_rate"/>
+    	<result property="year_budg_value" column="year_budg_value"/>
+    	<result property="year_execute_value" column="year_execute_value"/>
+    	<result property="year_execute_rate" column="year_execute_rate"/>
+    	<result property="index_name" column="index_name"/>
+        <result property="dept_name" column="dept_name"/>
+	</resultMap>
+    <!-- 查询科室预算\执行统计 -->
+	<select id="query" parameterType="java.util.Map" resultMap="budgDeptExecStatisticMap" >
+	   
+         select month_data.group_id,
+                month_data.hos_id,
+                month_data.copy_code,
+                month_data.year,
+                month_data.month,
+                month_data.index_code,
+                bid.index_name,
+                hd.dept_code,
+                hd.dept_name,
+                month_data.budg_value,
+                month_data.execute_value,
+                month_data.month_execute_rate,
+                year_budg_data.year_budg_value, 
+                year_execute_data.year_execute_value,
+                case when year_budg_data.year_budg_value!=0 then year_execute_data.year_execute_value/year_budg_data.year_budg_value else null end year_execute_rate
+         from 
+         (
+         select  case when budg_data.group_id is null then  execute_data.group_id else budg_data.group_id end group_id,
+                 case when budg_data.hos_id is null then  execute_data.hos_id else budg_data.hos_id end hos_id,
+                 case when budg_data.copy_code is null then  execute_data.copy_code else budg_data.copy_code end copy_code,
+                 case when budg_data.year is null then  execute_data.year else budg_data.year end year,
+                 case when budg_data.month is null then  execute_data.month else budg_data.month end month,
+                 case when budg_data.index_code is null then  execute_data.index_code else budg_data.index_code end index_code,
+                 case when budg_data.dept_id is null then  execute_data.dept_id else budg_data.dept_id end dept_id,
+                budg_data.budg_value,execute_data.execute_value,
+                case when budg_data.budg_value!=0 then execute_data.execute_value/budg_data.budg_value else null end month_execute_rate
+               from 
+               (
+               select group_id,hos_id,copy_code,year,month,index_code,dept_id,sum(budg_value) budg_value 
+               from budg_work_dept_month 
+               group by group_id,hos_id,copy_code,year,month,index_code,dept_id
+               ) budg_data full outer join 
+               (
+               select group_id,hos_id,copy_code,year,month,index_code,dept_id,sum(execute_value) execute_value 
+               from budg_work_dept_execute
+               group by group_id,hos_id,copy_code,year,month,index_code,dept_id
+               ) execute_data 
+               on  budg_data.group_id =execute_data.group_id
+               and budg_data.hos_id =execute_data.hos_id
+               and budg_data.copy_code =execute_data.copy_code
+               and budg_data.year =execute_data.year
+               and budg_data.month =execute_data.month
+               and budg_data.index_code =execute_data.index_code
+               and budg_data.dept_id =execute_data.dept_id
+         ) month_data
+         left join (
+          select group_id,hos_id,copy_code,year,index_code,dept_id,sum(budg_value) year_budg_value 
+          from budg_work_dept_month 
+          group by group_id,hos_id,copy_code,year,index_code,dept_id
+         ) year_budg_data 
+         on  month_data.group_id =year_budg_data.group_id
+         and month_data.hos_id =year_budg_data.hos_id
+         and month_data.copy_code =year_budg_data.copy_code
+         and month_data.year =year_budg_data.year
+         and month_data.index_code =year_budg_data.index_code
+         and month_data.dept_id =year_budg_data.dept_id
+         left join (
+        
+          select group_id,hos_id,copy_code,year,month,index_code,dept_id,sum((select sum(execute_value) execute_value 
+            from budg_work_dept_execute bwhe_l  
+            where bwhe_l.group_id =bwhe_m.group_id 
+                and bwhe_l.hos_id =bwhe_m.hos_id 
+                and bwhe_l.copy_code =bwhe_m.copy_code 
+                and bwhe_l.year =bwhe_m.year 
+                and bwhe_l.index_code =bwhe_m.index_code 
+                and bwhe_l.dept_id =bwhe_m.dept_id
+                and bwhe_l.month &lt;= bwhe_m.month )) year_execute_value 
+          from budg_work_dept_execute bwhe_m
+          group by group_id,hos_id,copy_code,year,month,index_code,dept_id
+          ) year_execute_data 
+         on  month_data.group_id =year_execute_data.group_id
+         and month_data.hos_id =year_execute_data.hos_id
+         and month_data.copy_code =year_execute_data.copy_code
+         and month_data.year =year_execute_data.year
+         and month_data.month =year_execute_data.month
+         and month_data.index_code =year_execute_data.index_code
+         and month_data.dept_id =year_execute_data.dept_id
+         left join budg_index_dict bid
+           on month_data.group_id = bid.group_id
+          and month_data.hos_id = bid.hos_id
+          and month_data.copy_code = bid.copy_code
+          and month_data.index_code = bid.index_code
+         
+         left join hos_dept hd
+           on month_data.group_id = hd.group_id
+          and month_data.hos_id = hd.hos_id
+          and month_data.dept_id = hd.dept_id
+        
+         where month_data.group_id=#{group_id,jdbcType=INTEGER}
+           and month_data.hos_id=#{hos_id,jdbcType=INTEGER}
+           and month_data.copy_code=#{copy_code,jdbcType=VARCHAR}
+           and month_data.year =#{year,jdbcType=VARCHAR}
+           and bid.data_nature='01'
+           <if test="index_code != null and index_code != ''">
+            AND month_data.index_code = #{index_code,jdbcType=VARCHAR}
+            </if>
+            <if test="dept_id != null and dept_id != ''">
+            AND month_data.dept_id = #{dept_id,jdbcType=VARCHAR}
+            </if>
+            <if test="month != null and month != ''">
+            AND month_data.month = #{month,jdbcType=VARCHAR}
+            </if>   
+           
+         order by month_data.index_code ,hd.dept_code, month_data.month
+	</select>
+	
+</mapper>
+

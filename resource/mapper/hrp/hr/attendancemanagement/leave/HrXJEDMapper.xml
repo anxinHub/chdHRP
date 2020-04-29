@@ -1,0 +1,336 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.hr.dao.attendancemanagement.leave.HrXJEDMapper">
+
+	<resultMap id="hrXJEDMap" type="java.util.Map">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="emp_id" column="emp_id" />
+		<result property="emp_code" column="emp_code" />
+		<result property="emp_name" column="emp_name" />
+		<result property="attend_year" column="attend_year" />
+		<result property="attend_code" column="attend_code" />
+		<result property="attend_name" column="attend_name" />
+		<result property="attend_ed" column="attend_ed" />
+	</resultMap>
+
+	<resultMap id="hrXJEDEmp" type="com.chd.hrp.hr.entity.attendancemanagement.leave.HrXJEDEmp">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="attend_ed_code" column="attend_ed_code" />
+		<result property="attend_year" column="attend_year" />
+		<result property="emp_id" column="emp_id" />
+		<result property="emp_name" column="emp_name" />
+		<result property="dept_no" column="dept_no" />
+		<result property="dept_name" column="dept_name" />
+		<result property="duty_code" column="duty_code" />
+		<result property="duty_name" column="duty_name" />
+	</resultMap>
+
+	<resultMap type="java.util.Map" id="CommuteProject">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="attend_code" column="attend_code" />
+		<result property="attend_name" column="attend_name" />
+		<result property="attend_shortname" column="attend_shortname" />
+		<result property="attend_types" column="attend_types" />
+		<result property="colour" column="colour" />
+		<result property="attend_type_name" column="attend_type_name" />
+		<result property="attend_ed_is" column="attend_ed_is" />
+		<result property="attend_ed_type" column="attend_ed_type" />
+		<result property="control_type" column="control_type" />
+		<result property="ed_type_name" column="ed_type_name" />
+		<result property="attend_ed_jsgs" column="attend_ed_jsgs" />
+	</resultMap>
+	
+	<!-- 初始化导入 -->
+	<insert id="addImpXJED" parameterType="java.util.Map">
+		insert into hr_attend_xjed (
+			group_id,hos_id,attend_year,emp_id,attend_code,attend_ed
+		)
+		select a.group_id,a.hos_id,#{attend_year,jdbcType=VARCHAR} attend_year,a.emp_id,b.attend_code, 
+			case attend_ed_is when 0 then 0 else case control_type when 0 then max_ed else 0 end end
+		from hos_emp a
+		left join hr_attend_item b on a.group_id=b.group_id and a.hos_id=b.hos_id
+		where a.group_id = #{group_id ,jdbcType=INTEGER}
+			and a.hos_id = #{hos_id,jdbcType=INTEGER}
+			<if test="dept_id != null">
+				and a.dept_id = #{dept_id,jdbcType=INTEGER}
+			</if>
+			and b.is_stop = 0
+			and b.is_jx = 0
+			and a.is_attend = 1 
+			and b.attend_types = '03'
+			and b.attend_ed_is = 1
+			and not exists (
+				select c.group_id,c.hos_id,c.attend_year,c.emp_id,c.attend_code
+				from hr_attend_xjed c
+				where c.group_id = #{group_id,jdbcType=INTEGER}
+					and c.hos_id = #{hos_id,jdbcType=INTEGER}
+					and c.attend_year = #{attend_year,jdbcType=VARCHAR}
+					and b.attend_code=c.attend_code
+					and a.emp_id = c.emp_id
+			)
+		order by a.emp_id,b.attend_code
+	</insert>
+
+	<!-- 查询职工 -->
+	<select id="queryEmpByDeptId" parameterType="java.util.Map" resultType="java.util.Map">
+		select b.emp_id,b.emp_code,b.emp_name
+		from hr_attend_xjed a
+		join hos_emp b on a.group_id=b.group_id and a.hos_id=b.hos_id and a.emp_id=b.emp_id and b.is_attend = 1 
+		where a.group_id = #{group_id,jdbcType=INTEGER}
+			and a.hos_id = #{hos_id,jdbcType=INTEGER}
+			and a.attend_year = #{attend_year,jdbcType=VARCHAR}
+			and b.dept_id = #{dept_id,jdbcType=INTEGER}
+			and b.is_attend = 1 
+		group by b.emp_id,b.emp_code,b.emp_name
+		order by b.emp_code
+	</select>
+
+	<!-- 批量修改 -->
+	<update id="update" parameterType="java.util.Map">
+		update hr_attend_xjed set attend_ed = #{attend_ed}
+		<where>
+				group_id = #{group_id}
+			AND hos_id = #{hos_id}
+			AND attend_year = #{attend_year}
+			<if test="emp_id != null">
+				AND emp_id = #{emp_id}
+			</if>
+			<if test="empIds != null">
+				AND emp_id in (${empIds})
+			</if>
+			AND attend_code = #{attend_code}
+		</where>
+	</update>
+	
+	<!-- 批量修改 -->
+	<update id="updateXJED" parameterType="java.util.List">
+		<foreach collection="list" item="item" index="index" open="begin" close=";end;" separator=";">
+			update HR_ATTEND_XJED set attend_ed = #{item.attend_ed}
+			where group_id = #{map.group_id}
+				AND hos_id = #{map.hos_id}
+				AND attend_year = #{map.attend_year}
+				AND emp_id = #{item.emp_id}
+				AND attend_code = #{item.attend_code}
+		</foreach>
+	</update>
+	
+	<!--批量增加 -->
+	<insert id="addXJED" parameterType="java.util.List">
+		INSERT INTO HR_ATTEND_XJED (
+			group_id,
+			hos_id,
+			attend_year,
+			emp_id,
+			attend_code,
+			attend_ed
+		) (
+		<foreach collection="list" item="item" index="index" separator=" union all ">
+			select
+				#{map.group_id,jdbcType=INTEGER},
+				#{map.hos_id,jdbcType=INTEGER},
+				#{map.attend_year,jdbcType=VARCHAR},
+				#{item.emp_id,jdbcType=INTEGER},
+				#{item.attend_code,jdbcType=VARCHAR},
+				#{item.attend_ed,jdbcType=INTEGER}
+			from dual
+		</foreach>
+		)
+	</insert>
+	
+	<!-- 查询 -->
+	<select id="query" parameterType="java.util.Map" resultType="java.util.Map">
+		select he.emp_code,he.emp_id,he.emp_name,${sql}he.worktime
+		from HR_ATTEND_XJED hax 
+		left join hos_emp he on hax.emp_id=he.emp_id and hax.group_id=he.group_id and hax.hos_id=he.hos_id and he.is_attend = 1
+		<if test="dept_source == 1">
+		left join hr_dept hd on he.dept_id=hd.dept_id and he.group_id=hd.group_id
+			and he.hos_id = hd.hos_id
+		</if>
+		<if test="dept_source == 2">
+		left join hos_dept hd on he.dept_id=hd.dept_id and he.group_id=hd.group_id
+			and he.hos_id = hd.hos_id
+		</if>
+		<where>
+			<if test="group_id != null and group_id != ''">
+				he.group_id = #{group_id,jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND he.hos_id = #{hos_id,jdbcType=INTEGER}
+			</if>
+			<if test="dept_id != null and dept_id != ''">
+				AND he.dept_id = #{dept_id,jdbcType=INTEGER}
+			</if>
+			<if test="super_id != null and super_id != ''">
+				AND hd.super_code = #{super_id,jdbcType=INTEGER}
+			</if>
+			<if test="attend_year != null and attend_year != ''">
+				AND hax.attend_year = #{attend_year,jdbcType=VARCHAR}
+			</if>
+			and he.is_attend = 1
+		</where>
+		group by he.emp_code,he.emp_id,he.emp_name,he.worktime
+		order by he.emp_code asc
+	</select>
+	
+	<!-- 打印 -->
+	<select id="queryXJEDByPrint" parameterType="java.util.Map" resultType="java.util.Map">
+		select he.emp_code,he.emp_id,he.emp_name,${sql}he.worktime
+		from hos_emp he
+		left join HR_ATTEND_XJED hax on hax.emp_id=he.emp_id and hax.group_id=he.group_id and hax.hos_id=he.hos_id
+		<if test="dept_source == 1">
+		left join hr_dept hd on he.dept_id=hd.dept_id and he.group_id=hd.group_id and he.hos_id=hd.hos_id
+		</if>
+		<if test="dept_source == 2">
+		left join hos_dept hd on he.dept_id=hd.dept_id and he.group_id=hd.group_id and he.hos_id=hd.hos_id
+		</if>
+		<where>
+			<if test="group_id != null and group_id != ''">
+				he.group_id = #{group_id,jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND he.hos_id = #{hos_id,jdbcType=INTEGER}
+			</if>
+			<if test="dept_id != null and dept_id != ''">
+				AND he.dept_id = #{dept_id,jdbcType=INTEGER}
+			</if>
+			<if test="super_id != null and super_id != ''">
+				AND hd.super_code = #{super_id,jdbcType=INTEGER}
+			</if>
+			<if test="attend_year != null and attend_year != ''">
+				AND hax.attend_year = #{attend_year,jdbcType=VARCHAR}
+			</if>
+		</where>
+		group by he.emp_code,he.emp_id,he.emp_name,he.worktime
+		order by he.emp_code asc
+	</select>
+
+	<select id="queryByCode" parameterType="java.util.Map" resultMap="hrXJEDMap">
+		select ha.group_id,ha.hos_id,ha.attend_code,ha.attend_year,ha.emp_id,he.emp_name
+		from HR_ATTEND_XJED ha
+		left join hos_emp he on ha.emp_id=he.emp_id and ha.group_id=he.group_id and ha.hos_id=he.hos_id
+		<where>
+			<if test="group_id != null and group_id != ''">
+				ha.group_id = #{group_id,jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND ha.hos_id = #{hos_id,jdbcType=INTEGER}
+			</if>
+			<if test="attend_year != null and attend_year != ''">
+				AND ha.attend_year = #{attend_year,jdbcType=VARCHAR}
+			</if>
+			<if test="emp_id != null and emp_id != ''">
+				AND ha.emp_id = #{emp_id,jdbcType=VARCHAR}
+			</if>
+			<if test="attend_code != null and attend_code != ''">
+				AND ha.attend_code = #{attend_code,jdbcType=VARCHAR}
+			</if>
+		</where>
+	</select>
+
+
+	<select id="queryXJEDDetail" parameterType="java.util.Map" resultMap="hrXJEDEmp">
+		select hde.dept_no dept_no , hde.dept_name dept_name,he.emp_id emp_id,he.emp_name emp_name ,
+			hd.duty_code duty_code,hd.duty_name duty_name
+		from HR_ATTEND_XJED_EMP hred hos_emp left join he on hred.emp_id =he.emp_id
+		left join hos_dept_dict hde on he.dept_no =hde.dept_no 
+			and he.group_id=hde.group_id and he.hos_id=hde.hos_id
+		left join HR_HOS_DUTY hhd on he.emp_id=hhd.emp_id 
+			and he.group_id=hhd.group_id and he.hos_id=hhd.hos_id
+		left join hos_duty hd on hhd.duty_code=hd.duty_code 
+			and hd.group_id=hhd.group_id and hd.hos_id=hhd.hos_id
+		where hred.group_id = #{group_id,jdbcType=INTEGER}
+			AND hred.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND hred.attend_year = #{attend_year,jdbcType=VARCHAR}
+			AND hred.attend_code = #{attend_code,jdbcType=VARCHAR}
+		order by hred.group_id asc
+	</select>
+
+	
+
+	<resultMap type="java.util.Map" id="hrSelectMap">
+		<result property="id" column="id" />
+		<result property="text" column="text" />
+		<result property="name" column="name" />
+		<result property="label" column="label" />
+		<result property="type" column="type" />
+		<result property="is_write" column="is_write" />
+	</resultMap>
+
+	<!--查询休假类型 -->
+	<select id="queryAttendCode" resultMap="hrSelectMap" parameterType="java.util.Map">
+		select ha.attend_code as id ,ha.attend_name as text from hr_attend_item ha
+		where ha.group_id = #{group_id}
+			and ha.hos_id = #{hos_id}
+			and ha.attend_types='03'
+			and ha.attend_ed_is = 1
+			and ha.is_jx = 0
+			and ha.control_type = #{control_type}
+	</select>
+
+
+	<select id="queryAttendItem" parameterType="java.util.Map" resultMap="CommuteProject">
+		select ha.group_id, ha.hos_id, ha.attend_code, ha.attend_name,
+			ha.attend_shortname, ha.attend_types, dt.type_name attend_type_name,ha.attend_ed_is, ha.control_type, 
+			case when ha.attend_ed_is = 0 then '是' when ha.attend_ed_is = 1 then '否' else '' end as ed_type_name
+		from HR_ATTEND_ITEM ha
+		left join DIC_ATTEND_TYPE dt on ha.attend_types = dt.type_code
+		<where>
+				ha.group_id = #{group_id}
+			AND ha.hos_id = #{hos_id}
+			and ha.attend_types = '03'
+			and ha.attend_ed_is = 1
+			and ha.is_jx = 0
+		</where>
+		order by ha.attend_code asc
+	</select>
+
+	<select id="queryAttendItemEd" parameterType="java.util.Map" resultMap="CommuteProject">
+		select ha.group_id, ha.hos_id, ha.attend_code, ha.attend_name,
+			ha.attend_shortname, ha.attend_types, dt.type_name attend_type_name,ha.attend_ed_is, ha.control_type, 
+			case when ha.attend_ed_is = 0 then '是' when ha.attend_ed_is = 1 then '否' else '' end as ed_type_name
+		from HR_ATTEND_ITEM ha
+		left join DIC_ATTEND_TYPE dt on ha.attend_types = dt.type_code
+		<where>
+				ha.group_id = #{group_id}
+			AND ha.hos_id = #{hos_id}
+			and ha.attend_types = '03'
+			and ha.attend_ed_is = 1
+			and ha.is_jx = 0
+			and ha.CONTROL_TYPE=1
+		</where>
+		order by ha.attend_code asc
+	</select>
+
+	<select id="queryAttendEmpByYear" parameterType="java.util.Map" resultType="java.util.Map">
+		  select a.group_id, a.hos_id, a.attend_year, a.emp_id, a.attend_code
+		  from HR_ATTEND_XJED a
+		  left join hos_emp  b on a.group_id=b.group_id and a.hos_id=b.hos_id and a.emp_id=b.emp_id and b.is_attend = 1 
+		<where>
+				a.group_id = #{group_id,jdbcType=INTEGER}
+			and a.hos_id = #{hos_id,jdbcType=INTEGER}
+			and a.attend_year = #{attend_year,jdbcType=VARCHAR}
+			and b.dept_id !=1534
+			and b.is_attend = 1 
+		</where>
+	</select>
+	
+	<select id="queryEdByItem" parameterType="java.util.Map" resultType="java.lang.String">
+		SELECT max_ed 
+		FROM hr_attend_item 
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND attend_code = #{attend_code,jdbcType=VARCHAR}
+	</select>
+	
+	<update id="updateEdByItem" parameterType="java.util.Map">
+		UPDATE hr_attend_xjed 
+		SET attend_ed = #{attend_ed,jdbcType=NUMERIC}
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND attend_year = #{attend_year,jdbcType=VARCHAR}
+			AND attend_code = #{attend_code,jdbcType=VARCHAR}
+	</update>
+</mapper>

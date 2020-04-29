@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.htcg.dao.model.HtcgDrgsPmodelMapper">
+	<resultMap id="htcgDrgsPmodel" type="com.chd.hrp.htcg.entity.model.HtcgDrgsPmodel"></resultMap>
+
+	<!-- 生成 -->
+	<select id="initHtcgDrgsPmodel" statementType="CALLABLE" parameterType="java.util.Map" resultType="java.util.Map">
+          <![CDATA[
+			{call pkg_htcg_app.prc_htcg_drgs_p_model(
+		        #{group_id, mode=IN},
+		        #{hos_id, mode=IN},
+		        #{copy_code, mode=IN},
+		        #{scheme_code, mode=IN},
+		        #{acc_year, mode=IN},
+		        #{msg,mode=OUT,jdbcType=VARCHAR}
+			)}
+			]]>
+	</select>
+	
+	<insert id="addBatchHtcgDrgsPmodelNote" parameterType="java.util.List" >
+	    insert into htcg_drgs_p_model_note
+				  (group_id,
+				   hos_id,
+				   copy_code,
+				   period_type_code,
+				   acc_year,
+				   acc_month,
+				   scheme_code,
+				   drgs_code,
+				   clp_p_step,
+				   main_treat,
+				   main_nurse)
+		<foreach collection="list" item="item" separator="union all">
+			 select 
+			   #{item.group_id},
+			   #{item.hos_id},
+			   #{item.copy_code},
+			   #{item.period_type_code},
+			   #{item.acc_year},
+			   #{item.acc_month},
+			   #{item.scheme_code},
+			   #{item.drgs_code},
+			   #{item.clp_p_step},
+			   #{item.main_treat},
+			   #{item.main_nurse}
+			 from dual
+		</foreach>
+	</insert>
+	
+	
+	<delete id="deleteBatchHtcgDrgsPmodelNote" parameterType="java.util.List" >
+	             delete htcg_drgs_p_model_note where
+	  <foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+			           group_id = #{item.group_id}
+				   and hos_id = #{item.hos_id}
+				   and copy_code = #{item.copy_code}
+				   and period_type_code = #{item.period_type_code}
+				   and acc_year = #{item.acc_year}
+				   and acc_month = #{item.acc_month}
+				   and scheme_code = #{item.scheme_code}
+				   and drgs_code = #{item.drgs_code}
+				   and clp_p_step = #{item.clp_p_step}
+		</foreach> 
+   </delete>
+   
+    <!-- 查询 -->
+	<select id="queryHtcgDrgsPmodel" parameterType="java.util.Map" resultType="java.util.Map">
+		  			with temp as (
+							      select hdpm.group_id,
+										 hdpm.hos_id,
+										 hdpm.copy_code,
+										 hdpm.period_type_code,
+										 hpt.period_type_name,
+										 hpd.period_code,
+										 hpd.period_name,
+										 hdpm.acc_year,
+										 hdpm.acc_month,
+										 hdpm.scheme_code,
+										 hs.scheme_name,
+										 hdpm.drgs_code,
+										 hd.drgs_name,
+										 hdpm.clp_p_step,
+										 hcsd.clp_step_name,
+										 hdpmn.main_treat,
+										 hdpmn.main_nurse,
+										 decode(hdpm.charge_nature_code,'01',ccia.charge_item_code,'02',hdd.drug_code,'03',hmd.mate_code) item_code,
+										 decode(hdpm.charge_nature_code,'01',ccia.charge_item_name,'02',hdd.drug_name,'03',hmd.mate_name) item_name,
+										 decode(hdpm.charge_nature_code,'01','','02',hdd.mode_code,'03',hmd.mate_mode) mode_code,
+										 decode(hdpm.charge_nature_code,'01',hdpm.amount,'02',hdpm.amount,'03',hdpm.amount) amount,
+										 hdpm.recipe_type_code
+								from htcg_drgs_p_model hdpm
+								left join htcg_drgs_p_model_note hdpmn
+								on hdpm.group_id = hdpmn.group_id
+								and hdpm.hos_id = hdpmn.hos_id
+								and hdpm.copy_code = hdpmn.copy_code
+								and hdpm.period_type_code = hdpmn.period_type_code
+								and hdpm.acc_year = hdpmn.acc_year
+								and hdpm.acc_month = hdpmn.acc_month
+								and hdpm.scheme_code = hdpmn.scheme_code
+								and hdpm.drgs_code = hdpmn.drgs_code
+								and hdpm.clp_p_step = hdpmn.clp_p_step
+								left join htcg_period_type hpt
+								on hdpm.period_type_code = hpt.period_type_code
+								left join htcg_period_dict hpd
+								on hpd.period_type_code = hdpm.period_type_code
+								and hpd.period_code = hdpm.acc_month
+								left join htcg_scheme hs
+								on hs.group_id = hdpm.group_id
+								and hs.hos_id = hdpm.hos_id
+								and hs.copy_code = hdpm.copy_code
+								and hs.scheme_code = hdpm.scheme_code
+								left join htcg_drgs hd
+								on hd.group_id = hdpm.group_id
+								and hd.hos_id = hdpm.hos_id
+								and hd.copy_code = hdpm.copy_code
+								and hd.drgs_code = hdpm.drgs_code
+								left join htcg_clp_step_dict hcsd
+								on hcsd.group_id = hdpm.group_id
+								and hcsd.hos_id = hdpm.hos_id
+								and hcsd.copy_code = hdpm.copy_code
+								and hcsd.clp_step_code = hdpm.clp_p_step
+								left join cost_charge_item_arrt ccia
+								on ccia.group_id = hdpm.group_id
+								and ccia.hos_id = hdpm.hos_id
+								and ccia.copy_code = hdpm.copy_code
+								and ccia.charge_item_code = hdpm.item_code
+								left join htcg_drug_dict hdd
+								on hdpm.group_id = hdd.group_id
+								and hdpm.hos_id = hdd.hos_id
+								and hdpm.copy_code = hdd.copy_code
+								and hdpm.item_code =  hdd.drug_code
+								left join htc_material_dict hmd
+								on hmd.group_id = hdpm.group_id
+								and hmd.hos_id = hdpm.hos_id
+								and hmd.copy_code = hdpm.copy_code
+ 								and hmd.mate_code = hdpm.item_code
+ 								<where>
+ 								       hdpm.group_id = #{group_id}
+ 								   and  hdpm.hos_id = #{hos_id}
+ 								   and hdpm.copy_code = #{copy_code}
+							   <if test="scheme_code != null and scheme_code != ''">
+							       and hdpm.scheme_code = #{scheme_code}
+							   </if>
+							    <if test="period_type_code != null and period_type_code != ''">
+							       and hdpm.period_type_code = #{period_type_code}
+							   </if>
+							   <if test="acc_year != null and acc_year != ''">
+							       and hdpm.acc_year = #{acc_year}
+							   </if>
+							   <if test="period_code != null and period_code != ''">
+							       and hpd.period_code = #{period_code}
+							   </if>
+ 								</where>
+				) select     group_id,
+							 hos_id,
+							 copy_code,
+							 period_type_code,
+							 period_type_name,
+							 period_code,
+							 period_name,
+							 acc_year,
+							 acc_month,
+							 scheme_code,
+							 scheme_name,
+							 drgs_code,
+							 drgs_name,
+							 clp_p_step,
+							 clp_step_name,
+							 main_treat,
+							 main_nurse
+				 <foreach collection="recipeTypes" item="item" index="index" separator="" >
+					, decode(recipe_type_code,'${item.recipe_type_code}',item_code) item_code_${item.recipe_type_code}
+					, decode(recipe_type_code,'${item.recipe_type_code}',item_name) item_name${item.recipe_type_code}
+					, decode(recipe_type_code,'${item.recipe_type_code}',mode_code) mode_code${item.recipe_type_code}
+					, decode(recipe_type_code,'${item.recipe_type_code}',amount) amount${item.recipe_type_code}
+				 </foreach>
+					from temp
+					order by   group_id,
+							   hos_id,
+							   copy_code,
+							   period_type_code,
+							   period_code,
+							   acc_year,
+							   acc_month,
+							   scheme_code,
+							   scheme_name,
+							   drgs_code,
+							   drgs_name,
+							   clp_p_step
+	</select>
+</mapper>
+

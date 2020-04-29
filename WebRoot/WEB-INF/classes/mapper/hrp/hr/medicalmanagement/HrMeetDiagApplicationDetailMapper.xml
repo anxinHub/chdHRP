@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.hr.dao.medicalmanagement.HrMeetDiagApplicationDetailMapper">
+
+	<resultMap id="hrMeetDiagApplicationDetail" type="com.chd.hrp.hr.entity.medicalmanagement.HrMeetDiagAppDetail">
+	<result property="group_id" column="group_id"/>
+	<result property="hos_id" column="hos_id"/>
+	<result property="bill_no" column="bill_no"/>
+	<result property="app_date" column="app_date"/>
+	<result property="dept_id" column="dept_id"/>
+	<result property="dept_name" column="dept_name"/>
+	<result property="case_no" column="case_no"/>
+	<result property="md_dept_id" column="md_dept_id"/>
+	<result property="md_dept_name" column="md_dept_name"/>
+	</resultMap>
+
+
+
+	<insert id="addBatch" parameterType="java.util.List" >
+	
+		INSERT INTO HR_MEET_DIAG_APP_DETAIL (
+		group_id,
+		hos_id,
+		bill_no,
+		dept_id,
+		app_date,
+		case_no,
+		md_dept_id
+		)(
+		<foreach collection="list" item="item" index="index" separator=" union all " >
+			select 		
+			#{item.group_id,jdbcType=INTEGER},
+			#{item.hos_id,jdbcType=INTEGER},
+			<!-- to_date(#{item.occ_date},'YYYY-MM-DD'), -->
+			#{item.bill_no,jdbcType=VARCHAR},
+			#{item.dept_id,jdbcType=INTEGER},
+			#{item.app_date,jdbcType=DATE},
+			#{item.case_no,jdbcType=VARCHAR},
+			#{item.md_dept_id,jdbcType=INTEGER}
+		    from dual
+		</foreach>
+		) </insert>
+		<delete id="deleteDetailBatch" parameterType="java.util.List">
+		DELETE FROM HR_MEET_DIAG_APP_DETAIL 
+		<where>
+				<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+				 group_id = #{map.group_id,jdbcType=INTEGER}
+				AND hos_id = #{map.hos_id,jdbcType=INTEGER}
+				<if test="item.bill_no != null and item.bill_no != ''">
+				AND bill_no = #{item.bill_no,jdbcType=VARCHAR}
+				</if>
+				<if test="item.dept_id != null and item.dept_id != ''">
+				AND dept_id = #{item.dept_id,jdbcType=INTEGER}
+				</if>
+				<if test="item.case_no != null and item.case_no != ''">
+				AND case_no = #{item.case_no,jdbcType=VARCHAR}
+				</if>
+				<if test="item.app_date!= null and item.app_date != ''">
+				AND app_date = #{item.app_date,jdbcType=DATE}
+				</if>
+			</foreach>
+	    </where>  
+	</delete>
+	<select id="query" parameterType="java.util.Map" resultMap="hrMeetDiagApplicationDetail">
+select het.group_id, het.hos_id, het.bill_no, het.app_date, het.dept_id
+	, het.case_no, het.md_dept_id,hd.dept_name as md_dept_name
+from HR_MEET_DIAG_APP_detail het
+left join hos_dept hd on het.md_dept_id=hd.dept_id and het.group_id=hd.group_id and hd.group_id=hd.group_id
+		<where>
+				<if test="group_id != null and group_id != ''">
+				 het.group_id = #{group_id,jdbcType=INTEGER}
+				</if>
+				<if test="hos_id != null and hos_id != ''">
+				AND het.hos_id = #{hos_id,jdbcType=INTEGER}
+				</if>
+				<if test="bill_no != null and bill_no != ''">
+				AND het.bill_no = #{bill_no,jdbcType=VARCHAR}
+				</if>
+				<if test="dept_id != null and dept_id != ''">
+				AND het.dept_id = #{dept_id,jdbcType=INTEGER}
+				</if>
+				<if test="case_no != null and case_no != ''">
+				AND het.case_no = #{case_no,jdbcType=VARCHAR}
+				</if>
+				<if test="app_date!= null and app_date != ''">
+				AND het.app_date =to_date(#{app_date},'YYYY-MM-DD')
+				</if>
+	    </where>  
+	</select>
+	<update id="updateBatch"  parameterType="java.util.List">
+	
+		<foreach collection="list" item="item" index="index" open="begin" close=";end;" separator=";" >
+			UPDATE HR_MEET_DIAG_APP_detail 
+			<trim prefix="SET"  suffixOverrides=","> 
+			md_dept_id = #{item.md_dept_id,jdbcType=INTEGER},
+			</trim>
+			<where>                     
+			AND group_id = #{item.group_id,jdbcType=INTEGER}
+			AND hos_id = #{item.hos_id,jdbcType=INTEGER}
+			AND bill_no = #{item.bill_no,jdbcType=VARCHAR}
+			AND app_date = #{item.app_date,jdbcType=DATE}
+			AND dept_id = #{item.dept_id,jdbcType=INTEGER}
+			AND case_no = #{item.case_no,jdbcType=VARCHAR}
+			</where>  			
+		</foreach> </update>
+		
+	
+</mapper>

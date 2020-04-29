@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.ass.dao.dailymanagement.AssRepairTroubleMapper">
+
+<!-- 故障统计 -->
+<resultMap type="java.util.Map" id="assRepairTrouble">
+<result column="troublelevel" property="troublelevel"/>
+<result column="total" property="total"/>
+</resultMap>
+<!--维修费用  -->
+<resultMap type="java.util.Map" id="assRepairRec">
+<result column="repairrecno" property="repairrecno"/>
+<result column="repairmoney" property="repairmoney"/>
+</resultMap>
+
+<!--维修工时  -->
+<resultMap type="java.util.Map" id="assRepairHours">
+<result column="repairrecno" property="repairrecno"/>
+<result column="repairhours" property="repairhours"/>
+</resultMap>
+
+<!--维修费用对比  -->
+
+<resultMap type="java.util.Map" id="assRepairMoneyContrast">
+<result column="repairrecno" property="repairrecno"/>
+<result column="fixed_dept_id" property="fixed_dept_id"/>
+<result  column="dept_name" property="dept_name"/>
+<result column="ass_card_no" property="ass_card_no"/>
+<result column="repair_engr" property="repair_engr"/>
+<result column="repair_name" property="repair_name"/>
+<result column="repair_hours" property="repair_hours"/>
+<result column="repair_money" property="repair_money"/>
+<result column="other_money" property="other_money"/>
+
+
+
+
+
+
+
+
+</resultMap>
+
+
+
+
+
+
+
+
+
+
+
+
+<!-- 故障统计 -->
+<select id="queryAssRepairTrouble"  parameterType="java.util.Map" resultMap="assRepairTrouble" >
+
+select 
+case when TROUBLE_LEVEL =1 then '一级故障' when TROUBLE_LEVEL =2 then '二级故障'when
+ TROUBLE_LEVEL =3 then '三级故障' else  '四级故障' end troublelevel,
+count(*) as total from ASS_REPAIR_REC t 
+<where>                     
+		<if test="group_id != null and group_id != ''">
+		AND group_id = #{group_id,jdbcType=INTEGER}
+		</if>
+		<if test="hos_id != null and hos_id != ''">
+		AND hos_id = #{hos_id,jdbcType=INTEGER}
+		</if>
+		<if test="copy_code != null and copy_code != ''">
+		AND copy_code = #{copy_code,jdbcType=VARCHAR}
+		</if>
+</where> 
+group  by t.TROUBLE_LEVEL
+
+</select>
+
+<!--维修费用  -->
+
+<select id="queryAssRepairRec" parameterType="java.util.Map" resultMap="assRepairRec">
+select  t.REPAIR_REC_NO as repairrecno, t.REPAIR_MONEY as repairmoney
+
+from ASS_REPAIR_REC  t
+<where>                     
+		<if test="group_id != null and group_id != ''">
+		AND group_id = #{group_id,jdbcType=INTEGER}
+		</if>
+		<if test="hos_id != null and hos_id != ''">
+		AND hos_id = #{hos_id,jdbcType=INTEGER}
+		</if>
+		<if test="copy_code != null and copy_code != ''">
+		AND copy_code = #{copy_code,jdbcType=VARCHAR}
+		</if>
+		  <if test="repair_money_begin != null and repair_money_begin != '' and repair_money_end != null and repair_money_end != ''">
+			AND repair_money between #{repair_money_begin} and #{repair_money_end}
+		</if>
+</where>
+  order  by t.REPAIR_REC_NO
+
+</select>
+
+<!--维修工时  -->
+<select id="queryAssRepairHours"  parameterType="java.util.Map" resultMap="assRepairHours">
+select  t.REPAIR_REC_NO as repairrecno, t.REPAIR_HOURS as repairhours
+
+from ASS_REPAIR_REC  t
+<where>                     
+		<if test="group_id != null and group_id != ''">
+		AND group_id = #{group_id,jdbcType=INTEGER}
+		</if>
+		<if test="hos_id != null and hos_id != ''">
+		AND hos_id = #{hos_id,jdbcType=INTEGER}
+		</if>
+		<if test="copy_code != null and copy_code != ''">
+		AND copy_code = #{copy_code,jdbcType=VARCHAR}
+		</if>
+		  <if test="repair_hours_begin != null and repair_hours_begin != '' and repair_hours_end != null and repair_hours_end != ''">
+			AND REPAIR_HOURS between #{repair_hours_begin} and #{repair_hours_end}
+		</if>
+</where>
+  order  by t.REPAIR_REC_NO
+
+
+
+
+</select>
+
+
+<!-- 查询维修费用对比 -->
+
+<select id="queryAssRepairMoneyContrast" parameterType="java.util.Map" resultMap="assRepairMoneyContrast" >
+
+select  rec.repair_rec_no as repairrecno , rec.ass_card_no,rec.repair_hours,
+rec.repair_money,rec.other_money,de.dept_name as dept_name ,
+em.emp_name as repair_name   
+from  ASS_REPAIR_REC rec left join hos_dept de on rec.fixed_dept_id=de.dept_id
+left join HOS_EMP em on  rec.repair_engr=em.emp_name
+<where>                     
+		<if test="group_id != null and group_id != ''">
+		AND rec.group_id = #{group_id,jdbcType=INTEGER}
+		</if>
+		<if test="hos_id != null and hos_id != ''">
+		AND rec.hos_id = #{hos_id,jdbcType=INTEGER}
+		</if>
+		<if test="copy_code != null and copy_code != ''">
+		AND rec.copy_code = #{copy_code,jdbcType=VARCHAR}
+		</if>
+		<if test="fixed_dept_id != null and fixed_dept_id != ''">
+		AND rec.fixed_dept_id = #{fixed_dept_id,jdbcType=VARCHAR}
+		</if>
+		  <if test="repair_date1 != null and repair_date1 != '' and repair_date2 != null and repair_date2 != ''">
+			AND rec.REPAIR_DATE  between 	to_date(#{repair_date1},'YYYY-MM-DD')  and to_date(#{repair_date2},'YYYY-MM-DD')
+		</if>
+		<if test="ass_card_no != null and ass_card_no != ''">
+			and	rec.ass_card_no like '%${ass_card_no}%' 
+			</if>
+</where>
+  order  by rec.REPAIR_REC_NO 
+</select>
+
+
+
+
+</mapper>

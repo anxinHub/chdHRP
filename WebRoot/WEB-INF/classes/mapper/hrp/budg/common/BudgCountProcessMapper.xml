@@ -1,0 +1,789 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.budg.dao.common.BudgCountProcessMapper">
+	
+	<resultMap id="countDataMap" type="java.util.Map">
+	<result property="group_id" column="group_id"/>
+	<result property="hos_id" column="hos_id"/>
+	<result property="copy_code" column="copy_code"/>
+	<result property="code" column="code"/>
+	<result property="count_item" column="count_item"/>
+	<result property="count_value" column="count_value"/>
+	</resultMap>
+	
+	
+	
+	<resultMap id="getWayMap" type="java.util.Map">
+	<result property="group_id" column="group_id"/>
+	<result property="hos_id" column="hos_id"/>
+	<result property="copy_code" column="copy_code"/>
+	<result property="index_code" column="index_code"/>
+	<result property="index_name" column="index_name"/>
+	<result property="get_value_way" column="get_value_way"/>
+	<result property="edit_method" column="edit_method"/>
+	<result property="get_way" column="get_way"/>
+	<result property="formula_id" column="formula_id"/>
+	<result property="fun_id" column="fun_id"/>
+	</resultMap>
+	
+	<!-- 查询 基本指标类 或 费用标注类  预算层次为 医院年度  的 计算项数据 -->
+	<select id="queryHosBasicIndex" resultMap="countDataMap"  parameterType="java.util.Map" >
+	
+		SELECT 
+			a.group_id,
+			a.hos_id,
+			a.copy_code,
+			<if test="element_type_code == '01'">
+			a.index_code code,
+			b.index_name as count_item,
+			</if>
+			<if test="element_type_code == '02'">
+			a.charge_stan_code code,
+			b.charge_stan_name as count_item,
+			</if>
+			a.budg_value as count_value	
+		
+		FROM ${table}  a
+		<if test="element_type_code == '01'">
+			LEFT JOIN BUDG_BASIC_INDEX_DICT b
+			ON
+				a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code
+				and a.index_code = b.index_code 
+		</if>
+		<if test="element_type_code == '02'">
+			LEFT JOIN BUDG_CHARGE_STANDARD_DICT b
+			ON
+				a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code
+				and a.charge_stan_code = b.charge_stan_code 
+		</if>
+		where                     
+			a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND a.year = #{year,jdbcType=VARCHAR}
+			<if test="index_code != null and index_code != '' and element_type_code == '01'">
+			AND a.index_code = #{index_code,jdbcType=VARCHAR}
+			</if>
+			<if test="index_code != null and index_code != '' and element_type_code == '02'">
+			AND a.charge_stan_code = #{index_code,jdbcType=VARCHAR}
+			</if>
+	</select>
+	
+	<!-- 查询 基本指标类 或 费用标注类  预算层次为 科室年度  的 计算项数据  -->
+	<select id="queryDeptBasicIndex" resultMap="countDataMap"  parameterType="java.util.Map" >
+	
+		SELECT 
+			a.group_id,
+			a.hos_id,
+			a.copy_code,
+			<if test="element_type_code == '01'">
+			a.index_code code,
+			b.index_name as count_item,
+			</if>
+			<if test="element_type_code == '02'">
+			a.charge_stan_code code,
+			b.charge_stan_name as count_item,
+			</if>
+			a.budg_value as count_value	
+		
+		FROM ${table}  a
+		<if test="element_type_code == '01'">
+			LEFT JOIN BUDG_BASIC_INDEX_DICT b
+			ON
+				a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code
+				and a.index_code = b.index_code 
+		</if>
+		<if test="element_type_code == '02'">
+			LEFT JOIN BUDG_CHARGE_STANDARD_DICT b
+			ON
+				a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code
+				and a.charge_stan_code = b.charge_stan_code 
+		</if>
+		where                     
+			a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND a.year = #{year,jdbcType=VARCHAR}
+			<if test="dept_id != null and dept_id != ''">
+			AND a.dept_id = #{dept_id,jdbcType=INTEGER}
+			</if>
+			<if test="index_code != null and index_code != '' and element_type_code == '01'">
+			AND a.index_code = #{index_code,jdbcType=VARCHAR}
+			</if>
+			<if test="index_code != null and index_code != '' and element_type_code == '02'">
+			AND a.charge_stan_code = #{index_code,jdbcType=VARCHAR}
+			</if>
+	</select>
+	
+	<!-- 查询  预算指标类 计算项 数据 -->
+	<select id="queryBudgIndex" resultMap="countDataMap"  parameterType="java.util.Map" >
+	
+		SELECT 
+			a.group_id,
+			a.hos_id,
+			a.copy_code,
+			a.index_code code,
+			b.index_name as count_item,
+			<if test=" value_type_code == '01' ">
+			a.budg_value as count_value	
+			</if>
+			<if test=" value_type_code == '02' ">
+			a.execute_value as count_value	
+			</if>
+		FROM ${table}  a
+		LEFT JOIN BUDG_INDEX_DICT b
+			ON
+				a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code
+				and a.index_code = b.index_code 
+		where                     
+			a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND a.year = #{year,jdbcType=VARCHAR}
+			<if test="index_code != null and index_code != '' ">
+			AND a.index_code = #{index_code,jdbcType=VARCHAR}
+			</if>
+			<if test="dept_id != null and dept_id != '' ">
+			AND a.dept_id = #{dept_id,jdbcType=INTEGER}
+			</if>
+			<if test="month != null and month != '' ">
+			AND a.month = #{month,jdbcType=VARCHAR}
+			</if>
+	</select>
+	
+	<!-- 查询  收入科目类 元素层次element_level 01 医院年度，预算值类型value_type_code 为 01本年预算 的 计算项 数据 -->
+	<select id="queryBudgInHYBudg" resultMap="countDataMap"  parameterType="java.util.Map" >
+	
+		SELECT 
+			a.group_id,
+			a.hos_id,
+			a.copy_code,
+			a.subj_code code,
+			b.subj_name as count_item,
+			a.budg_value as count_value	
+		FROM BUDG_MED_INCOME_HOS_YEAR  a
+		LEFT JOIN BUDG_INCOME_SUBJ b
+			ON
+				a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code
+				and a.year = b.budg_year
+				and a.subj_code = b.subj_code 
+		where                     
+			a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND a.year = #{year,jdbcType=VARCHAR}
+			<if test="index_code != null and index_code != '' ">
+			AND a.subj_code = #{index_code,jdbcType=VARCHAR}
+			</if>
+	</select>
+	
+	
+	<!-- 查询  收入科目类 元素层次element_level 02 医院月份，预算值类型value_type_code 为 01本年预算 的 计算项 数据 -->
+	<select id="queryBudgInHMBudg" resultMap="countDataMap"  parameterType="java.util.Map" >
+	
+		SELECT 
+			a.group_id,
+			a.hos_id,
+			a.copy_code,
+			a.subj_code code,
+			b.subj_name as count_item,
+			a.budg_value as count_value	
+		
+		FROM BUDG_MED_INCOME_DEPT_MONTH  a
+		LEFT JOIN BUDG_INCOME_SUBJ b
+			ON
+				a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code
+				and a.year = b.budg_year
+				and a.subj_code = b.subj_code 
+		where                     
+			a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND a.year = #{year,jdbcType=VARCHAR}
+			<if test="index_code != null and index_code != '' ">
+			AND a.subj_code = #{index_code,jdbcType=VARCHAR}
+			</if>
+			<if test="month != null and month != '' ">
+			AND a.month = #{month,jdbcType=VARCHAR}
+			</if>
+	</select>
+	
+	<!-- // 查询  收入科目类 元素层次element_level 03 科室年度，预算值类型value_type_code 为 01本年预算 的 计算项 数据 -->
+	<select id="queryBudgInDYBudg" resultMap="countDataMap"  parameterType="java.util.Map" >
+	
+		SELECT 
+			a.group_id,
+			a.hos_id,
+			a.copy_code,
+			a.subj_code code,
+			b.subj_name as count_item,
+			a.budg_value as count_value	
+		FROM BUDG_MED_INCOME_DEPT_YEAR  a
+		LEFT JOIN BUDG_INCOME_SUBJ b
+			ON
+				a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code
+				and a.year = b.budg_year
+				and a.subj_code = b.subj_code 
+		where                     
+			a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND a.year = #{year,jdbcType=VARCHAR}
+			<if test="index_code != null and index_code != '' ">
+			AND a.subj_code = #{index_code,jdbcType=VARCHAR}
+			</if>
+			<if test="dept_id != null and dept_id != '' ">
+			AND a.dept_id = #{dept_id,jdbcType=INTEGER}
+			</if>
+	</select>
+	
+	<!--  查询  收入科目类 元素层次element_level 04 科室月份，预算值类型value_type_code 为 01本年预算 的 计算项 数据 -->
+	<select id="queryBudgInDMBudg" resultMap="countDataMap"  parameterType="java.util.Map" >
+	
+		SELECT 
+			a.group_id,
+			a.hos_id,
+			a.copy_code,
+			a.subj_code code,
+			b.subj_name as count_item,
+			a.budg_value as count_value	
+		FROM BUDG_MED_INCOME_DEPT_MONTH  a
+		LEFT JOIN BUDG_INCOME_SUBJ b
+			ON
+				a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code
+				and a.year = b.budg_year
+				and a.subj_code = b.subj_code 
+		where                    
+			a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND a.year = #{year,jdbcType=VARCHAR}
+			<if test="index_code != null and index_code != '' ">
+			AND a.subj_code = #{index_code,jdbcType=VARCHAR}
+			</if>
+			<if test="dept_id != null and dept_id != '' ">
+			AND a.dept_id = #{dept_id,jdbcType=INTEGER}
+			</if>
+			<if test="month != null and month != '' ">
+			AND a.month = #{month,jdbcType=VARCHAR}
+			</if>
+	</select>
+	
+	<!-- 查询  收入科目类 元素层次element_level 01 医院年度，预算值类型value_type_code 为 02上年执行 的 计算项 数据 -->
+	<select id="queryBudgInHYExecute" resultMap="countDataMap"  parameterType="java.util.Map" >
+			select a.group_id,
+					a.hos_id,
+					a.copy_code,
+					a.budg_year year ,
+					a.subj_code code,
+					a.subj_name as count_item,
+					nvl(SUM(b.amount),0) as count_value
+			from BUDG_INCOME_SUBJ a
+			left join BUDG_MED_INCOME_EXECUTE b
+				ON
+					a.group_id = b.group_id
+					and a.hos_id = b.hos_id
+					and a.copy_code = b.copy_code
+					and a.budg_year = b.year
+					and b.subj_code like a.subj_code ||'%'
+			where 
+				a.group_id = #{group_id,jdbcType=INTEGER}
+				AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+				AND a.budg_year = #{year,jdbcType=VARCHAR}
+				AND a.subj_code = #{index_code,jdbcType=VARCHAR}
+			group by  a.group_id, a.hos_id, a.copy_code,a.budg_year , a.subj_code , a.subj_name 
+			
+	</select>
+	
+	
+	<!-- 查询  收入科目类 元素层次element_level 02 医院月份，预算值类型value_type_code 为 02上年执行 的 计算项 数据 -->
+	<select id="queryBudgInHMExecute" resultMap="countDataMap"  parameterType="java.util.Map" >
+	
+		SELECT 
+			a.group_id,
+			a.hos_id,
+			a.copy_code,
+			a.budg_year year ,
+			b.month ,
+			a.subj_code code,
+			a.subj_name as count_item,
+			
+			nvl(SUM(b.amount),0) as count_value	
+		
+		FROM BUDG_INCOME_SUBJ    a
+		LEFT JOIN  BUDG_MED_INCOME_EXECUTE b
+			ON
+				a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code
+				and a.year = b.budg_year
+				and b.subj_code like a.subj_code || '%' 
+		where                     
+			a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND a.year = #{year,jdbcType=VARCHAR}
+			AND a.subj_code = #{index_code,jdbcType=VARCHAR}
+			AND b.month = #{month,jdbcType=VARCHAR}
+		group by a.group_id , a.hos_id , a.copy_code , a.budg_year , b.month , a.subj_code , a.subj_name
+	</select>
+	
+	<!-- // 查询  收入科目类 元素层次element_level 03 科室年度，预算值类型value_type_code 为 02上年执行 的 计算项 数据 -->
+	<select id="queryBudgInDYExecute" resultMap="countDataMap"  parameterType="java.util.Map" >
+	
+		SELECT 
+		a.group_id,
+		a.hos_id,
+		a.copy_code,
+		a.budg_year year ,
+		a.subj_code code,
+		a.subj_name as count_item,
+		b.dept_id ,
+		nvl(SUM(b.amount),0) as count_value	
+		
+		FROM BUDG_INCOME_SUBJ    a
+		LEFT JOIN BUDG_MED_INCOME_EXECUTE b
+			ON
+				a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code
+				and a.budg_year = b.year
+				and b.subj_code like a.subj_code ||'%' 
+		where                     
+			a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND a.budg_year = #{year,jdbcType=VARCHAR}
+			AND a.subj_code = #{index_code,jdbcType=VARCHAR}
+			AND b.dept_id = #{dept_id,jdbcType=INTEGER}
+		group by a.group_id , a.hos_id , a.copy_code , a.budg_year , a.subj_code , b.dept_id , a.subj_name
+	</select>
+	
+	<!--  查询  收入科目类 元素层次element_level 04 科室月份，预算值类型value_type_code 为 02上年执行 的 计算项 数据 -->
+	<select id="queryBudgInDMExecute" resultMap="countDataMap"  parameterType="java.util.Map" >
+	
+		SELECT 
+			a.group_id,
+			a.hos_id,
+			a.copy_code,
+			a.budg_year year ,
+			b.momth ,
+			a.subj_code code,
+			a.subj_name as count_item,
+			b.dept_id ,
+			nvl(sum(b.amount),0) as count_value	
+		FROM BUDG_INCOME_SUBJ    a
+		LEFT JOIN  BUDG_MED_INCOME_EXECUTE b
+			ON
+				a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code
+				and a.budg_year = b.year
+				and b.subj_code like a.subj_code || '%'
+		where                     
+			a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND a.budg_year = #{year,jdbcType=VARCHAR}
+			AND a.subj_code = #{index_code,jdbcType=VARCHAR}
+			AND b.dept_id = #{dept_id,jdbcType=INTEGER}
+			AND b.month = #{month,jdbcType=VARCHAR}
+		group by a.group_id, a.hos_id, 	a.copy_code, a.budg_year ,b.momth ,	a.subj_code,a.subj_name ,b.dept_id 
+	</select>
+	
+	
+	
+	<!-- 查询  支出科目类 元素层次element_level 01 医院年度，预算值类型value_type_code 为 01本年预算 的 计算项 数据 -->
+	<select id="queryBudgCostHYBudg" resultMap="countDataMap"  parameterType="java.util.Map" >
+	
+		SELECT 
+			a.group_id,
+			a.hos_id,
+			a.copy_code,
+			a.subj_code code,
+			b.subj_name as count_item,
+			SUM(a.cost_budg) as count_value	
+		
+		FROM BUDG_MED_COST  a
+		LEFT JOIN BUDG_COST_SUBJ b
+			ON
+				a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code
+				and a.year = b.budg_year
+				and a.subj_code = b.subj_code 
+		where                     
+			a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND a.year = #{year,jdbcType=VARCHAR}
+			<if test="index_code != null and index_code != '' ">
+			AND a.subj_code = #{index_code,jdbcType=VARCHAR}
+			</if>
+		group by a.group_id , a.hos_id , a.copy_code , a.year ,  a.subj_code , b.subj_name
+	</select>
+	
+	
+	<!-- 查询  支出科目类 元素层次element_level 02 医院月份，预算值类型value_type_code 为 01本年预算 的 计算项 数据 -->
+	<select id="queryBudgCostHMBudg" resultMap="countDataMap"  parameterType="java.util.Map" >
+	
+		SELECT 
+			a.group_id,
+			a.hos_id,
+			a.copy_code,
+			a.subj_code code,
+			b.subj_name as count_item,
+			SUM(a.cost_budg) as count_value	
+		
+		FROM BUDG_MED_COST  a
+		LEFT JOIN BUDG_COST_SUBJ b
+			ON
+				a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code
+				and a.year = b.budg_year
+				and a.subj_code = b.subj_code 
+		where                     
+			a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND a.year = #{year,jdbcType=VARCHAR}
+			<if test="index_code != null and index_code != '' ">
+			AND a.subj_code = #{index_code,jdbcType=VARCHAR}
+			</if>
+			<if test="month != null and month != '' ">
+			AND a.month = #{month,jdbcType=VARCHAR}
+			</if>
+		group by a.group_id , a.hos_id , a.copy_code , a.year ,a.month , a.subj_code , b.subj_name
+	</select>
+	
+	<!-- // 查询  支出科目类 元素层次element_level 03 科室年度，预算值类型value_type_code 为 01本年预算 的 计算项 数据 -->
+	<select id="queryBudgCostDYBudg" resultMap="countDataMap"  parameterType="java.util.Map" >
+	
+		SELECT 
+		a.group_id,
+		a.hos_id,
+		a.copy_code,
+		a.subj_code code,
+		b.subj_name as count_item,
+		SUM(a.cost_budg) as count_value	
+		
+		FROM BUDG_MED_COST  a
+		LEFT JOIN BUDG_COST_SUBJ b
+			ON
+				a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code
+				and a.year = b.budg_year
+				and a.subj_code = b.subj_code 
+		where                     
+			a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			<if test="year != null and year != ''">
+			AND a.year = #{year,jdbcType=VARCHAR}
+			</if>
+			<if test="index_code != null and index_code != '' ">
+			AND a.subj_code = #{index_code,jdbcType=VARCHAR}
+			</if>
+			<if test="dept_id != null and dept_id != '' ">
+			AND a.dept_id = #{dept_id,jdbcType=INTEGER}
+			</if>
+		group by a.group_id , a.hos_id , a.copy_code , a.year , a.subj_code , a.dept_id , b.subj_name
+	</select>
+	
+	<!--  查询  支出科目类 元素层次element_level 04 科室月份，预算值类型value_type_code 为 01本年预算 的 计算项 数据 -->
+	<select id="queryBudgCostDMBudg" resultMap="countDataMap"  parameterType="java.util.Map" >
+	
+		SELECT 
+		a.group_id,
+		a.hos_id,
+		a.copy_code,
+		a.subj_code code,
+		b.subj_name as count_item,
+		a.cost_budg as count_value	
+		
+		FROM BUDG_MED_COST  a
+		LEFT JOIN BUDG_COST_SUBJ b
+			ON
+				a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code
+				and a.year = b.budg_year
+				and a.subj_code = b.subj_code 
+		where                     
+			a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			<if test="year != null and year != ''">
+			AND a.year = #{year,jdbcType=VARCHAR}
+			</if>
+			<if test="index_code != null and index_code != '' ">
+			AND a.subj_code = #{index_code,jdbcType=VARCHAR}
+			</if>
+			<if test="dept_id != null and dept_id != '' ">
+			AND a.dept_id = #{dept_id,jdbcType=INTEGER}
+			</if>
+			<if test="month != null and month != '' ">
+			AND a.month = #{month,jdbcType=VARCHAR}
+			</if>
+	</select>
+	
+	
+	<!-- 查询  支出科目类 元素层次element_level 01 医院年度，预算值类型value_type_code 为 02上年执行 的 计算项 数据 -->
+	<select id="queryBudgCostHYExecute" resultMap="countDataMap"  parameterType="java.util.Map" >
+	
+		SELECT 
+		a.group_id,
+		a.hos_id,
+		a.copy_code,
+		a.budg_year year ,
+		a.subj_code code,
+		a.subj_name as count_item,
+		
+		nvl(SUM(b.amount),0) as count_value	
+		
+		FROM BUDG_COST_SUBJ    a
+		LEFT JOIN BUDG_MED_COST_EXECUTE b
+			ON
+				a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code
+				and a.budg_year = b.year
+				and b.subj_code like a.subj_code || '%' 
+		where                    
+			a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND a.budg_year = #{year,jdbcType=VARCHAR}
+			AND a.subj_code = #{index_code,jdbcType=VARCHAR}
+		group by a.group_id , a.hos_id , a.copy_code , a.budg_year ,  a.subj_code , a.subj_name
+	</select>
+	
+	
+	<!-- 查询  支出科目类 元素层次element_level 02 医院月份，预算值类型value_type_code 为 02上年执行 的 计算项 数据 -->
+	<select id="queryBudgCostHMExecute" resultMap="countDataMap"  parameterType="java.util.Map" >
+	
+		SELECT 
+		a.group_id,
+		a.hos_id,
+		a.copy_code,
+		a.budg_year year ,
+		b.month ,
+		a.subj_code code,
+		a.subj_name as count_item,
+		nvl(SUM(a.amount),0) as count_value	
+		FROM BUDG_COST_SUBJ    a
+		LEFT JOIN  BUDG_MED_COST_EXECUTE b
+			ON
+				a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code
+				and a.budg_year = b.year
+				and b.subj_code like a.subj_code || '%'
+		where                     
+			a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND a.budg_year = #{year,jdbcType=VARCHAR}
+			AND a.subj_code = #{index_code,jdbcType=VARCHAR}
+			AND b.month = #{month,jdbcType=VARCHAR}
+		group by a.group_id , a.hos_id , a.copy_code , a.budg_year ,b.month , a.subj_code , a.subj_name 
+	</select>
+	
+	<!-- // 查询  支出科目类 元素层次element_level 03 科室年度，预算值类型value_type_code 为 02上年执行 的 计算项 数据 -->
+	<select id="queryBudgCostDYExecute" resultMap="countDataMap"  parameterType="java.util.Map" >
+	
+		SELECT 
+		a.group_id,
+		a.hos_id,
+		a.copy_code,
+		a.budg_year year ,
+		a.subj_code code,
+		a.subj_name as count_item,
+		b.dept_id ,
+		nvl(SUM(b.amount),0) as count_value	
+		FROM BUDG_COST_SUBJ    a
+		LEFT JOIN  BUDG_MED_COST_EXECUTE b
+			ON
+				a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code
+				and a.budg_year = b.year
+				and b.subj_code like  a.subj_code || '%' 
+		where                    
+			a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND a.budg_year = #{year,jdbcType=VARCHAR}
+			AND a.subj_code = #{index_code,jdbcType=VARCHAR}
+			AND b.dept_id = #{dept_id,jdbcType=INTEGER}
+		group by a.group_id , a.hos_id , a.copy_code , a.budg_year , a.subj_code , b.dept_id , a.subj_name
+	</select>
+	
+	<!--  查询  支出科目类 元素层次element_level 04 科室月份，预算值类型value_type_code 为 02上年执行 的 计算项 数据 -->
+	<select id="queryBudgCostDMExecute" resultMap="countDataMap"  parameterType="java.util.Map" >
+	
+		SELECT 
+			a.group_id,
+			a.hos_id,
+			a.copy_code,
+			a.budg_year year ,
+			b.month ,
+			a.subj_code code,
+			a.subj_name as count_item,
+			b.dept_id ,
+			nvl(sum(b.amount),0) as count_value	
+		FROM BUDG_COST_SUBJ    a
+		LEFT JOIN  BUDG_MED_COST_EXECUTE b
+			ON
+				a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code
+				and a.budg_year = b.year
+				and b.subj_code like a.subj_code || '%'
+		where                     
+			a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND a.budg_year = #{year,jdbcType=VARCHAR}
+			AND a.subj_code = #{index_code,jdbcType=VARCHAR}
+			AND b.dept_id = #{dept_id,jdbcType=INTEGER}
+			AND b.month = #{month,jdbcType=VARCHAR}
+		group by a.group_id, a.hos_id, a.copy_code, a.budg_year , b.month , a.subj_code , a.subj_name , b.dept_id 
+	</select>
+	
+	<!-- 计算项取值  递归  计算项 类型为 01 基本指标时  从 BUDG_BASIC_INDEX_GET_WAY(基本指标取值方法)表中 查询其取值方法 ; -->
+	<select id="queryBasicIndexGetWay" resultMap="getWayMap"  parameterType="java.util.Map" >
+	
+		SELECT 
+			a.group_id,
+			a.hos_id,
+			a.copy_code,
+			a.index_code ,
+			b.index_name ,
+			a.get_value_way,
+			a.formula_id,
+			a.fun_id
+		FROM BUDG_BASIC_INDEX_GET_WAY a
+		left join BUDG_BASIC_INDEX_DICT b
+			on	
+				a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code
+				and a.index_code = b.index_code
+		WHERE 
+			a.group_id = #{group_id,jdbcType=INTEGER}   
+			and a.hos_id = #{hos_id,jdbcType=INTEGER}   
+			and a.copy_code = #{copy_code,jdbcType=VARCHAR}   
+			and a.index_code = #{index_code,jdbcType=VARCHAR} 
+	
+	</select>
+	
+	<!-- 计算项取值  递归  计算项 类型为 02 费用指标时  从 BUDG_CHARGE_STAND_GET_WAY(费用标准取值方法)表中 查询其取值方法； -->
+	<select id="queryChargeStanIndexGetWay" resultMap="getWayMap"  parameterType="java.util.Map" >
+	
+		SELECT 
+			a.group_id,
+			a.hos_id,
+			a.copy_code,
+			a.charge_stand_code index_code,
+			b.charge_stan_name index_name,
+			a.get_value_way,
+			a.formula_id,
+			a.fun_id
+		FROM BUDG_CHARGE_STAND_GET_WAY a
+		LEFT JOIN BUDG_CHARGE_STANDARD_DICT b
+			on
+				a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code
+				and a.charge_stand_code = b.charge_stan_code
+		WHERE 
+			a.group_id = #{group_id,jdbcType=INTEGER}   
+			and a.hos_id = #{hos_id,jdbcType=INTEGER}   
+			and a.copy_code = #{copy_code,jdbcType=VARCHAR}   
+			and a.charge_stand_code = #{index_code,jdbcType=VARCHAR} 
+	
+	</select>
+	
+	<!-- 计算项取值  递归  计算项 类型为 03 预算指标时  从 BUDG_WORK_EDIT_PLAN(业务预算编制方案)表中 查询其取值方法； -->
+	<select id="queryBudgIndexGetWay" resultMap="getWayMap"  parameterType="java.util.Map" >
+	
+		SELECT 
+			a.group_id,
+			a.hos_id,
+			a.copy_code,
+			a.index_code,
+			b.index_name,
+			a.edit_method ,
+			a.get_way,
+			a.formula_id,
+			a.fun_id
+		FROM BUDG_WORK_EDIT_PLAN a
+		LEFT JOIN  BUDG_INDEX_dict b
+			on
+				a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code
+				and a.index_code = b.index_code
+		WHERE 
+			a.group_id = #{group_id,jdbcType=INTEGER}   
+			and a.hos_id = #{hos_id,jdbcType=INTEGER}   
+			and a.copy_code = #{copy_code,jdbcType=VARCHAR} 
+			and a.budg_year = #{year,jdbcType=VARCHAR} 
+			and a.budg_level = #{element_level,jdbcType=VARCHAR}   
+			and a.index_code = #{index_code,jdbcType=VARCHAR} 
+	
+	</select>
+	
+	<!-- 计算项取值  递归  计算项 类型为 04 收入科目时  从 BUDG_MED_INCOME_EDIT_PLAN (医疗收入预算编制方案)表中 查询其取值方法； -->
+	<select id="queryIncomeIndexGetWay" resultMap="getWayMap"  parameterType="java.util.Map" >
+	
+		SELECT 
+			a.group_id,
+			a.hos_id,
+			a.copy_code,
+			a.subj_code index_code,
+			b.subj_name index_name,
+			a.edit_method ,
+			a.get_way,
+			a.formula_id,
+			a.fun_id
+		FROM BUDG_MED_INCOME_EDIT_PLAN a
+		LEFT JOIN  BUDG_INCOME_SUBJ b
+			on
+				a.group_id = b.group_id
+				and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code
+				and a.budg_year = b.budg_year
+				and a.subj_code = b.subj_code
+		WHERE 
+			a.group_id = #{group_id,jdbcType=INTEGER}   
+			and a.hos_id = #{hos_id,jdbcType=INTEGER}   
+			and a.copy_code = #{copy_code,jdbcType=VARCHAR} 
+			and a.budg_year = #{year,jdbcType=VARCHAR} 
+			and a.subj_code = #{index_code,jdbcType=VARCHAR} 
+	
+	</select>
+</mapper>
+

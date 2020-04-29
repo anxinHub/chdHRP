@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.htcg.dao.calculation.HtcgHosPdrgsCostMapper">
+	<resultMap id="hospPdrgsCost" type="com.chd.hrp.htcg.entity.calculation.HtcgHosPdrgsCost">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="period_type_code" column="period_type_code" />
+		<result property="period_type_name" column="period_type_name" />
+		<result property="period_code" column="period_code" />
+		<result property="period_name" column="period_name" />
+		<result property="acc_year" column="acc_year" />
+		<result property="acc_month" column="acc_month" />
+		<result property="scheme_code" column="scheme_code" />
+		<result property="scheme_name" column="scheme_name" />
+		<result property="drgs_code" column="drgs_code" />
+		<result property="drgs_name" column="drgs_name" />
+		<result property="clp_p_step" column="clp_p_step" />
+		<result property="clp_step_name" column="clp_step_name" />
+		<result property="item_code" column="item_code" />
+		<result property="item_name" column="item_name" />
+		<result property="charge_nature_code" column="charge_nature_code" />
+		<result property="amount" column="amount" />
+		<result property="price" column="price" />
+		<result property="income_money" column="income_money" />
+		<result property="cost_price" column="cost_price" />
+		<result property="cost_money" column="cost_money" />
+		<result property="profit_money" column="profit_money" />
+		<result property="recipe_type_code" column="recipe_type_code" />
+		<result property="recipe_type_name" column="recipe_type_name" />
+	</resultMap>
+
+	<select id="initHtcgHosPdrgsCost" statementType="CALLABLE" parameterType="java.util.Map" resultType="java.util.Map">
+              <![CDATA[
+			{call pkg_htcg_cal.prc_htcg_hos_p_drgs_cost(
+		        #{group_id, mode=IN},
+		        #{hos_id, mode=IN},
+		        #{copy_code, mode=IN},
+		        #{scheme_code, mode=IN},
+		        #{acc_year, mode=IN},
+		        #{msg,mode=OUT,jdbcType=VARCHAR}
+			)}
+			]]>
+    </select> 
+                 
+    <delete id= "deleteBatchHtcgHosPdrgsCost" parameterType="java.util.List">
+             delete htcg_hos_p_drgs_cost where
+		<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+			       group_id = #{item.group_id}
+			   and hos_id = #{item.hos_id}
+			   and copy_code = #{item.copy_code}
+			   and period_type_code = #{item.period_type_code}
+			   and acc_year = #{item.acc_year}
+			   and acc_month = #{item.acc_month}
+			   and scheme_code = #{item.scheme_code}
+			   and drgs_code = #{item.drgs_code}
+			   and clp_p_step = #{item.clp_p_step}
+			   and item_code = #{item.item_code}
+			   and charge_nature_code = #{item.charge_nature_code}
+			   and price = #{item.price}
+			   and recipe_type_code = #{item.recipe_type_code}
+		</foreach>
+    </delete>
+	
+	<select id="queryHtcgHosPdrgsCost" parameterType="java.util.Map" resultMap="hospPdrgsCost">
+		         select hhpdc.group_id,
+				       hhpdc.hos_id,
+				       hhpdc.copy_code,
+				       hhpdc.period_type_code,
+					   hpt.period_type_name,
+					   hpd.period_code,
+					   hpd.period_name,
+				       hhpdc.acc_year,
+				       hhpdc.acc_month,
+				       hhpdc.scheme_code,
+					   hs.scheme_name,
+				       hhpdc.drgs_code,
+					   hd.drgs_name,
+				       hhpdc.clp_p_step,
+					   hcsd.clp_step_name,
+					   decode(hhpdc.charge_nature_code, '01', ccia.charge_item_code, '02', hdd.drug_code, '03', hmd.mate_code) as item_code,
+					   decode(hhpdc.charge_nature_code, '01', ccia.charge_item_name, '02', hdd.drug_name, '03', hmd.mate_name) as item_name,
+				       hhpdc.charge_nature_code,
+				       hhpdc.amount,
+				       hhpdc.price,
+				       hhpdc.income_money,
+				       hhpdc.cost_price,
+				       hhpdc.cost_money,
+				       hhpdc.recipe_type_code,
+					   hrt.recipe_type_name
+				  from htcg_hos_p_drgs_cost hhpdc
+					left join htcg_period_type hpt
+					on hpt.period_type_code = hhpdc.period_type_code
+					left join htcg_period_dict hpd
+					on hpd.period_type_code = hhpdc.period_type_code
+					and hpd.period_code = hhpdc.acc_month
+					left join htcg_scheme hs
+					on hs.group_id = hhpdc.group_id
+					and hs.hos_id = hhpdc.hos_id 
+					and hs.copy_code = hhpdc.copy_code 
+					and hs.scheme_code = hhpdc.scheme_code 
+				  left join htcg_drgs hd
+					on hd.group_id = hhpdc.group_id
+					and hd.hos_id = hhpdc.hos_id
+					and hd.copy_code = hhpdc.copy_code
+					and hd.drgs_code = hhpdc.drgs_code
+					left join htcg_clp_step_dict hcsd
+					on hcsd.group_id = hhpdc.group_id
+					and hcsd.hos_id = hhpdc.hos_id
+					and hcsd.copy_code = hhpdc.copy_code
+					and hcsd.clp_step_code = hhpdc.clp_p_step
+				  left join cost_charge_item_arrt ccia 
+					on ccia.group_id = hhpdc.group_id
+					and ccia.hos_id = hhpdc.hos_id
+					and ccia.copy_code = hhpdc.copy_code
+					and ccia.charge_item_code = hhpdc.item_code 
+					left join htcg_drug_dict hdd 
+					on hdd.group_id = hhpdc.group_id
+					and hdd.hos_id = hhpdc.hos_id
+					and hdd.copy_code = hhpdc.copy_code
+					and hdd.drug_code = hhpdc.item_code 
+					left join htc_material_dict hmd 
+					on hmd.group_id = hhpdc.group_id
+					and hmd.hos_id = hhpdc.hos_id
+					and hmd.copy_code = hhpdc.copy_code
+					and hmd.mate_code = hhpdc.item_code 
+					left join htcg_recipe_type hrt
+					on hrt.group_id = hhpdc.group_id
+					and hrt.hos_id = hhpdc.hos_id
+					and hrt.copy_code = hhpdc.copy_code
+					and hrt.recipe_type_code = hhpdc.recipe_type_code
+				 <where> hhpdc.group_id = #{group_id}
+				   and hhpdc.hos_id = #{hos_id}
+				   and hhpdc.copy_code = #{copy_code}
+				    <if test="scheme_code != null and scheme_code != ''">
+					   and hhpdc.scheme_code = #{scheme_code}
+					</if>
+				    <if test="acc_year != null and acc_year != ''">
+					   and hhpdc.acc_year = #{acc_year}
+					</if>
+					<if test="period_type_code != null and period_type_code != ''">
+						and hhpdc.period_type_code = #{period_type_code}
+					</if>
+					<if test="period_code != null and period_code != ''">
+						and hpd.period_code = #{period_code}
+					</if>
+				 </where>
+						  
+	</select>
+
+</mapper>
+

@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.eqc.dao.base.AssBenefitAnalysisObjectMapper">
+	
+	<resultMap id="assBenefitAnalysisObject" type="java.util.Map">
+	<result property="group_id" column="group_id"/>
+	<result property="hos_id" column="hos_id"/>
+	<result property="copy_code" column="copy_code"/>
+	<result property="analysis_code" column="analysis_code"/>
+	<result property="analysis_name" column="analysis_name"/>
+	<result property="analysis_attribute" column="analysis_attribute"/>
+	<result property="analysis_attribute_name" column="analysis_attribute_name"/>
+	<result property="invalid_flag" column="invalid_flag"/>
+	<result property="remark" column="remark"/>
+	</resultMap>
+	
+	<insert id="add" useGeneratedKeys="true" >
+	
+		INSERT INTO ASS_BENEFIT_ANALYSIS_OBJECT (
+			group_id
+			,
+			hos_id
+			,
+			copy_code
+			,
+			analysis_code
+			,
+			analysis_name
+			,
+			analysis_attribute
+			,
+			invalid_flag
+			,
+			remark
+		
+		) VALUES (
+			#{group_id}		,
+			#{hos_id}		,
+			#{copy_code}		,
+			#{analysis_code}		,
+			#{analysis_name}		,
+			#{analysis_attribute}		,
+			#{invalid_flag}		,
+			#{remark}		
+		)
+	
+	</insert>
+	<insert id="addBatch" parameterType="java.util.List" >
+	
+		INSERT INTO ASS_Benefit_Analysis_Object (
+			group_id
+			,
+			hos_id
+			,
+			copy_code
+			,
+			analysis_code
+			,
+			analysis_name
+			,
+			analysis_attribute
+			,
+			invalid_flag
+			,
+			remark
+			
+			
+		) select t.* from(
+		<foreach collection="list" item="item" index="index" separator=" union all " >
+			select 		
+				#{item.group_id}			,
+				#{item.hos_id}			,
+				#{item.copy_code}			,
+				#{item.analysis_code}			,
+				#{item.analysis_name}			,
+				#{item.analysis_attribute}			,
+				#{item.invalid_flag}			,
+				#{item.remark}			
+			from dual
+		</foreach>
+		)t
+	</insert>
+	
+	<update id="update" parameterType="java.util.Map">
+	
+		UPDATE ASS_Benefit_Analysis_Object SET
+		
+			invalid_flag = #{invalid_flag}
+			,
+			remark = #{remark}
+		
+		WHERE 
+				group_id = #{group_id}
+			and hos_id = #{hos_id}
+			and copy_code = #{copy_code}
+			and analysis_code = #{analysis_code}	
+		
+	
+	</update>
+	<update id="updateBatch" parameterType="java.util.List">
+	
+		<foreach collection="list" item="item" index="index" open="begin" close=";end;" separator=";" >
+			UPDATE ASS_Benefit_Analysis_Object SET
+			
+				invalid_flag = #{item.invalid_flag}
+				,
+				remark = #{item.remark}
+			
+			WHERE 
+					group_id = #{item.group_id}
+				and hos_id = #{item.hos_id}
+				and copy_code = #{item.copy_code}
+				and analysis_code = #{item.analysis_code}	
+			
+		</foreach>
+	</update>
+	
+	<delete id="delete" parameterType="java.util.Map">
+	
+		DELETE FROM ASS_Benefit_Analysis_Object 
+		WHERE
+			group_id = #{group_id}
+			and hos_id = #{hos_id}
+			and copy_code = #{copy_code}
+			and analysis_code = #{analysis_code}	
+	
+	</delete>
+	<delete id="deleteBatch" parameterType="java.util.List">
+		DELETE FROM ASS_Benefit_Analysis_Object WHERE
+			<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+					group_id = #{item.group_id}
+				and hos_id = #{item.hos_id}
+				and copy_code = #{item.copy_code}
+				and analysis_code = #{item.analysis_code}	
+			</foreach>
+	
+	</delete>
+	<select id="query" parameterType="java.util.Map" resultMap="assBenefitAnalysisObject" >
+	
+		SELECT 
+			a.group_id,
+			a.hos_id,
+			a.copy_code,
+			a.analysis_code ,
+			a.analysis_name,
+			a.analysis_attribute,
+			case a.analysis_attribute when '01' then '机组' else '设备' end analysis_attribute_name ,
+			a.invalid_flag,
+			a.remark
+		FROM ASS_Benefit_Analysis_Object a
+		where                     
+			a.group_id = #{group_id}
+			AND a.hos_id = #{hos_id}
+			AND a.copy_code = #{copy_code}
+			<if test="analysis_code != null and analysis_code != ''">
+			AND (a.analysis_code like #{analysis_code}||'%' or
+				a.analysis_name like '%'||#{analysis_code}||'%'
+			)
+			</if>
+			<if test="analysis_attribute != null and analysis_attribute != ''">
+			AND a.analysis_attribute = #{analysis_attribute}
+			</if>
+		order by a.analysis_code asc
+	</select>
+	<select id="queryByCode" resultMap="assBenefitAnalysisObject" parameterType="string" >
+	
+		SELECT 
+			group_id,
+			hos_id,
+			copy_code,
+			analysis_code,
+			analysis_name,
+			analysis_attribute,
+			invalid_flag,
+			remark
+		FROM ASS_Benefit_Analysis_Object 
+		WHERE 
+			group_id = #{group_id}
+			and hos_id = #{hos_id}
+			and copy_code = #{copy_code}
+			and analysis_code = #{analysis_code}	
+	
+	</select>
+	
+	<!-- 查询添加数据是否已存在 -->
+	<select id="queryDataExist" resultType="java.lang.String">
+		<foreach collection="list" item="item" index="index" separator=" union all " >
+			SELECT to_number(${item.rowNo})+ 1 rowNo
+			FROM ASS_Benefit_Analysis_Object
+			where
+				group_id = #{item.group_id,jdbcType=INTEGER}
+				AND hos_id = #{item.hos_id,jdbcType=INTEGER}
+				AND copy_code = #{item.copy_code,jdbcType=VARCHAR}
+				AND analysis_code = #{item.analysis_code,jdbcType=VARCHAR}
+		</foreach>
+	</select>
+
+</mapper>
+

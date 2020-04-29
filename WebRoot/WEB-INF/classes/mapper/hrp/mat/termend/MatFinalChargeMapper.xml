@@ -1,0 +1,444 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.mat.dao.termend.MatFinalChargeMapper">
+	 
+	<!-- 结账 -->
+	<select id="updateMatFinalCharge" statementType="CALLABLE" parameterType="java.util.Map" resultType="java.lang.String">
+		<![CDATA[
+			{call MAT_FINAL_CHARGE_MONTH(#{group_id,jdbcType=INTEGER}, #{hos_id,jdbcType=INTEGER}, 
+				#{copy_code,jdbcType=VARCHAR}, #{year,jdbcType=INTEGER}, #{month,jdbcType=VARCHAR}, 
+				#{next_year,jdbcType=INTEGER}, #{next_month,jdbcType=VARCHAR},
+				#{user_id,jdbcType=INTEGER}, #{msg, mode=OUT, jdbcType=VARCHAR})}
+		]]>
+	</select>
+	
+	<!-- 反结账 -->
+	<select id="updateMatFinalInverse" statementType="CALLABLE" parameterType="java.util.Map" resultType="java.lang.String">
+		<![CDATA[
+			{call MAT_FINAL_INVERSE_MONTH(#{group_id,jdbcType=INTEGER}, #{hos_id,jdbcType=INTEGER}, 
+				#{copy_code,jdbcType=VARCHAR}, #{year,jdbcType=INTEGER}, #{month,jdbcType=VARCHAR}, 
+				#{last_year,jdbcType=INTEGER}, #{last_month,jdbcType=VARCHAR},
+				#{before_year,jdbcType=INTEGER}, #{before_month,jdbcType=VARCHAR},
+				#{user_id,jdbcType=INTEGER}, #{msg, mode=OUT, jdbcType=VARCHAR})}
+		]]>
+	</select>
+	
+	<!-- 反结账 -->
+	<select id="updateMatFinalChargeStore" statementType="CALLABLE" parameterType="java.util.Map" resultType="java.lang.String">
+		<![CDATA[
+			{call MAT_FINAL_CHARGE_MONTH_STORE(#{group_id,jdbcType=INTEGER}, #{hos_id,jdbcType=INTEGER}, 
+				#{copy_code,jdbcType=VARCHAR}, #{set_id,jdbcType=INTEGER}, #{year,jdbcType=INTEGER}, 
+				#{month,jdbcType=VARCHAR}, #{next_year,jdbcType=INTEGER}, #{next_month,jdbcType=VARCHAR},
+				#{user_id,jdbcType=INTEGER}, #{msg, mode=OUT, jdbcType=VARCHAR})}
+		]]>
+	</select>
+	
+	<!-- 反结账 -->
+	<select id="updateMatFinalInverseStore" statementType="CALLABLE" parameterType="java.util.Map" resultType="java.lang.String">
+		<![CDATA[
+			{call MAT_FINAL_INVERSE_MONTH_STORE(#{group_id,jdbcType=INTEGER}, #{hos_id,jdbcType=INTEGER}, 
+				#{copy_code,jdbcType=VARCHAR}, #{set_id,jdbcType=INTEGER}, #{year,jdbcType=INTEGER}, 
+				#{month,jdbcType=VARCHAR}, #{last_year,jdbcType=INTEGER}, #{last_month,jdbcType=VARCHAR},
+				#{before_year,jdbcType=INTEGER}, #{before_month,jdbcType=VARCHAR},
+				#{user_id,jdbcType=INTEGER}, #{msg, mode=OUT, jdbcType=VARCHAR})}
+		]]>
+	</select>
+	
+	<select id="queryYearMonthByStoreSet" parameterType="java.util.Map" resultType="java.util.Map" >
+		with t_stym as(
+			<!-- 取虚仓已结账的最大年月 -->
+			select max(year || month) year_month
+			from mat_termend_store mts
+			where mts.group_id = #{group_id,jdbcType=INTEGER} 
+				and mts.hos_id = #{hos_id,jdbcType=INTEGER} 
+				and mts.copy_code = #{copy_code,jdbcType=VARCHAR} 
+				and mts.is_account = 1
+				and exists(
+					select 1 from mat_store_detail 
+					where group_id = #{group_id,jdbcType=INTEGER} 
+						and hos_id = #{hos_id,jdbcType=INTEGER} 
+						and set_id = #{set_id,jdbcType=INTEGER} 
+						and is_account = 1
+						and store_id = mts.store_id 
+				)
+		), t_sytmb as(
+			<!-- 取虚仓最小启用年月 -->
+			select min(start_year || start_month) year_month
+			from mat_store_start mss
+			where mss.group_id = #{group_id,jdbcType=INTEGER} 
+				and mss.hos_id = #{hos_id,jdbcType=INTEGER} 
+				and mss.copy_code = #{copy_code,jdbcType=VARCHAR} 
+				and exists(
+					select 1 from mat_store_detail
+					where group_id = #{group_id,jdbcType=INTEGER} 
+						and hos_id = #{hos_id,jdbcType=INTEGER} 
+						and set_id = #{set_id,jdbcType=INTEGER} 
+						and is_account = 1
+						and store_id = mss.store_id
+				)
+		)
+		select a.year_month, b.before_year_month
+		from (
+		    select max(year_month) as year_month from (
+			select min(acc_year || '.' || acc_month) year_month
+			from acc_year_month aym 
+			where aym.group_id = #{group_id,jdbcType=INTEGER} 
+				and aym.hos_id = #{hos_id,jdbcType=INTEGER} 
+				and aym.copy_code = #{copy_code,jdbcType=VARCHAR} 
+				and acc_year || acc_month > (select year_month from t_stym) 
+			 union all
+			select min(start_year || '.' || start_month) year_month
+			from mat_store_start mss
+			where mss.group_id = #{group_id,jdbcType=INTEGER} 
+				and mss.hos_id = #{hos_id,jdbcType=INTEGER} 
+				and mss.copy_code = #{copy_code,jdbcType=VARCHAR} 
+				and exists(
+					select 1 from mat_store_detail
+					where group_id = #{group_id,jdbcType=INTEGER} 
+						and hos_id = #{hos_id,jdbcType=INTEGER} 
+						and set_id = #{set_id,jdbcType=INTEGER} 
+						and is_account = 1
+						and store_id = mss.store_id
+				)
+				)
+		) a 
+		left join (
+			select max(acc_year || '.' || acc_month) before_year_month
+			from acc_year_month aymb
+			where aymb.group_id = #{group_id,jdbcType=INTEGER} 
+				and aymb.hos_id = #{hos_id,jdbcType=INTEGER} 
+				and aymb.copy_code = #{copy_code,jdbcType=VARCHAR} 
+				and acc_year || acc_month &lt;= (select year_month from t_stym) 
+				and acc_year || acc_month >= (select year_month from t_sytmb) 
+		) b
+			on 1 = 1
+	</select>
+	
+	<!-- 账表核对 -->
+	<resultMap id="MatFinalCheck" type="com.chd.hrp.mat.entity.MatFinalCheck">
+		<result property="store_code" column="store_code"/>
+		<result property="store_name" column="store_name"/>
+		<result property="inv_code" column="inv_code"/>
+		<result property="inv_name" column="inv_name"/>
+		<result property="begin_amount_rpt" column="begin_amount_rpt"/>
+		<result property="begin_amount_calc" column="begin_amount_calc"/>
+		<result property="begin_money_rpt" column="begin_money_rpt"/>
+		<result property="begin_money_calc" column="begin_money_calc"/>
+		<result property="in_amount_rpt" column="in_amount_rpt"/>
+		<result property="in_amount_calc" column="in_amount_calc"/>
+		<result property="in_money_rpt" column="in_money_rpt"/>
+		<result property="in_money_calc" column="in_money_calc"/>
+		<result property="out_amount_rpt" column="out_amount_rpt"/>
+		<result property="out_amount_calc" column="out_amount_calc"/>
+		<result property="out_money_rpt" column="out_money_rpt"/>
+		<result property="out_money_calc" column="out_money_calc"/>
+		<result property="end_amount_rpt" column="end_amount_rpt"/>
+		<result property="end_amount_calc" column="end_amount_calc"/>
+		<result property="end_money_rpt" column="end_money_rpt"/>
+		<result property="end_money_calc" column="end_money_calc"/>
+		
+	</resultMap>
+	<select id="query" parameterType="java.util.Map" resultMap="MatFinalCheck" >
+		WITH  bal_table as(
+		    SELECT 
+		           mbb.store_id,
+		           mbb.inv_id, 
+		           nvl(SUM(mbb.begin_amount), 0.00) AS begin_amount_rpt, 
+		           nvl(SUM(ROUND(mbb.begin_money, #{para_04005,jdbcType=INTEGER})),0.00) AS begin_money_rpt, 
+		           nvl(SUM(mbb.in_amount), 0.00) AS in_amount_rpt, 
+		           nvl(SUM(ROUND(mbb.in_money, #{para_04005,jdbcType=INTEGER})),0.00) AS in_money_rpt, 
+		           nvl(SUM(mbb.out_amount), 0.00) AS out_amount_rpt, 
+		           nvl(SUM(ROUND(mbb.out_money, #{para_04005,jdbcType=INTEGER})),0.00) AS out_money_rpt
+			FROM mat_batch_balance mbb
+			WHERE mbb.group_id = #{group_id,jdbcType=INTEGER}
+				AND mbb.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND mbb.copy_code = #{copy_code,jdbcType=VARCHAR} 
+				AND (mbb.year || mbb.month) = #{year,jdbcType=VARCHAR}||#{month,jdbcType=VARCHAR}
+				<if test="set_id != null and set_id != ''">
+				AND exists(
+					select 1 from mat_store_detail
+					where group_id = #{group_id,jdbcType=INTEGER} 
+						and hos_id = #{hos_id,jdbcType=INTEGER} 
+						and set_id = #{set_id,jdbcType=INTEGER} 
+						and is_account = 1
+						and store_id = mbb.store_id
+				)
+				</if>
+			GROUP BY mbb.store_id, mbb.inv_id
+		),begin_table as(
+		  SELECT 
+		           begin_in.store_id, 
+		           begin_in.inv_id, nvl(num_bin, 0.00) - nvl(num_bout, 0.00) AS begin_amount_calc, 
+		           nvl(money_bin, 0.00) - nvl(money_bout, 0.00) AS begin_money_calc
+		  FROM (
+		    SELECT 
+		           mim.store_id,
+		           mid.inv_id, 
+		           SUM(mid.amount) AS num_bin, 
+		           SUM(ROUND(nvl(mid.amount_money, 0.00), #{para_04005,jdbcType=INTEGER})) AS money_bin
+		    FROM mat_in_main mim
+		      JOIN mat_in_detail mid ON mim.in_id = mid.in_id 
+		    WHERE (mim.year || mim.month) &lt; #{year,jdbcType=VARCHAR}||#{month,jdbcType=VARCHAR}
+		      AND mim.group_id = #{group_id,jdbcType=INTEGER}
+		      AND mim.hos_id = #{hos_id,jdbcType=INTEGER}
+		      AND mim.copy_code = #{copy_code,jdbcType=VARCHAR}
+		      AND mim.state = '3' 
+				<if test="set_id != null and set_id != ''">
+				AND exists(
+					select 1 from mat_store_detail
+					where group_id = #{group_id,jdbcType=INTEGER} 
+						and hos_id = #{hos_id,jdbcType=INTEGER} 
+						and set_id = #{set_id,jdbcType=INTEGER} 
+						and is_account = 1
+						and store_id = mim.store_id
+				)
+				</if>
+		    GROUP BY mim.store_id, mid.inv_id
+		  ) begin_in
+		    LEFT JOIN (
+		      SELECT 
+		           mom.store_id, 
+		           mod.inv_id, 
+		           SUM(mod.amount) AS num_bout, 
+		           SUM(ROUND(nvl(mod.amount_money, 0.00), #{para_04005,jdbcType=INTEGER})) AS money_bout
+		      FROM mat_out_main mom
+		        JOIN mat_out_detail mod ON mom.out_id = mod.out_id 
+		      WHERE (mom.year || mom.month) &lt; #{year,jdbcType=VARCHAR}||#{month,jdbcType=VARCHAR}
+		        AND mom.group_id = #{group_id,jdbcType=INTEGER}
+		        AND mom.hos_id = #{hos_id,jdbcType=INTEGER}
+		        AND mom.copy_code = #{copy_code,jdbcType=VARCHAR}
+		        AND mom.state = '3' 
+		        <if test="set_id != null and set_id != ''">
+				AND exists(
+					select 1 from mat_store_detail
+					where group_id = #{group_id,jdbcType=INTEGER} 
+						and hos_id = #{hos_id,jdbcType=INTEGER} 
+						and set_id = #{set_id,jdbcType=INTEGER} 
+						and is_account = 1
+						and store_id = mom.store_id
+				)
+				</if>
+		      GROUP BY mom.store_id, mod.inv_id
+		    ) begin_out ON begin_in.store_id = begin_out.store_id
+		  AND begin_in.inv_id = begin_out.inv_id 
+		),cur_in as(  
+		      SELECT 
+		           mim.store_id, 
+		           mid.inv_id, 
+		           nvl(SUM(mid.amount), 0.00) AS in_amount_calc, 
+		           nvl(SUM(ROUND(nvl(mid.amount_money, 0.00), #{para_04005,jdbcType=INTEGER})), 0.00) AS in_money_calc
+		      FROM mat_in_main mim
+		      JOIN mat_in_detail mid ON mim.in_id = mid.in_id 
+		      WHERE 
+		         (mim.year || mim.month) = (#{year,jdbcType=VARCHAR} || #{month,jdbcType=VARCHAR})
+		         AND mim.group_id = #{group_id,jdbcType=INTEGER}
+		         AND mim.hos_id = #{hos_id,jdbcType=INTEGER}
+		         AND mim.copy_code = #{copy_code,jdbcType=VARCHAR}
+		         AND mim.state = '3' 
+				<if test="set_id != null and set_id != ''">
+				AND exists(
+					select 1 from mat_store_detail
+					where group_id = #{group_id,jdbcType=INTEGER} 
+						and hos_id = #{hos_id,jdbcType=INTEGER} 
+						and set_id = #{set_id,jdbcType=INTEGER} 
+						and is_account = 1
+						and store_id = mim.store_id
+				)
+				</if>
+		      GROUP BY mim.store_id, mid.inv_id
+		),cur_out as(  
+		      SELECT 
+		           mom.store_id, 
+		           mod.inv_id, 
+		           nvl(SUM(mod.amount), 0.00) AS out_amount_calc, 
+		           nvl(SUM(ROUND(nvl(mod.amount_money, 0.00), #{para_04005,jdbcType=INTEGER})), 0.00) AS out_money_calc
+		      FROM mat_out_main mom
+		      JOIN mat_out_detail mod ON mom.out_id = mod.out_id 
+		      WHERE (mom.year || mom.month) = #{year,jdbcType=VARCHAR}||#{month,jdbcType=VARCHAR}
+		         AND mom.group_id = #{group_id,jdbcType=INTEGER}
+		         AND mom.hos_id = #{hos_id,jdbcType=INTEGER}
+		         AND mom.copy_code = #{copy_code,jdbcType=VARCHAR}
+		         AND mom.state = '3' 
+				<if test="set_id != null and set_id != ''">
+				AND exists(
+					select 1 from mat_store_detail
+					where group_id = #{group_id,jdbcType=INTEGER} 
+						and hos_id = #{hos_id,jdbcType=INTEGER} 
+						and set_id = #{set_id,jdbcType=INTEGER} 
+						and is_account = 1
+						and store_id = mom.store_id
+				)
+				</if>
+		      GROUP BY mom.store_id, mod.inv_id
+		 ) ,
+		 rs_table as(
+		      select store_id,inv_id from bal_table
+		      union all 
+		      select store_id,inv_id from begin_table
+		      union all 
+		      select store_id,inv_id from cur_in
+		      union all 
+		      select store_id,inv_id from cur_out
+		 )
+		
+		   SELECT 
+		      hs.store_code,
+		      hs.store_name,
+		      mi.inv_code,
+		      mi.inv_name,
+		      nvl(bal_table.begin_amount_rpt,0.00)  as begin_amount_rpt, 
+		      nvl(begin_table.begin_amount_calc,0.00) as begin_amount_calc, 
+		      bal_table.begin_money_rpt, 
+		      begin_table.begin_money_calc, 
+		      nvl(bal_table.in_amount_rpt,0.00) as in_amount_rpt,
+		      nvl(cur_in.in_amount_calc,0.00) as in_amount_calc, 
+		      bal_table.in_money_rpt, 
+		      cur_in.in_money_calc, 
+		      nvl(bal_table.out_amount_rpt,0.00) as out_amount_rpt, 
+		      nvl(cur_out.out_amount_calc,0.00) as out_amount_calc, 
+		      bal_table.out_money_rpt, 
+		      cur_out.out_money_calc, 
+		      nvl(bal_table.begin_amount_rpt,0.00)+nvl(bal_table.in_amount_rpt,0.00)-nvl(bal_table.out_amount_rpt,0.00) as end_amount_rpt, 
+		      nvl(begin_table.begin_amount_calc,0.00)+nvl(cur_in.in_amount_calc,0.00)-nvl(cur_out.out_amount_calc,0.00) as end_amount_calc, 
+		      nvl(bal_table.begin_money_rpt,0.00)+nvl(bal_table.in_money_rpt,0.00)-nvl(bal_table.out_money_rpt,0.00) as end_money_rpt, 
+		      nvl(begin_table.begin_money_calc,0.00)+nvl(cur_in.in_money_calc,0.00)-nvl(cur_out.out_money_calc,0.00) as end_money_calc
+		  from 
+		     (select distinct store_id,inv_id from rs_table) rs
+		      left join bal_table  ON bal_table.store_id = rs.store_id AND bal_table.inv_id = rs.inv_id 
+		      left join begin_table ON rs.store_id = begin_table.store_id AND rs.inv_id = begin_table.inv_id 
+		      left join cur_in ON cur_in.store_id = rs.store_id AND cur_in.inv_id = rs.inv_id 
+		      left join cur_out ON cur_out.store_id = rs.store_id AND cur_out.inv_id = rs.inv_id 
+		      LEFT JOIN HOS_STORE hs  ON hs.group_id = #{group_id,jdbcType=INTEGER} AND hs.hos_id = #{hos_id,jdbcType=INTEGER} AND rs.store_id = hs.store_id 
+		      LEFT JOIN MAT_INV mi  ON mi.group_id = #{group_id,jdbcType=INTEGER} AND mi.hos_id = #{hos_id,jdbcType=INTEGER} AND mi.copy_code = #{copy_code,jdbcType=VARCHAR} AND rs.inv_id = mi.inv_id 
+		  WHERE nvl(begin_amount_rpt,0.00) &lt;&gt; nvl(begin_amount_calc,0.00)
+		    OR nvl(begin_money_rpt,0.00) &lt;&gt; nvl(begin_money_calc,0.00)
+		    OR nvl(in_amount_rpt,0.00) &lt;&gt; nvl(in_amount_calc,0.00)
+		    OR nvl(in_money_rpt,0.00) &lt;&gt; nvl(in_money_calc,0.00)
+		    OR nvl(out_amount_rpt,0.00) &lt;&gt; nvl(out_amount_calc,0.00)
+		    OR nvl(out_money_rpt,0.00) &lt;&gt; nvl(out_money_calc,0.00)
+		  ORDER BY rs.store_id, rs.inv_id
+	</select>
+	
+	<select id="existsMatFinalUnconfirm" parameterType="java.util.Map" resultType="Integer" >
+	SELECT SUM(num) FROM (
+			  SELECT 
+			  	COUNT(1) num
+			  FROM 
+			  	MAT_IN_MAIN 
+			  WHERE 
+			  	group_id=#{group_id,jdbcType=INTEGER}
+			    AND hos_id=#{hos_id,jdbcType=INTEGER}
+			    AND copy_code=#{copy_code,jdbcType=VARCHAR} 
+			    AND year=#{year,jdbcType=VARCHAR}
+			    AND month &lt;=#{month,jdbcType=VARCHAR} 
+			    AND state &lt;&gt; 3
+				<if test="set_id != null and set_id != ''">
+				AND exists(
+					select 1 from mat_store_detail
+					where group_id = #{group_id,jdbcType=INTEGER} 
+						and hos_id = #{hos_id,jdbcType=INTEGER} 
+						and set_id = #{set_id,jdbcType=INTEGER} 
+						and is_account = 1
+						and store_id = mat_in_main.store_id
+				)
+				</if>
+			UNION ALL
+			  SELECT 
+			  	COUNT(1) num 
+			  FROM 
+			  	MAT_OUT_MAIN 
+			  WHERE 
+			  	group_id=#{group_id,jdbcType=INTEGER}
+			    AND hos_id=#{hos_id,jdbcType=INTEGER}
+			    AND copy_code=#{copy_code,jdbcType=VARCHAR} 
+			    AND year=#{year,jdbcType=VARCHAR}
+			    AND month &lt;=#{month,jdbcType=VARCHAR} 
+			    AND state &lt;&gt; 3
+				<if test="set_id != null and set_id != ''">
+				AND exists(
+					select 1 from mat_store_detail
+					where group_id = #{group_id,jdbcType=INTEGER} 
+						and hos_id = #{hos_id,jdbcType=INTEGER} 
+						and set_id = #{set_id,jdbcType=INTEGER} 
+						and is_account = 1
+						and store_id = mat_out_main.store_id
+				)
+				</if>
+			    <!-- 
+			UNION ALL
+			  SELECT 
+			  	COUNT(*) num 
+			  FROM 
+			  	MAT_TRAN_MAIN 
+			  WHERE 
+			  	group_id=#{group_id,jdbcType=INTEGER}
+			    AND hos_id=#{hos_id,jdbcType=INTEGER}
+			    AND copy_code=#{copy_code,jdbcType=VARCHAR} 
+			    AND year=#{year,jdbcType=VARCHAR}
+			    AND month=#{month,jdbcType=VARCHAR} 
+			    AND state &lt;&gt; 3 
+			     -->
+			 UNION ALL
+			   SELECT 
+			   	COUNT(1) num
+			   FROM 
+			   	MAT_AFFI_IN
+			   WHERE 
+			  	group_id=#{group_id,jdbcType=INTEGER}
+			    AND hos_id=#{hos_id,jdbcType=INTEGER}
+			    AND copy_code=#{copy_code,jdbcType=VARCHAR} 
+			    AND year=#{year,jdbcType=VARCHAR}
+			    AND month &lt;=#{month,jdbcType=VARCHAR} 
+			    AND state &lt;&gt; 3 
+			    <!-- 台州有两张单据的状态是5 -->
+			    and state != 5
+				<if test="set_id != null and set_id != ''">
+				AND exists(
+					select 1 from mat_store_detail
+					where group_id = #{group_id,jdbcType=INTEGER} 
+						and hos_id = #{hos_id,jdbcType=INTEGER} 
+						and set_id = #{set_id,jdbcType=INTEGER} 
+						and is_account = 1
+						and store_id = mat_affi_in.store_id
+				)
+				</if>
+			UNION ALL
+			  SELECT 
+			  	COUNT(1) num 
+			  FROM 
+			  	MAT_AFFI_OUT 
+			  WHERE 
+			  	group_id=#{group_id,jdbcType=INTEGER}
+			    AND hos_id=#{hos_id,jdbcType=INTEGER}
+			    AND copy_code=#{copy_code,jdbcType=VARCHAR} 
+			    AND year=#{year,jdbcType=VARCHAR}
+			    AND month &lt;=#{month,jdbcType=VARCHAR} 
+			    AND state &lt;&gt; 3
+				<if test="set_id != null and set_id != ''">
+				AND exists(
+					select 1 from mat_store_detail
+					where group_id = #{group_id,jdbcType=INTEGER} 
+						and hos_id = #{hos_id,jdbcType=INTEGER} 
+						and set_id = #{set_id,jdbcType=INTEGER} 
+						and is_account = 1
+						and store_id = mat_affi_out.store_id
+				)
+				</if>
+			    <!-- 
+			 UNION ALL
+			  SELECT 
+			  	COUNT(*) num 
+			  FROM 
+			  	MAT_AFFI_TRAN_MAIN 
+			  WHERE 
+			  	group_id=#{group_id,jdbcType=INTEGER}
+			    AND hos_id=#{hos_id,jdbcType=INTEGER}
+			    AND copy_code=#{copy_code,jdbcType=VARCHAR} 
+			    AND year=#{year,jdbcType=VARCHAR}
+			    AND month=#{month,jdbcType=VARCHAR} 
+			    AND state &lt;&gt; 3
+			     -->
+			  )
+	</select>	
+</mapper>
+

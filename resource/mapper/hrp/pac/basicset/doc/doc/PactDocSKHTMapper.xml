@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper
+	namespace="com.chd.hrp.pac.dao.basicset.doc.doc.PactDocSKHTMapper">
+	<resultMap id="pactStateEntity"
+		type="com.chd.hrp.pac.entity.basicset.doc.PactDocEntity">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="doc_id" column="doc_id" />
+		<result property="pact_code" column="pact_code" />
+		<result property="doc_type" column="doc_type" />
+		<result property="doc_name" column="doc_name" />
+		<result property="dept_id" column="dept_id" />
+		<result property="dept_no" column="dept_no" />
+		<result property="emp_id" column="emp_id" />
+		<result property="location" column="location" />
+		<result property="file_path" column="file_path" />
+	</resultMap>
+
+	<resultMap id="pactStateEntityL"
+		type="java.util.Map">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="doc_id" column="doc_id" />
+		<result property="pact_code" column="pact_code" />
+		<result property="doc_type" column="doc_type" />
+		<result property="doc_name" column="doc_name" />
+		<result property="dept_id" column="dept_id" />
+		<result property="dept_no" column="dept_no" />
+		<result property="dept_name" column="dept_name" />
+		<result property="emp_id" column="emp_id" />
+		<result property="location" column="location" />
+		<result property="file_path" column="file_path" />
+		<result property="state_name" column="state_name" />
+		<result property="doc_type_name" column="doc_type_name" />
+		<result property="emp_name" column="emp_name" />
+		<result property="pact_state" column="pact_state" />
+	</resultMap>
+
+	<select id="query" parameterType="java.util.Map"
+		resultMap="pactStateEntityL">
+		select
+		p.doc_id,p.pact_code,p.doc_type,p.doc_name,p.dept_id,p.dept_id||'@'||p.dept_no as dept_no,p.emp_id,p.location,p.file_path,p.pact_state ,type.type_name as doc_type_name,emp.emp_name,dept.dept_name,ps.state_name
+		from
+		PACT_DOC_SKHT p
+		left join PACT_DOC_TYPE type on p.group_id=type.group_id and p.hos_id = type.hos_id and type.type_code=p.doc_type
+		left join HOS_EMP emp on p.group_id=emp.group_id and p.hos_id = emp.hos_id and p.emp_id = emp.emp_id
+		left join HOS_DEPT dept on p.group_id=dept.group_id and p.hos_id = dept.hos_id and p.dept_id = dept.dept_id
+		LEFT JOIN PACT_STATE ps on p.group_id = ps.group_id and p.hos_id = ps.hos_id and p.copy_code = ps.copy_code and p.PACT_STATE = ps.state_code
+		where p.group_id=#{group_id,jdbcType=NUMERIC}
+		and p.hos_id=#{hos_id,jdbcType=NUMERIC}
+		and p.copy_code=#{copy_code,jdbcType=VARCHAR}
+		and p.pact_code =#{pact_code,jdbcType=VARCHAR}
+	</select>
+
+<select id="queryMaxDocId" parameterType="java.util.Map"
+		resultType="java.lang.Integer">
+		select
+		max(doc_id)
+		from PACT_DOC_SKHT
+		where group_id=#{group_id,jdbcType=NUMERIC}
+		and hos_id=#{hos_id,jdbcType=NUMERIC}
+		and copy_code=#{copy_code,jdbcType=VARCHAR}
+		and pact_code =#{pact_code,jdbcType=VARCHAR}
+	</select>
+	
+	<select id="queryPactDocByCode" parameterType="java.util.Map"
+		resultType="com.chd.hrp.pac.entity.basicset.doc.PactDocEntity">
+		select
+		group_id,hos_id,copy_code,doc_id,pact_code,doc_type,doc_name,dept_id,dept_no,emp_id,location,file_path
+		from PACT_DOC_SKHT
+		where group_id=#{group_id,jdbcType=NUMERIC}
+		and hos_id=#{hos_id,jdbcType=NUMERIC}
+		and copy_code=#{copy_code,jdbcType=VARCHAR}
+		and pact_code =#{pact_code,jdbcType=VARCHAR}
+		and doc_id=#{doc_id,jdbcType=NUMERIC}
+	</select>
+	
+	<select id="queryPactDocSKHTForExec"
+		parameterType="java.util.Map" resultMap="pactStateEntity">
+		select
+		p.doc_id,p.pact_code,p.doc_type,p.doc_name,p.dept_id,p.dept_no,p.emp_id,p.location,p.file_path ,type.type_name as doc_type_name,emp.emp_name,dept.dept_name
+		from
+		PACT_DOC_SKHT p
+		left join PACT_DOC_TYPE type on p.group_id=type.group_id and p.hos_id = type.hos_id and type.type_code=p.doc_type
+		left join HOS_EMP emp on p.group_id=emp.group_id and p.hos_id = emp.hos_id and p.emp_id = emp.emp_id
+		left join HOS_DEPT dept on p.group_id=dept.group_id and p.hos_id = dept.hos_id and p.dept_no = dept.dept_id
+		where
+		p.group_id=#{group_id,jdbcType=NUMERIC}
+		and p.hos_id=#{hos_id,jdbcType=NUMERIC}
+		and p.copy_code=#{copy_code,jdbcType=VARCHAR}
+		and p.pact_code =#{pact_code,jdbcType=VARCHAR}
+		and p.doc_id not in(
+			SELECT fdf.doc_id from PACT_FILE_DOC_SKHT fdf where
+			fdf.group_id=#{group_id,jdbcType=NUMERIC}
+			and fdf.hos_id=#{hos_id,jdbcType=NUMERIC}
+			and fdf.copy_code=#{copy_code,jdbcType=VARCHAR}
+			and fdf.pact_code =#{pact_code,jdbcType=VARCHAR}
+		)
+		<if test="doc_ids != null and doc_ids != ''">
+			and p.doc_id not in(${doc_ids})
+		</if>
+	</select>
+
+	<insert id="add" parameterType="java.util.Map">
+		INSERT INTO PACT_DOC_SKHT
+		(group_id,hos_id,copy_code,doc_id,pact_code,doc_type,doc_name,dept_id,dept_no,emp_id,location,file_path)
+		VALUES(
+		#{group_id,jdbcType=NUMERIC},
+		#{hos_id,jdbcType=NUMERIC},
+		#{copy_code,jdbcType=VARCHAR},
+		#{doc_id,jdbcType=NUMERIC},
+		#{pact_code,jdbcType=VARCHAR},
+		#{doc_type,jdbcType=VARCHAR},
+		#{doc_name,jdbcType=VARCHAR},
+		#{dept_id,jdbcType=NUMERIC},
+		#{dept_no,jdbcType=NUMERIC},
+		#{emp_id,jdbcType=NUMERIC},
+		#{location,jdbcType=VARCHAR},
+		#{file_path,jdbcType=VARCHAR},
+		)
+	</insert>
+
+	<insert id="addBatch" parameterType="java.util.List">
+		INSERT INTO PACT_DOC_SKHT
+		(group_id,hos_id,copy_code,doc_id,pact_code,doc_type,doc_name,dept_id,dept_no,emp_id,location,file_path,pact_state)
+		<foreach close=")" collection="list" item="item" index="index"
+			open="(" separator="union">
+			select
+			#{item.group_id,jdbcType=NUMERIC},
+			#{item.hos_id,jdbcType=NUMERIC},
+			#{item.copy_code,jdbcType=VARCHAR},
+			#{item.doc_id,jdbcType=NUMERIC},
+			#{item.pact_code,jdbcType=VARCHAR},
+			#{item.doc_type,jdbcType=VARCHAR},
+			#{item.doc_name,jdbcType=VARCHAR},
+			#{item.dept_id,jdbcType=NUMERIC},
+			#{item.dept_no,jdbcType=NUMERIC},
+			#{item.emp_id,jdbcType=NUMERIC},
+			#{item.location,jdbcType=VARCHAR},
+			#{item.file_path,jdbcType=VARCHAR},
+			#{item.pact_state,jdbcType=VARCHAR}
+			from dual
+		</foreach>
+	</insert>
+	<delete id="deleteAllBatch" parameterType="java.util.List">
+		DELETE FROM PACT_DOC_SKHT
+		<where>
+			<foreach collection="list" index="index" item="item" open="("
+				separator="or" close=")">
+				GROUP_ID = #{item.group_id,jdbcType=NUMERIC}
+				and HOS_ID = #{item.hos_id,jdbcType=NUMERIC}
+				AND COPY_CODE = #{item.copy_code,jdbcType=VARCHAR}
+				AND pact_code = #{item.pact_code,jdbcType=VARCHAR}
+				and doc_id = #{item.doc_id,jdbcType=NUMERIC}
+			</foreach>
+		</where>
+	</delete>
+	
+	<delete id="deleteByPactCode" parameterType="java.util.Map">
+		DELETE FROM PACT_DOC_SKHT
+		<where>
+			GROUP_ID = #{group_id,jdbcType=NUMERIC}
+			and HOS_ID = #{hos_id,jdbcType=NUMERIC}
+			AND COPY_CODE = #{copy_code,jdbcType=VARCHAR}
+			AND pact_code = #{pact_code,jdbcType=VARCHAR}
+		</where>
+	</delete>
+
+	<delete id="deleteByPactCodeList" parameterType="java.util.List">
+		DELETE FROM PACT_DOC_SKHT
+		<where>
+			<foreach collection="list" index="index" item="item" open="("
+				separator="or" close=")">
+				GROUP_ID = #{item.group_id,jdbcType=NUMERIC}
+				and HOS_ID = #{item.hos_id,jdbcType=NUMERIC}
+				AND COPY_CODE = #{item.copy_code,jdbcType=VARCHAR}
+				AND pact_code = #{item.pact_code,jdbcType=VARCHAR}
+			</foreach>
+		</where>
+	</delete>
+	
+	<update id="update" parameterType="java.util.Map">
+		UPDATE PACT_DOC_SKHT SET
+		<if test="doc_type != null and doc_type != ''">
+			doc_type=#{doc_type,jdbcType=VARCHAR},
+		</if>
+		<if test="doc_name != null and doc_name != ''">
+			doc_name=#{doc_name,jdbcType=VARCHAR},
+		</if>
+		<if test="dept_id != null and dept_id != ''">
+			dept_id=#{dept_id,jdbcType=NUMERIC},
+		</if>
+		<if test="dept_no != null and dept_no != ''">
+			dept_no=#{dept_no,jdbcType=NUMERIC},
+		</if>
+		<if test="emp_id != null and emp_id != ''">
+			emp_id=#{emp_id,jdbcType=NUMERIC},
+		</if>
+		<if test="location != null and location != ''">
+			location=#{location,jdbcType=VARCHAR},
+		</if>
+		<if test="file_path != null and file_path != ''">
+			file_path=#{file_path,jdbcType=VARCHAR}
+		</if>
+		WHERE
+		GROUP_ID = #{group_id,jdbcType=NUMERIC}
+		AND HOS_ID = #{hos_id,jdbcType=NUMERIC}
+		AND COPY_CODE = #{copy_code,jdbcType=VARCHAR}
+		AND pact_code = #{pact_code,jdbcType=VARCHAR}
+		and doc_id = #{item.doc_id,jdbcType=NUMERIC}
+	</update>
+	
+	<select id="queryPactSKHTType" parameterType="java.util.Map" resultType="java.util.Map">
+		select  PACT_TYPE_CODE as "pact_type_code"
+		from PACT_MAIN_SKHT
+		where
+		GROUP_ID = #{group_id,jdbcType=NUMERIC}
+		AND HOS_ID =#{hos_id,jdbcType=NUMERIC}
+		AND COPY_CODE = #{copy_code,jdbcType=VARCHAR}
+		AND pact_code = #{pact_code,jdbcType=VARCHAR}
+	</select>
+</mapper>

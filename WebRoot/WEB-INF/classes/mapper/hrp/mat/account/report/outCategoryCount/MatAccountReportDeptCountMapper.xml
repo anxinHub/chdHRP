@@ -1,0 +1,298 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.mat.dao.account.report.outCategoryCount.MatAccountReportDeptCountMapper">
+	<resultMap id="queryMatAccountReportDeptCountMap" type="java.util.Map">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="sup_code" column="sup_code" />
+		<result property="sup_name" column="sup_name" />
+		<result property="amount_money" column="amount_money" />
+		<result property="mat_type_count" column="mat_type_count" />
+		<result property="in_id_count" column="in_id_count" />
+		<result property="store_name" column="store_name"/>
+		<result property="set_name" column="set_name"/>
+		<result property="money" column="money"/>
+		<result property="mat_type_code" column="mat_type_code"/>
+		<result property="is_last" column="is_last"/>
+		<result property="dept_code" column="dept_code"/>
+		<result property="dept_name" column="dept_name"/>
+		<result property="idx" column="idx"/>
+		<result property="kind_code" column="kind_code"/>
+		<result property="type_level" column="type_level"/>
+		
+	</resultMap>
+	
+	
+	<!-- 科室统计 查询     按物资类别、科室 汇总出库合计金额 -->
+	<select id="queryMatAccountReportDeptCount" parameterType="java.util.Map" resultMap="queryMatAccountReportDeptCountMap">
+		with d_tmp as ( 
+			select a.mat_type_code,b.dept_code,b.dept_name,sum(round(b.money,4)) money,a.is_last,b.kind_code
+       		from mat_type_dict  a
+       		left join  (
+				select hsd.dept_code,hsd.dept_name,sum(mid.price * mid.amount) as money, mtd.mat_type_code,hsd.kind_code
+			 	from mat_out_main mim
+		    	left join mat_out_detail mid on mim.group_id = mid.group_id
+				    and mim.hos_id = mid.hos_id
+				    and mim.copy_code = mid.copy_code
+				    and mim.out_id = mid.out_id 
+		     	left join mat_inv_dict midd on midd.group_id = mim.group_id
+				    and midd.hos_id = mim.hos_id
+				    and midd.copy_code = mim.copy_code
+				    and midd.inv_id = mid.inv_id
+				    and midd.inv_no = mid.inv_no 
+		    	left join mat_type_dict mtd on midd.mat_type_id = mtd.mat_type_id
+				    and mim.group_id = mtd.group_id
+				    and mim.hos_id = mtd.hos_id
+				    and mim.copy_code = mtd.copy_code
+				    and mtd.is_stop = 0 
+		     	left join hos_dept_dict hsd on mim.dept_id  = hsd.dept_id 
+				    and hsd.is_stop = 0
+				    and hsd.group_id = mim.group_id
+				    and hsd.hos_id = mim.hos_id 
+		    	where mim.state = '3'
+		       		and mim.group_id = #{group_id}
+				    and mim.hos_id = #{hos_id}
+				    and mim.copy_code = #{copy_code}
+		      		<if test="mat_type_id != null and mat_type_id != ''">
+						and midd.mat_type_id = #{mat_type_id,jdbcType=VARCHAR}
+					</if>
+					<if test="mat_type_id == null and mat_type_id == ''">
+						and to_char(midd.mat_type_id) in (
+							select perm_code from v_user_data_perm  
+							where group_id = #{group_id,jdbcType=INTEGER}
+								and hos_id = #{hos_id,jdbcType=INTEGER}
+								and table_code = 'MAT_TYPE_DICT'
+								and user_id = #{user_id,jdbcType=INTEGER}
+								and is_read = 1 and is_write = 1 
+						)
+					</if>
+					
+					<if test="dept_id !=null and dept_id != ''">
+						and hsd.dept_id= #{dept_id,jdbcType=VARCHAR}
+					</if>
+					<if test="is_charge !=null and is_charge != ''">
+						and midd.is_charge= #{is_charge}
+					</if>
+					<if test="set_id ==null or set_id=='' ">
+						<if test="store_id != null and store_id != ''">
+							and mim.store_id = #{store_id}
+						</if>
+					</if>
+					<if test="bus_type_code !=null and bus_type_code !='' ">
+					 and mim.bus_type_code in ${bus_type_code}
+					 </if>
+					<if test="set_id!=null and set_id!=''">
+						and to_char(mim.store_id) in (select store_id from MAT_STORE_DETAIL  where set_id = #{set_id} and group_id=#{group_id} and hos_id=#{hos_id})
+					</if>
+					<if test="mat_type_code !=null and mat_type_code != ''">
+						and mtd.mat_type_code like '%${mat_type_code}'
+					</if>
+					<!-- 只显示有权限的库房信息 -->
+					and to_char(mim.store_id) in (
+						select perm_code from v_user_data_perm  
+						where group_id = #{group_id,jdbcType=INTEGER}
+							and hos_id = #{hos_id,jdbcType=INTEGER}
+							and table_code = 'HOS_STORE_DICT'
+							and user_id = #{user_id,jdbcType=INTEGER}
+							and is_read = 1 and is_write = 1 
+					)
+		      		and mim.confirm_date between to_date(#{begin_date}, 'yyyy-MM-dd') and to_date(#{end_date}, 'yyyy-MM-dd')
+		      		group by hsd.DEPT_CODE, hsd.DEPT_name, mtd.MAT_TYPE_CODE,hsd.kind_code
+		         ) b on b.mat_type_code like a.mat_type_code||'%'
+		        where
+		        	a.group_id = #{group_id,jdbcType=INTEGER}
+					and a.hos_id = #{hos_id,jdbcType=INTEGER}
+					and a.copy_code = #{copy_code,jdbcType=VARCHAR}
+					and a.is_stop=0		
+					and b.money != 0
+		        group by a.mat_type_code, b.dept_code, b.dept_name, a.is_last,b.kind_code
+    	) , 
+    	<!--温州需求  2017-08-03  gaopei   -->
+    	 kind_tmp
+		  as
+		  (
+		    select a.mat_type_code,  '医疗类合计' as dept_code, null as dept_name, sum(money) as money, b.is_last
+		      , '99' as kind_code, type_level
+		    from mat_type_dict a
+		      left join d_tmp b on a.mat_type_code = b.mat_type_code 
+		  where   a.group_id=#{group_id}
+	               	and a.hos_id=#{hos_id}
+	               	  and b.is_last is not null
+		      and b.kind_code in ('01','02','03')
+		    group by a.mat_type_code, a.type_level, b.is_last
+		  ),
+ 		 s_tmp as (
+		             select a.mat_type_code, '总合计' as dept_code, null as dept_name, sum(money) as money,   b.is_last, '99' as kind_code, type_level
+				    from mat_type_dict a
+	               left join   d_tmp b on a.mat_type_code=b.mat_type_code
+	               where   a.group_id=#{group_id}
+	               	and a.hos_id=#{hos_id}
+	               	  and b.is_last is not null
+	               group by a.mat_type_code,a.type_level,b.is_last
+		) 
+		
+		select mat_type_code, dept_code, dept_name, money, is_last, kind_code, type_level
+  		from (
+		  select to_char(a.mat_type_code) as mat_type_code, a.dept_code, a.dept_name, a.money, a.is_last , a.kind_code,b.type_level
+		  from d_tmp a
+		  left join mat_type_dict b on a.mat_type_code=b.mat_type_code
+		  where b.is_stop=0 and b.group_id= #{group_id} and b.hos_id=#{hos_id}
+		   union all 
+		  select to_char(mat_type_code) as mat_type_code, dept_code, dept_name, money, is_last
+		    , '0301', type_level
+		  from  kind_tmp
+		  union all
+		   select to_char(mat_type_code) as mat_type_code, dept_code, dept_name, money, is_last, '', type_level
+		  from s_tmp
+		)
+		order by   kind_code, type_level,dept_code,mat_type_code
+		--order by  kind_code, type_level,dept_code,mat_type_code
+		--order by kind_code, type_level, mat_type_code, dept_code, dept_name
+	</select>
+	
+	
+	<!-- 移库分类统计表 -->
+	<select id="queryMatTransferCount" parameterType="java.util.Map" resultType="java.util.Map">
+		with id_tmp as (
+			select a.group_id,a.hos_id,a.copy_code,
+				<if test="bus_type_code == 15 ">
+					b.in_id 
+				</if>
+				<if test="bus_type_code == 14 ">
+					b.out_id 
+				</if>
+			from (
+				select mtm.group_id,mtm.hos_id,mtm.copy_code,mtm.tran_id
+				from mat_tran_main mtm
+				<where>
+					<if test="group_id !=null and group_id !=''">
+						and mtm.group_id = #{group_id}
+					</if>
+					<if test="hos_id !=null and hos_id !=''">
+						and mtm.hos_id = #{hos_id}
+					</if>
+					<if test="copy_code !=null and copy_code !=''">
+						and mtm.copy_code = #{copy_code}
+					</if>
+					and mtm.state = '3'
+					<if test="bus_type_code == 15 ">
+						and mtm.out_store_id = #{store_id}
+					</if>
+					<if test="bus_type_code == 14 ">
+						and mtm.in_store_id = #{store_id}
+					</if>
+					and to_char(mtm.confirm_date, 'yyyy-MM-dd') between #{begin_date} and #{end_date}
+				</where>
+			) a
+			left join mat_tran_rela b on a.group_id=b.group_id and a.hos_id=b.hos_id and a.copy_code=b.copy_code
+				and a.tran_id=b.tran_id
+		),d_tmp as (
+			select a.group_id,a.hos_id,a.mat_type_code,c.store_code,c.store_name,a.is_last,sum(b.money) money
+       		from mat_type_dict a
+			left join (
+				<if test="bus_type_code == 14 ">
+					select mom.group_id,mom.hos_id,mom.copy_code,mom.store_id,mom.store_no,mtd.mat_type_code,sum(md.amount_money) money
+					from id_tmp it
+					left join mat_out_main mom on it.group_id=mom.group_id and it.hos_id=mom.hos_id and it.copy_code=mom.copy_code
+						and it.out_id=mom.out_id
+					left join mat_out_detail md on mom.group_id=md.group_id and mom.hos_id=md.hos_id and mom.copy_code=md.copy_code
+						and mom.out_id=md.out_id
+					left join mat_inv_dict mid on md.group_id=mid.group_id and md.hos_id=mid.hos_id and md.copy_code=mid.copy_code
+						and md.inv_id=mid.inv_id and md.inv_no=mid.inv_no
+					left join mat_type_dict mtd on mid.group_id=mtd.group_id and mid.hos_id=mtd.hos_id and mid.mat_type_id=mtd.mat_type_id
+               			and mid.mat_type_no=mtd.mat_type_no 
+               		<where>
+               			<if test="is_charge !=null and is_charge != ''">
+							and mid.is_charge= #{is_charge}
+						</if>
+						and to_char(mom.store_id) in (
+							select perm_code from v_user_data_perm  
+							where group_id = #{group_id,jdbcType=INTEGER}
+								and hos_id = #{hos_id,jdbcType=INTEGER}
+								and table_code = 'HOS_STORE_DICT'
+								and user_id = #{user_id,jdbcType=INTEGER}
+								and is_read = 1 and is_write = 1 
+						)
+						and to_char(mid.mat_type_id) in (
+							select perm_code from v_user_data_perm  
+							where group_id = #{group_id,jdbcType=INTEGER}
+								and hos_id = #{hos_id,jdbcType=INTEGER}
+								and table_code = 'MAT_TYPE_DICT'
+								and user_id = #{user_id,jdbcType=INTEGER}
+								and is_read = 1 and is_write = 1 
+						)
+               		</where>
+					group by mom.group_id,mom.hos_id,mom.copy_code,mom.store_id,mom.store_no,mtd.mat_type_code
+				</if>
+				<if test="bus_type_code == 15 ">
+					select mom.group_id,mom.hos_id,mom.copy_code,mom.store_id,mom.store_no,mtd.mat_type_code,sum(md.amount_money) money
+					from id_tmp it
+					left join mat_in_main mom on it.group_id=mom.group_id and it.hos_id=mom.hos_id and it.copy_code=mom.copy_code
+						and it.in_id=mom.in_id
+					left join mat_in_detail md on mom.group_id=md.group_id and mom.hos_id=md.hos_id and mom.copy_code=md.copy_code
+						and mom.in_id=md.in_id
+					left join mat_inv_dict mid on md.group_id=mid.group_id and md.hos_id=mid.hos_id and md.copy_code=mid.copy_code
+						and md.inv_id=mid.inv_id and md.inv_no=mid.inv_no
+					left join mat_type_dict mtd on mid.group_id=mtd.group_id and mid.hos_id=mtd.hos_id and mid.mat_type_id=mtd.mat_type_id
+               			and mid.mat_type_no=mtd.mat_type_no 
+               		<where>
+               			<if test="is_charge !=null and is_charge != ''">
+							and mid.is_charge= #{is_charge}
+						</if>
+						and to_char(mom.store_id) in (
+							select perm_code from v_user_data_perm  
+							where group_id = #{group_id,jdbcType=INTEGER}
+								and hos_id = #{hos_id,jdbcType=INTEGER}
+								and table_code = 'HOS_STORE_DICT'
+								and user_id = #{user_id,jdbcType=INTEGER}
+								and is_read = 1 and is_write = 1 
+						)
+						and to_char(mid.mat_type_id) in (
+							select perm_code from v_user_data_perm  
+							where group_id = #{group_id,jdbcType=INTEGER}
+								and hos_id = #{hos_id,jdbcType=INTEGER}
+								and table_code = 'MAT_TYPE_DICT'
+								and user_id = #{user_id,jdbcType=INTEGER}
+								and is_read = 1 and is_write = 1 
+						)
+               		</where>
+					group by mom.group_id,mom.hos_id,mom.copy_code,mom.store_id,mom.store_no,mtd.mat_type_code
+				</if>
+			) b on a.group_id=b.group_id and a.hos_id=b.hos_id and b.mat_type_code like a.mat_type_code||'%' 
+			left join hos_store_dict c on b.group_id=c.group_id and b.hos_id=c.hos_id and b.store_id=c.store_id 
+				and b.store_no=c.store_no
+			<where>
+				<if test="type_level == 1">
+					and a.is_last = 0
+				</if>
+				<if test="type_level == 2">
+					and a.is_last = 1
+				</if>
+				and a.is_stop = 0
+				and b.money != 0
+				
+			</where>
+			group by a.group_id,a.hos_id,a.mat_type_code,c.store_code,c.store_name,a.is_last
+		),s_tmp as (
+			select aa.mat_type_code, '总合计' as store_code, null as store_name, sum(money) as money, bb.is_last, aa.type_level
+			from mat_type_dict aa
+	        left join d_tmp bb on aa.mat_type_code=bb.mat_type_code
+	        where bb.is_last is not null
+	        group by aa.mat_type_code,aa.type_level,bb.is_last
+		) 
+		
+		select mat_type_code, store_code, store_name, money, is_last, type_level
+  		from (
+		  select to_char(a.mat_type_code) as mat_type_code, a.store_code, a.store_name, a.money, a.is_last,b.type_level
+		  from d_tmp a
+		  left join mat_type_dict b on a.mat_type_code=b.mat_type_code and a.group_id=b.group_id and a.hos_id=b.hos_id
+		  where b.is_stop=0 
+		  union all
+		  select to_char(mat_type_code) as mat_type_code, store_code, store_name, money, is_last, type_level
+		  from s_tmp
+		)
+		order by  type_level,store_code,mat_type_code
+		
+	</select>
+</mapper>

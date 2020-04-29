@@ -1,0 +1,3146 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.med.dao.base.HrpMedSelectMapper">
+	<resultMap type="com.chd.hrp.med.entity.HrpMedSelect" id="hrpMedSelect">
+		<result property="id" column="id" />
+		<result property="text" column="text" />
+		
+		<result property="code" column="code"/>
+		<result property="name" column="name"/>
+		
+	</resultMap>
+	<select id="queryMedYearOrNo" resultMap="hrpMedSelect">
+		SELECT
+			0 id,
+			'否' text
+		FROM DUAL
+		UNION ALL
+		SELECT
+			1 id,
+			'是' text
+		FROM DUAL
+	</select>
+	
+	<select id="queryMedType" resultMap="hrpMedSelect">
+		SELECT
+			med_type_id id,
+			med_type_code||' '||med_type_name text
+		FROM MED_TYPE_DICT
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null  and copy_code != ''">
+				and copy_code = #{copy_code}
+			</if>
+			<if test="med_type_id != null  and med_type_id != ''">
+				and med_type_id = #{med_type_id}
+			</if>
+			<if test="is_last != null and is_last != ''">
+				and is_last = #{is_last}
+			</if>
+			<if test="med_type_code != null  and med_type_code != ''">
+				and #{med_type_code} like med_type_code||'%'
+			</if>
+			and is_stop = 0
+			<if test="key != null and key != ''">
+				and (
+				med_type_code like '${key}%' or 
+				med_type_name like '%${key}%'
+				or
+				spell_code like '%${key}%' or 
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by med_type_code
+	</select>
+	<!-- 药品分类变更表 -->
+	<select id="queryMedTypeDict" resultMap="hrpMedSelect">
+		SELECT
+			med_type_id||','||med_type_no id,
+			med_type_code||' '||med_type_name text
+		FROM MED_TYPE_DICT
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null  and copy_code != ''">
+				and copy_code = #{copy_code}
+			</if>
+			<if test="med_type_id != null  and med_type_id != ''">
+				and med_type_id = #{med_type_id}
+			</if>
+			<if test="is_last != null and is_last != ''">
+				and is_last = #{is_last}
+			</if>
+			<if test="med_type_code != null  and med_type_code != ''">
+				and #{med_type_code} like med_type_code||'%'
+			</if>
+			and is_stop = 0
+			<if test="key != null and key != ''">
+				and (
+				med_type_code like '${key}%' or 
+				med_type_name like '%${key}%'
+				or
+				spell_code like '%${key}%' or 
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by med_type_code
+	</select>
+	<!-- 药品分类变更表 -->
+	<select id="queryMedTypeDictByWrite" resultMap="hrpMedSelect">
+		SELECT
+			med_type_id||','||med_type_no id,
+			med_type_code||' '||med_type_name text
+		FROM MED_TYPE_DICT
+		WHERE group_id = #{group_id}
+			and hos_id = #{hos_id}
+			and copy_code = #{copy_code}
+			and med_type_id in (
+				select perm_code from v_user_data_perm
+				where group_id = ${group_id}
+					and hos_id = ${hos_id} 
+					and user_id = ${user_id} 
+					and table_code = 'MED_TYPE_DICT' 
+					and is_write = 1
+			)
+			<if test="med_type_id != null  and med_type_id != ''">
+				and med_type_id = #{med_type_id}
+			</if>
+			<if test="is_last != null and is_last != ''">
+				and is_last = #{is_last}
+			</if>
+			<if test="med_type_code != null  and med_type_code != ''">
+				and #{med_type_code} like med_type_code||'%'
+			</if>
+			and is_stop = 0
+			<if test="key != null and key != ''">
+				and (
+				med_type_code like '${key}%' or 
+				med_type_name like '%${key}%'
+				or
+				spell_code like '%${key}%' or 
+				wbx_code like '%${key}%'
+				)
+			</if>
+		order by med_type_code
+	</select>
+	<!-- 材料改变药品类别查询改类别材料数 -->
+	<select id="queryChangeMedTypeCode" resultMap="hrpMedSelect">
+		select count(mid.inv_code) as inv_count, max(mid.inv_code) as inv_code
+		  from MED_TYPE_DICT mtd
+		  left join MED_INV_DICT mid
+		    on mtd.group_id = mid.group_id
+		   and mtd.hos_id = mid.hos_id
+		   and mtd.copy_code = mid.copy_code
+		   and mtd.med_type_id = mid.med_type_id
+		 where mtd.group_id = #{group_id,jdbcType=INTEGER}
+		   and mtd.hos_id =  #{hos_id,jdbcType=INTEGER}
+		   and mtd.copy_code = #{copy_code,jdbcType=VARCHAR}
+		   and mtd.med_type_id = #{med_type_id,jdbcType=INTEGER}
+	</select>
+	
+	<select id="queryMedTypeDictCode" resultMap="hrpMedSelect">
+		SELECT
+			a.med_type_id||','||a.med_type_no||','||a.med_type_code id,
+			a.med_type_code||' '||a.med_type_name text
+		FROM MED_TYPE_DICT a 
+		<!-- join v_user_data_perm b 
+			on a.group_id = b.group_id and a.hos_id = b.hos_id
+			and b.user_id = #{user_id,jdbcType=INTEGER} and b.table_code = 'MED_TYPE_DICT' 
+			and b.perm_code = a.med_type_id and b.is_read = 1 and b.is_write = 1 -->
+		<where>
+		a.med_type_id in (select b.perm_code from   v_user_data_perm b 
+						where  b.group_id = #{group_id,jdbcType=INTEGER}  and  b.hos_id = #{hos_id,jdbcType=INTEGER} 
+						and b.user_id = #{user_id,jdbcType=INTEGER} and b.table_code = 'MED_TYPE_DICT' 
+						  and b.is_read = 1 and b.is_write = 1
+						)
+			<if test="group_id != null  and group_id != ''">
+				and a.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and a.hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null  and copy_code != ''">
+				and a.copy_code = #{copy_code}
+			</if>
+			<if test="med_type_id != null  and med_type_id != ''">
+				and a.med_type_id = #{med_type_id}
+			</if>
+			<if test="is_last != null and is_last != ''">
+				and a.is_last = #{is_last}
+			</if>
+			<if test="med_type_code != null  and med_type_code != ''">
+				and #{med_type_code} like a.med_type_code||'%'
+			</if>
+			and a.is_stop = 0
+			<if test="key != null and key != ''">
+				and (
+				a.med_type_code like '${key}%' or 
+				a.med_type_name like '%${key}%'
+				or
+				a.spell_code like '%${key}%' or 
+				a.wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by a.med_type_code
+	</select>
+	<!-- 通过参数控制 物资类别权限 -->
+	<select id="queryMedTypeDictDate" resultMap="hrpMedSelect">
+		SELECT 
+						a.med_type_id||','||a.med_type_no ||','||a.med_type_code id,
+			a.med_type_code||' '||a.med_type_name text
+		FROM MED_TYPE_DICT a 
+		<!-- <if  test="is_read != null  and is_read != '' or is_write != null  and is_write != '' or read_or_write != null  and read_or_write != '' ">
+		join v_user_data_perm b 
+			on a.group_id = b.group_id and a.hos_id = b.hos_id
+			and b.user_id = #{user_id,jdbcType=INTEGER} 
+			and b.table_code = 'MED_TYPE_DICT' 
+			and b.perm_code = to_char(a.med_type_id)
+          <if  test="is_read != null  and is_read != ''">
+                and b.is_read = 1
+          </if>
+          <if  test="is_write != null and is_write != ''">
+                 and b.is_write = 1 
+          </if>
+	 	 <if  test="read_or_write != null and read_or_write != ''">
+                 and  (b.is_write = 1 or b.is_read = 1 )
+          </if>
+	
+        </if> -->
+     	<where>
+     	
+     	<if  test="is_read != null  and is_read != '' or is_write != null  and is_write != '' or read_or_write != null  and read_or_write != '' ">
+		 to_char(a.med_type_id) in (select b.perm_code from  v_user_data_perm b 
+							where  b.group_id = #{group_id,jdbcType=INTEGER}   and  b.hos_id = #{hos_id,jdbcType=INTEGER} 
+							and b.user_id = #{user_id,jdbcType=INTEGER} 
+							and b.table_code = 'MED_TYPE_DICT' 
+							 
+				          <if  test="is_read != null  and is_read != ''">
+				                and b.is_read = 1
+				          </if>
+				          <if  test="is_write != null and is_write != ''">
+				                 and b.is_write = 1 
+				          </if>
+					 	 <if  test="read_or_write != null and read_or_write != ''">
+				                 and  (b.is_write = 1 or b.is_read = 1 )
+				          </if>
+					
+					)
+	
+        </if>
+        
+     		<if test="group_id != null  and group_id != ''">
+				and a.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and a.hos_id = #{hos_id}
+			</if>
+			<if test="is_last != null and is_last != ''">
+				and a.is_last = #{is_last}
+			</if>
+			<if test="med_type_id != null and med_type_id != ''">
+				and a.med_type_id = #{med_type_id}
+			</if>
+			and a.is_stop = 0
+			<if test="key != null and key != ''">
+				and (
+					a.med_type_code like '${key}%' or
+					a.med_type_name like '%${key}%' 
+				or
+					a.spell_code like '%${key}%' or
+					a.wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by a.med_type_code	
+	</select>
+	
+	
+	<select id="queryMedFinaType" resultMap="hrpMedSelect">
+		SELECT
+			fina_type_code id,
+			fina_type_code||' '||fina_type_name text
+		FROM MED_FINA_TYPE
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null  and copy_code != ''">
+				and copy_code = #{copy_code}
+			</if>
+			and is_stop = 0
+			<if test="key != null and key != ''">
+				and (
+				fina_type_code like '${key}%' or 
+				fina_type_name like '%${key}%'
+				or
+				spell_code like '%${key}%' or 
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by fina_type_code
+	</select>
+	
+	<select id="queryMedInv" resultMap="hrpMedSelect">
+		SELECT
+			inv_id||','||inv_no id,
+			inv_code||' '||inv_name ||'('|| inv_model ||')'  text
+		FROM MED_INV_DICT
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null  and copy_code != ''">
+				and copy_code = #{copy_code}
+			</if>
+			<if test="inv_id != null  and inv_id != ''">
+				and inv_id = #{inv_id}
+			</if>
+			<if test="med_type_id != null  and med_type_id != ''">
+				and med_type_id = #{med_type_id}
+			</if>
+			and is_stop = 0
+			<if test="key != null and key != ''">
+				and (
+				inv_code like '${key}%' or 
+				inv_name like '%${key}%'
+				or
+				spell_code like '%${key}%' or 
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by inv_code
+	</select>
+	<!-- 货位分类字典 -->
+	<select id="queryMedLocationType" resultMap="hrpMedSelect">
+		select 
+			location_type_id id,
+			location_type_code||' '||location_type_name text
+		from med_location_type
+		<where> 
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null  and copy_code != ''">
+				and copy_code = #{copy_code}
+			</if>
+			and is_stop = 0
+			<if test="key != null and key != ''">
+				and (
+					location_type_code like '${key}%' or
+					location_type_name like '%${key}%'
+				or
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%'
+				)
+			</if> 
+		</where>
+		order by location_type_id 
+	</select>
+	<!-- 货位字典 -->
+	<select id="queryMedLocationDict" resultMap="hrpMedSelect">
+		select 
+			location_id id,
+			location_code||' '||location_name text
+		from med_location_dict
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null  and copy_code != ''">
+				and copy_code = #{copy_code}
+			</if>
+			and  is_stop = 0
+			<if test="key != null and key != ''">
+				and (
+					location_code like '${key}%' or
+					location_name like '%${key}%'
+				or
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by location_code 
+	</select>
+	<!--当前用户查看有权限的仓库  -->
+	<select id="queryMedStoredisable" resultMap="hrpMedSelect">
+		select  a.store_id||','||a.store_no id, 
+			a.store_code||' '||a.store_name text
+		from HOS_STORE_DICT a 
+		<!--  join v_user_data_perm b 
+			on a.group_id = b.group_id and a.hos_id = b.hos_id
+			and b.user_id = #{user_id,jdbcType=INTEGER} and b.table_code = 'HOS_STORE_DICT' 
+			and b.perm_code = a.store_id and b.is_read = 1 and b.is_write = 1 -->
+		join med_store c 
+			on a.group_id = c.group_id
+			and a.hos_id = c.hos_id
+			and a.store_id = c.store_id
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER}
+			and a.hos_id = #{hos_id,jdbcType=INTEGER}  
+			and a.is_stop = 0
+			and a.is_med=1
+			and a.is_disable=0
+	
+	        and a.store_id  in (select b.perm_code from  v_user_data_perm b 
+							where b.group_id = #{group_id,jdbcType=INTEGER} and b.hos_id = #{hos_id,jdbcType=INTEGER}  
+							and b.user_id = #{user_id,jdbcType=INTEGER} and b.table_code = 'HOS_STORE_DICT' 
+							 and b.is_read = 1 and b.is_write = 1
+							)
+			<if test="is_purchase != null and is_purchase != ''">
+				and c.is_purchase = 1
+			</if>
+			<if test="is_com != null">
+				and c.is_com = #{is_com,jdbcType=INTEGER}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+					store_code like '${key}%' or
+					store_name like '%${key}%'
+				or
+					a.spell_code like '%${key}%' or
+					a.wbx_code like '%${key}%'
+				)
+			</if>
+			order by a.store_code asc
+	</select>
+	
+	<!-- 通过参数控制 仓库权限 -->
+	<select id="queryMedStoreDictDate" resultMap="hrpMedSelect">
+		select  a.store_id||','||a.store_no id, 
+			a.store_code||' '||a.store_name text
+		from HOS_STORE_DICT a 
+	<!-- 	<if  test="is_read != null  and is_read != '' or is_write != null  and is_write != '' or read_or_write != null  and read_or_write != ''">
+		join v_user_data_perm b 
+			on a.group_id = b.group_id and a.hos_id = b.hos_id
+			and b.user_id = #{user_id,jdbcType=INTEGER} and b.table_code = 'HOS_STORE_DICT' 
+			and b.perm_code = to_char(a.store_id)
+		
+          <if  test="is_read != null  and is_read != ''">
+                and b.is_read = 1
+          </if>
+          <if  test="is_write != null and is_write != ''">
+                 and b.is_write = 1 
+          </if>
+           <if  test="read_or_write != null and read_or_write != ''">
+                 and  (b.is_write = 1 or b.is_read = 1 )
+          </if>
+
+        </if> -->
+        join med_store c
+        on a.group_id = c.group_id
+        and a.hos_id = c.hos_id
+        and a.store_id = c.store_id
+     	<where>
+     		<if  test="is_read != null  and is_read != '' or is_write != null  and is_write != '' or read_or_write != null  and read_or_write != ''">
+				to_char(a.store_id) in (
+					select b.perm_code from  v_user_data_perm b 
+					where b.group_id = #{group_id,jdbcType=INTEGER}  and   b.hos_id = #{hos_id,jdbcType=INTEGER} 
+					and b.user_id = #{user_id,jdbcType=INTEGER} and b.table_code = 'HOS_STORE_DICT' 
+			          <if  test="is_read != null  and is_read != ''">
+			                and b.is_read = 1
+			          </if>
+			          <if  test="is_write != null and is_write != ''">
+			                 and b.is_write = 1 
+			          </if>
+			           <if  test="read_or_write != null and read_or_write != ''">
+			                 and  (b.is_write = 1 or b.is_read = 1 )
+			          </if>
+				)
+			 </if>
+        
+     		<if test="group_id != null  and group_id != ''">
+				and a.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and a.hos_id = #{hos_id}
+			</if>
+			<if test="is_last != null and is_last != ''">
+				and a.is_last = #{is_last}
+			</if>
+			<if test="store_id != null and store_id != ''">
+				and a.store_id = #{store_id}
+			</if>
+			and a.is_stop = 0
+			and a.is_med = 1
+			<if test="is_com != null">
+				and c.is_com = #{is_com,jdbcType=INTEGER}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+					a.store_code like '${key}%' or
+					a.store_name like '%${key}%' 
+				or
+					a.spell_code like '%${key}%' or
+					a.wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by a.store_code	
+	</select>
+	
+	<!--当前用户查看有权限的仓库  -->
+	<select id="queryMedStore" resultMap="hrpMedSelect">
+		select  a.store_id||','||a.store_no|| ',' || c.stock_emp || ',' ||t1.emp_code || ' ' || t1.emp_name || ',' || c.manager id, 
+			a.store_code||' '||a.store_name text
+		from HOS_STORE_DICT a 
+		<!--  join v_user_data_perm b 
+			on a.group_id = b.group_id and a.hos_id = b.hos_id
+			and b.user_id = #{user_id,jdbcType=INTEGER} and b.table_code = 'HOS_STORE_DICT' 
+			and b.perm_code = a.store_id and b.is_read = 1 and b.is_write = 1 -->
+		join med_store c 
+			on a.group_id = c.group_id
+			and a.hos_id = c.hos_id
+			and a.store_id = c.store_id
+		 left join HOS_EMP_DICT t1
+		    on t1.group_id = c.group_id
+		    and t1.hos_id = c.hos_id
+		    and t1.emp_id = c.stock_emp
+		    and t1.is_stop = 0  
+		
+		<!-- 关联启用表, 查询已经启用的仓库 -->    
+		JOIN MED_STORE_START s
+    	ON
+	        a.group_id = s.group_id
+	        AND a.hos_id = s.hos_id
+	        AND s.copy_code = #{copy_code}
+	        AND a.store_id = s.store_id
+	        AND s.start_year is not null
+	        AND s.start_month is not null 
+        
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER}
+			and a.hos_id = #{hos_id,jdbcType=INTEGER}  
+			and a.is_stop = 0
+			and a.is_med=1
+			and  a.store_id in (select b.perm_code from  v_user_data_perm b 
+							where b.group_id = #{group_id,jdbcType=INTEGER} and  b.hos_id = #{hos_id,jdbcType=INTEGER}  
+							and b.user_id = #{user_id,jdbcType=INTEGER} and b.table_code = 'HOS_STORE_DICT' 
+							  and b.is_read = 1 and b.is_write = 1
+							)
+			<if test="store_id != null and store_id != ''">
+				and c.store_id = #{store_id,jdbcType=INTEGER}
+			</if>
+			<if test="is_purchase != null and is_purchase != ''">
+				and c.is_purchase = 1
+			</if>
+			<if test="is_com != null">
+				and c.is_com = #{is_com,jdbcType=INTEGER}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+					store_code like '${key}%' or
+					store_name like '%${key}%' or
+					a.spell_code like '%${key}%' or
+					a.wbx_code like '%${key}%'
+				)
+			</if>
+			order by a.store_code asc
+	</select>
+	
+	
+	
+	
+	<!--当前用户查看只有读的权限的仓库  -->
+	<select id="queryMedStoreByRead" resultMap="hrpMedSelect">
+		select  a.store_id||','||a.store_no id, 
+			a.store_code||' '||a.store_name text
+		from HOS_STORE_DICT a 
+		<!--  join v_user_data_perm b 
+			on a.group_id = b.group_id and a.hos_id = b.hos_id
+			and b.user_id = #{user_id,jdbcType=INTEGER} and b.table_code = 'HOS_STORE_DICT' 
+			and b.perm_code = a.store_id and (b.is_read = 1 or b.is_write = 1) -->
+		join med_store c 
+			on a.group_id = c.group_id
+			and a.hos_id = c.hos_id
+			and a.store_id = c.store_id
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER}
+			and a.hos_id = #{hos_id,jdbcType=INTEGER}  
+			and a.is_stop = 0
+			and a.is_med=1
+		    and  a.store_id in (select b.perm_code from  v_user_data_perm b 
+							where b.group_id = #{group_id,jdbcType=INTEGER} and  b.hos_id = #{hos_id,jdbcType=INTEGER}  
+							and b.user_id = #{user_id,jdbcType=INTEGER} and b.table_code = 'HOS_STORE_DICT' 
+							 and (b.is_read = 1 or b.is_write = 1)
+							)
+			<if test="is_purchase != null and is_purchase != ''">
+				and c.is_purchase = 1
+			</if>
+			<if test="is_com != null">
+				and c.is_com = #{is_com,jdbcType=INTEGER}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+					store_code like '${key}%' or
+					store_name like '%${key}%'
+				or
+					a.spell_code like '%${key}%' or
+					a.wbx_code like '%${key}%'
+				)
+			</if>
+			order by a.store_code asc
+	</select>
+	
+	<select id="queryMedStoreByReaddisable" resultMap="hrpMedSelect">
+		select  a.store_id||','||a.store_no id, 
+			a.store_code||' '||a.store_name text
+		from HOS_STORE_DICT a 
+		 <!-- join v_user_data_perm b 
+			on a.group_id = b.group_id and a.hos_id = b.hos_id
+			and b.user_id = #{user_id,jdbcType=INTEGER} and b.table_code = 'HOS_STORE_DICT' 
+			and b.perm_code = a.store_id and b.is_read = 1   and  b.is_write = 0 -->
+		join med_store c 
+			on a.group_id = c.group_id
+			and a.hos_id = c.hos_id
+			and a.store_id = c.store_id
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER}
+			and a.hos_id = #{hos_id,jdbcType=INTEGER}  
+			and a.is_stop = 0
+			and a.is_med=1
+		    and a.is_disable=0
+			and a.store_id in (select b.perm_code from  v_user_data_perm b 
+						where b.group_id = #{group_id,jdbcType=INTEGER} and  b.hos_id = #{hos_id,jdbcType=INTEGER} 
+						and b.user_id = #{user_id,jdbcType=INTEGER} and b.table_code = 'HOS_STORE_DICT' 
+						 and b.is_read = 1   and  b.is_write = 0
+						)
+			<if test="is_purchase != null and is_purchase != ''">
+				and c.is_purchase = 1
+			</if>
+			<if test="is_com != null">
+				and c.is_com = #{is_com,jdbcType=INTEGER}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+					store_code like '${key}%' or
+					store_name like '%${key}%'
+				or
+					a.spell_code like '%${key}%' or
+					a.wbx_code like '%${key}%'
+				)
+			</if>
+			order by a.store_code asc
+	</select>
+	<!--当前用户查看只有写的权限的仓库  -->
+	<select id="queryMedStoreByWrite" resultMap="hrpMedSelect">
+		select  a.store_id||','||a.store_no id, 
+			a.store_code||' '||a.store_name text
+		from HOS_STORE_DICT a 
+		<!--  join v_user_data_perm b 
+			on a.group_id = b.group_id and a.hos_id = b.hos_id
+			and b.user_id = #{user_id,jdbcType=INTEGER} and b.table_code = 'HOS_STORE_DICT' 
+			and b.perm_code = a.store_id and b.is_write = 1  --> 
+		join med_store c 
+			on a.group_id = c.group_id
+			and a.hos_id = c.hos_id
+			and a.store_id = c.store_id
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER}
+			and a.hos_id = #{hos_id,jdbcType=INTEGER}  
+			and a.is_stop = 0
+			and a.is_med=1
+			and a.is_disable=0
+			and a.store_id in (select b.perm_code from v_user_data_perm b 
+						where b.group_id = #{group_id,jdbcType=INTEGER} and b.hos_id = #{hos_id,jdbcType=INTEGER}  
+						and b.user_id = #{user_id,jdbcType=INTEGER} and b.table_code = 'HOS_STORE_DICT' 
+						 and b.is_write = 1 
+						)
+			<if test="is_purchase != null and is_purchase != ''">
+				and c.is_purchase = 1
+			</if>
+			<if test="is_com != null">
+				and c.is_com = #{is_com,jdbcType=INTEGER}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+					store_code like '${key}%' or
+					store_name like '%${key}%'
+				or
+					a.spell_code like '%${key}%' or
+					a.wbx_code like '%${key}%'
+				)
+			</if>
+			
+					order by a.store_code asc
+	</select>
+	<!--当前用户查看有权限的仓库  -->
+	<select id="queryMedStoreStocker" resultMap="hrpMedSelect">
+		select  a.store_id||','||a.store_no||','||ms.stock_emp||','||t1.emp_code||' '||t1.emp_name||','||ms.manager|| ',' || t2.emp_code || ' ' || t2.emp_name id, 
+			a.store_code||' '||a.store_name text
+		from HOS_STORE_DICT a 
+		<!--  join v_user_data_perm b 
+			on a.group_id = b.group_id and a.hos_id = b.hos_id
+			and b.user_id = #{user_id,jdbcType=INTEGER} and b.table_code = 'HOS_STORE_DICT' 
+			and b.perm_code = a.store_id and b.is_read = 1 and b.is_write = 1 -->
+		join med_store ms 
+			on a.group_id = ms.group_id
+			and a.hos_id = ms.hos_id
+			and a.store_id = ms.store_id
+		left join hos_emp_dict t1 on t1.group_id=ms.group_id and t1.hos_id=ms.hos_id and t1.emp_id=ms.stock_emp
+        	and t1.is_stop=0
+       	left join hos_emp_dict t2 on t2.group_id=ms.group_id and t2.hos_id=ms.hos_id and t2.emp_id=ms.manager
+       		and t2.is_stop=0
+		WHERE  a.group_id = #{group_id,jdbcType=INTEGER} 
+			and a.hos_id = #{hos_id,jdbcType=INTEGER} 
+			and a.is_stop = 0
+			and ms.is_purchase = 1
+			and a.is_med=1
+			and a.is_disable=0
+			and a.store_id in (select b.perm_code from  v_user_data_perm b 
+							where b.group_id = #{group_id,jdbcType=INTEGER}  and b.hos_id = #{hos_id,jdbcType=INTEGER}
+							and b.user_id = #{user_id,jdbcType=INTEGER} and b.table_code = 'HOS_STORE_DICT' 
+							 and b.is_read = 1 and b.is_write = 1
+							)
+			<if test="is_com != null">
+				and ms.is_com = #{is_com,jdbcType=INTEGER}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+					store_code like '${key}%' or
+					store_name like '%${key}%'
+				or
+					a.spell_code like '%${key}%' or
+					a.wbx_code like '%${key}%'
+				)
+			</if>
+			order by a.store_code asc
+	</select>
+	
+	
+	<!-- 领用人 无权限 -->
+	<select id="queryMedEmpDictData" resultMap="hrpMedSelect">
+		select a.emp_id || ',' || a.emp_no id,
+		       a.emp_code || ' ' || a.emp_name text
+		  from hos_emp_dict a
+		  <!-- join v_user_data_perm b
+		    on a.group_id = b.group_id
+		   and a.hos_id = b.hos_id
+		   and b.user_id = #{user_id, jdbcType = INTEGER}
+		   and b.table_code = 'HOS_DEPT_DICT'
+		   and b.perm_code = a.dept_id
+		   and (b.is_read = 1  or b.is_write = 1) -->
+		WHERE  a.group_id = #{group_id,jdbcType=INTEGER} 
+			and a.hos_id = #{hos_id,jdbcType=INTEGER} 
+			and a.is_stop = 0
+			and a.dept_id in (select b.perm_code from v_user_data_perm b
+						   where b.group_id = #{group_id,jdbcType=INTEGER} 
+						   and  b.hos_id = #{hos_id,jdbcType=INTEGER} 
+						   and b.user_id = #{user_id, jdbcType = INTEGER}
+						   and b.table_code = 'HOS_DEPT_DICT'
+						   and (b.is_read = 1  or b.is_write = 1)
+						   )
+		<if test="key != null and key != ''">
+			and (
+				a.emp_code like '${key}%' 
+				or a.emp_name like '%${key}%' 
+				or a.spell_code like '%${key}%' 
+				or a.wbx_code like '%${key}%'
+			)
+		</if>
+		order by a.emp_code asc
+	</select>
+	
+	
+	
+	<!--仓库下拉框（所有仓库）  -->
+	<select id="queryMedStoreAll" resultMap="hrpMedSelect">
+		select  a.store_id||','||a.store_no id, 
+			a.store_code||' '||a.store_name text
+		from HOS_STORE_DICT a 
+		join med_store ms 
+			on a.group_id = ms.group_id
+			and a.hos_id = ms.hos_id
+			and a.store_id = ms.store_id
+		WHERE  a.group_id = #{group_id,jdbcType=INTEGER} 
+			and a.hos_id = #{hos_id,jdbcType=INTEGER} 
+			and a.is_stop = 0
+			and a.is_med=1
+			and a.is_disable=0
+			<if test="is_purchase != null and is_purchase != ''">
+				and ms.is_purchase = 1
+			</if>
+			<if test="is_com != null">
+				and ms.is_com = #{is_com,jdbcType=INTEGER}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+					store_code like '${key}%' or
+					store_name like '%${key}%'
+				or
+					a.spell_code like '%${key}%' or
+					a.wbx_code like '%${key}%'
+				)
+			</if>
+			order by a.store_code asc
+	</select>
+	
+	<!--当前用户查看有权限的仓库 and 仓库别名  -->
+	<select id="queryMedStoreAlias" resultMap="hrpMedSelect">
+		select  a.store_id||','||a.store_no||','||c.alias id, 
+			a.store_code||' '||a.store_name text
+		from HOS_STORE_DICT a 
+		<!-- join v_user_data_perm b 
+			on a.group_id = b.group_id and a.hos_id = b.hos_id
+			and b.user_id = #{user_id,jdbcType=INTEGER} and b.table_code = 'HOS_STORE_DICT' 
+			and b.perm_code = a.store_id and b.is_read = 1 and b.is_write = 1 -->
+		join med_store c on a.group_id = c.group_id and a.hos_id = c.hos_id and a.store_id = c.store_id
+		WHERE  a.group_id = #{group_id,jdbcType=INTEGER} 
+			and a.hos_id = #{hos_id,jdbcType=INTEGER} 
+			and a.is_stop = 0
+			and a.is_med=1
+			and a.is_disable=0
+			and a.store_id in (select b.perm_code from v_user_data_perm b 
+							where b.group_id = #{group_id,jdbcType=INTEGER}  and  b.hos_id = #{hos_id,jdbcType=INTEGER} 
+							and b.user_id = #{user_id,jdbcType=INTEGER} and b.table_code = 'HOS_STORE_DICT' 
+							 and b.is_read = 1 and b.is_write = 1
+							)
+			<if test="is_com != null">
+				and c.is_com = #{is_com,jdbcType=INTEGER}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+					store_code like '${key}%' or
+					store_name like '%${key}%'
+				or
+					a.spell_code like '%${key}%' or
+					a.wbx_code like '%${key}%'
+				)
+			</if>
+			order by a.store_code asc
+	</select>
+	
+	<!--当前用户查看有权限的科室  -->
+	<select id="queryMedDept" resultMap="hrpMedSelect">
+		select  a.dept_id||','||a.dept_no id, 
+			a.dept_code||' '||a.dept_name text
+		from HOS_DEPT_DICT a 
+		<!-- join v_user_data_perm b 
+			on a.group_id = b.group_id and a.hos_id = b.hos_id
+			and b.user_id = #{user_id,jdbcType=INTEGER} and b.table_code = 'HOS_DEPT_DICT' 
+			and b.perm_code = a.dept_id and b.is_read = 1 and b.is_write = 1 -->
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER} 
+			and a.hos_id = #{hos_id,jdbcType=INTEGER} 
+			and a.is_stop = 0
+			and a.dept_id in (select b.perm_code from  v_user_data_perm b 
+							where b.group_id = #{group_id,jdbcType=INTEGER}  and  b.hos_id = #{hos_id,jdbcType=INTEGER} 
+							and b.user_id = #{user_id,jdbcType=INTEGER} and b.table_code = 'HOS_DEPT_DICT' 
+							 and b.is_read = 1 and b.is_write = 1
+							)
+			<if test="key != null and key != ''">
+				and (
+					dept_code like '${key}%' or
+					dept_name like '%${key}%'
+				or
+					a.spell_code like '%${key}%' or
+					a.wbx_code like '%${key}%'
+				)
+			</if>
+			<if test="is_last != null and is_last != ''">
+				and a.is_last = #{is_last}
+			</if>
+			order by dept_code
+	</select>
+	
+	
+	<!-- 采购状态 -->
+	<select id="queryMedPlanState" resultMap="hrpMedSelect">
+		SELECT 0 id, '已中止' text FROM DUAL
+		UNION ALL
+		SELECT 2 id, '未执行' text FROM DUAL
+		<!-- UNION ALL
+		SELECT 2 id, '已审核' text FROM DUAL -->
+		UNION ALL
+		SELECT 3 id, '执行完毕' text FROM DUAL
+		UNION ALL
+		SELECT 4 id, '部分执行' text FROM DUAL
+	</select>
+	
+	<!-- 职工表/领料人-->
+	<select id="queryMedEmp" resultMap="hrpMedSelect">
+		
+		select b.emp_code as id , a.emp_code || ' ' || a.emp_name AS text
+         from hos_emp_dict a
+         left join sys_user  b on b.emp_code=a.emp_id 
+       <if test="group_id != null  and group_id != ''">
+				and b.group_id = #{group_id}
+       </if>
+       <if test="hos_id != null  and hos_id != ''">
+				and b.hos_id = #{hos_id}
+       </if>
+         where 
+             user_id=#{user_id} 
+            <if test="group_id != null  and group_id != ''">
+				and a.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and a.hos_id = #{hos_id}
+			</if>
+
+ 
+ union all
+		
+		select  emp_id id,
+			emp_code||' '||emp_name text
+		from hos_emp_dict
+		<where>  
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+	 		
+			<if test="emp_id != null  and emp_id != ''">
+				and emp_id = #{emp_id}
+			</if>
+			<if test="dept_id != null  and dept_id != ''">
+				and dept_id = #{dept_id}
+			</if>
+			<if test="dept_no != null  and dept_no != ''">
+				and dept_no = #{dept_no}
+			</if>
+			and is_stop = 0 
+			<if test="key != null and key != ''">
+				and (
+					emp_code like '${key}%' or
+					emp_name like '%${key}%' or
+					emp_id like '%${key}%'
+				or
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		
+	</select>
+	
+	<!-- 职工表/领料人 变更表-->
+	<select id="queryMedEmpDict" resultMap="hrpMedSelect">
+		select  emp_id||','||emp_no id,
+			emp_code||' '||emp_name text
+		from hos_emp_dict
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="emp_id != null  and emp_id != ''">
+				and emp_id = #{emp_id}
+			</if>
+			<if test="dept_id != null  and dept_id != ''">
+				and dept_id = #{dept_id}
+			</if>
+			<if test="dept_no != null  and dept_no != ''">
+				and dept_no = #{dept_no}
+			</if>
+			and is_stop = 0 
+			<if test="key != null and key != ''">
+				and (
+					emp_code like '${key}%' or
+					emp_name like '%${key}%' or
+					emp_id like '%${key}%'
+				or
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by emp_id
+	</select>
+	
+	<!-- 编制科室 无权限 -->
+	<select id="queryMedDeptDict" resultMap="hrpMedSelect">
+		select a.dept_id||','||a.dept_no id,
+			a.dept_code||' '||a.dept_name text
+		from hos_dept_dict a
+		<!-- join v_user_data_perm b on a.group_id = b.group_id
+         and a.hos_id = b.hos_id
+          and b.user_id =  #{user_id,jdbcType=INTEGER}
+          and b.table_code = 'HOS_DEPT_DICT'
+          and b.perm_code = a.dept_id
+          and b.is_read = 1
+          and b.is_write = 1  -->
+     	<where>
+     	a.dept_id in (select b.perm_code from  v_user_data_perm b where b.group_id = #{group_id,jdbcType=INTEGER}
+				         and b.hos_id = #{hos_id,jdbcType=INTEGER}
+				          and b.user_id =  #{user_id,jdbcType=INTEGER}
+				          and b.table_code = 'HOS_DEPT_DICT'
+				          and b.is_read = 1
+				          and b.is_write = 1 
+				          )
+     		<if test="group_id != null  and group_id != ''">
+				and a.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and a.hos_id = #{hos_id}
+			</if>
+			<if test="is_last != null and is_last != ''">
+				and a.is_last = #{is_last}
+			</if>
+			<if test="dept_id != null and dept_id != ''">
+				and a.dept_id = #{dept_id}
+			</if>
+			and a.is_stop = 0
+			<if test="key != null and key != ''">
+				and (
+					a.dept_code like '${key}%' or
+					a.dept_name like '%${key}%' 
+				or
+					a.spell_code like '%${key}%' or
+					a.wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by a.dept_code	
+	</select>
+	
+	<!-- 通过参数控制 编制科室权限 -->
+	<select id="queryMedDeptDictDate" resultMap="hrpMedSelect">
+		select a.dept_id||','||a.dept_no id,
+			a.dept_code||' '||a.dept_name text
+		from hos_dept_dict a
+		<!-- <if  test="is_read != null  and is_read != '' or is_write != null  and is_write != '' or read_or_write != null  and read_or_write != ''">
+		
+		 join v_user_data_perm b on a.group_id = b.group_id
+          and a.hos_id = b.hos_id
+          and b.user_id =  #{user_id,jdbcType=INTEGER}
+          and b.table_code = 'HOS_DEPT_DICT'
+          and b.perm_code = to_char(a.dept_id)
+          <if  test="is_read != null  and is_read != ''">
+                and b.is_read = 1
+          </if>
+          <if  test="is_write != null and is_write != ''">
+                 and b.is_write = 1 
+          </if>
+           <if  test="read_or_write != null and read_or_write != ''">
+                 and (b.is_write = 1 or b.is_read = 1) 
+          </if>
+          
+
+        </if>    -->
+     	<where>
+      <if  test="is_read != null  and is_read != '' or is_write != null  and is_write != '' or read_or_write != null  and read_or_write != ''">
+		
+		  to_char(a.dept_id) in (select  b.perm_code from v_user_data_perm b where b.group_id = #{group_id,jdbcType=INTEGER}
+					          and b.hos_id = #{hos_id,jdbcType=INTEGER}
+					          and b.user_id =  #{user_id,jdbcType=INTEGER}
+					          and b.table_code = 'HOS_DEPT_DICT'
+					          <if  test="is_read != null  and is_read != ''">
+					                and b.is_read = 1
+					          </if>
+					          <if  test="is_write != null and is_write != ''">
+					                 and b.is_write = 1 
+					          </if>
+					           <if  test="read_or_write != null and read_or_write != ''">
+					                 and (b.is_write = 1 or b.is_read = 1) 
+					          </if>
+					          )
+
+        </if>   
+        
+        
+     		<if test="group_id != null  and group_id != ''">
+				and a.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and a.hos_id = #{hos_id}
+			</if>
+			<if test="is_last != null and is_last != ''">
+				and a.is_last = #{is_last}
+			</if>
+			<if test="dept_id != null and dept_id != ''">
+				and a.dept_id = #{dept_id}
+			</if>
+			and a.is_stop = 0
+			<if test="key != null and key != ''">
+				and (
+					a.dept_code like '${key}%' or
+					a.dept_name like '%${key}%' 
+				or
+					a.spell_code like '%${key}%' or
+					a.wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by a.dept_code	
+	</select>
+	<!-- 盘点科室 -->
+	<select id="queryMedPDDeptDict" resultMap="hrpMedSelect">
+	
+	select a.dept_id as id, a.dept_code || ' ' || a.dept_name as text
+		from hos_dept_dict a
+      left join hos_emp_dict hed on hed.group_id=a.group_id and hed.hos_id=a.hos_id and hed.dept_no=a.dept_no and hed.dept_id=a.dept_id
+      left join sys_user su on hed.group_id=su.group_id and hed.hos_id=su.hos_id and hed.emp_code=su.user_code and hed.emp_no=su.emp_code
+    
+		<where>
+     		<if test="group_id != null  and group_id != ''">
+				and a.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and a.hos_id = #{hos_id}
+			</if>
+			<if test="is_last != null and is_last != ''">
+				and a.is_last = #{is_last}
+			</if>
+			<if test="dept_id != null and dept_id != ''">
+				and su.user_id = #{dept_id}
+			</if>
+			and a.is_stop = 0
+			<if test="key != null and key != ''">
+				and (
+					a.dept_code like '${key}%' or
+					a.dept_name like '%${key}%' 
+				or
+					a.spell_code like '%${key}%' or
+					a.wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+     
+       union all
+       
+		select a.dept_id id,
+			a.dept_code||' '||a.dept_name text
+		from hos_dept_dict a
+     	<where>
+     		<if test="group_id != null  and group_id != ''">
+				and a.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and a.hos_id = #{hos_id}
+			</if>
+			<if test="is_last != null and is_last != ''">
+				and a.is_last = #{is_last}
+			</if>
+<!-- 			<if test="dept_id != null and dept_id != ''"> -->
+<!-- 				and a.dept_id = #{dept_id} -->
+<!-- 			</if> -->
+			and a.is_stop = 0
+			<if test="key != null and key != ''">
+				and (
+					a.dept_code like '${key}%' or
+					a.dept_name like '%${key}%' 
+				or
+					a.spell_code like '%${key}%' or
+					a.wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+<!-- 		order by a.dept_code	 -->
+	</select>
+	
+	<!-- 领料科室 无权限 -->
+	<select id="queryMedAppDept" resultMap="hrpMedSelect">
+		select a.dept_id  id,
+			a.dept_code||' '||a.dept_name text
+		from hos_dept a
+     	<where>
+     		<if test="group_id != null  and group_id != ''">
+				and a.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and a.hos_id = #{hos_id}
+			</if>
+			<if test="is_last != null and is_last != ''">
+				and a.is_last = #{is_last}
+			</if>
+			and a.is_stop = 0
+			<if test="key != null and key != ''">
+				and (
+					a.dept_code like '${key}%' or
+					a.dept_name like '%${key}%' 
+				or
+					a.spell_code like '%${key}%' or
+					a.wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by a.dept_code	
+	</select>
+	
+	<!-- 职能科室  hos_dept -->
+	<select id="queryMedDeptIsManager" resultMap="hrpMedSelect">
+		select a.dept_id id,
+			a.dept_code||' '||a.dept_name text
+		from hos_dept a
+		left join acc_dept_attr b on a.dept_id = b.dept_id 
+     		and a.hos_id = b.hos_id 
+     		and a.group_id = b.group_id
+     	<where>
+     		<if test="group_id != null  and group_id != ''">
+				and a.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and a.hos_id = #{hos_id}
+			</if>
+<!-- 			<if test="is_last != null and is_last != ''"> -->
+<!-- 				and a.is_last = #{is_last} -->
+<!-- 			</if> -->
+			and a.is_stop = 0
+			<if test="key != null and key != ''">
+				and (
+					a.dept_code like '${key}%' or
+					a.dept_name like '%${key}%' 
+				or
+					a.spell_code like '%${key}%' or
+					a.wbx_code like '%${key}%'
+				)
+			</if>
+			and a.is_last =1
+			<!-- and b.is_manager = 1 -->
+		</where>
+		order by a.dept_id
+	</select>
+	
+	<!-- 库房管理员  变更表-->
+	<select id="queryMedManagerEmp" resultMap="hrpMedSelect">
+		select  
+			emp_id||','||emp_no id,
+			emp_code||' '||emp_name text
+		from hos_emp_dict
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="dept_id != null  and dept_id != ''">
+				and dept_id = #{dept_id}
+			</if>
+			and is_stop = 0 
+			<if test="key != null and key != ''">
+				and (
+					emp_code like '${key}%' or
+					emp_name like '%${key}%' 
+				or
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by emp_code
+		
+	</select>
+	
+	<!-- 采购员 变更表-->
+	<select id="queryMedStockEmp" resultMap="hrpMedSelect">
+		select  
+			emp_id id,
+			emp_code||' '||emp_name text
+		from hos_emp_dict
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="dept_id != null  and dept_id != ''">
+				and dept_id = #{dept_id}
+			</if>
+			<if test="dept_no != null  and dept_no != ''">
+				and dept_no = #{dept_no}
+			</if>
+			<if test="emp_id != null  and emp_id != ''">
+				and emp_id = #{emp_id}
+			</if>
+			<if test="manager != null  and manager != ''">
+				and emp_id = #{manager}
+			</if>
+			and is_stop = 0 
+			<if test="key != null and key != ''">
+				and (
+					emp_code like '${key}%' or
+					emp_name like '%${key}%' 
+				or
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by emp_id
+		
+	</select>
+	
+	<!-- 采购员 变更表-->
+	<select id="queryMedStockEmpDict" resultMap="hrpMedSelect">
+		select  
+			emp_id||','||emp_no id,
+			emp_code||' '||emp_name text
+		from hos_emp_dict
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="dept_id != null  and dept_id != ''">
+				and dept_id = #{dept_id}
+			</if>
+			<if test="dept_no != null  and dept_no != ''">
+				and dept_no = #{dept_no}
+			</if>
+			and is_stop = 0 
+			<if test="key != null and key != ''">
+				and (
+					emp_code like '${key}%' or
+					emp_name like '%${key}%' or
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by emp_id
+		
+	</select>
+	
+	<!-- 采购人 一个仓库对应多个采购员 查询  即墨需求   2017/04/06  gaopei -->
+	<select id="queryMedStockEmpByStore" resultMap="hrpMedSelect"  >
+		select  
+      hed.emp_id id,
+      hed.emp_code||' '||hed.emp_name text
+    from hos_emp_dict hed
+    left join med_store_emp_map msem on hed.emp_id = msem.emp_id and hed.group_id = msem.group_id and hed.hos_id = msem.hos_id 
+		<where>
+		      msem.store_id = #{store_id}
+			<if test="group_id != null  and group_id != ''">
+				and hed.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hed.hos_id = #{hos_id}
+			</if>
+			<if test="dept_id != null  and dept_id != ''">
+				and hed.dept_id = #{dept_id}
+			</if>
+			<if test="dept_no != null  and dept_no != ''">
+				and hed.dept_no = #{dept_no}
+			</if>
+			<if test="emp_id != null  and emp_id != ''">
+				and hed.emp_id = #{emp_id}
+			</if>
+			and hed.is_stop = 0 
+			<if test="key != null and key != ''">
+				and (
+					hed.emp_code like '${key}%' or
+					hed.emp_name like '%${key}%' 
+				or
+					hed.spell_code like '%${key}%' or
+					hed.wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by hed.emp_id
+		
+	</select>
+	
+	
+	<!-- 库房分类 -->
+	<select id="queryMedStoreType" resultMap="hrpMedSelect">
+		select 
+			type_code id,
+			type_code||' '||type_name text
+		from hos_store_type
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			and is_stop = 0
+			<if test="key != null and key != ''">
+				and (
+					type_code like '${key}%' or
+					type_name like '%${key}%' 
+				or
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by type_code
+	</select>
+	
+	<select id="queryMedInvDict" resultMap="hrpMedSelect">
+		SELECT
+			inv_id||','||inv_no id,
+			inv_code||' '||inv_name text
+		FROM MED_INV_DICT
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null  and copy_code != ''">
+				and copy_code = #{copy_code}
+			</if>
+			<if test="inv_id != null  and inv_id != ''">
+				and inv_id = #{inv_id}
+			</if>
+			<if test="med_type_id != null  and med_type_id != ''">
+				and med_type_id = #{med_type_id}
+			</if>
+			<if test="is_com != null  and is_com != ''">
+				and is_com = #{is_com}
+			</if>
+			and is_stop = 0
+			<if test="key != null and key != ''">
+				and (
+				inv_code like '${key}%' or 
+				inv_name like '%${key}%'
+				or
+				spell_code like '%${key}%' or 
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by inv_code
+	</select>
+	
+	<select id="queryMedInvDictByStoreInv" resultMap="hrpMedSelect">
+		select 
+			mid.inv_id||','||mid.inv_no id,
+			mid.inv_code||' '||mid.inv_name text
+		from MED_STORE_INV msi
+		left join MED_INV_DICT mid on msi.group_id = mid.group_id and msi.hos_id = mid.hos_id and msi.copy_code = mid.copy_code and msi.inv_id = mid.inv_id
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and msi.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and msi.hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null  and copy_code != ''">
+				and msi.copy_code = #{copy_code}
+			</if>
+			<if test="inv_id != null  and inv_id != ''">
+				and mid.inv_id = #{inv_id}
+			</if>
+			<if test="is_com != null  and is_com != ''">
+				and mid.is_com = #{is_com}
+			</if>
+			<if test="store_id != null  and store_id != ''">
+				and msi.store_id = #{store_id}
+			</if>
+			and is_stop = 0
+			<if test="key != null and key != ''">
+				and (
+				mid.inv_code like '${key}%' or 
+				mid.inv_name like '%${key}%'
+				or
+				mid.spell_code like '%${key}%' or 
+				mid.wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by mid.inv_code
+	</select>
+	
+	<!-- 供应商字典 -->
+	<select id="queryHosSup" resultMap="hrpMedSelect">
+		SELECT
+			sup_id id,
+			sup_code||' '||sup_name text
+		FROM HOS_SUP_DICT
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="sup_id != null  and sup_id != ''">
+				and sup_id = #{sup_id}
+			</if>
+			and is_stop = 0
+			and is_med = 1
+			<if test="is_disable != null">
+				and is_disable = #{is_disable}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+				sup_code like '${key}%' or 
+				sup_name like '%${key}%'
+				or
+				spell_code like '%${key}%' 
+				<!-- or wbx_code like '%${key}%' -->
+				)
+			</if>
+		</where>
+		order by sup_code
+	</select>
+	
+	<!-- 供应商字典含变更号 -->
+	<select id="queryHosSupDict" resultMap="hrpMedSelect">
+		SELECT
+			sup_id||','||sup_no id,
+			sup_code||' '||sup_name text
+		FROM HOS_SUP_DICT
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="sup_id != null  and sup_id != ''">
+				and sup_id = #{sup_id}
+			</if>
+			and is_stop = 0
+			and is_med = 1
+			<if test="is_disable != null">
+				and is_disable = #{is_disable}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+				sup_code like '${key}%' or 
+				sup_name like '%${key}%'
+				or
+				spell_code like '%${key}%' 
+				<!-- or wbx_code like '%${key}%' -->
+				)
+			</if>
+		</where>
+		order by sup_code
+	</select>
+	
+		<!-- 供应商字典含停用的不显示-->
+	<select id="queryHosSupDictDisable" resultMap="hrpMedSelect">
+		SELECT
+			sup_id||','||sup_no id,
+			sup_code||' '||sup_name text
+		FROM HOS_SUP_DICT
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="sup_id != null  and sup_id != ''">
+				and sup_id = #{sup_id}
+			</if>
+			and is_stop = 0
+			and is_disable=0
+			and is_med = 1
+			<if test="key != null and key != ''">
+				and (
+				sup_code like '${key}%' or 
+				sup_name like '%${key}%'
+				or
+				spell_code like '%${key}%' 
+				<!-- or wbx_code like '%${key}%' -->
+				)
+			</if>
+		</where>
+		order by sup_code
+	</select>
+	
+	<!-- 生产厂商的字典 -->
+	<select id="queryHosFac" resultMap="hrpMedSelect">
+		SELECT
+			fac_id id,
+			fac_code||' '||fac_name text
+		FROM HOS_FAC_DICT
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="fac_id != null  and fac_id != ''">
+				and fac_id = #{fac_id}
+			</if>
+			and is_stop = 0
+			<if test="key != null and key != ''">
+				and (
+				fac_code like '${key}%' or 
+				fac_name like '%${key}%'
+				or
+				spell_code like '%${key}%' 
+				<!-- or wbx_code like '%${key}%' -->
+				)
+			</if>
+		</where>
+		order by fac_code
+	</select>
+	<select id="queryHosFacInv" resultMap="hrpMedSelect">
+		SELECT
+			fac_id id,
+			fac_code||' '||fac_name text
+		FROM HOS_FAC
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="fac_id != null  and fac_id != ''">
+				and fac_id = #{fac_id}
+			</if>
+			
+			<if test="key != null and key != ''">
+				and (
+				fac_code like '${key}%' or 
+				fac_name like '%${key}%'
+				or
+				spell_code like '%${key}%' 
+				<!-- or wbx_code like '%${key}%' -->
+				)
+			</if>
+		</where>
+		order by fac_code
+	</select>
+	<!-- 生产厂商含变更号 -->
+	<select id="queryHosFacDict" resultMap="hrpMedSelect">
+		SELECT
+			fac_id||','||fac_no id,
+			fac_code||' '||fac_name text
+		FROM HOS_FAC_DICT
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="fac_id != null  and fac_id != ''">
+				and fac_id = #{fac_id}
+			</if>
+			and is_stop = 0
+			<if test="key != null and key != ''">
+				and (
+				fac_code like '${key}%' or 
+				fac_name like '%${key}%'
+				or
+				spell_code like '%${key}%' 
+				<!-- or wbx_code like '%${key}%' -->
+				)
+			</if>
+		</where>
+		order by fac_code
+	</select>
+	
+	<select id="queryHosUnit" resultMap="hrpMedSelect">
+		SELECT
+			unit_code id,
+			 unit_name text
+		FROM HOS_UNIT
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="unit_code != null  and unit_code != ''">
+				and unit_code = #{unit_code}
+			</if>
+			and is_stop = 0
+			<if test="key != null and key != ''">
+				and (
+				unit_code like '${key}%' or 
+				unit_name like '%${key}%'
+				or
+				spell_code like '%${key}%' or 
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by unit_code
+	</select>
+	<select id="querySysUser" resultMap="hrpMedSelect">
+		SELECT
+			user_id id,
+			user_code ||' '|| user_name text
+		FROM SYS_USER
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="user_code != null  and user_code != ''">
+				and user_code = #{user_code}
+			</if>
+			and is_stop = 0
+			<if test="key != null and key != ''">
+				and (
+				user_code like '${key}%' or 
+				user_name like '%${key}%'
+				or
+				spell_code like '%${key}%' or 
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by user_code
+	</select>
+	<!-- 业务类型下拉列表 -->
+	<select id="queryMedBusType" resultMap="hrpMedSelect">
+		SELECT
+			bus_type_code id,
+			bus_type_name text
+		FROM med_bus_type
+		<where>
+			<if test="in_out_type != null and in_out_type != ''">
+				AND in_out_type = #{in_out_type}
+			</if>
+			<if test="sel_flag != null and sel_flag != ''">
+				AND sel_flag = #{sel_flag}
+			</if>
+			<if test="codes != null and codes != ''">
+				AND bus_type_code in (${codes})
+			</if>
+			 and is_stop = 0
+		</where>
+		ORDER BY cast(bus_type_code as numeric(4,0))
+	</select>
+	
+	<select id="queryMedBusTypes" resultMap="hrpMedSelect">
+	    
+		SELECT
+			bus_type_code id,
+			bus_type_name text
+		FROM med_bus_type
+		<where>
+			<if test="in_out_type != null and in_out_type != ''">
+				AND in_out_type = #{in_out_type}
+			</if> 
+			<if test="sel_flag != null and sel_flag != ''">
+				AND sel_flag = #{sel_flag}
+			</if>
+			<if test="codes != null and codes != ''">
+				AND bus_type_code in (${codes})
+			</if>
+			 and is_stop = 0 
+		</where>
+		union all
+		select '0' as id,'期初结存' as text from dual
+         union all
+        select '99' as id,'期末结存' as text from dual
+        
+	</select>
+	
+	<!-- 内置数据下拉列表 -->
+	<select id="queryMedSysList" resultMap="hrpMedSelect">
+		SELECT
+			field_value id,
+			field_value||'：'||field_desc text
+		FROM med_sys_list
+		WHERE field_code = upper(#{field_code})
+			<if test="table_code != null and table_code != ''">
+				AND table_code = upper(#{table_code})
+			</if>
+			<if test="values != null and values != ''">
+				AND field_value in (${values})
+			</if>
+			<if test="notValues != null and notValues != ''">
+				AND field_value not in (${notValues})
+			</if>
+	</select>
+	<!-- 材料证件分类 下拉框 -->
+	<select id="qryMedInvCertType" resultMap="hrpMedSelect">
+		SELECT
+			type_id || ',' || validity_type  id,
+			type_code || ' ' || type_name text
+		FROM MED_INV_CERT_TYPE
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null  and copy_code != ''">
+				and copy_code = #{copy_code}
+			</if>
+			<if test="key != null and key != '' ">
+		    	and (type_id like '%${key}%'
+			      or type_code like '%${key}%'
+			      or type_name like '%${key}%'
+			      or soell_code like '%${key}%'
+			      or wbx_code like '%${key}%')
+			</if>
+		</where>
+	</select>
+	<!-- 药品仓库配套表配套表信息 -->
+	<select id="queryMedStoreMatch" resultMap="hrpMedSelect">
+		select 
+		    store_match_id as id,
+		    store_match_id || ' '|| store_match_name as text
+		from MED_STORE_MATCH 
+		<where>
+			<if test="group_id != null and group_id != ''">
+			    group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != '' ">
+			    and hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != '' ">
+			    and copy_code = #{copy_code}
+			</if>
+			<if test="store_id != null and store_id != '' ">
+			    and store_id = #{store_id}
+			</if>
+			<if test="key != null and key != '' ">
+		    	and (store_match_id like '%${key}%'
+			      or store_match_name like '%${key}%')
+			</if>
+		</where>
+	</select>
+	
+	<!-- 药品科室配套表信息 -->
+	<select id="queryMedDeptMatch" resultMap="hrpMedSelect">
+		select 
+		    dept_match_id as id,
+		    dept_match_id || ' '|| dept_match_name as text
+		from MED_DEPT_MATCH 
+		<where>
+			<if test="group_id != null and group_id != ''">
+			    group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != '' ">
+			    and hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != '' ">
+			    and copy_code = #{copy_code}
+			</if>
+			<if test=" store_id != null and store_id != '' ">
+			    and (store_id = #{store_id} or store_id is null)
+			</if>
+			<if test="dept_id != null and dept_id != '' ">
+			    and dept_id = #{dept_id}
+			</if>
+			<if test="key != null and key != '' ">
+		    	and (dept_match_id like '%${key}%'
+			      or dept_match_name like '%${key}%')
+			</if>
+		</where>
+	</select>
+	
+	<!-- 证件编码下拉框 -->
+	<select id="queryMedInvCert" resultMap="hrpMedSelect">
+		SELECT
+			cert_id id,
+			cert_id || ' ' || cert_code text
+		FROM MED_INV_CERT
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null  and copy_code != ''">
+				and copy_code = #{copy_code}
+			</if>
+			<if test="key != null and key != '' ">
+		    	and (cert_id like '%${key}%'
+			      or cert_code like '%${key}%')
+			</if>
+		</where>
+	</select>
+	
+	<!-- 年 -->
+	<select id="queryMedYear" resultMap="hrpMedSelect">
+		select distinct acc_year id,
+			acc_year text 
+		from acc_year
+		<where>
+			<if test="group_id != null and group_id != ''">
+			    group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != '' ">
+			    and hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != '' ">
+			    and copy_code = #{copy_code}
+			</if>
+		</where> 
+		order by acc_year
+	</select> 
+	<!-- 月 -->
+	<select id="queryMedMonth" resultMap="hrpMedSelect">
+		select distinct acc_month id ,
+			acc_month text
+		from ACC_YEAR_MONTH 
+		<where> 
+			<if test="group_id != null and group_id != ''">
+			    group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != '' ">
+			    and hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != '' ">
+			    and copy_code = #{copy_code}
+			</if>
+			<if test="acc_year != null and acc_year != '' ">
+			    and acc_year = #{acc_year}
+			</if>
+		</where>
+		order by  acc_month
+	</select>
+	<!-- 供应商类别  -->
+	<select id="queryHosSupType" resultMap="hrpMedSelect">
+		SELECT
+			type_code id,
+			type_code||' '||type_name text
+		FROM hos_sup_type
+		<where>
+			is_stop = 0
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+				type_code like '${key}%' or 
+				type_name like '%${key}%'
+				or
+				spell_code like '%${key}%' or 
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by type_code
+	</select>
+	
+	<!-- 供应商 证件类别  -->
+	<select id="queryMedVenCertType" resultMap="hrpMedSelect">
+		SELECT
+			type_id id,
+			type_code||' '||type_name text
+		FROM MED_VEN_CERT_TYPE
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null  and copy_code  != ''">
+				and copy_code  = #{copy_code }
+			</if>
+			<if test="key != null and key != ''">
+				and (
+				type_code like '${type_code}%' or 
+				type_name like '%${type_code}%'
+				or
+				spell_code like '%${type_code}%' or 
+				wbx_code like '%${type_code}%'
+				)
+			</if>
+		</where>
+		order by type_code
+	</select>
+	<!-- 药品分类级次 -->
+	<select id="queryMedTypeLevel" resultMap="hrpMedSelect">
+		 select * from (select distinct a.type_level as id, to_char(a.type_level) as text
+           				 from MED_TYPE_DICT a
+    			  		where a.group_id = #{group_id}
+						      and a.hos_id =  #{hos_id}
+						      and a.copy_code =   #{copy_code }
+						      and a.is_stop = 0 
+						     order by a.type_level)
+		union all 
+				select * from (
+				 select distinct 99 as id, '末级' as text
+								from MED_TYPE_DICT b
+							   where b.group_id = #{group_id}
+								      and b.hos_id = #{hos_id}
+								      and b.copy_code =  #{copy_code }
+								      and b.is_stop = 0
+				               )
+	</select>
+	
+	<!-- 药品分类级次-带id -->
+	<select id="queryMedTypeLevel_2" resultMap="hrpMedSelect">
+		SELECT  id,to_char(text) text FROM (
+			SELECT
+				DISTINCT type_level id,type_level text
+			FROM MED_TYPE_DICT
+			<where>
+				<if test="group_id != null  and group_id != ''">
+					AND group_id = #{group_id}
+				</if>
+				<if test="hos_id != null  and hos_id != ''">
+					AND hos_id = #{hos_id}
+				</if>
+				<if test="copy_code != null  and copy_code != ''">
+					AND copy_code = #{copy_code}
+				</if>
+				AND is_stop = 0
+			</where>
+			ORDER BY type_level
+		)
+		UNION ALL
+		SELECT 0 AS id, '末级' AS text FROM DUAL
+	</select>
+	
+	<!-- 采购协议类别  下拉框-->
+	<select id="queryMedProtocolType" resultMap="hrpMedSelect">
+		SELECT
+			type_id id,
+			type_code||' '||type_name text
+		FROM MED_PROTOCOL_TYPE
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null  and copy_code  != ''">
+				and copy_code  = #{copy_code }
+			</if>
+			<if test="key != null and key != ''">
+				and (
+				type_code like '${key}%' or 
+				type_name like '%${key}%'
+				or
+				spell_code like '%${key}%' or 
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by type_code
+	</select>
+	
+	<!-- 包装单位下拉框 -->
+	<select id="queryHosPackage" resultMap="hrpMedSelect">
+		SELECT
+			pack_code id,
+			pack_name text
+		FROM HOS_PACKAGE
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="pack_code != null and pack_code != ''">
+				and (
+				pack_code like '${pack_code}%' or 
+				pack_name like '%${pack_code}%'
+				or
+				spell_code like '%${pack_code}%' or 
+				wbx_code like '%${pack_code}%'
+				)
+			</if>
+			<if test="key != null and key != ''">
+				and (
+				pack_code like '${key}%' or 
+				pack_name like '%${key}%'
+				or
+				spell_code like '%${key}%' or 
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by pack_code
+	</select>
+	
+	<!-- 按照用户权限查询科室：采购部门  下拉框 -->
+	<select id="queryPurDept" resultMap="hrpMedSelect">
+		SELECT  
+			a.dept_id||','||a.dept_no id, 
+	      	a.dept_code||' '||a.dept_name text
+	    FROM HOS_DEPT_DICT a 
+		<!-- join v_user_data_perm b 
+			on a.group_id = b.group_id and a.hos_id = b.hos_id
+			and b.user_id = #{user_id,jdbcType=INTEGER} and b.table_code = 'HOS_DEPT_DICT' 
+			and b.perm_code = a.dept_id and b.is_read = 1 and b.is_write = 1 -->
+	    LEFT JOIN ACC_DEPT_ATTR c
+	    ON
+	         a.group_id = c.group_id
+	         AND a.hos_id = c.hos_id
+	         AND a.dept_id = c.dept_id
+	    WHERE a.group_id = #{group_id,jdbcType=INTEGER} 
+			and a.hos_id = #{hos_id,jdbcType=INTEGER} 
+			AND a.group_id = #{group_id} 
+			AND a.is_stop = 0
+			AND c.is_stock = 1
+			and a.dept_id  in (select b.perm_code from  v_user_data_perm b 
+								where b.group_id = #{group_id} and  b.hos_id = #{hos_id} 
+								and b.user_id = #{user_id,jdbcType=INTEGER} and b.table_code = 'HOS_DEPT_DICT' 
+								 and b.is_read = 1 and b.is_write = 1
+								)
+			<if test="is_last != null and is_last != ''">
+				and a.is_last = #{is_last}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+					a.dept_code like '${key}%' or
+					a.dept_name like '%${key}%'
+				or
+					a.spell_code like '%${key}%' or
+					a.wbx_code like '%${key}%'
+				)
+			</if>
+	</select>
+	
+	<!-- 计划类型 -->
+	<select id="queryMedPlanType" resultMap="hrpMedSelect">
+		SELECT 1 id, '自购状态' text FROM DUAL
+		UNION ALL
+		SELECT 2 id, '统购状态' text FROM DUAL
+	</select>
+	
+	<!-- 采购计划:采购员 变更表-->
+	<select id="queryMedPurStockEmp" resultMap="hrpMedSelect">
+		select  
+			emp_id||','||emp_no id,
+			emp_code||' '||emp_name text,
+			emp_id||','||emp_no code,
+			emp_code||' '||emp_name name
+		from hos_emp_dict
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="dept_id != null  and dept_id != ''">
+				and dept_id = #{dept_id}
+			</if>
+			and is_stop = 0 
+			<if test="key != null and key != ''">
+				and (
+					emp_code like '${key}%' or
+					emp_name like '%${key}%' 
+				or
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by emp_id
+		
+	</select>
+	
+	<!-- 包装单位-->
+	<select id="queryMedHosPackage" resultMap="hrpMedSelect">
+		select  
+			pack_code id,
+			pack_name text
+		from hos_package
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			and is_stop = 0 
+			<if test="key != null and key != ''">
+				and (
+					pack_code like '${key}%' or
+					pack_name like '%${key}%' 
+				or
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by pack_code
+	</select>
+	<!-- 签订部门：当前用户有权限的职能科室列表（HOS_DEPT_DICT 中is_stop=0的职能科室列表） -->
+	<select id="querySignedDept" resultMap="hrpMedSelect">
+		select  a.dept_id||','||a.dept_no id, 
+			a.dept_code||' '||a.dept_name text
+		from HOS_DEPT_DICT a 
+		<!-- join v_user_data_perm b 
+			on a.group_id = b.group_id and a.hos_id = b.hos_id
+			and b.user_id = #{user_id,jdbcType=INTEGER} and b.table_code = 'HOS_DEPT_DICT' 
+			and b.perm_code = a.dept_id and b.is_read = 1 and b.is_write = 1 -->
+		left join acc_dept_attr ada
+			ON 
+				a.dept_id = ada.dept_id 
+	     		and a.hos_id = ada.hos_id 
+	     		and a.group_id = ada.group_id
+     	<where>
+     	a.dept_id in (select b.perm_code from  v_user_data_perm b 
+						where b.group_id = #{group_id} and  b.hos_id = #{hos_id}
+						and b.user_id = #{user_id,jdbcType=INTEGER} and b.table_code = 'HOS_DEPT_DICT' 
+						 and b.is_read = 1 and b.is_write = 1
+						)
+     	<if test="group_id != null  and group_id != ''">
+				and a.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and a.hos_id = #{hos_id}
+			</if>
+			<if test="is_last != null and is_last != ''">
+				and a.is_last = #{is_last}
+			</if>
+			<if test="dept_id != null and dept_id != ''">
+				and (
+					a.dept_code like '${dept_id}%' or
+					a.dept_name like '%${dept_id}%'
+				or
+					a.spell_code like '%${dept_id}%' or
+					a.wbx_code like '%${dept_id}%'
+				)
+			</if>
+			and ada.is_manager = 1
+			and a.is_stop = 0
+     	</where> 
+		order by dept_code
+	</select>
+	
+	<!-- 采购类型-->
+	<select id="queryMedStockType" resultMap="hrpMedSelect">
+		select stock_type_code id,
+			stock_type_name text
+		from (
+			select stock_type_code,stock_type_name
+			from med_stock_type 
+			<where>
+				<if test="group_id != null  and group_id != ''">
+					and group_id = #{group_id}
+				</if>
+				<if test="hos_id != null  and hos_id != ''">
+					and hos_id = #{hos_id}
+				</if>
+				<if test="copy_code != null  and copy_code != ''">
+					and copy_code = #{copy_code}
+				</if>
+				and is_stop = 0 
+				<if test="key != null and key != ''">
+					and (
+						stock_type_code like '${key}%' or
+						stock_type_name like '%${key}%' 
+					or
+						spell_code like '%${key}%' or
+						wbx_code like '%${key}%'
+					)
+				</if>
+				and stock_type_code = '02'
+			</where>
+			union all
+			select stock_type_code,stock_type_name
+			from med_stock_type 
+			<where>
+				<if test="group_id != null  and group_id != ''">
+					and group_id = #{group_id}
+				</if>
+				<if test="hos_id != null  and hos_id != ''">
+					and hos_id = #{hos_id}
+				</if>
+				<if test="copy_code != null  and copy_code != ''">
+					and copy_code = #{copy_code}
+				</if>
+				and is_stop = 0 
+				<if test="key != null and key != ''">
+					and (
+						stock_type_code like '${key}%' or
+						stock_type_name like '%${key}%' 
+					or
+						spell_code like '%${key}%' or
+						wbx_code like '%${key}%'
+					)
+				</if>
+				and stock_type_code not in ('02')
+			</where> 
+		)
+		
+	</select>
+	<!-- 采购协议主表 下拉框-->
+	<select id="queryMedProtocolMain" resultMap="hrpMedSelect">
+		SELECT
+			protocol_id||','||protocol_code id,
+			protocol_code||' '||protocol_name text
+		FROM MED_PROTOCOL_MAIN
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null  and copy_code  != ''">
+				and copy_code  = #{copy_code }
+			</if>
+			<if test="sup_id != null  and sup_id  != ''">
+				and sup_id  = #{sup_id }
+			</if>
+			<if test="key != null and key != ''">
+				and (
+				type_code like '${key}%' or 
+				type_name like '%${key}%'
+				or
+				spell_code like '%${key}%' or 
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by protocol_id
+	</select>
+	
+	<!-- 付款方式(结算方式) -->
+	<select id="queryMedPayType" resultMap="hrpMedSelect">
+		SELECT
+		pay_code id,
+		pay_name text
+		FROM ACC_PAY_TYPE 
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null  and copy_code != ''">
+				and copy_code = #{copy_code}
+			</if>
+			and is_stop = 0
+			<if test="key != null and key != ''">
+				and (
+				pay_code like '%${key}%' or
+				pay_name like '%${key}%' or
+				spell_code like '%${key}%' or
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by pay_code
+	</select>
+	<!-- 采购发票  付款条件下拉框 -->
+	<select id="queryMedPayTerm" resultMap="hrpMedSelect">
+		SELECT
+		pay_term_id id,
+		pay_term_code ||' '|| pay_term_name text
+		FROM MED_PAY_TERM 
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null  and copy_code != ''">
+				and copy_code = #{copy_code}
+			</if>
+			and is_stop = 0
+			<if test="key != null and key != ''">
+				and (
+				pay_term_code like '${key}%' or
+				pay_term_name like '%${key}%' or
+				spell_code like '%${key}%' or
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by pay_term_code
+	</select>
+	
+	<!-- 有权限科室 -->
+	<select id="queryHosDeptByPerm" resultMap="hrpMedSelect">
+		select  a.dept_id id, 
+			a.dept_code||' '||a.dept_name text
+		from HOS_DEPT_DICT a 
+		<!-- join v_user_data_perm b 
+			on a.group_id = b.group_id and a.hos_id = b.hos_id
+			and b.user_id = #{user_id,jdbcType=INTEGER} and b.table_code = 'HOS_DEPT_DICT' 
+			and b.perm_code = a.dept_id and b.is_read = 1 and b.is_write = 1 -->
+		<where>
+		a.dept_id in (select b.perm_code from v_user_data_perm b 
+						where b.group_id = #{group_id} and  b.hos_id = #{hos_id}
+						and b.user_id = #{user_id,jdbcType=INTEGER} and b.table_code = 'HOS_DEPT_DICT' 
+						 and b.is_read = 1 and b.is_write = 1
+						)
+			<if test="group_id != null  and group_id != ''">
+				and a.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and a.hos_id = #{hos_id}
+			</if>
+			<if test="is_last != null and is_last != ''">
+				and a.is_last = #{is_last}
+			</if>
+			and a.is_stop = 0
+			<if test="key != null and key != ''">
+				and (
+					a.dept_code like '${key}%' or
+					a.dept_name like '%${key}%'
+				or
+					a.spell_code like '%${key}%' or
+					a.wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by dept_code
+	</select>
+	<!-- 有权限科室带变更 -->
+	<select id="queryHosDeptDictByPerm" resultMap="hrpMedSelect">
+		select  a.dept_id||','||a.dept_no id, 
+			a.dept_code||' '||a.dept_name text
+		from HOS_DEPT_DICT a 
+		<!-- join v_user_data_perm b 
+			on a.group_id = b.group_id and a.hos_id = b.hos_id
+			and b.user_id = #{user_id,jdbcType=INTEGER} and b.table_code = 'HOS_DEPT_DICT' 
+			and b.perm_code = a.dept_id and b.is_read = 1 and b.is_write = 1 -->
+		<where>
+		a.dept_id in (select b.perm_code from  v_user_data_perm b 
+						where b.group_id = #{group_id} and b.hos_id = #{hos_id}
+						and b.user_id = #{user_id,jdbcType=INTEGER} and b.table_code = 'HOS_DEPT_DICT' 
+						 and b.is_read = 1 and b.is_write = 1
+						)
+			<if test="group_id != null  and group_id != ''">
+				and a.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and a.hos_id = #{hos_id}
+			</if>
+			<if test="is_last != null and is_last != ''">
+				and a.is_last = #{is_last}
+			</if>
+			and a.is_stop = 0
+			<if test="key != null and key != ''">
+				and (
+					a.dept_code like '${key}%' or
+					a.dept_name like '%${key}%'
+				or
+					a.spell_code like '%${key}%' or
+					a.wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by dept_code
+	</select>
+	
+	<!-- 科室 -->
+	<select id="queryHosDept" resultMap="hrpMedSelect">
+		select  a.dept_id id, 
+			a.dept_code||' '||a.dept_name text
+		from HOS_DEPT_DICT a 
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and a.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and a.hos_id = #{hos_id}
+			</if>
+			<if test="is_last != null and is_last != ''">
+				and a.is_last = #{is_last}
+			</if>
+			and a.is_stop = 0
+			<if test="key != null and key != ''">
+				and (
+					a.dept_code like '${key}%' or
+					a.dept_name like '%${key}%'
+				or
+					a.spell_code like '%${key}%' or
+					a.wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by dept_code
+	</select>
+	<!-- 科室带变更 -->
+	<select id="queryHosDeptDict" resultMap="hrpMedSelect">
+		select  a.dept_id||','||a.dept_no id, 
+			a.dept_code||' '||a.dept_name text
+		from HOS_DEPT_DICT a 
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and a.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and a.hos_id = #{hos_id}
+			</if>
+			<if test="is_last != null and is_last != ''">
+				and a.is_last = #{is_last}
+			</if>
+			and a.is_stop = 0
+			<if test="key != null and key != ''">
+				and (
+					a.dept_code like '${key}%' or
+					a.dept_name like '%${key}%'
+				or
+					a.spell_code like '%${key}%' or
+					a.wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by dept_code
+	</select>
+	
+	<!-- 查询单位 -->
+	<select id="queryMedHosInfo" resultMap="hrpMedSelect">
+		select 
+			hos_id id,
+			hos_code ||' '|| hos_name text
+			from v_hos_dict
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and (hos_id = #{hos_id} or group_id = hos_id)
+			</if>
+			and is_stop = 0
+			<if test="key != null and key != ''">
+				and (
+				hos_code like '${key}%' or
+				hos_name like '%${key}%'
+				)
+			</if>
+		</where>
+	</select>
+	
+	<!-- 查询单位变更号 -->
+	<select id="queryMedHosInfoDict" resultMap="hrpMedSelect">
+		select 
+			hos_id||','||hos_no id,
+			hos_code ||' '|| hos_name text
+			from v_hos_dict
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and (hos_id = #{hos_id} or group_id = hos_id)
+			</if>
+			and is_stop = 0
+			<if test="key != null and key != ''">
+				and (
+				hos_code like '${key}%' or
+				hos_name like '%${key}%'
+				)
+			</if>
+		</where>
+	</select>
+	
+	<!-- 查询项目 -->
+	<select id="queryMedProj" resultMap="hrpMedSelect">
+		select 
+			proj_id id,
+			proj_code ||' '|| proj_name text
+			from hos_proj_dict
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			and is_stop = 0
+			<if test="key != null and key != ''">
+				and (
+				proj_code like '${key}%' or
+				proj_name like '%${key}%' or
+				spell_code like '%${key}%' or
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+	</select>
+	
+	<!-- 查询项目(带变更号) -->
+	<select id="queryMedProjDict" resultMap="hrpMedSelect">
+		select 
+			proj_id id,
+			proj_code ||' '|| proj_name text
+			from hos_proj_dict
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			and is_stop = 0
+			<if test="key != null and key != ''">
+				and (
+				proj_code like '${key}%' or
+				proj_name like '%${key}%'
+				)
+			</if>
+		</where>
+	</select>
+	
+	<!-- 查询出库药品用途 -->
+	<select id="queryMedOutUse" resultMap="hrpMedSelect">
+		select 
+			use_code id,
+			use_name text
+			from med_out_use
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null  and copy_code != ''">
+				and copy_code = #{copy_code}
+			</if>
+			and is_stop = 0
+			<if test="key != null and key != ''">
+				and (
+				use_code like '${key}%' or
+				use_name like '%${key}%'
+				)
+			</if>
+		</where>
+	</select>
+	
+	<!-- 科室需求计划 供应商维护 -->
+	<select id="queryMedSupByInvId" resultMap="hrpMedSelect">
+		select 
+			hsd.sup_id||','||hsd.sup_no id,
+			hsd.sup_code ||' '||hsd.sup_name text
+		from hos_sup_dict hsd
+		left join med_inv_sup mis on mis.sup_id = hsd.sup_id
+		     and hsd.group_id = mis.group_id
+		     and hsd.hos_id = mis.hos_id
+		     and hsd.is_stop = 0
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				hsd.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hsd.hos_id = #{hos_id}
+			</if>
+			<if test="inv_id != null  and inv_id != ''">
+				and mis.inv_id = #{inv_id}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+					hsd.sup_code like '${key}%' or
+					hsd.sup_name like '%${key}%'
+				)
+			</if>
+		</where>
+		order by hsd.sup_code
+	</select>
+	
+	<!-- 科室级次 -->
+	<select id="queryHosDeptLevel" parameterType="java.util.Map" resultMap="hrpMedSelect">
+		SELECT id ,text FROM(
+			SELECT 
+				distinct dept_level as id,to_char(dept_level) as text from hos_dept
+			<where>
+				<if test="group_id != null and group_id != '' ">
+			       group_id = #{group_id}
+				</if>
+				
+				<if test="hos_id != null and hos_id != '' ">
+			       and hos_id = #{hos_id}
+				</if>
+			       and is_stop = 0
+			</where>
+			ORDER BY dept_level
+		)
+		<if test="showLast == 1">
+			UNION ALL
+			SELECT 0 AS id,'末级' AS text FROM DUAL 
+		</if>
+	</select>
+	
+	<!-- 仓库(虚仓) -->
+	<select id="queryMedVirStore" parameterType="java.util.Map" resultMap="hrpMedSelect">
+		SELECT
+		     mss.set_id as id,
+		     mss.set_code||' '||mss.set_name as text 
+		FROM MED_STORE_SET mss
+		<where>
+			<if test="group_id != null and group_id != '' ">
+			     mss.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != '' ">
+			     AND mss.hos_id = #{hos_id}
+			</if>
+			<if test="set_id != null and set_id != '' ">
+			     AND mss.set_id = #{set_id}
+			</if>
+		</where>
+		order by mss.set_code
+	</select>
+	
+	<!-- 仓库(虚仓) -->
+	<select id="queryMedVirStoreByWrite" parameterType="java.util.Map" resultMap="hrpMedSelect">
+		SELECT
+		     mss.set_id as id,
+		     mss.set_code||' '||mss.set_name as text 
+		FROM MED_STORE_SET mss
+		<where>
+			<if test="group_id != null and group_id != '' ">
+			     mss.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != '' ">
+			     AND mss.hos_id = #{hos_id}
+			</if>
+			<if test="set_id != null and set_id != '' ">
+			     AND mss.set_id = #{set_id}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+					mss.set_code like '${key}%' or
+					mss.set_name like '%${key}%'
+				)
+			</if>
+			AND exists(
+				select 1 from med_store_detail a
+				<!-- join v_user_data_perm b 
+					on a.group_id = b.group_id and a.hos_id = b.hos_id
+					and b.user_id = #{user_id,jdbcType=INTEGER} 
+					and b.table_code = 'HOS_STORE_DICT' 
+					and b.perm_code = a.store_id and b.is_write = 1 -->
+				where a.group_id = mss.group_id 
+					and a.hos_id = mss.hos_id 
+					and a.set_id = mss.set_id 
+					and a.store_id in (select b.perm_code from  v_user_data_perm b 
+									where b.group_id = #{group_id,jdbcType=INTEGER}  and b.hos_id = #{hos_id,jdbcType=INTEGER} 
+									and b.user_id = #{user_id,jdbcType=INTEGER} 
+									and b.table_code = 'HOS_STORE_DICT' 
+									 and b.is_write = 1
+									)
+			)
+		</where>
+		order by mss.set_code
+	</select>
+	
+	<!-- 注册证号 -->
+	<select id="queryMedInvCertId" resultMap="hrpMedSelect">
+		
+		select mic.cert_id code, 
+			mic.cert_code name
+		from med_inv_cert_rela micr
+        left join  med_inv_cert  mic 
+        	on mic.group_id = micr.group_id
+        	and mic.hos_id = micr.hos_id
+        	and mic.copy_code = micr.copy_code
+        	and mic.cert_id = micr.cert_id
+        	and mic.cert_state = 1
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				micr.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and micr.hos_id = #{hos_id}
+			</if>
+			<if test="inv_id != null  and inv_id != ''">
+				and micr.inv_id = #{inv_id}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+					mic.cert_code like '${key}%' 
+				)
+			</if>
+			and mic.cert_state = 1
+		</where>
+		order by mic.cert_id desc
+	</select>
+	
+	<!-- 注册证号 带生产日期 -->
+	<select id="queryMedInvCertIdWithDate" resultMap="hrpMedSelect">
+		select mic.cert_id code, 
+			mic.cert_code||' '||to_char(start_date,'yyyy-MM-dd')||'至'||to_char(end_date,'yyyy-MM-dd') name
+		from med_inv_cert_rela micr
+        left join  med_inv_cert  mic 
+        	on mic.group_id = micr.group_id
+        	and mic.hos_id = micr.hos_id
+        	and mic.copy_code = micr.copy_code
+        	and mic.cert_id = micr.cert_id
+        	and mic.cert_state = 1
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				micr.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and micr.hos_id = #{hos_id}
+			</if>
+			<if test="inv_id != null  and inv_id != ''">
+				and micr.inv_id = #{inv_id}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+					mic.cert_code like '${key}%' 
+				)
+			</if>
+		</where>
+		order by mic.cert_id desc
+	</select>
+	
+	<!-- 管理类别 -->
+	<select id="queryMedManageType" resultMap="hrpMedSelect">
+		SELECT manage_type id, 
+			manage_type_name text
+		FROM MED_INV_MANA_TYPE
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			<if test="key != null and key != ''">
+				and (
+					manage_type like '${key}%' 
+				)
+			</if>
+		ORDER BY manage_type
+	</select>
+	
+	<!-- 药品分类变更表 用于药品材料主页 取is_last做判断-->
+	<select id="queryMedTypeDicts" resultMap="hrpMedSelect">
+		SELECT
+			med_type_id ||','|| med_type_no ||','|| is_last id,
+			med_type_code||' '||med_type_name text
+		FROM MED_TYPE_DICT
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null  and copy_code != ''">
+				and copy_code = #{copy_code}
+			</if>
+			<if test="med_type_id != null  and med_type_id != ''">
+				and med_type_id = #{med_type_id}
+			</if>
+			<if test="is_last != null and is_last != ''">
+				and is_last = #{is_last}
+			</if>
+			<if test="med_type_code != null  and med_type_code != ''">
+				and #{med_type_code} like med_type_code||'%'
+			</if>
+			and is_stop = 0
+			<if test="key != null and key != ''">
+				and (
+				med_type_code like '${key}%' or 
+				med_type_name like '%${key}%'
+				or
+				spell_code like '%${key}%' or 
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by med_type_code
+	</select>
+	
+	<!-- 货位-->
+	<select id="queryMedLocation" resultMap="hrpMedSelect">
+		SELECT location_id id, 
+			location_code ||' '|| location_name text
+		FROM med_location_dict
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			<if test="store_id != null and store_id != ''">
+				and store_id= #{store_id,jdbcType=INTEGER}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+				location_code like '${key}%' or 
+				location_name like '%${key}%'
+				or
+				spell_code like '%${key}%' or 
+				wbx_code like '%${key}%'
+				)
+			</if>
+		ORDER BY location_code
+	</select>
+	
+	<!-- 查询带权限科室、权限仓库 -->
+	<select id="queryPermDeptAndStoreDict" resultMap="hrpMedSelect">
+		WITH dept_temp AS (
+     		SELECT 
+	     		hdd.dept_id||','||hdd.dept_no id, 
+	      		hdd.dept_code||' '||hdd.dept_name text
+    		FROM HOS_DEPT_DICT hdd
+    		<!-- JOIN V_USER_DATA_PERM b 
+      		ON 
+      			hdd.group_id = b.group_id AND hdd.hos_id = b.hos_id
+      			AND b.user_id = #{user_id,jdbcType=INTEGER} 
+      			AND b.table_code = 'HOS_DEPT_DICT' 
+      			AND b.perm_code = hdd.dept_id AND b.is_read = 1 AND b.is_write = 1 -->
+    		WHERE 
+    			hdd.group_id = #{group_id,jdbcType=INTEGER} AND hdd.hos_id = #{hos_id,jdbcType=INTEGER} 
+    			AND hdd.is_stop = '0' AND hdd.is_last = '1'
+    			and hdd.dept_id in (select b.perm_code from V_USER_DATA_PERM b 
+					      		   where b.group_id = #{group_id,jdbcType=INTEGER} AND  b.hos_id = #{hos_id,jdbcType=INTEGER} 
+					      			AND b.user_id = #{user_id,jdbcType=INTEGER} 
+					      			AND b.table_code = 'HOS_DEPT_DICT' 
+					      			  AND b.is_read = 1 AND b.is_write = 1
+					      			)
+      			AND (
+          			hdd.dept_code LIKE '${key}%' 
+          		or
+					hdd.dept_name LIKE '%${key}%'
+				or
+					hdd.spell_code LIKE '%${key}%' 
+				or
+					hdd.wbx_code LIKE '%${key}%'
+      			)
+     		ORDER BY hdd.dept_code
+		),
+		STORE_TEMP AS (
+    		SELECT  
+	    		hsd.store_id||','||hsd.store_no id, 
+				hsd.store_code||' '||hsd.store_name text
+			FROM HOS_STORE_DICT hsd
+		 	<!-- JOIN V_USER_DATA_PERM vu
+			ON 
+				hsd.group_id = vu.group_id AND hsd.hos_id = vu.hos_id
+				AND vu.user_id = #{user_id,jdbcType=INTEGER}  
+				AND vu.table_code = 'HOS_STORE_DICT' 
+				AND vu.perm_code = hsd.store_id AND (vu.is_read = 1 or vu.is_write = 1) -->
+      		JOIN MED_STORE c 
+			ON 
+				hsd.group_id = c.group_id AND hsd.hos_id = c.hos_id AND hsd.store_id = c.store_id
+     		WHERE 
+     			hsd.group_id = #{group_id,jdbcType=INTEGER} AND hsd.hos_id = #{hos_id,jdbcType=INTEGER} 
+     			AND hsd.is_stop = 0 
+     			and hsd.store_id in (select vu.perm_code from V_USER_DATA_PERM vu
+								    where vu.group_id = #{group_id,jdbcType=INTEGER} AND vu.hos_id = #{hos_id,jdbcType=INTEGER}
+									AND vu.user_id = #{user_id,jdbcType=INTEGER}  
+									AND vu.table_code = 'HOS_STORE_DICT' 
+									AND (vu.is_read = 1 or vu.is_write = 1)
+									)
+      		AND (
+           			hsd.store_code LIKE '${key}%' 
+           		OR
+					hsd.store_name LIKE '%${key}%'
+				OR
+					hsd.spell_code LIKE '%${key}%' 
+				OR
+					hsd.wbx_code LIKE '%${key}%'
+      		)
+      		ORDER BY hsd.store_code
+		)
+		SELECT dt.id,dt.text FROM dept_temp dt
+		UNION ALL 
+		SELECT st.id,st.text FROM store_temp st
+	</select>
+	
+	<!-- 药品分类变更表 按用户数据权限查询  -->
+	<select id="queryPermMedTypeDict" resultMap="hrpMedSelect">
+		SELECT
+			mtd.med_type_id||','||mtd.med_type_no||','|| mtd.is_last id,
+			mtd.med_type_code||' '||mtd.med_type_name text
+		FROM MED_TYPE_DICT mtd
+		<!-- JOIN V_USER_DATA_PERM vu
+		ON 
+			mtd.group_id = vu.group_id AND mtd.hos_id = vu.hos_id
+			AND vu.user_id = #{user_id,jdbcType=INTEGER}  
+			AND vu.table_code = 'MED_TYPE_DICT' 
+			AND vu.perm_code = mtd.med_type_id AND vu.is_read = 1 and vu.is_write = 1 -->
+		<where>
+		mtd.med_type_id  in (select vu.perm_code from  V_USER_DATA_PERM vu
+								where vu.group_id = #{group_id} AND  vu.hos_id = #{hos_id}
+								AND vu.user_id = #{user_id,jdbcType=INTEGER}  
+								AND vu.table_code = 'MED_TYPE_DICT' 
+								 AND vu.is_read = 1 and vu.is_write = 1
+								)
+			<if test="group_id != null  and group_id != ''">
+				and mtd.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and mtd.hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null  and copy_code != ''">
+				and mtd.copy_code = #{copy_code}
+			</if>
+			<if test="med_type_id != null  and med_type_id != ''">
+				and mtd.med_type_id = #{med_type_id}
+			</if>
+			<if test="is_last != null and is_last != ''">
+				and mtd.is_last = #{is_last}
+			</if>
+			<if test="med_type_code != null  and med_type_code != ''">
+				and #{med_type_code} like mtd.med_type_code||'%'
+			</if>
+			and mtd.is_stop = 0
+			<if test="key != null and key != ''">
+				and (
+				mtd.med_type_code like '${key}%' or 
+				mtd.med_type_name like '%${key}%'
+				or
+				mtd.spell_code like '%${key}%' or 
+				mtd.wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by mtd.med_type_code
+	</select>
+	<select id="queryMedFimTypeDict" resultMap="hrpMedSelect">
+		SELECT fim_type_code id ,fim_type_name text
+		FROM med_fim_type
+		<where>
+			<if test="group_id != null  and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null  and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null  and copy_code != ''">
+				and copy_code = #{copy_code}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+				fim_type_code like '${key}%' or 
+				fim_type_name like '%${key}%'
+				or
+				spell_code like '%${key}%' or 
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by id
+	</select>
+		
+	<!-- 药品仓库配套表配套表信息 -->
+	<select id="queryMedStoreMatchRead" resultMap="hrpMedSelect">
+		select 
+		    store_match_id as id,
+		    store_match_id || ' '|| store_match_name as text
+		from MED_STORE_MATCH  a
+		<where>
+			<if test="group_id != null and group_id != ''">
+			    group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != '' ">
+			    and hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != '' ">
+			    and copy_code = #{copy_code}
+			</if>
+			<if test="store_id != null and store_id != '' ">
+			    and a.store_id = #{store_id}
+			</if>
+			<if test="key != null and key != '' ">
+		    	and (store_match_id like '%${key}%'
+			      or store_match_name like '%${key}%')
+			</if>
+			and exists(
+			select 1 from v_user_data_perm b 
+			where a.group_id = b.group_id and a.hos_id = b.hos_id
+			and b.user_id = #{user_id,jdbcType=INTEGER} and b.table_code = 'HOS_STORE_DICT' 
+			and b.perm_code = a.store_id and (b.is_read = 1 or b.is_write = 1)
+			)
+		</where>
+	</select>
+	<!-- 物资科室配套表信息 -->
+	<select id="queryMedDeptMatchRead" resultMap="hrpMedSelect">
+		select 
+		    dept_match_id as id,
+		    dept_match_id || ' '|| dept_match_name as text
+		from MED_DEPT_MATCH a
+		
+		<where>
+		    
+			<if test="group_id != null and group_id != ''">
+			    group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != '' ">
+			    and hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != '' ">
+			    and copy_code = #{copy_code}
+			</if>
+			<if test=" store_id != null and store_id != '' ">
+			    and (store_id = #{store_id} or store_id is null)
+			</if>
+			<if test="dept_id != null and dept_id != '' ">
+			    and a.dept_id = #{dept_id}
+			</if>
+			<if test="key != null and key != '' ">
+		    	and (dept_match_id like '%${key}%'
+			      or dept_match_name like '%${key}%')
+			</if>
+			<!-- 权限过滤 只读 -->
+			and exists(
+			select 1 from v_user_data_perm b where 
+			 b.user_id = #{user_id,jdbcType=INTEGER} and b.table_code = 'HOS_DEPT_DICT' 
+			and b.perm_code = a.dept_id and (b.is_read = 1 or b.is_write = 1) 
+			and a.group_id = b.group_id and a.hos_id = b.hos_id
+			)
+			
+		</where>
+	</select>
+	
+	<select id="queryMedSx" resultMap="hrpMedSelect">
+		SELECT
+			med_sx_id id,
+			med_sx_name text
+		FROM MED_SX
+		<where>
+			is_stop = 0
+			<if test="med_sx_id != null  and med_sx_id != ''">
+				and med_sx_id = #{med_sx_id}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+				med_sx_id like '${key}%' or 
+				med_sx_name like '%${key}%'
+				or
+				spell_code like '%${key}%' or 
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by med_sx_id
+	</select>
+	
+	<select id="queryMedJx" resultMap="hrpMedSelect">
+		SELECT
+			med_jx_id id,
+			med_jx_name text
+		FROM MED_JX
+		<where>
+			is_stop = 0
+			<if test="med_jx_id != null  and med_jx_id != ''">
+				and med_jx_id = #{med_jx_id}
+			</if>
+			<if test="key != null and key != ''">
+				and (
+				med_jx_id like '${key}%' or 
+				med_jx_name like '%${key}%'
+				or
+				spell_code like '%${key}%' or 
+				wbx_code like '%${key}%'
+				)
+			</if>
+		</where>
+		order by med_jx_id
+	</select>
+	
+</mapper>
+

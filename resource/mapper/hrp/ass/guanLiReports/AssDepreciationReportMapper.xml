@@ -1,0 +1,1816 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.ass.dao.guanLiReports.AssDepreciationReportMapper">
+	
+	<!-- 科室分类 -->
+	<resultMap type="java.util.Map" id="hosDeptKindMap">
+		<result property="kind_code" column="kind_code"/>
+		<result property="kind_name" column="kind_name"/>
+	</resultMap>
+	
+	<select id="queryHosDeptKinds" parameterType="java.util.Map" resultMap="hosDeptKindMap">
+		select t.kind_code, t.kind_name
+		  from hos_dept_kind t
+		 where t.group_id = #{group_id}
+		   and t.hos_id = #{hos_id}
+		 order by t.kind_code
+	</select> 
+	
+	<!-- 资产分类 -->
+	<resultMap type="java.util.Map" id="assTypeDictMap">
+		<result property="ass_type_code" column="ass_type_code"/>
+		<result property="ass_type_name" column="ass_type_name"/>
+	</resultMap>
+
+	<select id="queryAssTypeDicts" parameterType="java.util.Map" resultMap="assTypeDictMap">
+		select t.ass_type_code,t.ass_type_name 
+		  from ass_type_dict t
+		 where t.group_id = #{group_id}
+		   and t.hos_id = #{hos_id}
+		   and t.copy_code = #{copy_code}
+		   and t.type_level = #{type_level}
+		   order by t.ass_type_code
+	</select>
+	
+	<!-- 资金来源 -->
+	<resultMap type="java.util.Map" id="hosSourceMap">
+		<result property="source_id" column="source_id"/>
+		<result property="source_name" column="source_name"/>
+	</resultMap>	
+	
+	<select id="queryHosSources" parameterType="java.util.Map" resultMap="hosSourceMap">
+		select t.source_id,t.source_name
+		  from hos_source t
+		 where t.group_id = #{group_id}
+		   and t.hos_id = #{hos_id}
+		 order by t.source_id
+	</select>
+	
+	<!-- 资产折旧分析 -->
+	<resultMap type="java.util.Map" id="analyseMap">
+		<result property="kind_code" column="kind_code"/>
+		<result property="kind_name" column="kind_name"/>
+		<result property="source_id" column="source_id"/>
+		<result property="source_name" column="source_name"/>
+		<result property="ass_type_code" column="ass_type_code"/>
+		<result property="ass_type_name" column="ass_type_name"/>
+		<result property="price" column="price"/>
+		<result property="now_depre_amount" column="now_depre_amount"/>
+		<result property="add_depre_amount" column="add_depre_amount"/>
+	</resultMap>
+	
+	<select id="queryAssDepreciationAnalyse" parameterType="java.util.Map" resultMap="analyseMap">
+		with temp1 as (
+			select 
+			       depre.group_id,
+			       depre.hos_id,
+			       depre.copy_code,
+			       kind.kind_code,
+			       ass.ass_type_id,
+			       depre.source_id,
+			       depre.prim_money price,
+			       depre.now_depre_amount,
+			       depre.add_depre_amount
+			      
+			        from v_ass_depre_acc depre
+			      
+			        left join hos_dept_dict dept
+			          on depre.use_dept_id = dept.dept_id
+			         and depre.group_id = dept.group_id
+			         and depre.hos_id = dept.hos_id
+			         and dept.is_stop = 0
+			      
+			        left join hos_dept_kind kind
+			          on dept.kind_code = kind.kind_code
+			         and depre.group_id = kind.group_id
+			         and depre.hos_id = kind.hos_id
+			      
+			        left join v_ass_card card
+			          on depre.ass_card_no = card.ass_card_no
+			         and depre.group_id = card.group_id
+			         and depre.hos_id = card.hos_id
+			         and depre.copy_code = card.copy_code
+			      
+			        left join ass_no_dict ass
+			          on card.ass_id = ass.ass_id
+			         and card.ass_no = ass.ass_no
+			         and depre.group_id = ass.group_id
+			         and depre.hos_id = ass.hos_id
+			         and depre.copy_code = ass.copy_code
+			         
+			       where depre.group_id = #{group_id}
+			         and depre.hos_id = #{hos_id}
+			         and depre.copy_code = #{copy_code} 
+         			 <if test="depre_year_month != null and depre_year_month != ''">
+							AND depre.depre_year || '' || depre.depre_month = #{depre_year_month,jdbcType=DATE}
+					</if>
+			),
+			temp2 as
+			     (select t1.ass_type_code,
+			             nvl(t1.super_code, 0) super_code,
+			             t1.type_level,
+			             t2.source_id,
+			             t2.price,
+			             t2.now_depre_amount,
+			             t2.add_depre_amount,
+			             t2.kind_code
+			        from ass_type_dict t1
+			        left join temp1 t2
+			          on t1.ass_type_id = t2.ass_type_id
+			         and t1.group_id = t2.group_id
+			         and t1.hos_id = t2.hos_id
+			         and t1.copy_code = t2.copy_code
+			       where t1.group_id = #{group_id}
+			         and t1.hos_id = #{hos_id}
+			         and t1.copy_code = #{copy_code}   
+			          )
+			select t.kind_code,
+			           t.source_id,
+			           t.ass_type_code,
+			           t.price,
+			           t.now_depre_amount,
+			           t.add_depre_amount
+			      from hos_dept_kind kind
+			      left join (select dd.kind_code,
+			                        dd.source_id,
+			                        dd.ass_type_code,
+			                        sum(dd.price) price,
+			                        sum(dd.now_depre_amount) now_depre_amount,
+			                        sum(dd.add_depre_amount) add_depre_amount
+			                   from (select connect_by_root(d.ass_type_code) ass_type_code,
+			                                d.source_id,
+			                                d.kind_code,
+			                                d.price,
+			                                d.now_depre_amount,
+			                                d.add_depre_amount
+			                           from temp2 d
+			                          start with d.super_code in
+			                                     (select super_code
+			                                        from temp2
+			                                       where type_level = #{type_level})
+			                         connect by prior d.ass_type_code = d.super_code) dd
+			                  group by dd.kind_code, dd.ass_type_code, dd.source_id
+			                  order by dd.kind_code) t
+			        on kind.kind_code = t.kind_code
+			     where kind.kind_code = #{kind_code}
+			       and kind.group_id = #{group_id}
+			       and kind.hos_id = #{hos_id}
+			     order by kind.kind_code
+		
+	</select>
+	
+	<select id="queryAssDepreciationAnalyseAddPrice" parameterType="java.util.Map" resultMap="analyseMap">
+		with temp1 as (
+			select 
+			       card.group_id,
+			       card.hos_id,
+			       card.copy_code,
+			       kind.kind_code,
+			       ass.ass_type_id,
+            	   ar.source_id,
+                   <!-- case when (card.use_state = 6 or card.use_state = 7)  then -(card.price - abs(nvl(acs.change_price,0))) else  card.price - abs(nvl(acs.change_price,0)) end price -->
+                   card.price - abs(nvl(acs.change_price,0)) price
+              from  v_ass_card card
+              
+               left join v_ass_share_dept asd on
+                card.group_id = asd.group_id
+               and card.hos_id = asd.hos_id
+               and card.copy_code = asd.copy_code
+               and card.ass_card_no = asd.ass_card_no
+                    
+            
+              left join hos_dept_dict dept
+                on asd.dept_id = dept.dept_id
+               and asd.group_id = dept.group_id
+               and asd.hos_id = dept.hos_id
+               and dept.is_stop = 0
+            
+              left join hos_dept_kind kind
+                on dept.kind_code = kind.kind_code
+               and dept.group_id = kind.group_id
+               and dept.hos_id = kind.hos_id
+               
+               left join v_ass_resource ar on
+               card.group_id = ar.group_id
+               and card.hos_id = ar.hos_id
+               and card.copy_code = ar.copy_code
+               and card.ass_card_no = ar.ass_card_no
+               
+               
+               left join( 
+               
+	               select t1.group_id,t1.hos_id,t1.copy_code,t1.ass_card_no,t1.source_id,sum(t1.change_price) change_price from v_ass_change_source t1
+	               left join v_ass_change_main t2 on
+	               t1.group_id = t2.group_id
+	               and t1.hos_id = t2.hos_id
+	               and t1.copy_code = t2.copy_code
+	               and t1.change_no = t2.change_no
+	               
+	               where t1.group_id = #{group_id}
+	               and t1.hos_id = #{hos_id}
+	               and t1.copy_code = #{copy_code}
+	               and to_char(t2.change_date,'YYYYMM') &gt; #{depre_year_month,jdbcType=DATE}
+	                
+	               group by t1.group_id,t1.hos_id,t1.copy_code,t1.ass_card_no,t1.source_id 
+               ) acs on
+                ar.group_id = acs.group_id
+               and ar.hos_id = acs.hos_id
+               and ar.copy_code = acs.copy_code
+               and ar.ass_card_no = acs.ass_card_no
+               and ar.source_id = acs.source_id
+            
+              left join ass_no_dict ass
+                on card.ass_id = ass.ass_id
+               and card.group_id = ass.group_id
+               and card.hos_id = ass.hos_id
+               and card.copy_code = ass.copy_code
+               
+             where  card.group_id = #{group_id}
+			         and card.hos_id = #{hos_id}
+			         and card.copy_code = #{copy_code} 
+			         and to_char(card.in_date,'YYYYMM') = #{depre_year_month,jdbcType=DATE}
+        
+      ),
+      temp2 as
+           (select t1.ass_type_code,
+                   nvl(t1.super_code, 0) super_code,
+                   t1.type_level,
+                   t2.source_id,
+                   t2.price,
+                   t2.kind_code
+              from ass_type_dict t1
+              left join temp1 t2
+                on t1.ass_type_id = t2.ass_type_id
+               and t1.group_id = t2.group_id
+               and t1.hos_id = t2.hos_id
+               and t1.copy_code = t2.copy_code
+             where t1.group_id = #{group_id}
+			         and t1.hos_id = #{hos_id}
+			         and t1.copy_code = #{copy_code}   
+                )
+      select t.kind_code,
+                 t.source_id,
+                 t.ass_type_code,
+                 t.price
+            from hos_dept_kind kind
+            left join (select dd.kind_code,
+                              dd.source_id,
+                              dd.ass_type_code,
+                              sum(dd.price) price
+                         from (select connect_by_root(d.ass_type_code) ass_type_code,
+                                      d.source_id,
+                                      d.kind_code,
+                                      d.price
+                                 from temp2 d
+                                start with d.super_code in
+                                           (select super_code
+                                              from temp2
+                                             where type_level = #{type_level})
+                               connect by prior d.ass_type_code = d.super_code) dd
+                        group by dd.kind_code, dd.ass_type_code, dd.source_id
+                        order by dd.kind_code) t
+              on kind.kind_code = t.kind_code
+           where  kind.kind_code = #{kind_code}
+			       and kind.group_id = #{group_id}
+			       and kind.hos_id = #{hos_id}
+           order by kind.kind_code
+	</select>
+	
+	
+	<select id="queryAssDepreciationAnalyseDelPrice" parameterType="java.util.Map" resultMap="analyseMap">
+		with temp1 as (
+			select 
+			       card.group_id,
+			       card.hos_id,
+			       card.copy_code,
+			       kind.kind_code,
+			       ass.ass_type_id,
+            	   ar.source_id,
+                   card.price price
+              from  v_ass_card card
+              
+               left join v_ass_share_dept asd on
+                card.group_id = asd.group_id
+               and card.hos_id = asd.hos_id
+               and card.copy_code = asd.copy_code
+               and card.ass_card_no = asd.ass_card_no
+                    
+            
+              left join hos_dept_dict dept
+                on asd.dept_id = dept.dept_id
+               and asd.group_id = dept.group_id
+               and asd.hos_id = dept.hos_id
+               and dept.is_stop = 0
+            
+              left join hos_dept_kind kind
+                on dept.kind_code = kind.kind_code
+               and dept.group_id = kind.group_id
+               and dept.hos_id = kind.hos_id
+               
+               left join v_ass_resource ar on
+               card.group_id = ar.group_id
+               and card.hos_id = ar.hos_id
+               and card.copy_code = ar.copy_code
+               and card.ass_card_no = ar.ass_card_no
+             
+            
+              left join ass_no_dict ass
+                on card.ass_id = ass.ass_id
+               and card.group_id = ass.group_id
+               and card.hos_id = ass.hos_id
+               and card.copy_code = ass.copy_code
+               
+             where  card.group_id = #{group_id}
+			         and card.hos_id = #{hos_id}
+			         and card.copy_code = #{copy_code} 
+			         and to_char(card.in_date,'YYYYMM') = #{depre_year_month,jdbcType=DATE}
+			         and card.use_state in ('6','7')
+			         
+			         
+        
+      ),
+      temp2 as
+           (select t1.ass_type_code,
+                   nvl(t1.super_code, 0) super_code,
+                   t1.type_level,
+                   t2.source_id,
+                   t2.price,
+                   t2.kind_code
+              from ass_type_dict t1
+              left join temp1 t2
+                on t1.ass_type_id = t2.ass_type_id
+               and t1.group_id = t2.group_id
+               and t1.hos_id = t2.hos_id
+               and t1.copy_code = t2.copy_code
+             where t1.group_id = #{group_id}
+			         and t1.hos_id = #{hos_id}
+			         and t1.copy_code = #{copy_code}   
+                )
+      select t.kind_code,
+                 t.source_id,
+                 t.ass_type_code,
+                 t.price
+            from hos_dept_kind kind
+            left join (select dd.kind_code,
+                              dd.source_id,
+                              dd.ass_type_code,
+                              sum(dd.price) price
+                         from (select connect_by_root(d.ass_type_code) ass_type_code,
+                                      d.source_id,
+                                      d.kind_code,
+                                      d.price
+                                 from temp2 d
+                                start with d.super_code in
+                                           (select super_code
+                                              from temp2
+                                             where type_level = #{type_level})
+                               connect by prior d.ass_type_code = d.super_code) dd
+                        group by dd.kind_code, dd.ass_type_code, dd.source_id
+                        order by dd.kind_code) t
+              on kind.kind_code = t.kind_code
+           where  kind.kind_code = #{kind_code}
+			       and kind.group_id = #{group_id}
+			       and kind.hos_id = #{hos_id}
+           order by kind.kind_code
+	</select>
+	
+	
+	<select id="queryAssDepreciationAnalyseAllTotal" parameterType="java.util.Map" resultMap="analyseMap">
+		with temp1 as (
+			select 
+			       depre.group_id,
+			       depre.hos_id,
+			       depre.copy_code,
+			       kind.kind_code,
+			       ass.ass_type_id,
+			       depre.source_id,
+			       depre.prim_money price,
+			       depre.now_depre_amount,
+			       depre.add_depre_amount
+			      
+			        from v_ass_depre_acc depre
+			      
+			        left join hos_dept_dict dept
+			          on depre.use_dept_id = dept.dept_id
+			         and depre.group_id = dept.group_id
+			         and depre.hos_id = dept.hos_id
+			         and dept.is_stop = 0
+			      
+			        left join hos_dept_kind kind
+			          on dept.kind_code = kind.kind_code
+			         and depre.group_id = kind.group_id
+			         and depre.hos_id = kind.hos_id
+			      
+			        left join v_ass_card card
+			          on depre.ass_card_no = card.ass_card_no
+			         and depre.group_id = card.group_id
+			         and depre.hos_id = card.hos_id
+			         and depre.copy_code = card.copy_code
+			      
+			        left join ass_no_dict ass
+			          on card.ass_id = ass.ass_id
+			         and card.ass_no = ass.ass_no
+			         and depre.group_id = ass.group_id
+			         and depre.hos_id = ass.hos_id
+			         and depre.copy_code = ass.copy_code
+			         
+			       where depre.group_id = #{group_id}
+			         and depre.hos_id = #{hos_id}
+			         and depre.copy_code = #{copy_code} 
+         			 <if test="depre_year_month != null and depre_year_month != ''">
+							AND depre.depre_year || '' || depre.depre_month = #{depre_year_month,jdbcType=DATE}
+					</if>
+			),
+			temp2 as
+			     (select t1.ass_type_code,
+			             nvl(t1.super_code, 0) super_code,
+			             t1.type_level,
+			             t2.source_id,
+			             t2.price,
+			             t2.now_depre_amount,
+			             t2.add_depre_amount,
+			             t2.kind_code
+			        from ass_type_dict t1
+			        left join temp1 t2
+			          on t1.ass_type_id = t2.ass_type_id
+			         and t1.group_id = t2.group_id
+			         and t1.hos_id = t2.hos_id
+			         and t1.copy_code = t2.copy_code
+			       where t1.group_id = #{group_id}
+			         and t1.hos_id = #{hos_id}
+			         and t1.copy_code = #{copy_code}   
+			          )
+			select  case when t.source_id is not null then 'allTotal' else null end kind_code,
+                 t.source_id,
+                 t.ass_type_code,
+                 sum(t.price) price,
+                 sum(t.now_depre_amount) now_depre_amount,
+                 sum(t.add_depre_amount) add_depre_amount
+			      from hos_dept_kind kind
+			      left join (select dd.kind_code,
+			                        dd.source_id,
+			                        dd.ass_type_code,
+			                        sum(dd.price) price,
+			                        sum(dd.now_depre_amount) now_depre_amount,
+			                        sum(dd.add_depre_amount) add_depre_amount
+			                   from (select connect_by_root(d.ass_type_code) ass_type_code,
+			                                d.source_id,
+			                                d.kind_code,
+			                                d.price,
+			                                d.now_depre_amount,
+			                                d.add_depre_amount
+			                           from temp2 d
+			                          start with d.super_code in
+			                                     (select super_code
+			                                        from temp2
+			                                       where type_level = #{type_level})
+			                         connect by prior d.ass_type_code = d.super_code) dd
+			                  group by dd.kind_code, dd.ass_type_code, dd.source_id
+			                  order by dd.kind_code) t
+			        on kind.kind_code = t.kind_code
+			     where kind.group_id = #{group_id}
+			       and kind.hos_id = #{hos_id}
+			     group by  t.source_id,t.ass_type_code
+		
+	</select>
+	
+	<select id="queryAssDepreciationAnalyseAllTotalAddPrice" parameterType="java.util.Map" resultMap="analyseMap">
+		with temp1 as (
+			select 
+			       card.group_id,
+			       card.hos_id,
+			       card.copy_code,
+			       kind.kind_code,
+			       ass.ass_type_id,
+            	   ar.source_id,
+                   <!-- case when (card.use_state = 6 or card.use_state = 7)  then -(card.price - abs(nvl(acs.change_price,0))) else  card.price - abs(nvl(acs.change_price,0)) end price -->
+                   card.price - abs(nvl(acs.change_price,0)) price
+              from  v_ass_card card
+              
+               left join v_ass_share_dept asd on
+                card.group_id = asd.group_id
+               and card.hos_id = asd.hos_id
+               and card.copy_code = asd.copy_code
+               and card.ass_card_no = asd.ass_card_no
+                    
+            
+              left join hos_dept_dict dept
+                on asd.dept_id = dept.dept_id
+               and asd.group_id = dept.group_id
+               and asd.hos_id = dept.hos_id
+               and dept.is_stop = 0
+            
+              left join hos_dept_kind kind
+                on dept.kind_code = kind.kind_code
+               and dept.group_id = kind.group_id
+               and dept.hos_id = kind.hos_id
+               
+               left join v_ass_resource ar on
+               card.group_id = ar.group_id
+               and card.hos_id = ar.hos_id
+               and card.copy_code = ar.copy_code
+               and card.ass_card_no = ar.ass_card_no
+               
+               left join( 
+               
+	               select t1.group_id,t1.hos_id,t1.copy_code,t1.ass_card_no,t1.source_id,sum(t1.change_price) change_price from v_ass_change_source t1
+	               left join v_ass_change_main t2 on
+	               t1.group_id = t2.group_id
+	               and t1.hos_id = t2.hos_id
+	               and t1.copy_code = t2.copy_code
+	               and t1.change_no = t2.change_no
+	               
+	               where t1.group_id = #{group_id}
+	               and t1.hos_id = #{hos_id}
+	               and t1.copy_code = #{copy_code}
+	               and to_char(t2.change_date,'YYYYMM') &gt; #{depre_year_month,jdbcType=DATE}
+	                
+	               group by t1.group_id,t1.hos_id,t1.copy_code,t1.ass_card_no,t1.source_id 
+               ) acs on
+                ar.group_id = acs.group_id
+               and ar.hos_id = acs.hos_id
+               and ar.copy_code = acs.copy_code
+               and ar.ass_card_no = acs.ass_card_no
+               and ar.source_id = acs.source_id
+            
+              left join ass_no_dict ass
+                on card.ass_id = ass.ass_id
+               and card.group_id = ass.group_id
+               and card.hos_id = ass.hos_id
+               and card.copy_code = ass.copy_code
+            where card.group_id = #{group_id}
+			         and card.hos_id = #{hos_id}
+			         and card.copy_code = #{copy_code} 
+					 and to_char(card.in_date,'YYYYMM') = #{depre_year_month,jdbcType=DATE}
+      ),
+      temp2 as
+           (select t1.ass_type_code,
+                   nvl(t1.super_code, 0) super_code,
+                   t1.type_level,
+                   t2.source_id,
+                   t2.price,
+                   t2.kind_code
+              from ass_type_dict t1
+              left join temp1 t2
+                on t1.ass_type_id = t2.ass_type_id
+               and t1.group_id = t2.group_id
+               and t1.hos_id = t2.hos_id
+               and t1.copy_code = t2.copy_code
+            where t1.group_id = #{group_id}
+			         and t1.hos_id = #{hos_id}
+			         and t1.copy_code = #{copy_code}  
+                )
+      select  case when t.source_id is not null then 'allTotal' else null end kind_code,
+                 t.source_id,
+                 t.ass_type_code,
+                 sum(t.price) price
+            from hos_dept_kind kind
+            left join (select dd.kind_code,
+                              dd.source_id,
+                              dd.ass_type_code,
+                              sum(dd.price) price
+                         from (select connect_by_root(d.ass_type_code) ass_type_code,
+                                      d.source_id,
+                                      d.kind_code,
+                                      d.price
+                                 from temp2 d
+                                start with d.super_code in
+                                           (select super_code
+                                              from temp2
+                                             where type_level = #{type_level})
+                               connect by prior d.ass_type_code = d.super_code) dd
+                        group by dd.kind_code, dd.ass_type_code, dd.source_id
+                        order by dd.kind_code) t
+              on kind.kind_code = t.kind_code
+            where kind.group_id = #{group_id}
+			       and kind.hos_id = #{hos_id}
+           group by  t.source_id,t.ass_type_code
+	</select>
+	
+	<select id="queryAssDepreciationAnalyseAllTotalDelPrice" parameterType="java.util.Map" resultMap="analyseMap">
+		with temp1 as (
+			select 
+			       card.group_id,
+			       card.hos_id,
+			       card.copy_code,
+			       kind.kind_code,
+			       ass.ass_type_id,
+            	   ar.source_id,
+                   card.price price
+              from  v_ass_card card
+              
+               left join v_ass_share_dept asd on
+                card.group_id = asd.group_id
+               and card.hos_id = asd.hos_id
+               and card.copy_code = asd.copy_code
+               and card.ass_card_no = asd.ass_card_no
+                    
+            
+              left join hos_dept_dict dept
+                on asd.dept_id = dept.dept_id
+               and asd.group_id = dept.group_id
+               and asd.hos_id = dept.hos_id
+               and dept.is_stop = 0
+            
+              left join hos_dept_kind kind
+                on dept.kind_code = kind.kind_code
+               and dept.group_id = kind.group_id
+               and dept.hos_id = kind.hos_id
+               
+               left join v_ass_resource ar on
+               card.group_id = ar.group_id
+               and card.hos_id = ar.hos_id
+               and card.copy_code = ar.copy_code
+               and card.ass_card_no = ar.ass_card_no
+               
+            
+              left join ass_no_dict ass
+                on card.ass_id = ass.ass_id
+               and card.group_id = ass.group_id
+               and card.hos_id = ass.hos_id
+               and card.copy_code = ass.copy_code
+            where card.group_id = #{group_id}
+			         and card.hos_id = #{hos_id}
+			         and card.copy_code = #{copy_code} 
+					 and to_char(card.in_date,'YYYYMM') = #{depre_year_month,jdbcType=DATE}
+					 and card.use_state in ('6','7')
+					 
+						 
+      ),
+      temp2 as
+           (select t1.ass_type_code,
+                   nvl(t1.super_code, 0) super_code,
+                   t1.type_level,
+                   t2.source_id,
+                   t2.price,
+                   t2.kind_code
+              from ass_type_dict t1
+              left join temp1 t2
+                on t1.ass_type_id = t2.ass_type_id
+               and t1.group_id = t2.group_id
+               and t1.hos_id = t2.hos_id
+               and t1.copy_code = t2.copy_code
+            where t1.group_id = #{group_id}
+			         and t1.hos_id = #{hos_id}
+			         and t1.copy_code = #{copy_code}  
+                )
+      select  case when t.source_id is not null then 'allTotal' else null end kind_code,
+                 t.source_id,
+                 t.ass_type_code,
+                 sum(t.price) price
+            from hos_dept_kind kind
+            left join (select dd.kind_code,
+                              dd.source_id,
+                              dd.ass_type_code,
+                              sum(dd.price) price
+                         from (select connect_by_root(d.ass_type_code) ass_type_code,
+                                      d.source_id,
+                                      d.kind_code,
+                                      d.price
+                                 from temp2 d
+                                start with d.super_code in
+                                           (select super_code
+                                              from temp2
+                                             where type_level = #{type_level})
+                               connect by prior d.ass_type_code = d.super_code) dd
+                        group by dd.kind_code, dd.ass_type_code, dd.source_id
+                        order by dd.kind_code) t
+              on kind.kind_code = t.kind_code
+            where kind.group_id = #{group_id}
+			       and kind.hos_id = #{hos_id}
+           group by  t.source_id,t.ass_type_code
+	</select>
+	
+	<select id="queryAssDepreciationAnalyseMedicalCostTotal" parameterType="java.util.Map" resultMap="analyseMap">
+		with temp1 as (
+			select 
+			       depre.group_id,
+			       depre.hos_id,
+			       depre.copy_code,
+			       kind.kind_code,
+			       ass.ass_type_id,
+			       depre.source_id,
+			       depre.prim_money price,
+			       depre.now_depre_amount,
+			       depre.add_depre_amount
+			      
+			        from v_ass_depre_acc depre
+			      
+			        left join hos_dept_dict dept
+			          on depre.use_dept_id = dept.dept_id
+			         and depre.group_id = dept.group_id
+			         and depre.hos_id = dept.hos_id
+			         and dept.is_stop = 0
+			      
+			        left join hos_dept_kind kind
+			          on dept.kind_code = kind.kind_code
+			         and depre.group_id = kind.group_id
+			         and depre.hos_id = kind.hos_id
+			      
+			        left join v_ass_card card
+			          on depre.ass_card_no = card.ass_card_no
+			         and depre.group_id = card.group_id
+			         and depre.hos_id = card.hos_id
+			         and depre.copy_code = card.copy_code
+			      
+			        left join ass_no_dict ass
+			          on card.ass_id = ass.ass_id
+			         and card.ass_no = ass.ass_no
+			         and depre.group_id = ass.group_id
+			         and depre.hos_id = ass.hos_id
+			         and depre.copy_code = ass.copy_code
+			         
+			       where depre.group_id = #{group_id}
+			         and depre.hos_id = #{hos_id}
+			         and depre.copy_code = #{copy_code} 
+			        <if test="depre_year_month != null and depre_year_month != ''">
+							AND depre.depre_year || '' || depre.depre_month = #{depre_year_month,jdbcType=DATE}
+					</if>
+			),
+			temp2 as 
+			     (select t1.ass_type_code,
+			             nvl(t1.super_code, 0) super_code,
+			             t1.type_level,
+			             t2.source_id,
+			             t2.price,
+			             t2.now_depre_amount,
+			             t2.add_depre_amount,
+			             t2.kind_code
+			        from ass_type_dict t1
+			        left join temp1 t2
+			          on t1.ass_type_id = t2.ass_type_id
+			         and t1.group_id = t2.group_id
+			         and t1.hos_id = t2.hos_id
+			         and t1.copy_code = t2.copy_code
+			       where t1.group_id = #{group_id}
+			         and t1.hos_id = #{hos_id}
+			         and t1.copy_code = #{copy_code}   
+			          )
+			select  case when t.source_id is not null then 'medicalCostTotal' else null end kind_code,
+                 t.source_id,
+                 t.ass_type_code,
+                 sum(t.price) price,
+                 sum(t.now_depre_amount) now_depre_amount,
+                 sum(t.add_depre_amount) add_depre_amount
+			      from hos_dept_kind kind
+			      left join (select dd.kind_code,
+			                        dd.source_id,
+			                        dd.ass_type_code,
+			                        sum(dd.price) price,
+			                        sum(dd.now_depre_amount) now_depre_amount,
+			                        sum(dd.add_depre_amount) add_depre_amount
+			                   from (select connect_by_root(d.ass_type_code) ass_type_code,
+			                                d.source_id,
+			                                d.kind_code,
+			                                d.price,
+			                                d.now_depre_amount,
+			                                d.add_depre_amount
+			                           from temp2 d
+			                          start with d.super_code in
+			                                     (select super_code
+			                                        from temp2
+			                                       where type_level = #{type_level})
+			                         connect by prior d.ass_type_code = d.super_code) dd
+			                  group by dd.kind_code, dd.ass_type_code, dd.source_id
+			                  order by dd.kind_code) t
+			        on kind.kind_code = t.kind_code
+			     where kind.kind_code in ('01','02','03')
+			       and kind.group_id = #{group_id}
+			       and kind.hos_id = #{hos_id}
+			     group by  t.source_id,t.ass_type_code
+		
+	</select>
+	
+	<select id="queryAssDepreciationAnalyseMCostTotalAddPrice" parameterType="java.util.Map" resultMap="analyseMap">
+		with temp1 as (
+		select 
+             card.group_id,
+             card.hos_id,
+             card.copy_code,
+             kind.kind_code,
+             ass.ass_type_id,
+             ar.source_id,
+             <!-- case when (card.use_state = 6 or card.use_state = 7)  then -(card.price - abs(nvl(acs.change_price,0))) else  card.price - abs(nvl(acs.change_price,0)) end price -->
+              card.price - abs(nvl(acs.change_price,0)) price
+                    
+              from  v_ass_card card
+              
+               left join v_ass_share_dept asd on
+                card.group_id = asd.group_id
+               and card.hos_id = asd.hos_id
+               and card.copy_code = asd.copy_code
+               and card.ass_card_no = asd.ass_card_no
+                    
+            
+              left join hos_dept_dict dept
+                on asd.dept_id = dept.dept_id
+               and asd.group_id = dept.group_id
+               and asd.hos_id = dept.hos_id
+               and dept.is_stop = 0
+            
+              left join hos_dept_kind kind
+                on dept.kind_code = kind.kind_code
+               and dept.group_id = kind.group_id
+               and dept.hos_id = kind.hos_id
+               
+               left join v_ass_resource ar on
+               card.group_id = ar.group_id
+               and card.hos_id = ar.hos_id
+               and card.copy_code = ar.copy_code
+               and card.ass_card_no = ar.ass_card_no
+               
+               left join( 
+               
+	               select t1.group_id,t1.hos_id,t1.copy_code,t1.ass_card_no,t1.source_id,sum(t1.change_price) change_price from v_ass_change_source t1
+	               left join v_ass_change_main t2 on
+	               t1.group_id = t2.group_id
+	               and t1.hos_id = t2.hos_id
+	               and t1.copy_code = t2.copy_code
+	               and t1.change_no = t2.change_no
+	               
+	               where t1.group_id = #{group_id}
+	               and t1.hos_id = #{hos_id}
+	               and t1.copy_code = #{copy_code}
+	               and to_char(t2.change_date,'YYYYMM') &gt; #{depre_year_month,jdbcType=DATE}
+	                
+	               group by t1.group_id,t1.hos_id,t1.copy_code,t1.ass_card_no,t1.source_id 
+               ) acs on
+                ar.group_id = acs.group_id
+               and ar.hos_id = acs.hos_id
+               and ar.copy_code = acs.copy_code
+               and ar.ass_card_no = acs.ass_card_no
+               and ar.source_id = acs.source_id
+            
+              left join ass_no_dict ass
+                on card.ass_id = ass.ass_id
+               and card.group_id = ass.group_id
+               and card.hos_id = ass.hos_id
+               and card.copy_code = ass.copy_code
+               
+               where card.group_id = #{group_id}
+			         and card.hos_id = #{hos_id}
+			         and card.copy_code = #{copy_code} 
+					 and to_char(card.in_date,'YYYYMM') = #{depre_year_month,jdbcType=DATE}
+			),
+			temp2 as
+			     (select t1.ass_type_code,
+			             nvl(t1.super_code, 0) super_code,
+			             t1.type_level,
+			             t2.source_id,
+			             t2.price,
+			             t2.kind_code
+			        from ass_type_dict t1
+			        left join temp1 t2
+			          on t1.ass_type_id = t2.ass_type_id
+			         and t1.group_id = t2.group_id
+			         and t1.hos_id = t2.hos_id
+			         and t1.copy_code = t2.copy_code
+			         where t1.group_id = #{group_id}
+			         and t1.hos_id = #{hos_id}
+			         and t1.copy_code = #{copy_code}   
+			          )
+			select  case when t.source_id is not null then 'medicalCostTotal' else null end kind_code,
+                 t.source_id,
+                 t.ass_type_code,
+                 sum(t.price) price
+            from hos_dept_kind kind
+            left join (select dd.kind_code,
+                              dd.source_id,
+                              dd.ass_type_code,
+                              sum(dd.price) price
+                         from (select connect_by_root(d.ass_type_code) ass_type_code,
+                                      d.source_id,
+                                      d.kind_code,
+                                      d.price
+                                 from temp2 d
+                                start with d.super_code in
+                                           (select super_code
+                                              from temp2
+                                             where type_level = #{type_level})
+                               connect by prior d.ass_type_code = d.super_code) dd
+                        group by dd.kind_code, dd.ass_type_code, dd.source_id
+                        order by dd.kind_code) t
+              on kind.kind_code = t.kind_code
+           where kind.kind_code in ('01','02','03')
+           and kind.group_id = #{group_id}
+			       and kind.hos_id = #{hos_id}
+           group by  t.source_id,t.ass_type_code
+	</select>
+	
+	<select id="queryAssDepreciationAnalyseMCostTotalDelPrice" parameterType="java.util.Map" resultMap="analyseMap">
+		with temp1 as (
+		select 
+             card.group_id,
+             card.hos_id,
+             card.copy_code,
+             kind.kind_code,
+             ass.ass_type_id,
+             ar.source_id,
+              card.price price
+                    
+              from  v_ass_card card
+              
+               left join v_ass_share_dept asd on
+                card.group_id = asd.group_id
+               and card.hos_id = asd.hos_id
+               and card.copy_code = asd.copy_code
+               and card.ass_card_no = asd.ass_card_no
+                    
+            
+              left join hos_dept_dict dept
+                on asd.dept_id = dept.dept_id
+               and asd.group_id = dept.group_id
+               and asd.hos_id = dept.hos_id
+               and dept.is_stop = 0
+            
+              left join hos_dept_kind kind
+                on dept.kind_code = kind.kind_code
+               and dept.group_id = kind.group_id
+               and dept.hos_id = kind.hos_id
+               
+               left join v_ass_resource ar on
+               card.group_id = ar.group_id
+               and card.hos_id = ar.hos_id
+               and card.copy_code = ar.copy_code
+               and card.ass_card_no = ar.ass_card_no
+               
+            
+              left join ass_no_dict ass
+                on card.ass_id = ass.ass_id
+               and card.group_id = ass.group_id
+               and card.hos_id = ass.hos_id
+               and card.copy_code = ass.copy_code
+               
+               where card.group_id = #{group_id}
+			         and card.hos_id = #{hos_id}
+			         and card.copy_code = #{copy_code} 
+					 and to_char(card.in_date,'YYYYMM') = #{depre_year_month,jdbcType=DATE}
+					 and card.use_state in ('6','7')
+					 
+			),
+			temp2 as
+			     (select t1.ass_type_code,
+			             nvl(t1.super_code, 0) super_code,
+			             t1.type_level,
+			             t2.source_id,
+			             t2.price,
+			             t2.kind_code
+			        from ass_type_dict t1
+			        left join temp1 t2
+			          on t1.ass_type_id = t2.ass_type_id
+			         and t1.group_id = t2.group_id
+			         and t1.hos_id = t2.hos_id
+			         and t1.copy_code = t2.copy_code
+			         where t1.group_id = #{group_id}
+			         and t1.hos_id = #{hos_id}
+			         and t1.copy_code = #{copy_code}   
+			          )
+			select  case when t.source_id is not null then 'medicalCostTotal' else null end kind_code,
+                 t.source_id,
+                 t.ass_type_code,
+                 sum(t.price) price
+            from hos_dept_kind kind
+            left join (select dd.kind_code,
+                              dd.source_id,
+                              dd.ass_type_code,
+                              sum(dd.price) price
+                         from (select connect_by_root(d.ass_type_code) ass_type_code,
+                                      d.source_id,
+                                      d.kind_code,
+                                      d.price
+                                 from temp2 d
+                                start with d.super_code in
+                                           (select super_code
+                                              from temp2
+                                             where type_level = #{type_level})
+                               connect by prior d.ass_type_code = d.super_code) dd
+                        group by dd.kind_code, dd.ass_type_code, dd.source_id
+                        order by dd.kind_code) t
+              on kind.kind_code = t.kind_code
+           where kind.kind_code in ('01','02','03')
+           and kind.group_id = #{group_id}
+			       and kind.hos_id = #{hos_id}
+           group by  t.source_id,t.ass_type_code
+	</select>
+	
+	
+	<select id="queryAssDepreciationAnalyseNotDepre" parameterType="java.util.Map" resultMap="analyseMap">
+		with temp1 as (
+			select 
+			       card.group_id,
+			       card.hos_id,
+			       card.copy_code,
+			       kind.kind_code,
+			       ass.ass_type_id,
+            	   ar.source_id,
+                   card.price price
+              from  v_ass_card card
+              
+               left join v_ass_share_dept asd on
+                card.group_id = asd.group_id
+               and card.hos_id = asd.hos_id
+               and card.copy_code = asd.copy_code
+               and card.ass_card_no = asd.ass_card_no
+                    
+            
+              left join hos_dept_dict dept
+                on asd.dept_id = dept.dept_id
+               and asd.group_id = dept.group_id
+               and asd.hos_id = dept.hos_id
+               and dept.is_stop = 0
+            
+              left join hos_dept_kind kind
+                on dept.kind_code = kind.kind_code
+               and dept.group_id = kind.group_id
+               and dept.hos_id = kind.hos_id
+               
+               left join v_ass_resource ar on
+               card.group_id = ar.group_id
+               and card.hos_id = ar.hos_id
+               and card.copy_code = ar.copy_code
+               and card.ass_card_no = ar.ass_card_no
+               
+            
+              left join ass_no_dict ass
+                on card.ass_id = ass.ass_id
+               and card.group_id = ass.group_id
+               and card.hos_id = ass.hos_id
+               and card.copy_code = ass.copy_code
+            where  card.group_id = #{group_id}
+			         and card.hos_id = #{hos_id}
+			         and card.copy_code = #{copy_code} 
+			         and card.use_state not in ('6','7')
+			         and card.is_depr = 0
+					 
+						 
+      ),
+      temp2 as
+           (select t1.ass_type_code,
+                   nvl(t1.super_code, 0) super_code,
+                   t1.type_level,
+                   t2.source_id,
+                   t2.price,
+                   t2.kind_code
+              from ass_type_dict t1
+              left join temp1 t2
+                on t1.ass_type_id = t2.ass_type_id
+               and t1.group_id = t2.group_id
+               and t1.hos_id = t2.hos_id
+               and t1.copy_code = t2.copy_code
+            where t1.group_id = #{group_id}
+			         and t1.hos_id = #{hos_id}
+			         and t1.copy_code = #{copy_code}  
+                )
+      select  case when t.source_id is not null then 'allTotal' else null end kind_code,
+                 t.source_id,
+                 t.ass_type_code,
+                 sum(t.price) price
+            from hos_dept_kind kind
+            left join (select dd.kind_code,
+                              dd.source_id,
+                              dd.ass_type_code,
+                              sum(dd.price) price
+                         from (select connect_by_root(d.ass_type_code) ass_type_code,
+                                      d.source_id,
+                                      d.kind_code,
+                                      d.price
+                                 from temp2 d
+                                start with d.super_code in
+                                           (select super_code
+                                              from temp2
+                                             where type_level = #{type_level})
+                               connect by prior d.ass_type_code = d.super_code) dd
+                        group by dd.kind_code, dd.ass_type_code, dd.source_id
+                        order by dd.kind_code) t
+              on kind.kind_code = t.kind_code
+            where kind.group_id = #{group_id}
+			       and kind.hos_id = #{hos_id}
+           group by  t.source_id,t.ass_type_code
+	</select>
+	
+	
+	<!-- 资产折旧汇总 -->
+	<resultMap type="java.util.Map" id="summaryMap">
+		<result property="dept_code" column="dept_code" />
+		<result property="dept_name" column="dept_name" />
+		<result property="dept_level" column="dept_level" />
+		<result property="now_depre_amount" column="now_depre_amount" />
+		<result property="prim_money" column="prim_money" />
+		<result property="add_depre_amount" column="add_depre_amount" />
+	</resultMap>
+	
+	<select id="queryAssDepreciationSummary" parameterType="java.util.Map" resultMap="summaryMap">
+		with temp as
+			 (select 
+			 		 t.use_dept_id,
+			 		 t.group_id,
+			         t.hos_id,
+			         t.copy_code,
+			         t.depre_year,
+			         t.depre_month,
+			         t.now_depre_amount,
+			         t.prim_money,
+			         t.add_depre_amount
+			    from v_ass_depre_acc t
+			    where t.group_id = #{group_id}
+			     and t.hos_id = #{hos_id}
+			     and t.copy_code = #{copy_code}
+			     <if test="depre_year_month != null and depre_year_month != ''">
+					AND t.depre_year || '' || t.depre_month = #{depre_year_month,jdbcType=DATE}
+				 </if>
+			     <if test="source_id != null and source_id != ''">
+			     	and t.source_id = #{source_id}
+			     </if>
+			     <if test="ass_nature != null and ass_nature != ''">
+			     	and t.ass_naturs = #{ass_nature}
+			     </if>
+			  ),
+			temp2 as
+			 (select dept.dept_code,
+			         dept.super_code,
+			         sum(t.now_depre_amount) now_depre_amount,
+			         sum(t.prim_money) prim_money,
+			         sum(t.add_depre_amount) add_depre_amount
+			    from hos_dept_dict dept
+			    left join temp t
+			      on dept.dept_id = t.use_dept_id
+			     and dept.group_id = t.group_id
+			     and dept.hos_id = t.hos_id
+			     and dept.is_stop = 0
+			   
+			   group by dept.dept_code, dept.super_code),
+			   
+			  temp3 as
+				 (select dept.kind_code,
+				         sum(t.now_depre_amount) now_depre_amount,
+				         sum(t.prim_money) prim_money,
+				         sum(t.add_depre_amount) add_depre_amount
+				    from hos_dept_dict dept
+				    left join temp t
+				      on dept.dept_id = t.use_dept_id
+				     and dept.group_id = t.group_id
+				     and dept.hos_id = t.hos_id
+				     and dept.is_stop = 0
+				  
+				   group by dept.kind_code) 
+			   select *
+			  from (select t.dept_code,
+			               hdd.dept_name,
+			               hdd.dept_level,
+			               t.now_depre_amount,
+			               t.prim_money,
+			               t.add_depre_amount
+			          from (select t.dept_code,
+			                       nvl(sum(t.now_depre_amount), 0)
+			                       
+			                       now_depre_amount,
+			                       nvl(sum(t.prim_money), 0) prim_money,
+			                       nvl(sum(t.add_depre_amount), 0)
+			                       
+			                       add_depre_amount
+			                  from (select connect_by_root(d.dept_code)
+			                               
+			                               dept_code,
+			                               d.now_depre_amount,
+			                               d.prim_money,
+			                               d.add_depre_amount
+			                          from temp2 d
+			                         start with d.super_code in (select super_code from hos_dept_dict where group_id = #{group_id} and hos_id = #{hos_id} and is_stop = 0
+			                            	<if test="dept_level != null and dept_level != ''">
+			                            		and dept_level = #{dept_level}
+			                            	</if>
+			                                                     
+			                                                     )
+			                        connect by prior d.dept_code =
+			                                   
+			                                    d.super_code) t
+			                 group by t.dept_code
+			                
+			                ) t
+			          left join hos_dept_dict hdd
+			            on t.dept_code = hdd.dept_code
+			           and hdd.group_id =  #{group_id}
+			           and hdd.hos_id =  #{hos_id}
+			           and hdd.is_stop = 0
+			         order by dept_code)
+			
+				union all
+				select '小计' as dept_code,
+				       tt2.kind_name as dept_name,
+				       null
+				       
+				       as dept_level,
+				       
+				       tt1.now_depre_amount,
+				       tt1.prim_money,
+				       tt1.add_depre_amount
+				
+				  from temp3 tt1
+				  left join hos_dept_kind tt2
+				    on tt1.kind_code = tt2.kind_code
+				
+				union all
+				select '合计' dept_code,
+				       null as dept_name,
+				       null as dept_level,
+				       sum(t.now_depre_amount) now_depre_amount,
+				       sum(t.prim_money) prim_money,
+				       sum(t.add_depre_amount) add_depre_amount
+				  from
+				  	<if test="dept_level != null and dept_level != ''"> 
+				 	  (
+				  		select connect_by_root(d.dept_code)
+				               
+				               dept_code,
+				               d.now_depre_amount,
+				               d.prim_money,
+				               d.add_depre_amount
+				          from temp2 d
+				         start with d.super_code in (select super_code from hos_dept_dict where group_id = #{group_id} and hos_id = #{hos_id} and is_stop = 0
+			                            	
+			                            		and dept_level = #{dept_level}
+			                            	
+			                             )
+				        connect by prior d.dept_code =
+				                   
+				                    d.super_code) t
+           </if>
+         <if test="dept_level == null or dept_level == ''">
+                     temp2 t
+                 </if> 
+		
+	</select>
+	
+	
+	<!-- 资产折旧信息 -->
+	<resultMap type="java.util.Map" id="infoMap">
+		<result property="depre_year" column="depre_year"/>
+		<result property="depre_month" column="depre_month"/>
+		<result property="use_dept_code" column="use_dept_code"/>
+		<result property="use_dept_name" column="use_dept_name"/>
+		<result property="ass_card_no" column="ass_card_no"/>
+		<result property="ass_code" column="ass_code"/>
+		<result property="ass_name" column="ass_name"/>
+		<result property="ass_type_name" column="ass_type_name"/>
+		<result property="ass_spec" column="ass_spec"/>
+		<result property="ass_mondl" column="ass_mondl"/>
+		<result property="ass_brand" column="ass_brand"/>
+		<result property="in_date" column="in_date"/>
+		<result property="prim_money" column="prim_money"/>
+		<result property="cur_money" column="cur_money"/>
+		<result property="acc_depre_amount" column="acc_depre_amount"/>
+		<result property="now_depre_amount" column="now_depre_amount"/>
+		<result property="add_depre_amount" column="add_depre_amount"/>
+		<result property="source_name" column="source_name"/>
+		<result property="state_name" column="state_name"/>
+		<result property="dispose_type_name" column="dispose_type_name"/>
+	</resultMap>
+	
+	<select id="queryAssDepreciationInfo" parameterType="java.util.Map" resultMap="infoMap">
+	WITH temp_card AS
+ (SELECT card.group_id
+        ,card.hos_id
+        ,card.copy_code
+        ,card.ass_card_no
+        ,card.ass_id
+        ,card.ass_spec
+        ,card.ass_mondl
+        ,card.ass_brand
+        ,card.acc_depre_amount
+        ,nvl(card.price, 0) - nvl(v.CHANGE_PRICE, 0) price
+    FROM (SELECT group_id
+                ,hos_id
+                ,copy_code
+                ,ass_card_no
+                ,ass_id
+                ,ass_spec
+                ,ass_mondl
+                ,ass_brand
+                ,acc_depre_amount
+                ,SUM(price) price
+            FROM (SELECT a.group_id
+                        ,a.hos_id
+                        ,a.copy_code
+                        ,a.ass_card_no
+                        ,a.ass_id
+                        ,a.ass_spec
+                        ,a.ass_mondl
+                        ,a.ass_brand
+                        ,a.acc_depre_amount
+                        ,b.price
+                    FROM v_ass_Card a
+                    LEFT JOIN v_ass_resource b
+                      ON a.group_id = b.group_id
+                     AND a.hos_id = b.hos_id
+                     AND a.copy_code = b.copy_code
+                     AND a.ass_card_no = b.ass_card_no
+                   WHERE to_char(in_date, 'yyyyMM') &lt;= #{depre_year_month,jdbcType=DATE}
+                     AND use_state &gt; 0
+					 <if test="source_id != null and source_id != ''">
+						and b.source_id = #{source_id}
+					 </if>
+					 <if test="ass_nature != null and ass_nature != ''">
+						and a.ass_naturs = #{ass_nature}
+					 </if>
+					 <if test="ass_card_no != null and ass_card_no !=''">
+						and a.ass_card_no = #{ass_card_no}
+					</if>
+                  UNION ALL
+                  SELECT a.group_id
+                        ,a.hos_id
+                        ,a.copy_code
+                        ,a.ass_card_no
+                        ,a.ass_id
+                        ,a.ass_spec
+                        ,a.ass_mondl
+                        ,a.ass_brand
+                        ,a.acc_depre_amount
+                        ,-b.price
+                    FROM v_ass_Card a
+                    LEFT JOIN v_ass_resource b
+                      ON a.group_id = b.group_id
+                     AND a.hos_id = b.hos_id
+                     AND a.copy_code = b.copy_code
+                     AND a.ass_card_no = b.ass_card_no
+                   WHERE to_char(in_date, 'yyyyMM') &lt;= #{depre_year_month,jdbcType=DATE}
+                     AND use_state = 7
+					 <if test="source_id != null and source_id != ''">
+						and b.source_id = #{source_id}
+					 </if>
+					 <if test="ass_nature != null and ass_nature != ''">
+						and a.ass_naturs = #{ass_nature}
+					 </if>
+					  <if test="ass_card_no != null and ass_card_no !=''">
+						and a.ass_card_no = #{ass_card_no}
+					</if>
+					 ) tt
+           GROUP BY group_id
+                   ,hos_id
+                   ,copy_code
+                   ,ass_card_no
+                   ,ass_id
+                   ,ass_spec
+                   ,ass_mondl
+                   ,ass_brand
+                   ,acc_depre_amount) card
+    LEFT JOIN (
+              
+              SELECT t.GROUP_ID
+                     ,t.HOS_ID
+                     ,t.COPY_CODE
+                     ,t.ASS_CARD_NO
+                     ,SUM(t.CHANGE_PRICE) CHANGE_PRICE
+                     ,SUM(t.CHANGE_DEPRE) CHANGE_DEPRE
+                FROM (SELECT t1.GROUP_ID
+                             ,t1.HOS_ID
+                             ,t1.COPY_CODE
+                             ,t2.ASS_CARD_NO
+                             ,t2.CHANGE_PRICE
+                             ,0 CHANGE_DEPRE
+                         FROM v_ass_change_main t1
+                         LEFT JOIN v_ass_change_source t2
+                           ON t1.group_id = t2.group_id
+                          AND t1.hos_id = t2.hos_id
+                          AND t1.copy_code = t2.copy_code
+                          AND t1.CHANGE_NO = t2.CHANGE_NO
+                          AND t1.ass_naturs = t2.ass_naturs
+                        WHERE to_char(t1.CREATE_DATE, 'yyyyMM') &gt; #{depre_year_month,jdbcType=DATE}
+						<if test="source_id != null and source_id != ''">
+						and t2.source_id = #{source_id}
+					 </if>
+					 <if test="ass_nature != null and ass_nature != ''">
+						and t1.ass_naturs = #{ass_nature}
+					 </if>
+					  <if test="ass_card_no != null and ass_card_no !=''">
+						and t2.ass_card_no = #{ass_card_no}
+					</if>
+                       UNION ALL
+                       SELECT a.GROUP_ID
+                             ,a.HOS_ID
+                             ,a.COPY_CODE
+                             ,b.ASS_CARD_NO
+                             ,0 CHANGE_PRICE
+                             ,b.CHANGE_DEPRE
+                         FROM v_ass_depre_main a
+                         LEFT JOIN v_Ass_Depre_source b
+                           ON a.GROUP_ID = b.GROUP_ID
+                          AND a.HOS_ID = b.HOS_ID
+                          AND a.COPY_CODE = b.COPY_CODE
+                          AND a.ass_naturs = b.ass_naturs
+                          AND a.CHANGE_NO = b.CHANGE_NO
+                        WHERE to_char(a.CREATE_DATE, 'yyyyMM') &gt; #{depre_year_month,jdbcType=DATE}
+						<if test="source_id != null and source_id != ''">
+						and b.source_id = #{source_id}
+					 </if>
+					 <if test="ass_nature != null and ass_nature != ''">
+						and a.ass_naturs = #{ass_nature}
+					 </if>
+					  <if test="ass_card_no != null and ass_card_no !=''">
+						and b.ass_card_no = #{ass_card_no}
+					</if>
+						) t
+               GROUP BY t.GROUP_ID, t.HOS_ID, t.COPY_CODE, t.ASS_CARD_NO) v
+      ON card.group_id = v.group_id
+     AND card.hos_id = v.hos_id
+     AND card.copy_code = v.copy_code
+     AND card.ASS_CARD_NO = v.ass_card_no),
+
+temp_depre AS
+ (SELECT depre.group_id
+        ,depre.hos_id
+        ,depre.copy_code
+        ,depre.ASS_CARD_NO
+        ,SUM(depre.CUR_MONEY) CUR_MONEY
+        ,SUM(depre.NOW_DEPRE_AMOUNT) NOW_DEPRE_AMOUNT
+        ,SUM(depre.ADD_DEPRE_AMOUNT) ADD_DEPRE_AMOUNT
+    FROM v_ass_depre_acc depre
+   WHERE depre.DEPRE_YEAR || depre.DEPRE_MONTH = #{depre_year_month,jdbcType=DATE} AND nvl(NOTE,'0')!='冲减'
+   GROUP BY depre.group_id, depre.hos_id, depre.copy_code, depre.ASS_CARD_NO)
+
+SELECT card.ass_card_no, ass.ass_code, ass.ass_name, typed.ass_type_name, card.ass_spec, card.ass_mondl, card.ass_brand, card.price prim_money, case when nvl(depre.cur_money,9999999)=9999999 then card.price else depre.cur_money end  cur_money, card.acc_depre_amount, depre.now_depre_amount, depre.add_depre_amount
+  FROM temp_card card
+  LEFT JOIN temp_depre depre
+    ON card.group_id = depre.GROUP_ID AND card.hos_id = depre.HOS_ID AND card.copy_code = depre.COPY_CODE AND card.ass_card_no = depre.ass_card_no
+  LEFT JOIN ass_no_dict ass
+    ON card.group_id = ass.group_id AND card.hos_id = ass.hos_id AND card.copy_code = ass.copy_code AND card.ass_id = ass.ass_id
+  LEFT JOIN ass_type_dict typed
+    ON card.group_id = typed.group_id AND card.hos_id = typed.hos_id AND card.copy_code = typed.copy_code AND ass.ass_type_id = typed.ass_type_id
+ WHERE card.group_id = #{group_id}
+	 and card.hos_id = #{hos_id}
+	 and card.copy_code = #{copy_code}
+	 <if test="ass_type_id != null and ass_type_id !=''">
+	and ass.ass_type_id = #{ass_type_id}
+	</if>
+  
+	<if test="ass_name != null and ass_name !=''">
+	and (ass.ass_name like '%'||#{ass_name}||'%' or ass.ass_code like '%'||#{ass_name}||'%') 
+	</if>
+	 
+UNION ALL
+SELECT NULL ass_card_no, NULL ass_code, NULL ass_name, NULL ass_type_name, NULL ass_spec, NULL ass_mondl, '合计' ass_brand, SUM(card.price), SUM(case when nvl(depre.cur_money,9999999)=9999999 then card.price else depre.cur_money end), NULL acc_depre_amount, SUM(depre.now_depre_amount), SUM(add_depre_amount)
+  FROM temp_card card
+  LEFT JOIN temp_depre depre
+    ON card.group_id = depre.GROUP_ID AND card.hos_id = depre.HOS_ID AND card.copy_code = depre.COPY_CODE AND card.ass_card_no = depre.ass_card_no
+ LEFT JOIN ass_no_dict ass
+    ON card.group_id = ass.group_id AND card.hos_id = ass.hos_id AND card.copy_code = ass.copy_code AND card.ass_id = ass.ass_id
+  LEFT JOIN ass_type_dict typed
+    ON card.group_id = typed.group_id AND card.hos_id = typed.hos_id AND card.copy_code = typed.copy_code AND ass.ass_type_id = typed.ass_type_id
+
+ WHERE card.group_id = #{group_id}
+	 and card.hos_id = #{hos_id}
+	 and card.copy_code = #{copy_code}
+	<if test="ass_type_id != null and ass_type_id !=''">
+	and ass.ass_type_id = #{ass_type_id}
+	</if>
+  
+	<if test="ass_name != null and ass_name !=''">
+	and (ass.ass_name like '%'||#{ass_name}||'%' or ass.ass_code like '%'||#{ass_name}||'%') 
+	</if>
+	
+	</select>
+	
+	
+	
+	<select id="queryAssDeprePrint" parameterType="java.util.Map" resultMap="summaryMap">
+			with temp as
+			 (select t.group_id,
+			         t.hos_id,
+			         t.copy_code,
+			         t.depre_year,
+			         t.depre_month,
+			         t.now_depre_amount,
+			         t.prim_money,
+			         t.add_depre_amount
+			    from v_ass_depre_acc t
+			    where t.group_id = #{group_id}
+			     and t.hos_id = #{hos_id}
+			     and t.copy_code = #{copy_code}
+			     <if test="depre_year_month != null and depre_year_month != ''">
+					AND t.depre_year || '' || t.depre_month = #{depre_year_month,jdbcType=DATE}
+				 </if>
+			     <if test="source_id != null and source_id != ''">
+			     	and t.source_id = #{source_id}
+			     </if>
+			     <if test="ass_nature != null and ass_nature != ''">
+			     	and t.ass_naturs = #{ass_nature}
+			     </if>
+			  ),
+			temp2 as
+			 (select dept.dept_code,
+			         dept.super_code,
+			         sum(t.now_depre_amount) now_depre_amount,
+			         sum(t.prim_money) prim_money,
+			         sum(t.add_depre_amount) add_depre_amount
+			    from hos_dept_dict dept
+			    left join temp t
+			      on dept.dept_id = t.use_dept_id
+			     and dept.group_id = t.group_id
+			     and dept.hos_id = t.hos_id
+			     and dept.is_stop = 0
+			   
+			   group by dept.dept_code, dept.super_code),
+			   
+			  temp3 as
+				 (select dept.kind_code,
+				         sum(t.now_depre_amount) now_depre_amount,
+				         sum(t.prim_money) prim_money,
+				         sum(t.add_depre_amount) add_depre_amount
+				    from hos_dept_dict dept
+				    left join temp t
+				      on dept.dept_id = t.use_dept_id
+				     and dept.group_id = t.group_id
+				     and dept.hos_id = t.hos_id
+				     and dept.is_stop = 0
+				  
+				   group by dept.kind_code) 
+			   select *
+			  from (select t.dept_code,
+			               hdd.dept_name,
+			               hdd.dept_level,
+			               t.now_depre_amount,
+			               t.prim_money,
+			               t.add_depre_amount
+			          from (select t.dept_code,
+			                       nvl(sum(t.now_depre_amount), 0)
+			                       
+			                       now_depre_amount,
+			                       nvl(sum(t.prim_money), 0) prim_money,
+			                       nvl(sum(t.add_depre_amount), 0)
+			                       
+			                       add_depre_amount
+			                  from (select connect_by_root(d.dept_code)
+			                               
+			                               dept_code,
+			                               d.now_depre_amount,
+			                               d.prim_money,
+			                               d.add_depre_amount
+			                          from temp2 d
+			                         start with d.super_code in (select super_code from hos_dept_dict where group_id = #{group_id} and hos_id = #{hos_id} and is_stop = 0
+			                            	<if test="dept_level != null and dept_level != ''">
+			                            		and dept_level = #{dept_level}
+			                            	</if>
+			                                                     
+			                                                     )
+			                        connect by prior d.dept_code =
+			                                   
+			                                    d.super_code) t
+			                 group by t.dept_code
+			                
+			                ) t
+			          left join hos_dept_dict hdd
+			            on t.dept_code = hdd.dept_code
+			           and hdd.group_id =  #{group_id}
+			           and hdd.hos_id =  #{hos_id}
+			           and hdd.is_stop = 0
+			         order by dept_code)
+			
+				union all
+				select '小计' as dept_code,
+				       tt2.kind_name as dept_name,
+				       null
+				       
+				       as dept_level,
+				       
+				       tt1.now_depre_amount,
+				       tt1.prim_money,
+				       tt1.add_depre_amount
+				
+				  from temp3 tt1
+				  left join hos_dept_kind tt2
+				    on tt1.kind_code = tt2.kind_code
+				
+				union all
+				select '合计' dept_code,
+				       null as dept_name,
+				       null as dept_level,
+				       sum(t.now_depre_amount) now_depre_amount,
+				       sum(t.prim_money) prim_money,
+				       sum(t.add_depre_amount) add_depre_amount
+				  from
+				  	<if test="dept_level != null and dept_level != ''"> 
+				 	  (
+				  		select connect_by_root(d.dept_code)
+				               
+				               dept_code,
+				               d.now_depre_amount,
+				               d.prim_money,
+				               d.add_depre_amount
+				          from temp2 d
+				         start with d.super_code in (select super_code from hos_dept_dict where group_id = #{group_id} and hos_id = #{hos_id} and is_stop = 0
+			                            	
+			                            		and dept_level = #{dept_level}
+			                            	
+			                             )
+				        connect by prior d.dept_code =
+				                   
+				                    d.super_code) t
+           </if>
+         <if test="dept_level == null or dept_level == ''">
+                     temp2 t
+                 </if> 
+	</select>
+	
+	<select id="queryAssInfoPrint" parameterType="java.util.Map" resultMap="infoMap">
+		WITH temp_card AS
+ (SELECT card.group_id
+        ,card.hos_id
+        ,card.copy_code
+        ,card.ass_card_no
+        ,card.ass_id
+        ,card.ass_spec
+        ,card.ass_mondl
+        ,card.ass_brand
+        ,card.acc_depre_amount
+        ,nvl(card.price, 0) - nvl(v.CHANGE_PRICE, 0) price
+    FROM (SELECT group_id
+                ,hos_id
+                ,copy_code
+                ,ass_card_no
+                ,ass_id
+                ,ass_spec
+                ,ass_mondl
+                ,ass_brand
+                ,acc_depre_amount
+                ,SUM(price) price
+            FROM (SELECT a.group_id
+                        ,a.hos_id
+                        ,a.copy_code
+                        ,a.ass_card_no
+                        ,a.ass_id
+                        ,a.ass_spec
+                        ,a.ass_mondl
+                        ,a.ass_brand
+                        ,a.acc_depre_amount
+                        ,b.price
+                    FROM v_ass_Card a
+                    LEFT JOIN v_ass_resource b
+                      ON a.group_id = b.group_id
+                     AND a.hos_id = b.hos_id
+                     AND a.copy_code = b.copy_code
+                     AND a.ass_card_no = b.ass_card_no
+                   WHERE to_char(in_date, 'yyyyMM') &lt;= #{depre_year_month,jdbcType=DATE}
+                     AND use_state &gt; 0
+					 <if test="source_id != null and source_id != ''">
+						and b.source_id = #{source_id}
+					 </if>
+					 <if test="ass_nature != null and ass_nature != ''">
+						and a.ass_naturs = #{ass_nature}
+					 </if>
+					 <if test="ass_card_no != null and ass_card_no !=''">
+						and a.ass_card_no = #{ass_card_no}
+					</if>
+                  UNION ALL
+                  SELECT a.group_id
+                        ,a.hos_id
+                        ,a.copy_code
+                        ,a.ass_card_no
+                        ,a.ass_id
+                        ,a.ass_spec
+                        ,a.ass_mondl
+                        ,a.ass_brand
+                        ,a.acc_depre_amount
+                        ,-b.price
+                    FROM v_ass_Card a
+                    LEFT JOIN v_ass_resource b
+                      ON a.group_id = b.group_id
+                     AND a.hos_id = b.hos_id
+                     AND a.copy_code = b.copy_code
+                     AND a.ass_card_no = b.ass_card_no
+                   WHERE to_char(in_date, 'yyyyMM') &lt;= #{depre_year_month,jdbcType=DATE}
+                     AND use_state = 7
+					 <if test="source_id != null and source_id != ''">
+						and b.source_id = #{source_id}
+					 </if>
+					 <if test="ass_nature != null and ass_nature != ''">
+						and a.ass_naturs = #{ass_nature}
+					 </if>
+					  <if test="ass_card_no != null and ass_card_no !=''">
+						and a.ass_card_no = #{ass_card_no}
+					</if>
+					 ) tt
+           GROUP BY group_id
+                   ,hos_id
+                   ,copy_code
+                   ,ass_card_no
+                   ,ass_id
+                   ,ass_spec
+                   ,ass_mondl
+                   ,ass_brand
+                   ,acc_depre_amount) card
+    LEFT JOIN (
+              
+              SELECT t.GROUP_ID
+                     ,t.HOS_ID
+                     ,t.COPY_CODE
+                     ,t.ASS_CARD_NO
+                     ,SUM(t.CHANGE_PRICE) CHANGE_PRICE
+                     ,SUM(t.CHANGE_DEPRE) CHANGE_DEPRE
+                FROM (SELECT t1.GROUP_ID
+                             ,t1.HOS_ID
+                             ,t1.COPY_CODE
+                             ,t2.ASS_CARD_NO
+                             ,t2.CHANGE_PRICE
+                             ,0 CHANGE_DEPRE
+                         FROM v_ass_change_main t1
+                         LEFT JOIN v_ass_change_source t2
+                           ON t1.group_id = t2.group_id
+                          AND t1.hos_id = t2.hos_id
+                          AND t1.copy_code = t2.copy_code
+                          AND t1.CHANGE_NO = t2.CHANGE_NO
+                          AND t1.ass_naturs = t2.ass_naturs
+                        WHERE to_char(t1.CREATE_DATE, 'yyyyMM') &gt; #{depre_year_month,jdbcType=DATE}
+						<if test="source_id != null and source_id != ''">
+						and t2.source_id = #{source_id}
+					 </if>
+					 <if test="ass_nature != null and ass_nature != ''">
+						and t1.ass_naturs = #{ass_nature}
+					 </if>
+					  <if test="ass_card_no != null and ass_card_no !=''">
+						and t2.ass_card_no = #{ass_card_no}
+					</if>
+                       UNION ALL
+                       SELECT a.GROUP_ID
+                             ,a.HOS_ID
+                             ,a.COPY_CODE
+                             ,b.ASS_CARD_NO
+                             ,0 CHANGE_PRICE
+                             ,b.CHANGE_DEPRE
+                         FROM v_ass_depre_main a
+                         LEFT JOIN v_Ass_Depre_source b
+                           ON a.GROUP_ID = b.GROUP_ID
+                          AND a.HOS_ID = b.HOS_ID
+                          AND a.COPY_CODE = b.COPY_CODE
+                          AND a.ass_naturs = b.ass_naturs
+                          AND a.CHANGE_NO = b.CHANGE_NO
+                        WHERE to_char(a.CREATE_DATE, 'yyyyMM') &gt; #{depre_year_month,jdbcType=DATE}
+						<if test="source_id != null and source_id != ''">
+						and b.source_id = #{source_id}
+					 </if>
+					 <if test="ass_nature != null and ass_nature != ''">
+						and a.ass_naturs = #{ass_nature}
+					 </if>
+					  <if test="ass_card_no != null and ass_card_no !=''">
+						and b.ass_card_no = #{ass_card_no}
+					</if>
+						) t
+               GROUP BY t.GROUP_ID, t.HOS_ID, t.COPY_CODE, t.ASS_CARD_NO) v
+      ON card.group_id = v.group_id
+     AND card.hos_id = v.hos_id
+     AND card.copy_code = v.copy_code
+     AND card.ASS_CARD_NO = v.ass_card_no),
+
+temp_depre AS
+ (SELECT depre.group_id
+        ,depre.hos_id
+        ,depre.copy_code
+        ,depre.ASS_CARD_NO
+        ,SUM(depre.CUR_MONEY) CUR_MONEY
+        ,SUM(depre.NOW_DEPRE_AMOUNT) NOW_DEPRE_AMOUNT
+        ,SUM(depre.ADD_DEPRE_AMOUNT) ADD_DEPRE_AMOUNT
+    FROM v_ass_depre_acc depre
+   WHERE depre.DEPRE_YEAR || depre.DEPRE_MONTH = #{depre_year_month,jdbcType=DATE} AND nvl(NOTE,'0')!='冲减'
+   GROUP BY depre.group_id, depre.hos_id, depre.copy_code, depre.ASS_CARD_NO)
+
+SELECT card.ass_card_no, ass.ass_code, ass.ass_name, typed.ass_type_name, card.ass_spec, card.ass_mondl, card.ass_brand, card.price prim_money, case when nvl(depre.cur_money,9999999)=9999999 then card.price else depre.cur_money end  cur_money, card.acc_depre_amount, depre.now_depre_amount, depre.add_depre_amount
+  FROM temp_card card
+  LEFT JOIN temp_depre depre
+    ON card.group_id = depre.GROUP_ID AND card.hos_id = depre.HOS_ID AND card.copy_code = depre.COPY_CODE AND card.ass_card_no = depre.ass_card_no
+  LEFT JOIN ass_no_dict ass
+    ON card.group_id = ass.group_id AND card.hos_id = ass.hos_id AND card.copy_code = ass.copy_code AND card.ass_id = ass.ass_id
+  LEFT JOIN ass_type_dict typed
+    ON card.group_id = typed.group_id AND card.hos_id = typed.hos_id AND card.copy_code = typed.copy_code AND ass.ass_type_id = typed.ass_type_id
+ WHERE card.group_id = #{group_id}
+	 and card.hos_id = #{hos_id}
+	 and card.copy_code = #{copy_code}
+	 <if test="ass_type_id != null and ass_type_id !=''">
+	and ass.ass_type_id = #{ass_type_id}
+	</if>
+  
+	<if test="ass_name != null and ass_name !=''">
+	and (ass.ass_name like '%'||#{ass_name}||'%' or ass.ass_code like '%'||#{ass_name}||'%') 
+	</if>
+	 
+UNION ALL
+SELECT NULL ass_card_no, NULL ass_code, NULL ass_name, NULL ass_type_name, NULL ass_spec, NULL ass_mondl, '合计' ass_brand, SUM(card.price), SUM(case when nvl(depre.cur_money,9999999)=9999999 then card.price else depre.cur_money end), NULL acc_depre_amount, SUM(depre.now_depre_amount), SUM(add_depre_amount)
+  FROM temp_card card
+  LEFT JOIN temp_depre depre
+    ON card.group_id = depre.GROUP_ID AND card.hos_id = depre.HOS_ID AND card.copy_code = depre.COPY_CODE AND card.ass_card_no = depre.ass_card_no
+ LEFT JOIN ass_no_dict ass
+    ON card.group_id = ass.group_id AND card.hos_id = ass.hos_id AND card.copy_code = ass.copy_code AND card.ass_id = ass.ass_id
+  LEFT JOIN ass_type_dict typed
+    ON card.group_id = typed.group_id AND card.hos_id = typed.hos_id AND card.copy_code = typed.copy_code AND ass.ass_type_id = typed.ass_type_id
+
+ WHERE card.group_id = #{group_id}
+	 and card.hos_id = #{hos_id}
+	 and card.copy_code = #{copy_code}
+	<if test="ass_type_id != null and ass_type_id !=''">
+	and ass.ass_type_id = #{ass_type_id}
+	</if>
+  
+	<if test="ass_name != null and ass_name !=''">
+	and (ass.ass_name like '%'||#{ass_name}||'%' or ass.ass_code like '%'||#{ass_name}||'%') 
+	</if>
+	
+	</select>
+	
+</mapper>

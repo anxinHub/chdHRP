@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.htc.dao.task.basic.HtcPeopleTitleDictMapper">
+
+	<resultMap id="peopleTitleDict" type="com.chd.hrp.htc.entity.task.basic.HtcPeopleTitleDict">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="title_code" column="title_code" />
+		<result property="title_name" column="title_name" />
+		<result property="title_desc" column="title_desc" />
+		<result property="is_stop" column="is_stop" />
+		<result property="spell_code" column="spell_code" />
+		<result property="wbx_code" column="wbx_code" />
+	</resultMap>
+	<!-- useGeneratedKeys="true" keyProperty="xxx" for sqlserver and mysql -->
+	<insert id="addHtcPeopleTitleDict" useGeneratedKeys="true">
+
+		insert into htc_people_title_dict (
+			group_id,
+			hos_id,
+			copy_code,
+			title_code,
+			title_name,
+			title_desc,
+			is_stop,
+			spell_code,
+			wbx_code)
+		values (
+			#{group_id},
+			#{hos_id},
+		    #{copy_code},
+		    #{title_code},
+		    #{title_name},
+		    #{title_desc},
+		    #{is_stop},
+			#{spell_code},
+			#{wbx_code}
+		)
+	</insert>
+	
+	<insert id="addBatchHtcPeopleTitleDict" parameterType="java.util.List">
+
+		INSERT INTO HTC_PEOPLE_TITLE_DICT (
+			group_id ,
+			hos_id ,
+			copy_code ,
+			title_code ,
+			title_name ,
+			title_desc ,
+			is_stop,
+			spell_code ,
+			wbx_code
+		)  
+		<foreach collection="list" item="item" index="index" separator=" union all " >
+		 select 
+			#{item.group_id} ,
+			#{item.hos_id} ,
+			#{item.copy_code} ,
+			#{item.title_code} ,
+			#{item.title_name} ,
+			#{item.title_desc,jdbcType=VARCHAR} ,
+			#{item.is_stop},
+			#{item.spell_code} ,
+			#{item.wbx_code}
+		 from dual
+		</foreach>
+	</insert>
+
+	<select id="queryHtcPeopleTitleDict" parameterType="java.util.Map"
+		resultMap="peopleTitleDict">
+	        select 
+	           group_id,
+		       hos_id,
+		       copy_code,
+		       title_code,
+		       title_name,
+		       title_desc,
+		       is_stop,
+		       spell_code,
+		       wbx_code
+		from htc_people_title_dict
+		<where> 
+		         group_id = #{group_id}
+		     and hos_id = #{hos_id}
+		     and copy_code = #{copy_code}
+			 <if test="title_code != null and title_code != ''">
+	          and (
+	                   title_code like '%'||#{title_code} || '%'
+	                or title_name like '%'||#{title_code} || '%'
+	                or spell_code like '%'||#{title_code} || '%'
+	                or wbx_code like '%'||#{title_code} || '%'
+	           )
+        </if>
+		</where>
+		order by group_id,hos_id,copy_code,title_code
+	</select>
+	
+	<select id="queryHtcPeopleTitleDictByCode" resultMap="peopleTitleDict"
+		parameterType="java.util.Map">
+		SELECT
+			group_id,
+			hos_id,
+			copy_code,
+			title_code,
+			title_name,
+			title_desc,
+			is_stop,
+			spell_code,
+			wbx_code
+		FROM HTC_PEOPLE_TITLE_DICT
+	    where group_id = #{group_id}
+		AND hos_id = #{hos_id}
+		AND copy_code = #{copy_code}
+		AND title_code = #{title_code}
+	</select>
+
+	<delete id="deleteHtcPeopleTitleDict" parameterType="java.util.Map">
+
+		DELETE FROM htc_people_title_dict 
+		WHERE
+			group_id = #{group_id} and
+			hos_id = #{hos_id} and
+			copy_code = #{copy_code} and
+			title_code = #{title_code}
+
+	</delete>
+
+	<delete id="deleteBatchHtcPeopleTitleDict" parameterType="java.util.List">
+		delete from htc_people_title_dict
+		where
+		<foreach collection="list" index="index" item="item" separator="or" >
+		(
+			group_id = #{item.group_id}
+			and hos_id = #{item.hos_id}
+			and copy_code = #{item.copy_code}
+			and title_code = #{item.title_code}
+		)
+		</foreach>
+	</delete>	
+
+	<update id="updateHtcPeopleTitleDict" parameterType="java.util.Map">
+		UPDATE htc_people_title_dict 
+		SET
+			title_name = #{title_name} ,
+			title_desc = #{title_desc} ,
+			is_stop = #{is_stop},
+			spell_code = #{spell_code} ,
+			wbx_code = #{wbx_code}
+		WHERE
+			group_id = #{group_id} and
+			hos_id = #{hos_id} and
+			copy_code = #{copy_code} and
+			title_code = #{title_code}
+	</update>
+	
+	  <insert id="synchroHtcPeopleTitleDict" parameterType="java.util.Map">
+                insert into htc_people_title_dict
+				(group_id, hos_id, copy_code, title_code, title_name, title_desc,is_stop,spell_code, wbx_code)
+				 select group_id,hos_id,#{copy_code},duty_code,duty_name,note,is_stop,spell_code,wbx_code
+				 from hos_duty a
+				 where group_id = #{group_id}
+				 and hos_id = #{hos_id}
+				 and not exists (
+				  select 1 from htc_people_title_dict b
+					where a.group_id = b.group_id
+					and a.hos_id = b.hos_id
+					and b.copy_code = #{copy_code}
+					and a.duty_code = b.title_code
+				 )
+			
+    </insert> 
+</mapper>
+

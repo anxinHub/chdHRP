@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.mat.dao.cert.MatCertFileMapper">
+	
+	<!-- 批量添加 -->
+	<insert id="addMatCertFileBatch" parameterType="java.util.List">
+		INSERT INTO ${map.table_code} (
+			group_id, hos_id, copy_code, ${map.id_col}, file_name, file_name_o, 
+			file_type, file_path, file_size, size_unit, oper_name, oper_date 
+		) 
+		SELECT  
+			#{map.group_id,jdbcType=INTEGER} group_id, 
+			#{map.hos_id,jdbcType=INTEGER} hos_id,
+			#{map.copy_code,jdbcType=VARCHAR} copy_code,
+			#{map.id_val,jdbcType=BIGINT} ${map.id_col}, 
+			file_name, file_name_o, file_type, file_path, file_size, 
+			#{map.size_unit,jdbcType=VARCHAR} size_unit,
+			#{map.oper_name,jdbcType=VARCHAR} oper_name,
+			#{map.oper_date,jdbcType=TIMESTAMP} oper_date
+		FROM (
+		<foreach collection="list" item="item" index="index" separator=" union all ">
+			SELECT 
+				#{item.file_name,jdbcType=VARCHAR} file_name, 
+				#{item.file_name_o,jdbcType=VARCHAR} file_name_o, 
+				#{item.file_type,jdbcType=VARCHAR} file_type, 
+				#{item.file_path,jdbcType=VARCHAR} file_path, 
+				#{item.file_size,jdbcType=NUMERIC} file_size
+			FROM DUAL
+		</foreach>
+		) tmp
+	</insert>
+	
+	<!-- 根据路径删除文件 -->
+	<delete id="deleteMatCertFileByPath" parameterType="java.util.Map">
+		DELETE FROM ${table_code} a
+		WHERE ${id_col} = #{id_val,jdbcType=BIGINT}
+			AND EXISTS(
+				SELECT 1 FROM (
+					<foreach collection="list" item="item" index="index" separator=" union all ">
+						SELECT 
+							#{item.file_name,jdbcType=VARCHAR} file_name, 
+							#{item.file_path,jdbcType=VARCHAR} file_path 
+						FROM DUAL
+					</foreach>
+				) tmp 
+				WHERE a.file_name = tmp.file_name 
+					AND a.file_path = tmp.file_path 
+			)
+	</delete>
+	
+	<!-- 删除文件 -->
+	<delete id="deleteMatCertFile" parameterType="java.util.Map">
+		DELETE FROM ${table_code}
+		WHERE ${id_col} IN (
+			<foreach collection="id_list" item="item" index="index" separator=" union all ">
+				SELECT #{item,jdbcType=VARCHAR} id_val FROM DUAL
+			</foreach>
+		)
+	</delete>
+	
+	<!-- 查询文件 -->
+	<select id="queryMatCertFileList" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT group_id "group_id", hos_id "hos_id", copy_code "copy_code", 
+			${id_col} "${id_col}", file_name "file_name", file_name_o "file_name_o", 
+			file_type "file_type", file_path "file_path", file_size "file_size", size_unit "size_unit", 
+			oper_name "oper_name", oper_date  "oper_date" 
+		FROM ${table_code} 
+		WHERE ${id_col} = #{id_val,jdbcType=BIGINT}
+	</select>
+	
+	<select id="queryMatCertFileDeleteList" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT file_path "file_path", file_name "file_name" 
+		FROM ${table_code}
+		WHERE ${id_col} IN (
+			<foreach collection="id_list" item="item" index="index" separator=" union all ">
+				SELECT #{item,jdbcType=VARCHAR} id_val FROM DUAL
+			</foreach>
+		)
+	</select>
+</mapper>
+

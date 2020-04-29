@@ -1,0 +1,655 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.ass.dao.zengjian.AssZengJianMainMapper">
+
+	<resultMap id="AssZengJianMainMap" type="java.util.Map">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="note" column="note" />
+		<result property="price" column="price" />
+		<result property="depre_money" column="depre_money" />
+		<result property="cur_money" column="cur_money" />
+	</resultMap>
+ 
+	<select id="queryAssZengJian" parameterType="java.util.Map"
+		resultMap="AssZengJianMainMap">
+
+		SELECT '期初余额' note
+		,SUM(r_begin) price     
+		,SUM(l_begin) depre_money
+		,SUM(r_begin - l_begin) cur_money
+		FROM ass_collect_type_main t1
+		WHERE
+		group_id =#{group_id}
+		AND hos_id =#{hos_id}
+		AND copy_code =#{copy_code}
+		AND year_month=#{year_month_begin}
+			<if test="ass_nature != null and ass_nature != ''">
+			and exists(select 1 from ass_type_dict t2 where t2.group_id=t1.group_id and t2.hos_id=t1.hos_id and t2.copy_code=t1.copy_code
+			and t2.ass_type_id=t1.ass_type_id
+			<if test="ass_nature == '02'">
+			and (t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR}  )
+			</if>
+			<if test="ass_nature == '04'">
+			and (t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR} ') 
+			</if>
+			<if test="ass_nature != '02' and ass_nature != '04'">
+			and t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR}
+			</if>
+			)
+			</if>
+			
+		<if test="ass_type_id != null and ass_type_id != ''">
+		and t1.ass_type_id=#{ass_type_id,jdbcType=VARCHAR}
+		</if>
+		
+union all
+		SELECT '增加' AS note, 0 AS price, 0 AS depre_money, 0 AS
+		cur_money
+		FROM dual
+		UNION ALL
+		SELECT chr(41377) || chr(41377) ||
+		t1.bus_name
+		,SUM(t1.r_add) price
+		, 0 AS depre_money, 0 AS cur_money
+		FROM
+		ASS_COLLECT_TYPE_BUSTYPE t1
+		WHERE t1.group_id =#{group_id}
+		AND t1.hos_id
+		=#{hos_id}
+		AND t1.copy_code =#{copy_code}
+		AND T1.IN_OUT = 1
+		AND
+		t1.bus_type NOT IN (24, 25, 26)
+		AND t1.year_month between #{year_month_begin} and #{year_month_end}
+		<if test="ass_nature != null and ass_nature != ''">
+			and exists(select 1 from ass_type_dict t2 where t2.group_id=t1.group_id and t2.hos_id=t1.hos_id and t2.copy_code=t1.copy_code
+			and t2.ass_type_id=t1.ass_type_id
+			<if test="ass_nature == '02'">
+			and (t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR}  )
+			</if>
+			<if test="ass_nature == '04'">
+			and (t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR} ') 
+			</if>
+			<if test="ass_nature != '02' and ass_nature != '04'">
+			and t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR}
+			</if>
+			)
+			</if>
+		<if test="ass_type_id != null and ass_type_id != ''">
+		and t1.ass_type_id=#{ass_type_id,jdbcType=VARCHAR}
+		</if>
+		GROUP BY t1.bus_name
+		
+		union all
+		
+		SELECT chr(41377) || chr(41377) || '合计' note
+		,SUM(t1.r_add) price
+		, 0 AS depre_money, 0 AS cur_money
+		FROM
+		ASS_COLLECT_TYPE_BUSTYPE t1
+		WHERE t1.group_id =#{group_id}
+		AND t1.hos_id
+		=#{hos_id}
+		AND t1.copy_code =#{copy_code}
+		AND T1.IN_OUT = 1
+		AND
+		t1.bus_type NOT IN (24, 25, 26)
+		AND t1.year_month between #{year_month_begin} and #{year_month_end}
+		<if test="ass_nature != null and ass_nature != ''">
+			and exists(select 1 from ass_type_dict t2 where t2.group_id=t1.group_id and t2.hos_id=t1.hos_id and t2.copy_code=t1.copy_code
+			and t2.ass_type_id=t1.ass_type_id
+			<if test="ass_nature == '02'">
+			and (t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR}  )
+			</if>
+			<if test="ass_nature == '04'">
+			and (t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR} ') 
+			</if>
+			<if test="ass_nature != '02' and ass_nature != '04'">
+			and t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR}
+			</if>
+			)
+			</if>
+		<if test="ass_type_id != null and ass_type_id != ''">
+		and t1.ass_type_id=#{ass_type_id,jdbcType=VARCHAR}
+		</if>
+		union all
+		
+		SELECT '减少' AS note, 0 AS price, 0 AS depre_money, 0 AS
+		cur_money
+		FROM dual
+		UNION ALL
+		SELECT chr(41377) || chr(41377) ||
+		t1.bus_name
+		,SUM(t1.r_dec) price
+		, 0 AS depre_money, 0 AS cur_money
+		FROM
+		ASS_COLLECT_TYPE_BUSTYPE t1
+		WHERE t1.group_id =#{group_id}
+		AND t1.hos_id
+		=#{hos_id}
+		AND t1.copy_code =#{copy_code}
+		AND T1.IN_OUT = 0
+		AND
+		t1.bus_type NOT IN (24, 25, 26)
+		AND t1.year_month between #{year_month_begin} and #{year_month_end}
+		<if test="ass_nature != null and ass_nature != ''">
+			and exists(select 1 from ass_type_dict t2 where t2.group_id=t1.group_id and t2.hos_id=t1.hos_id and t2.copy_code=t1.copy_code
+			and t2.ass_type_id=t1.ass_type_id
+			<if test="ass_nature == '02'">
+			and (t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR}  )
+			</if>
+			<if test="ass_nature == '04'">
+			and (t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR} ') 
+			</if>
+			<if test="ass_nature != '02' and ass_nature != '04'">
+			and t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR}
+			</if>
+			)
+			</if>
+		<if test="ass_type_id != null and ass_type_id != ''">
+		and t1.ass_type_id=#{ass_type_id,jdbcType=VARCHAR}
+		</if>
+		GROUP BY t1.bus_name
+		
+		union all
+		
+		SELECT chr(41377) || chr(41377) || '合计' note
+		,SUM(t1.r_dec) price
+		, 0 AS depre_money, 0 AS cur_money
+		FROM
+		ASS_COLLECT_TYPE_BUSTYPE t1
+		WHERE t1.group_id =#{group_id}
+		AND t1.hos_id
+		=#{hos_id}
+		AND t1.copy_code =#{copy_code}
+		AND T1.IN_OUT = 0
+		AND
+		t1.bus_type NOT IN (24, 25, 26)
+		AND t1.year_month between #{year_month_begin} and #{year_month_end}
+		<if test="ass_nature != null and ass_nature != ''">
+			and exists(select 1 from ass_type_dict t2 where t2.group_id=t1.group_id and t2.hos_id=t1.hos_id and t2.copy_code=t1.copy_code
+			and t2.ass_type_id=t1.ass_type_id
+			<if test="ass_nature == '02'">
+			and (t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR}  )
+			</if>
+			<if test="ass_nature == '04'">
+			and (t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR} ') 
+			</if>
+			<if test="ass_nature != '02' and ass_nature != '04'">
+			and t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR}
+			</if>
+			)
+			</if>
+		<if test="ass_type_id != null and ass_type_id != ''">
+		and t1.ass_type_id=#{ass_type_id,jdbcType=VARCHAR}
+		</if>
+		
+		union all
+		
+		SELECT '折旧' AS note, 0 AS price, 0 AS
+		depre_money, 0 AS cur_money
+		FROM dual
+		UNION ALL
+		
+		
+		SELECT chr(41377) ||
+		chr(41377) || t1.bus_name
+		,0 price
+		, SUM(t1.r_add) AS depre_money, 0 AS
+		cur_money
+		FROM ASS_COLLECT_TYPE_BUSTYPE t1
+		WHERE t1.group_id
+		=#{group_id}
+		AND t1.hos_id =#{hos_id}
+		AND t1.copy_code =#{copy_code}
+		AND
+		T1.IN_OUT = 1
+		AND t1.bus_type = 24
+		AND t1.year_month between #{year_month_begin} and #{year_month_end}
+		<if test="ass_nature != null and ass_nature != ''">
+			and exists(select 1 from ass_type_dict t2 where t2.group_id=t1.group_id and t2.hos_id=t1.hos_id and t2.copy_code=t1.copy_code
+			and t2.ass_type_id=t1.ass_type_id
+			<if test="ass_nature == '02'">
+			and (t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR}  )
+			</if>
+			<if test="ass_nature == '04'">
+			and (t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR} ') 
+			</if>
+			<if test="ass_nature != '02' and ass_nature != '04'">
+			and t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR}
+			</if>
+			)
+			</if>
+		<if test="ass_type_id != null and ass_type_id != ''">
+		and t1.ass_type_id=#{ass_type_id,jdbcType=VARCHAR}
+		</if>
+		GROUP BY t1.bus_name
+		
+		union all
+		
+		SELECT chr(41377) || chr(41377) ||
+		t1.bus_name note
+		,0 price
+		, SUM(t1.l_dec) AS depre_money, 0 AS cur_money
+		FROM
+		ASS_COLLECT_TYPE_BUSTYPE t1
+		WHERE t1.group_id =#{group_id}
+		AND t1.hos_id
+		=#{hos_id}
+		AND t1.copy_code =#{copy_code}
+		AND T1.IN_OUT = 0
+		AND
+		t1.bus_type = 25
+		AND t1.year_month between #{year_month_begin} and #{year_month_end}
+		<if test="ass_nature != null and ass_nature != ''">
+			and exists(select 1 from ass_type_dict t2 where t2.group_id=t1.group_id and t2.hos_id=t1.hos_id and t2.copy_code=t1.copy_code
+			and t2.ass_type_id=t1.ass_type_id
+			<if test="ass_nature == '02'">
+			and (t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR}  )
+			</if>
+			<if test="ass_nature == '04'">
+			and (t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR} ') 
+			</if>
+			<if test="ass_nature != '02' and ass_nature != '04'">
+			and t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR}
+			</if>
+			)
+			</if>
+		<if test="ass_type_id != null and ass_type_id != ''">
+		and t1.ass_type_id=#{ass_type_id,jdbcType=VARCHAR}
+		</if>
+		GROUP BY t1.bus_name
+		
+		union all
+		
+		SELECT chr(41377) || chr(41377) || chr(41377) || chr(41377) ||
+		t1.bus_name note
+		,0 price
+		, SUM(t1.l_dec) AS depre_money, 0 AS cur_money
+		FROM
+		ASS_COLLECT_TYPE_BUSTYPE t1
+		WHERE t1.group_id =#{group_id}
+		AND t1.hos_id
+		=#{hos_id} 
+		AND t1.copy_code =#{copy_code}
+		AND T1.IN_OUT = 0
+		AND 
+		t1.bus_type in (41,51,11,12,21,22,23,24,31,32,33)
+		
+		and t1.bus_name != '原值减少'
+		
+		AND t1.year_month between #{year_month_begin} and #{year_month_end}
+		<if test="ass_nature != null and ass_nature != ''">
+			and exists(select 1 from ass_type_dict t2 where t2.group_id=t1.group_id and t2.hos_id=t1.hos_id and t2.copy_code=t1.copy_code
+			and t2.ass_type_id=t1.ass_type_id
+			<if test="ass_nature == '02'">
+			and (t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR}  )
+			</if>
+			<if test="ass_nature == '04'">
+			and (t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR} ') 
+			</if>
+			<if test="ass_nature != '02' and ass_nature != '04'">
+			and t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR}
+			</if>
+			)
+			</if>
+		<if test="ass_type_id != null and ass_type_id != ''">
+		and t1.ass_type_id=#{ass_type_id,jdbcType=VARCHAR}
+		</if>
+		GROUP BY t1.bus_name
+		
+		
+		union all 
+		
+		
+		SELECT '期末余额' note,nvl(t1.price,0) price,nvl(t1.depre_money,0) depre_money, (nvl(t1.price,0) - nvl(t1.depre_money,0))  cur_money
+		from (
+		SELECT '期初余额' note
+		,SUM(r_end) price     
+		,SUM(l_end) depre_money
+		,SUM(r_end - l_end) cur_money
+		FROM ass_collect_type_main t1
+		WHERE
+		group_id =#{group_id}
+		AND hos_id =#{hos_id}
+		AND copy_code =#{copy_code}
+		AND year_month=#{year_month_end}
+		<if test="ass_nature != null and ass_nature != ''">
+			and exists(select 1 from ass_type_dict t2 where t2.group_id=t1.group_id and t2.hos_id=t1.hos_id and t2.copy_code=t1.copy_code
+			and t2.ass_type_id=t1.ass_type_id
+			<if test="ass_nature == '02'">
+			and (t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR}  )
+			</if>
+			<if test="ass_nature == '04'">
+			and (t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR} ') 
+			</if>
+			<if test="ass_nature != '02' and ass_nature != '04'">
+			and t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR}
+			</if>
+			)
+			</if>
+		<if test="ass_type_id != null and ass_type_id != ''">
+		and t1.ass_type_id=#{ass_type_id,jdbcType=VARCHAR}
+		</if>
+		) t1
+		
+		
+	</select>
+
+
+	<!-- 打印 -->
+	<select id="queryAssZengJianMainPrint" parameterType="java.util.Map"
+		resultMap="AssZengJianMainMap">
+		SELECT '期初余额' note
+		,SUM(r_begin) price     
+		,SUM(l_begin) depre_money
+		,SUM(r_begin - l_begin) cur_money
+		FROM ass_collect_type_main t1
+		WHERE
+		group_id =#{group_id}
+		AND hos_id =#{hos_id}
+		AND copy_code =#{copy_code}
+		AND year_month=#{year_month_begin}
+			<if test="ass_nature != null and ass_nature != ''">
+			and exists(select 1 from ass_type_dict t2 where t2.group_id=t1.group_id and t2.hos_id=t1.hos_id and t2.copy_code=t1.copy_code
+			and t2.ass_type_id=t1.ass_type_id
+			<if test="ass_nature == '02'">
+			and (t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR}  )
+			</if>
+			<if test="ass_nature == '04'">
+			and (t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR} ') 
+			</if>
+			<if test="ass_nature != '02' and ass_nature != '04'">
+			and t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR}
+			</if>
+			)
+			</if>
+		<if test="ass_type_id != null and ass_type_id != ''">
+		and t1.ass_type_id=#{ass_type_id,jdbcType=VARCHAR}
+		</if>
+		
+union all
+		SELECT '增加' AS note, 0 AS price, 0 AS depre_money, 0 AS
+		cur_money
+		FROM dual
+		UNION ALL
+		SELECT chr(41377) || chr(41377) ||
+		t1.bus_name
+		,SUM(t1.r_add) price
+		, 0 AS depre_money, 0 AS cur_money
+		FROM
+		ASS_COLLECT_TYPE_BUSTYPE t1
+		WHERE t1.group_id =#{group_id}
+		AND t1.hos_id
+		=#{hos_id}
+		AND t1.copy_code =#{copy_code}
+		AND T1.IN_OUT = 1
+		AND
+		t1.bus_type NOT IN (24, 25, 26)
+		AND t1.year_month between #{year_month_begin} and #{year_month_end}
+		<if test="ass_nature != null and ass_nature != ''">
+			and exists(select 1 from ass_type_dict t2 where t2.group_id=t1.group_id and t2.hos_id=t1.hos_id and t2.copy_code=t1.copy_code
+			and t2.ass_type_id=t1.ass_type_id
+			<if test="ass_nature == '02'">
+			and (t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR}  )
+			</if>
+			<if test="ass_nature == '04'">
+			and (t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR} ') 
+			</if>
+			<if test="ass_nature != '02' and ass_nature != '04'">
+			and t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR}
+			</if>
+			)
+			</if>
+		<if test="ass_type_id != null and ass_type_id != ''">
+		and t1.ass_type_id=#{ass_type_id,jdbcType=VARCHAR}
+		</if>
+		GROUP BY t1.bus_name
+		
+		union all
+		
+		SELECT chr(41377) || chr(41377) || '合计' note
+		,SUM(t1.r_add) price
+		, 0 AS depre_money, 0 AS cur_money
+		FROM
+		ASS_COLLECT_TYPE_BUSTYPE t1
+		WHERE t1.group_id =#{group_id}
+		AND t1.hos_id
+		=#{hos_id}
+		AND t1.copy_code =#{copy_code}
+		AND T1.IN_OUT = 1
+		AND
+		t1.bus_type NOT IN (24, 25, 26)
+		AND t1.year_month between #{year_month_begin} and #{year_month_end}
+		<if test="ass_nature != null and ass_nature != ''">
+			and exists(select 1 from ass_type_dict t2 where t2.group_id=t1.group_id and t2.hos_id=t1.hos_id and t2.copy_code=t1.copy_code
+			and t2.ass_type_id=t1.ass_type_id
+			<if test="ass_nature == '02'">
+			and (t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR}  )
+			</if>
+			<if test="ass_nature == '04'">
+			and (t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR} ') 
+			</if>
+			<if test="ass_nature != '02' and ass_nature != '04'">
+			and t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR}
+			</if>
+			)
+			</if>
+		<if test="ass_type_id != null and ass_type_id != ''">
+		and t1.ass_type_id=#{ass_type_id,jdbcType=VARCHAR}
+		</if>
+		union all
+		
+		SELECT '减少' AS note, 0 AS price, 0 AS depre_money, 0 AS
+		cur_money
+		FROM dual
+		UNION ALL
+		SELECT chr(41377) || chr(41377) ||
+		t1.bus_name
+		,SUM(t1.r_dec) price
+		, 0 AS depre_money, 0 AS cur_money
+		FROM
+		ASS_COLLECT_TYPE_BUSTYPE t1
+		WHERE t1.group_id =#{group_id}
+		AND t1.hos_id
+		=#{hos_id}
+		AND t1.copy_code =#{copy_code}
+		AND T1.IN_OUT = 0
+		AND
+		t1.bus_type NOT IN (24, 25, 26)
+		AND t1.year_month between #{year_month_begin} and #{year_month_end}
+		<if test="ass_nature != null and ass_nature != ''">
+			and exists(select 1 from ass_type_dict t2 where t2.group_id=t1.group_id and t2.hos_id=t1.hos_id and t2.copy_code=t1.copy_code
+			and t2.ass_type_id=t1.ass_type_id
+			<if test="ass_nature == '02'">
+			and (t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR}  )
+			</if>
+			<if test="ass_nature == '04'">
+			and (t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR} ') 
+			</if>
+			<if test="ass_nature != '02' and ass_nature != '04'">
+			and t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR}
+			</if>
+			)
+			</if>
+		<if test="ass_type_id != null and ass_type_id != ''">
+		and t1.ass_type_id=#{ass_type_id,jdbcType=VARCHAR}
+		</if>
+		GROUP BY t1.bus_name
+		
+		union all
+		
+		SELECT chr(41377) || chr(41377) || '合计' note
+		,SUM(t1.r_dec) price
+		, 0 AS depre_money, 0 AS cur_money
+		FROM
+		ASS_COLLECT_TYPE_BUSTYPE t1
+		WHERE t1.group_id =#{group_id}
+		AND t1.hos_id
+		=#{hos_id}
+		AND t1.copy_code =#{copy_code}
+		AND T1.IN_OUT = 0
+		AND
+		t1.bus_type NOT IN (24, 25, 26)
+		AND t1.year_month between #{year_month_begin} and #{year_month_end}
+		<if test="ass_nature != null and ass_nature != ''">
+			and exists(select 1 from ass_type_dict t2 where t2.group_id=t1.group_id and t2.hos_id=t1.hos_id and t2.copy_code=t1.copy_code
+			and t2.ass_type_id=t1.ass_type_id
+			<if test="ass_nature == '02'">
+			and (t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR}  )
+			</if>
+			<if test="ass_nature == '04'">
+			and (t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR} ') 
+			</if>
+			<if test="ass_nature != '02' and ass_nature != '04'">
+			and t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR}
+			</if>
+			)
+			</if>
+		<if test="ass_type_id != null and ass_type_id != ''">
+		and t1.ass_type_id=#{ass_type_id,jdbcType=VARCHAR}
+		</if>
+		
+		union all
+		
+		SELECT '折旧' AS note, 0 AS price, 0 AS
+		depre_money, 0 AS cur_money
+		FROM dual
+		UNION ALL
+		SELECT chr(41377) ||
+		chr(41377) || t1.bus_name
+		,0 price
+		, SUM(t1.r_add) AS depre_money, 0 AS
+		cur_money
+		FROM ASS_COLLECT_TYPE_BUSTYPE t1
+		WHERE t1.group_id
+		=#{group_id}
+		AND t1.hos_id =#{hos_id}
+		AND t1.copy_code =#{copy_code}
+		AND
+		T1.IN_OUT = 1
+		AND t1.bus_type = 24
+		AND t1.year_month between #{year_month_begin} and #{year_month_end}
+		<if test="ass_nature != null and ass_nature != ''">
+			and exists(select 1 from ass_type_dict t2 where t2.group_id=t1.group_id and t2.hos_id=t1.hos_id and t2.copy_code=t1.copy_code
+			and t2.ass_type_id=t1.ass_type_id
+			<if test="ass_nature == '02'">
+			and (t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR}  )
+			</if>
+			<if test="ass_nature == '04'">
+			and (t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR} ') 
+			</if>
+			<if test="ass_nature != '02' and ass_nature != '04'">
+			and t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR}
+			</if>
+			)
+			</if>
+		<if test="ass_type_id != null and ass_type_id != ''">
+		and t1.ass_type_id=#{ass_type_id,jdbcType=VARCHAR}
+		</if>
+		GROUP BY t1.bus_name
+		
+		union all
+		
+		SELECT chr(41377) || chr(41377) ||
+		t1.bus_name note
+		,0 price
+		, SUM(t1.r_dec) AS depre_money, 0 AS cur_money
+		FROM
+		ASS_COLLECT_TYPE_BUSTYPE t1
+		WHERE t1.group_id =#{group_id}
+		AND t1.hos_id
+		=#{hos_id}
+		AND t1.copy_code =#{copy_code}
+		AND T1.IN_OUT = 0
+		AND
+		t1.bus_type = 25
+		AND t1.year_month between #{year_month_begin} and #{year_month_end}
+		<if test="ass_nature != null and ass_nature != ''">
+			and exists(select 1 from ass_type_dict t2 where t2.group_id=t1.group_id and t2.hos_id=t1.hos_id and t2.copy_code=t1.copy_code
+			and t2.ass_type_id=t1.ass_type_id
+			<if test="ass_nature == '02'">
+			and (t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR}  )
+			</if>
+			<if test="ass_nature == '04'">
+			and (t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR} ') 
+			</if>
+			<if test="ass_nature != '02' and ass_nature != '04'">
+			and t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR}
+			</if>
+			)
+			</if>
+		<if test="ass_type_id != null and ass_type_id != ''">
+		and t1.ass_type_id=#{ass_type_id,jdbcType=VARCHAR}
+		</if>
+		GROUP BY t1.bus_name
+		
+		union all 
+		
+		SELECT chr(41377) || chr(41377) || '合计'
+		,0 price
+		, SUM(t1.r_dec + t1.r_add) AS depre_money, 0 AS cur_money
+		FROM
+		ASS_COLLECT_TYPE_BUSTYPE t1
+		WHERE t1.group_id =#{group_id}
+		AND t1.hos_id
+		=#{hos_id}
+		AND t1.copy_code =#{copy_code}
+		AND t1.bus_type IN (24, 25)
+		AND t1.year_month between #{year_month_begin} and #{year_month_end}
+		<if test="ass_nature != null and ass_nature != ''">
+			and exists(select 1 from ass_type_dict t2 where t2.group_id=t1.group_id and t2.hos_id=t1.hos_id and t2.copy_code=t1.copy_code
+			and t2.ass_type_id=t1.ass_type_id
+			<if test="ass_nature == '02'">
+			and (t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR}  )
+			</if>
+			<if test="ass_nature == '04'">
+			and (t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR} ') 
+			</if>
+			<if test="ass_nature != '02' and ass_nature != '04'">
+			and t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR}
+			</if>
+			)
+			</if>
+		<if test="ass_type_id != null and ass_type_id != ''">
+		and t1.ass_type_id=#{ass_type_id,jdbcType=VARCHAR}
+		</if>
+		union all
+		
+		SELECT '期末余额' note,nvl(t1.price,0) price,nvl(t1.depre_money,0) depre_money, (nvl(t1.price,0) - nvl(t1.depre_money,0))  cur_money
+		from (
+		SELECT '期初余额' note
+		,SUM(r_end) price     
+		,SUM(l_end) depre_money
+		,SUM(r_end - l_end) cur_money
+		FROM ass_collect_type_main t1
+		WHERE
+		group_id =#{group_id}
+		AND hos_id =#{hos_id}
+		AND copy_code =#{copy_code}
+		AND year_month=#{year_month_end}
+		<if test="ass_nature != null and ass_nature != ''">
+			and exists(select 1 from ass_type_dict t2 where t2.group_id=t1.group_id and t2.hos_id=t1.hos_id and t2.copy_code=t1.copy_code
+			and t2.ass_type_id=t1.ass_type_id
+			<if test="ass_nature == '02'">
+			and (t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR}  )
+			</if>
+			<if test="ass_nature == '04'">
+			and (t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR} ') 
+			</if>
+			<if test="ass_nature != '02' and ass_nature != '04'">
+			and t2.ass_naturs = #{ass_nature,jdbcType=VARCHAR}
+			</if>
+			)
+			</if>
+		<if test="ass_type_id != null and ass_type_id != ''">
+		and t1.ass_type_id=#{ass_type_id,jdbcType=VARCHAR}
+		</if>
+		) t1
+		
+		  
+		</select>
+</mapper>
+

@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.acc.dao.accreconciliation.AccReconciliationByAssMapper">
+ 
+	<select id="queryAccReconciliationByAss" resultType="java.util.Map" parameterType="java.util.Map">
+		with a_table as (
+        select asj.subj_code, asj.subj_name_all,atd.ass_naturs, sum(avd.debit) as debit
+          , sum(avd.credit) as credit, atd.ass_type_id, atd.ass_type_code
+          , atd.ass_type_name, asj.subj_dire
+        from acc_vouch_detail avd
+        left join acc_vouch av on av.vouch_id = avd.vouch_id
+        and avd.group_id = av.group_id
+        and avd.hos_id = av.hos_id
+        and avd.copy_code = av.copy_code 
+        inner join acc_subj asj on avd.group_id = asj.group_id
+        and avd.hos_id = asj.hos_id
+        and avd.copy_code = asj.copy_code
+        and avd.acc_year = asj.acc_year
+        and avd.subj_code = asj.subj_code 
+        inner join acc_busi_map abm on abm.group_id = asj.group_id
+        and abm.hos_id = asj.hos_id
+        and abm.copy_code = asj.copy_code
+        and abm.subj_code = asj.subj_code
+        and abm.acc_year = asj.acc_year
+        and abm.meta_code in ('0501','0511' )
+          inner join ASS_TYPE_DICT atd on abm.sub_type_id = to_char(atd.ASS_TYPE_ID)
+        and abm.group_id = atd.group_id
+        and abm.hos_id = atd.hos_id
+        and abm.copy_code = atd.copy_code 
+        where avd.group_id = #{group_id,jdbcType=INTEGER}
+          and avd.hos_id = #{hos_id,jdbcType=INTEGER}
+          and avd.copy_code = #{copy_code,jdbcType=VARCHAR}
+          and avd.acc_year = #{acc_year}
+          and av.acc_month = #{acc_month}
+          <if test="ass_naturs != null and ass_naturs != ''">
+			and atd.ass_naturs = #{ass_naturs,jdbcType=VARCHAR}
+		  </if>
+        group by asj.subj_code, asj.subj_name_all,atd.ass_naturs, atd.ass_type_id, atd.ass_type_code, atd.ass_type_name, asj.subj_dire
+      ), 
+      b_table as (
+        select a.ass_type_id,d.ass_naturs,a.is_flag
+          ,sum(nvl(a.begin_money, 0)) as begin_money
+          ,sum(nvl(a.add_money, 0)) as in_money
+          ,sum(nvl(a.dec_money, 0)) as out_money
+          ,sum(nvl(a.end_money, 0)) as end_money
+        from Ass_Collect_Main a
+         left join ass_type_dict d on a.group_id = d.group_id
+          and a.hos_id = d.hos_id
+          and a.copy_code = d.copy_code
+          and a.ass_type_id = d.ass_type_id
+          and d.is_stop = 0
+          and d.is_last = 1 
+          where a.group_id = #{group_id,jdbcType=INTEGER}
+            and a.hos_id = #{hos_id,jdbcType=INTEGER}
+            and a.copy_code = #{copy_code,jdbcType=VARCHAR}
+            and (a.acc_year || a.acc_month) = (#{acc_year} || #{acc_month})
+            <if test="ass_naturs != null and ass_naturs != ''">
+			and d.ass_naturs = #{ass_naturs,jdbcType=VARCHAR}
+		   </if>
+          group by a.ass_type_id,d.ass_naturs,a.is_flag
+      ), 
+      c_table as (
+        select asj.subj_code, asj.subj_name_all,atd.ass_naturs, sum(avd.debit) as debit
+          , sum(avd.credit) as credit, atd.Ass_type_id
+        from acc_vouch_detail avd
+        left join acc_vouch av on av.vouch_id = avd.vouch_id
+        and avd.group_id = av.group_id
+        and avd.hos_id = av.hos_id
+        and avd.copy_code = av.copy_code 
+        inner join acc_subj asj on avd.group_id = asj.group_id
+        and avd.hos_id = asj.hos_id
+        and avd.copy_code = asj.copy_code
+        and avd.acc_year = asj.acc_year
+        and avd.subj_code = asj.subj_code 
+        inner join acc_busi_map abm on abm.group_id = asj.group_id
+        and abm.hos_id = asj.hos_id
+        and abm.copy_code = asj.copy_code
+        and abm.acc_year = asj.acc_year
+        and abm.subj_code = asj.subj_code
+        and abm.meta_code in ('0501','0511' ) 
+          inner join ASS_TYPE_DICT atd on abm.sub_type_id = to_char(atd.Ass_TYPE_ID)
+        and abm.group_id = atd.group_id
+        and abm.hos_id = atd.hos_id
+        and abm.copy_code = atd.copy_code 
+        where avd.group_id = #{group_id,jdbcType=INTEGER}
+          and avd.hos_id = #{hos_id,jdbcType=INTEGER}
+          and avd.copy_code = #{copy_code,jdbcType=VARCHAR}
+          and avd.acc_year = #{acc_year}
+          and av.acc_year = #{acc_year}
+          and av.acc_month between '01' and #{acc_month}
+          <if test="ass_naturs != null and ass_naturs != ''">
+			and atd.ass_naturs = #{ass_naturs,jdbcType=VARCHAR}
+		  </if>
+        group by asj.subj_code, asj.subj_name_all,atd.ass_naturs, atd.ass_type_id
+      )
+    select a.subj_code, a.subj_name_all,a.ass_naturs,an.naturs_name, a.subj_dire
+      , case 
+        when a.subj_dire = 0 then al.bal_os + c.debit - c.credit
+        else al.bal_os - c.debit + c.credit
+      end as acc_bal
+      ,sum(b.begin_money) as ass_bal
+      , a.debit, a.credit, sum(b.in_money) as in_money
+      , sum(b.out_money) as out_money
+      , case 
+        when a.subj_dire = 0 then al.bal_os + c.debit - c.credit + a.debit - a.credit
+        else al.bal_os - c.debit + c.credit - a.debit + a.credit
+      end as acc_end
+      ,sum(b.end_money) as ass_end
+      , to_char(wm_concat(DISTINCT a.ass_type_name)) as ass_type_name
+    from a_table a
+    left join b_table b on a.ass_type_id = b.ass_type_id 
+    left join c_table c on a.subj_code = c.subj_code
+    and a.ass_type_id = c.ass_type_id 
+   
+    left join acc_leder al on a.subj_code = al.subj_code
+    and al.acc_year = #{acc_year}
+    and al.acc_month = '00' 
+    left join ass_naturs an on a.ass_naturs=an.naturs_code
+    group by a.subj_code, a.subj_name_all,a.ass_naturs,an.naturs_name, a.debit, a.credit, c.debit, c.credit, al.bal_os, a.subj_dire
+ 
+	</select>
+
+</mapper>
+

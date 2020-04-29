@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.acc.dao.termend.monthend.AccCostExtractMapper">
+
+	<resultMap id="accCostExtractMapperDeptCost" type="java.util.Map">
+		<result property="dept_id" column="dept_id" />
+		<result property="dept_no" column="dept_no" />
+		<result property="dept_money" column="dept_money" />
+	</resultMap>
+	
+	<select id="addAccCostExtractVouch" statementType="CALLABLE" parameterType="java.util.Map" resultType="String"> 
+		<![CDATA[
+			{call acc_monthend_costextract(#{group_id,jdbcType=INTEGER}, #{hos_id,jdbcType=INTEGER}, 
+				#{copy_code,jdbcType=VARCHAR}, #{user_id,jdbcType=INTEGER}, #{acc_year,jdbcType=VARCHAR}, 
+				#{acc_month,jdbcType=VARCHAR}, #{template_id,jdbcType=INTEGER}, #{vouch_id,jdbcType=INTEGER}, 
+				#{vouch_no,jdbcType=VARCHAR}, #{msg, mode=OUT, jdbcType=VARCHAR})}
+		]]>
+	</select>
+	
+	<!-- 获取支出科目的总金额 -->
+	<select id="querySumCostSubjMoneyByType" parameterType="java.util.Map" resultType="java.lang.Double"> 
+		select nvl(sum(nvl(b.debit, 0)), 0) money_sum
+		from acc_vouch a
+		left join acc_vouch_detail b
+			on a.group_id = b.group_id and a.hos_id = b.hos_id
+			and a.copy_code = b.copy_code and a.vouch_id = b.vouch_id
+		join (
+			select a.subj_code from acc_termend_template_detail a
+			join acc_subj b
+				on a.group_id = b.group_id and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code and a.subj_code = b.subj_code
+			where a.group_id = #{group_id,jdbcType=INTEGER} 
+				and a.hos_id = #{hos_id,jdbcType=INTEGER} 
+				and a.copy_code = #{copy_code,jdbcType=VARCHAR}  
+				and b.acc_year = #{acc_year,jdbcType=VARCHAR}
+				and a.template_id = #{template_id,jdbcType=INTEGER}
+				<if test="subj_type_code != null and subj_type_code != ''">
+					and b.subj_code like '${subj_type_code}%' 
+				</if>
+		) c
+			on  b.subj_code = c.subj_code
+		where a.group_id = #{group_id,jdbcType=INTEGER} 
+			and a.hos_id = #{hos_id,jdbcType=INTEGER} 
+			and a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			and a.acc_year = #{acc_year,jdbcType=VARCHAR}
+			and a.acc_month = #{acc_month,jdbcType=VARCHAR}
+			and a.state = 99
+	</select>
+	
+	<!-- 获取支出科目的部门辅助核算金额 -->
+	<select id="queryDeptCostMoneyByType" parameterType="java.util.Map" resultMap="accCostExtractMapperDeptCost"> 
+		select c.${checkColumn}_id, c.${checkColumn}_no, 
+			c.${checkColumn}_id||'@'||c.${checkColumn}_no as ${checkColumn}, 
+			d.dept_code||' '||d.dept_name ${checkColumn}_name, sum(nvl(c.debit, 0)) dept_money
+		from acc_vouch a
+		left join acc_vouch_detail b
+			on a.group_id = b.group_id and a.hos_id = b.hos_id
+			and a.copy_code = b.copy_code and a.vouch_id = b.vouch_id
+		left join acc_vouch_check c
+			on b.group_id = c.group_id and b.hos_id = c.hos_id
+			and b.copy_code = c.copy_code and b.vouch_detail_id = c.vouch_detail_id
+		left join hos_dept_dict d
+			on a.group_id = d.group_id and a.hos_id = d.hos_id
+			and c.${checkColumn}_id = d.dept_id and c.${checkColumn}_no = d.dept_no 
+		join (
+			select a.subj_code from acc_termend_template_detail a
+			join acc_subj b
+				on a.group_id = b.group_id and a.hos_id = b.hos_id
+				and a.copy_code = b.copy_code and a.subj_code = b.subj_code
+			where a.group_id = #{group_id,jdbcType=INTEGER} 
+				and a.hos_id = #{hos_id,jdbcType=INTEGER} 
+				and a.copy_code = #{copy_code,jdbcType=VARCHAR}  
+				and b.acc_year = #{acc_year,jdbcType=VARCHAR}
+				and a.template_id = #{template_id,jdbcType=INTEGER}
+				<if test="subj_type_code != null and subj_type_code != ''">
+					and b.subj_code like '${subj_type_code}%' 
+				</if>
+		) e
+			on  b.subj_code = e.subj_code
+		where a.group_id = #{group_id,jdbcType=INTEGER} 
+			and a.hos_id = #{hos_id,jdbcType=INTEGER} 
+			and a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			and a.acc_year = #{acc_year,jdbcType=VARCHAR}
+			and a.acc_month = #{acc_month,jdbcType=VARCHAR}
+			and a.state = 99
+		group by c.${checkColumn}_id, c.${checkColumn}_no, d.dept_code, d.dept_name
+	</select>
+</mapper>
+

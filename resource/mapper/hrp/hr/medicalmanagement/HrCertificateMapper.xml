@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.hr.dao.medicalmanagement.HrCertificateMapper">
+	<resultMap id="hrCert" type="com.chd.hrp.hr.entity.medicalmanagement.HrCertificate">
+	<result property="group_id" column="group_id"/>
+	<result property="hos_id" column="hos_id"/>
+	<result property="cert_code" column="cert_code"/>
+	<result property="cert_name" column="cert_name"/>
+	<result property="begin_date" column="begin_date"/>
+	<result property="end_date" column="end_date"/>
+	<result property="inva_day" column="inva_day"/>
+	<result property="state" column="state"/>
+	
+	</resultMap>
+
+	<select id="queryHrCertSeq"  resultType="java.lang.Long" useCache="false" flushCache="true">
+		SELECT HR_Cert_SEQ.nextval  FROM DUAL
+	</select>
+
+	<insert id="add" useGeneratedKeys="true" >
+	
+		INSERT INTO HR_CERT  (
+		<trim suffix="" suffixOverrides=",">
+		group_id,
+		hos_id,
+		cert_code,
+		cert_name,
+		begin_date,
+		end_date
+		</trim>
+		) VALUES (
+		<trim suffix="" suffixOverrides=",">
+		#{group_id,jdbcType=INTEGER},
+		#{hos_id,jdbcType=INTEGER},
+		#{cert_code,jdbcType=VARCHAR},
+		#{cert_name,jdbcType=VARCHAR},
+		#{begin_date,jdbcType=DATE},
+		#{end_date,jdbcType=DATE}
+	    
+		</trim>		
+		)
+	
+	</insert>
+	
+	<update id="update" parameterType="java.util.Map">
+	
+		UPDATE HR_CERT 
+		<trim prefix="SET"  suffixOverrides=","> 
+		
+		begin_date = #{begin_date,jdbcType=DATE},
+		end_date = #{end_date,jdbcType=DATE},
+		
+		</trim>
+		<where>                     
+		AND group_id = #{group_id,jdbcType=INTEGER}
+		AND hos_id = #{hos_id,jdbcType=INTEGER}
+		AND cert_name = #{cert_name,jdbcType=VARCHAR}
+		
+		</where>  
+	</update>
+	
+	<insert id="addBatch" parameterType="java.util.List" >
+	
+		INSERT INTO HR_CERT (
+		group_id,
+		hos_id,
+		cert_code,
+		cert_name,
+		begin_date,
+		end_date
+		) (
+		<foreach collection="list" item="item" index="index" separator=" union all " >
+			select 		
+			#{item.group_id,jdbcType=INTEGER},
+			#{item.hos_id,jdbcType=INTEGER},
+			 #{item.cert_code,jdbcType=VARCHAR},
+			 #{item.cert_name,jdbcType=VARCHAR},
+			 #{item.begin_date,jdbcType=DATE},
+			#{item.end_date,jdbcType=DATE}
+			
+		    from dual
+		</foreach>
+		)
+	</insert>
+	
+	<select id="query" parameterType="java.util.Map" resultMap="hrCert" >
+	select c.group_id,c.hos_id,c.cert_code,c.cert_name,c.begin_date,c.end_date,
+ 	NVL(ROUND(TO_NUMBER(c.end_date - to_date(#{mDate}, 'YYYY-MM-DD'))), 0) as inva_day,
+ 	case 
+        when NVL(ROUND(TO_NUMBER(c.end_date - to_date(#{mDate}, 'YYYY-MM-DD'))), 0) &lt; 0 then '过期'
+        when NVL(ROUND(TO_NUMBER(c.end_date - to_date(#{mDate}, 'YYYY-MM-DD'))), 0) = 0 then '到期'
+        when NVL(ROUND(TO_NUMBER(c.end_date - to_date(#{mDate}, 'YYYY-MM-DD'))), 0) &lt; 60 then '临近'
+        else '安全'
+      end as state
+ from hr_cert c
+		<where>                     
+		<if test="group_id != null and group_id != ''">
+		AND c.group_id = #{group_id,jdbcType=INTEGER}
+		</if>
+		<if test="hos_id != null and hos_id != ''">
+		AND c.hos_id = #{hos_id,jdbcType=INTEGER}
+		</if>
+		<if test="cert_name != null and cert_name != ''">
+		
+		AND c.cert_name like '%${cert_name}%'
+		</if>
+		<if test="begin_date != null and begin_date != ''">
+		AND c.begin_date &gt;= to_date(#{begin_date},'YYYY-MM-DD')
+		</if>
+		<if test="end_date != null and end_date != ''">
+		AND c.end_date &lt;= to_date(#{end_date},'YYYY-MM-DD')
+		</if>
+		<if test="state == 1">
+		AND	NVL(ROUND(TO_NUMBER(c.end_date - to_date(#{mDate}, 'YYYY-MM-DD'))), 0) &lt; 60 
+		</if>
+		<if test="state == 2">
+		AND NVL(ROUND(TO_NUMBER(c.end_date - to_date(#{mDate}, 'YYYY-MM-DD'))), 0) = 0 
+		</if>
+		<if test="state == 3">
+		AND NVL(ROUND(TO_NUMBER(c.end_date - to_date(#{mDate}, 'YYYY-MM-DD'))), 0) &lt; 0 
+		</if>
+		
+		</where>   
+		order by c.cert_code ASC
+	</select>
+	
+	<select id="queryByCode" resultMap="hrCert"  parameterType="java.util.Map" >
+	
+		SELECT 
+		group_id,
+		hos_id,
+		cert_code,
+		cert_name,
+		begin_date,
+		end_date
+		FROM hr_cert 
+		WHERE 
+		group_id = #{group_id,jdbcType=INTEGER}   and 
+		hos_id = #{hos_id,jdbcType=INTEGER}   and 
+		<!-- cert_code = #{cert_code,jdbcType=VARCHAR}   and  -->
+		cert_name = #{cert_name,jdbcType=VARCHAR} 
+	
+	</select>
+	
+		<select id="queryByCodeCount" resultType="Integer"  parameterType="java.util.Map" >
+	
+		SELECT 
+		count(*) from hr_cert
+		WHERE 
+		group_id = #{group_id,jdbcType=INTEGER}   and 
+		hos_id = #{hos_id,jdbcType=INTEGER}    
+		<!-- <if test="cert_code != null and cert_code != ''">
+		AND cert_code = #{cert_code,jdbcType=VARCHAR}
+		</if> -->
+		<if test="cert_name != null and cert_name != ''">
+		AND cert_name = #{cert_name,jdbcType=VARCHAR}
+		</if>
+	
+	</select>
+	
+  <select id="queryByCodeNO" resultType="java.lang.String" parameterType="java.util.Map" >
+	
+		SELECT 
+		max(cert_code) 
+		from hr_cert
+		WHERE 
+		group_id = #{group_id,jdbcType=INTEGER}   and 
+		hos_id = #{hos_id,jdbcType=INTEGER}   
+		
+	
+	</select>
+	<delete id="deleteCertificate" parameterType="java.util.List">
+		DELETE FROM hr_cert 
+		<where>
+				<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+				 group_id = #{map.group_id,jdbcType=INTEGER}
+				AND hos_id = #{map.hos_id,jdbcType=INTEGER}
+				
+				AND cert_code = #{item.cert_code,jdbcType=VARCHAR}
+				
+				<if test="item.cert_name != null and item.cert_name != ''">
+				AND cert_name = #{item.cert_name,jdbcType=VARCHAR}
+				</if>
+				
+			</foreach>
+	    </where>  
+	</delete>
+	
+
+		<select id="queryCertificateByPrint" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT 
+    	group_id,
+		hos_id,
+		cert_code,
+		cert_name,
+		begin_date,
+		end_date
+    		FROM hr_cert
+		<where>                     
+		<if test="group_id != null and group_id != ''">
+		AND group_id = #{group_id,jdbcType=INTEGER}
+		</if>
+		<if test="hos_id != null and hos_id != ''">
+		AND hos_id = #{hos_id,jdbcType=INTEGER}
+		</if>
+		
+		</where>   
+		order by cert_code asc
+		</select>
+		
+		<insert id="addBatchImport" parameterType="java.util.List" >
+	
+		INSERT INTO HR_CERT  (
+		group_id,
+		hos_id,
+		cert_code,
+		cert_name,
+		begin_date,
+		end_date
+		) (
+		<foreach collection="list" item="item" index="index" separator=" union all " >
+			select 		
+			#{item.group_id,jdbcType=INTEGER},
+			#{item.hos_id,jdbcType=INTEGER},
+			#{item.cert_code,jdbcType=VARCHAR},
+		    #{item.cert_name,jdbcType=VARCHAR},
+		 to_date(#{item.begin_date,jdbcType=DATE},'yyyy-MM-dd'),
+	    to_date( #{item.end_date,jdbcType=DATE},'yyyy-MM-dd')
+		    from dual
+		</foreach>
+		)
+	</insert>
+	
+	
+</mapper>

@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.mat.dao.account.report.MatAccountReportReducedBudgMapper">
+	
+	<resultMap id="reducedBudg" type="java.util.Map">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="year" column="year"/>
+		<result property="month" column="month"/>
+		<result property="mat_type_code" column="mat_type_code"/>
+		<result property="mat_type_name" column="mat_type_name"/>
+		<result property="pur_budg" column="pur_budg"/>
+		<result property="amount_money" column="amount_money"/>
+	</resultMap>
+	
+	<!-- 预算降本报表 -->
+	<select id="queryReducedBudg" resultMap="reducedBudg" parameterType="java.util.Map">
+		with mat_temp as (
+					select 	mid.group_id,
+		           			mid.hos_id,
+		           			aym.acc_year year,
+		           			aym.acc_month month,
+		                    mid.copy_code,
+		                    mtd.mat_type_code,
+		                    mtd.mat_type_code || ' ' || mtd.mat_type_name mat_type_name,
+		                    sum(mid.amount_money) amount_money
+		               from mat_in_detail mid
+		               left join mat_in_main mim
+		                 on mid.group_id = mim.group_id
+		                and mid.hos_id = mim.hos_id
+		                and mid.copy_code = mim.copy_code
+		                and mid.in_id = mim.in_id
+		                and mid.in_no = mim.in_no
+		               left join mat_inv_dict minvd
+		                 on mid.group_id = minvd.group_id
+		                and mid.hos_id = minvd.hos_id
+		                and mid.copy_code = minvd.copy_code
+		                and mid.inv_id = minvd.inv_id
+		                and mid.inv_no = minvd.inv_no
+		               left join mat_type_dict mtd
+		                 on minvd.group_id = mtd.group_id
+		                and minvd.hos_id = mtd.hos_id
+		                and minvd.copy_code = mtd.copy_code
+		                and minvd.mat_type_id = mtd.mat_type_id
+		                and minvd.mat_type_no = mtd.mat_type_no
+		               left join acc_year_month aym
+					     on to_date(to_char(mim.confirm_date, 'yyyy-MM-dd'), 'yyyy-MM-dd') between aym.begin_date and aym.end_date
+					    and mim.group_id = aym.group_id
+					    and mim.hos_id = aym.hos_id
+					    and mim.copy_code = aym.copy_code  
+		               <where>
+		               	mim.bus_type_code in (2, 12, 27, 29, 47, 48)
+		               	and mim.state = 3
+			          	<if test="group_id != null and group_id != ''">
+			          		and mid.group_id = #{group_id, jdbcType=INTEGER}
+			          	</if>
+			          	<if test="hos_id != null and hos_id !='' ">
+							and mid.hos_id = #{hos_id,jdbcType=INTEGER}
+						</if>
+						<if test="copy_code != null and copy_code !='' ">
+							and mid.copy_code = #{copy_code,jdbcType=VARCHAR}
+						</if>
+						<if test="begin_year != null and begin_year != ''">
+							and aym.acc_year = #{begin_year, jdbcType=VARCHAR}
+						</if>
+						<if test="begin_month != null and begin_month != ''">
+							and aym.acc_month = #{begin_month, jdbcType=VARCHAR}
+						</if>
+						<if test="mat_type_code != null and mat_type_code != ''">
+							and mtd.mat_type_code like '${mat_type_code}%'
+						</if>
+			          </where> 
+		              group by mid.group_id,
+		                       mid.hos_id,
+		                       aym.acc_year,
+		           			   aym.acc_month,
+		                       mid.copy_code,
+		                       mtd.mat_type_code,
+		                       mtd.mat_type_name
+		), data_temp as (
+			select nvl(budg.group_id, mat.group_id) group_id,
+			       nvl(budg.hos_id, mat.hos_id) hos_id,
+			       nvl(budg.copy_code, mat.copy_code) copy_code,
+			       nvl(budg.year, mat.year) year,
+			       nvl(budg.month, mat.month) month,
+			       nvl(budg.mat_type_code, mat.mat_type_code) mat_type_code,
+			       nvl(budg.mat_type_name, mat.mat_type_name) mat_type_name, 
+			       nvl(budg.pur_budg, 0) pur_budg,
+			       nvl(mat.amount_money, 0) amount_money
+			  from (select bmp.group_id,
+			               bmp.hos_id,
+			               bmp.copy_code,
+			               bmp.year,
+			               bmp.month,
+			               mtd.mat_type_id,
+	       				   mtd.mat_type_no,
+			               mtd.mat_type_code,
+			               mtd.mat_type_code || ' ' || mtd.mat_type_name mat_type_name,
+			               bmp.pur_budg
+			          from budg_mat_pur bmp
+			          left join mat_type_dict mtd
+			            on bmp.group_id = mtd.group_id
+			           and bmp.hos_id = mtd.hos_id
+			           and bmp.copy_code = mtd.copy_code
+			           and bmp.mat_type_id = mtd.mat_type_id
+			          <where>
+			          	<if test="group_id != null and group_id != ''">
+			          		and bmp.group_id = #{group_id, jdbcType=INTEGER}
+			          	</if>
+			          	<if test="hos_id != null and hos_id !='' ">
+							and bmp.hos_id = #{hos_id, jdbcType=INTEGER}
+						</if>
+						<if test="copy_code != null and copy_code !='' ">
+							and bmp.copy_code = #{copy_code, jdbcType=VARCHAR}
+						</if>
+						<if test="begin_year != null and begin_year != ''">
+							and bmp.year = #{begin_year, jdbcType=VARCHAR}
+						</if>
+						<if test="begin_month != null and begin_month != ''">
+							and bmp.month = #{begin_month, jdbcType=VARCHAR}
+						</if>
+						<if test="mat_type_code != null and mat_type_code != ''">
+							and exists (
+								select 1 from mat_type_dict 
+                         	     where group_id=#{group_id, jdbcType=INTEGER} 
+                                   and hos_id = #{hos_id,jdbcType=INTEGER}
+                                   and copy_code = #{copy_code,jdbcType=VARCHAR}
+                                   and mat_type_code = #{mat_type_code,jdbcType=VARCHAR}
+                                   and (( mat_type_dict.type_level &lt; mtd.type_level and mtd.mat_type_code like #{mat_type_code,jdbcType=VARCHAR} ||'%' ) or
+                                   ( mat_type_dict.type_level &gt;= mtd.type_level and #{mat_type_code,jdbcType=VARCHAR} like mtd.mat_type_code ||'%' ) 
+                                  )
+                            	)
+						</if>
+							
+			          </where> ) budg
+			  full join mat_temp mat
+			  <!-- (
+			  				select t.group_id,
+							       t.hos_id,
+							       t.copy_code,
+							       t.year,
+							       t.month,
+							       mtd.mat_type_id,
+	       						   mtd.mat_type_no,
+							       mtd.mat_type_code,
+							       mtd.mat_type_code || ' ' || mtd.mat_type_name as mat_type_name,
+							       sum(t.amount_money) amount_money
+							  from mat_type_dict mtd
+							  left join mat_temp t
+							    on t.mat_type_code like mtd.mat_type_code || '%'
+							   and t.group_id = mtd.group_id
+	   						   and t.hos_id = mtd.hos_id
+	   						   and t.copy_code = mtd.copy_code 
+							 where t.amount_money &gt; 0
+							 	and mtd.is_stop = 0
+							 	<if test="mat_type_code != null and mat_type_code != ''">
+									and mtd.mat_type_code &gt;= #{mat_type_code, jdbcType=VARCHAR}
+								</if>
+							 group by t.group_id,
+							          t.hos_id,
+							          t.copy_code,
+							          t.year,
+							          t.month,
+							          mtd.mat_type_id,
+	       							  mtd.mat_type_no,
+							          mtd.mat_type_code,
+							          mtd.mat_type_name) mat -->
+			    on budg.group_id = mat.group_id
+			   and budg.hos_id = mat.hos_id
+			   and budg.copy_code = mat.copy_code
+			   and budg.year = mat.year
+			   and budg.month = mat.month
+			   and mat.mat_type_code like budg.mat_type_code || '%'
+			   <!-- 
+			   and mat.mat_type_id = budg.mat_type_id
+			   and mat.mat_type_no = budg.mat_type_no
+			   order by budg.mat_type_code, mat.mat_type_code
+			   -->
+		)
+		select 	group_id,
+				hos_id,
+				copy_code,
+			   	year,
+			   	month,
+			   	mat_type_code,
+			  	mat_type_name, 
+			  	pur_budg,
+			   	sum(amount_money) amount_money
+		from data_temp
+		group by group_id,
+				hos_id,
+				copy_code,
+			   	year,
+			   	month,
+			   	mat_type_code,
+			  	mat_type_name, 
+			  	pur_budg	
+		order by mat_type_code		  		   	
+	</select>
+</mapper>
+

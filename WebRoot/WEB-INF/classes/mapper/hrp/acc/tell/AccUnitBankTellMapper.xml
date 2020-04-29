@@ -1,0 +1,813 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.acc.dao.tell.AccUnitBankTellMapper">
+	<resultMap  id="accUnitBankTell" type="com.chd.hrp.acc.entity.AccUnitBankTell">
+		<result property="vouch_date" column="vouch_date"/>
+		<result property="vouch_no" column="vouch_no"/>
+		<result property="summary" column="summary"/>
+		<result property="pay_name" column="pay_name"/>
+		<result property="check_no" column="check_no"/>
+		<result property="debit" column="debit"/>
+		<result property="credit" column="credit"/> 
+		<result property="bal" column="bal"/> 
+		<result property="is_check" column="is_check"/>
+	</resultMap>
+	
+	 
+	<select id="queryAccUnitBankTell" parameterType="java.util.Map" resultMap="accUnitBankTell">
+		with a_table as(
+			select '' as vouch_date,
+			       '' as vouch_no,
+			       '期初余额' as summary,
+			       '' as pay_name,
+			       '' as check_no,
+			       0 as debit,
+			       0 as credit,
+			       nvl(l.end_os,0)+nvl(t.bal,0) as bal,
+			       '' as is_check
+			from acc_leder l, (select nvl(sum(avc.debit),0) - nvl(sum(avc.credit),0) as bal 
+				               from acc_vouch_check avc
+				               left join acc_vouch v 
+				                      on avc.group_id = v.group_id 
+				                     and avc.hos_id = v.hos_id 
+					                 and avc.copy_code = v.copy_code 
+					                 and avc.acc_year = v.acc_year 
+					                 and avc.vouch_id = v.vouch_id
+				               where avc.group_id = #{group_id} 
+				                 and avc.hos_id = #{hos_id} 
+				                 and avc.copy_code = #{copy_code} 
+					             and avc.subj_code = #{subj_code} 
+					             and v.vouch_date &lt; to_date(#{begin_date}, 'yyyy/MM/dd')) t
+			where l.group_id=#{group_id} 
+			  and l.hos_id=#{hos_id} 
+			  and l.copy_code=#{copy_code} 
+			  and l.acc_year=#{acc_year} 
+			  and l.acc_month='00'
+			  and l.subj_code = #{subj_code}
+		),
+ 
+		b_table as(
+			select b1.vouch_check_id,
+			       b1.vouch_date,
+			       b1.vouch_no,
+			       b1.summary,
+			       b1.pay_name,
+			       b1.check_no,
+			       b1.debit,
+			       b1.credit,
+			       b2.bal + sum(b1.debit - b1.credit) over (order by b1.vouch_date, b1.vouch_no, b1.vouch_check_id) as bal,
+			       b1.is_check
+			from (
+			select DISTINCT avc.vouch_check_id,
+				   to_char(av.vouch_date,'yyyy-MM-dd') as vouch_date,
+				   av.vouch_no,avc.summary,
+				   apt.pay_name,
+				   avc.check_no,
+				   nvl(avc.debit,0) as debit,
+				   nvl(avc.credit,0) as credit,
+				   case when abv.vouch_check_id is not null then '是' else  '否' end is_check
+			from acc_vouch_check avc
+			left join acc_vouch av 
+				    on avc.group_id = av.group_id 
+				   and avc.hos_id = av.hos_id
+				   and avc.copy_code = av.copy_code 
+				   and avc.acc_year = av.acc_year 
+				   and avc.vouch_id = av.vouch_id
+			left join acc_pay_type apt 
+				   on avc.group_id = apt.group_id 
+				  and avc.hos_id = apt.hos_id 
+				  and avc.copy_code = apt.copy_code
+				  and avc.pay_type_code = apt.pay_code
+			left join ACC_BANK_VERI abv 
+				   on avc.group_id = abv.group_id 
+				  and avc.hos_id = abv.hos_id
+				  and avc.copy_code = abv.copy_code 
+				  and avc.VOUCH_CHECK_ID = abv.VOUCH_CHECK_ID
+				  and avc.vouch_id = abv.vouch_id
+			<where>
+				<if test="group_id !=null and group_id !=''">
+					AND avc.group_id= #{group_id}
+				</if>
+				<if test="hos_id !=null and hos_id !='' ">
+					AND avc.hos_id = #{hos_id}
+				</if>
+				<if test="copy_code != null and copy_code!=''">
+					AND avc.copy_code = #{copy_code}
+				</if>
+				<if test="begin_date !=null and begin_date!='' and end_date !=null and end_date != ''">
+				    and av.vouch_date between to_date(#{begin_date}, 'yyyy/MM/dd') 
+				    and to_date(#{end_date}, 'yyyy/MM/dd')
+				</if>
+				<if test="subj_code != null and subj_code !='' ">
+					and avc.subj_code=#{subj_code}
+				</if>
+				<if test="vouch_no != null and vouch_no !='' ">
+					and av.vouch_no  like  '%'||#{vouch_no}||'%'
+				</if>
+				<if test="check_no != null and check_no !='' ">
+					and avc.check_no  like '%'||#{check_no}||'%'
+				</if>
+				<if test="pay_code != null and pay_code !='' ">
+					and apt.pay_code = #{pay_code}
+				</if>
+				<if test="isY_check != null and isY_check !='' ">
+				    and CASE WHEN abv.vouch_check_id IS NOT NULL THEN 1 ELSE 0 end = #{isY_check}
+				</if>
+				<if test="isN_check != null and isN_check !='' ">
+					and CASE WHEN abv.vouch_check_id IS NOT NULL THEN 1 ELSE 0 end = #{isN_check}
+				</if>
+				<if test="state != null and state !=''">
+					and av.state>=#{state}
+				</if>
+			</where>  
+			) b1, (select l.end_os + t.bal as bal 
+			      from acc_leder l, (select nvl(sum(avc.debit), 0) - nvl(sum(avc.credit), 0) as bal 
+			                         from acc_vouch_check avc
+						             left join acc_vouch v 
+						                    on avc.group_id = v.group_id 
+						                   and avc.hos_id = v.hos_id 
+						                   and avc.copy_code = v.copy_code 
+						                   and avc.acc_year = v.acc_year 
+						                   and avc.vouch_id = v.vouch_id
+						             where avc.group_id = #{group_id} 
+						               and avc.hos_id = #{hos_id} 
+						               and avc.copy_code = #{copy_code} 
+						               and avc.subj_code = #{subj_code} 
+						               and v.vouch_date &lt; to_date(#{begin_date}, 'yyyy/MM/dd')) t
+				  where l.group_id = #{group_id} 
+				    and l.hos_id = #{hos_id}
+				    and l.copy_code = #{copy_code} 
+				    and l.acc_year = #{acc_year} 
+				    and l.acc_month='00'
+				    and l.subj_code = #{subj_code}) b2
+			order by b1.vouch_date, b1.vouch_no, b1.vouch_check_id
+		),
+			 
+		c_table as(
+			select '' as vouch_date,
+				   '' as vouch_no,
+				   '合计' as summary,
+				   '' as pay_name,
+				   '' as check_no,
+				   nvl(sum(c.debit), 0) as debit,
+				   nvl(sum(c.credit),0) as credit,
+				   0 as bal,
+				   1 as create_user,
+				   '' as is_check
+			from (
+			select DISTINCT avc.vouch_check_id,
+				   avc.debit,
+				   avc.credit
+			from acc_vouch_check avc
+			left join acc_vouch av 
+				   on avc.group_id = av.group_id 
+				  and avc.hos_id = av.hos_id
+				  and avc.copy_code = av.copy_code 
+				  and avc.acc_year = av.acc_year 
+				  and avc.vouch_id = av.vouch_id
+			left join ACC_BANK_VERI abv 
+			       on avc.group_id = abv.group_id
+                  and avc.hos_id = abv.hos_id
+                  and avc.copy_code = abv.copy_code
+                  and avc.VOUCH_CHECK_ID = abv.VOUCH_CHECK_ID
+                  and avc.vouch_id = abv.vouch_id 
+				<where>
+					<if test="group_id != null and group_id != '' ">
+						  AND avc.group_id =#{group_id}
+					</if>
+					<if test="hos_id != null and hos_id != '' ">
+						  AND avc.hos_id =#{hos_id}
+					</if>
+					<if test="copy_code != null and copy_code !='' ">
+						  AND avc.copy_code = #{copy_code}
+					</if>
+					<if test="acc_year != null and acc_year != ''">
+						  AND avc.acc_year = #{acc_year}
+					</if>
+					<if test="subj_code != null and subj_code !='' ">
+						  AND avc.subj_code = #{subj_code}
+					</if>
+					<if test="state != null and state !=''">
+						and av.state>=#{state}
+					</if>
+					<if test="isY_check != null and isY_check !='' ">
+				    and CASE WHEN abv.vouch_check_id IS NOT NULL THEN 1 ELSE 0 end = #{isY_check}
+				</if>
+				<if test="isN_check != null and isN_check !='' ">
+					and CASE WHEN abv.vouch_check_id IS NOT NULL THEN 1 ELSE 0 end = #{isN_check}
+				</if>
+					<if test="begin_date !=null and begin_date!='' and end_date !=null and end_date != ''">
+				 
+				   and av.vouch_date between to_date(#{begin_date}, 'yyyy/MM/dd') and to_date(#{end_date}, 'yyyy/MM/dd')
+				</if>
+				</where>
+			) c
+			
+			)select * from(
+					select 
+						'' as vouch_date,
+						'' as vouch_no,
+						a.summary,
+						'' as pay_name,
+						'' as check_no,
+						0 as debit,
+						0 as credit,
+						a.bal,
+						'' as is_check 
+					from a_table a
+				
+				union all
+					select 
+						b.vouch_date,
+						b.vouch_no,
+						b.summary,
+						b.pay_name,
+						b.check_no,
+						b.debit,
+						b.credit,
+						b.bal,
+						b.is_check 
+					from b_table b
+				
+				union all 
+				
+					select 
+						c.vouch_date,
+						c.vouch_no,
+						c.summary,
+						c.pay_name,
+						c.check_no,
+						nvl(c.debit,0),
+						nvl(c.credit,0),
+						c.bal,
+						c.is_check 
+					from c_table c
+			)	
+		
+		
+	</select>
+	
+	<select id="queryAccUnitBankTellByTell" parameterType="java.util.Map" resultMap="accUnitBankTell">
+		with a_table as (
+		    select null as vouch_date, 
+		           null as vouch_no, 
+		           '期初余额' as summary, 
+		           null as pay_name, 
+		           null as check_no,
+		           0 as debit, 
+		           0 as credit,
+		           nvl(l.end_os, 0) + nvl(t.bal, 0) as bal,
+		           null as is_check
+		    from acc_leder l, (select nvl(sum(act.debit), 0) - nvl(sum(act.credit), 0) as bal
+					           from acc_tell act
+					           where act.group_id = #{group_id}
+						         and act.hos_id = #{hos_id}
+						         and act.copy_code = #{copy_code} 
+						         and act.cash_subj_code = #{subj_code}
+						         and act.acc_year = #{acc_year}
+						         and act.occur_date &lt; to_date(#{begin_date}, 'yyyy/MM/dd')
+						         and act.is_init = '0') t
+		    where l.group_id = #{group_id}
+		      and l.hos_id = #{hos_id}
+		      and l.copy_code = #{copy_code} 
+		      and l.acc_year = #{acc_year}
+		      and l.acc_month = '00'
+		      and l.subj_code =  #{subj_code}
+		  ), 
+		      
+		  b_table as (
+		      select b1.tell_id,
+		             b1.vouch_date,
+		             b1.vouch_no,
+		             b1.summary,
+		             b1.pay_name,
+		             b1.check_no,
+		             b1.debit,
+		             b1.credit,
+		             b2.bal + sum(b1.debit - b1.credit) over (order by b1.vouch_date, b1.vouch_no, b1.tell_id) as bal,
+		             b1.is_check
+		      from (
+		      select DISTINCT avc.tell_id,
+		             to_char(avc.occur_date, 'yyyy-MM-dd') as vouch_date, 
+		             att.tell_type_name || '-' || av.vouch_no as vouch_no, 
+		             avc.summary,
+		             apt.pay_name, 
+		             avc.check_no, 
+		             nvl(avc.debit, 0) as debit,
+		             nvl(avc.credit, 0) as credit,
+		             case when abv.vouch_check_id is not null then '是' else '否' end as is_check
+		      from acc_tell avc
+		    left join acc_vouch av 
+		           on avc.group_id = av.group_id
+			      and avc.hos_id = av.hos_id
+			      and avc.copy_code = av.copy_code
+			      and avc.acc_year = av.acc_year
+			      and avc.vouch_id = av.vouch_id 
+		    left join acc_tell_type att 
+		           on av.group_id = att.group_id
+		          and av.hos_id = att.hos_id 
+		          and av.copy_code = att.copy_code
+		          and avc.tell_type_code = att.tell_type_code
+		    left join acc_pay_type apt 
+		           on avc.group_id = apt.group_id
+			      and avc.hos_id = apt.hos_id
+			      and avc.copy_code = apt.copy_code
+			      and avc.pay_type_code = apt.pay_code 
+		    left join ACC_BANK_VERI abv 
+		           on avc.group_id = abv.group_id
+			      and avc.hos_id = abv.hos_id
+			      and avc.copy_code = abv.copy_code
+			      and avc.tell_id = abv.tell_id
+			      and avc.vouch_id = abv.vouch_id 
+		    <where>
+				<if test="group_id !=null and group_id !=''">
+					AND avc.group_id= #{group_id}
+				</if>
+				<if test="hos_id !=null and hos_id !='' ">
+					AND avc.hos_id = #{hos_id}
+				</if>
+				<if test="copy_code != null and copy_code!=''">
+					AND avc.copy_code = #{copy_code}
+				</if>
+				<if test="begin_date !=null and begin_date!='' and end_date !=null and end_date != ''">
+				    and avc.occur_date between to_date(#{begin_date}, 'yyyy/MM/dd') and to_date(#{end_date}, 'yyyy/MM/dd')
+				</if>
+				<if test="subj_code != null and subj_code !='' ">
+					and avc.cash_subj_code=#{subj_code}
+				</if>
+				<if test="vouch_no != null and vouch_no !='' ">
+					and av.vouch_no  like  '%'||#{vouch_no}||'%'
+				</if>
+				<if test="check_no != null and check_no !='' ">
+					and avc.check_no  like '%'||#{check_no}||'%'
+				</if>
+				<if test="pay_code != null and pay_code !='' ">
+					and apt.pay_code = #{pay_code}
+				</if>
+				<if test="isY_check != null and isY_check !='' ">
+				    and CASE WHEN abv.vouch_check_id IS NOT NULL THEN 1 ELSE 0 end = #{isY_check}
+				</if>
+				<if test="isN_check != null and isN_check !='' ">
+					and CASE WHEN abv.vouch_check_id IS NOT NULL THEN 1 ELSE 0 end = #{isN_check}
+				</if>
+				<if test="state != null and state !=''">
+					and av.state>=#{state}
+				</if> 
+			</where>  
+			) b1, (select l.end_os + t.bal as bal
+		            from acc_leder l, (select nvl(sum(at0.debit), 0) - nvl(sum(at0.credit), 0) as bal
+		                               from acc_tell at0
+		                               where at0.group_id = #{group_id}
+		                                 and at0.hos_id = #{hos_id}
+		                                 and at0.copy_code = #{copy_code} 
+		                                 and at0.cash_subj_code = #{subj_code}
+		                                 and at0.occur_date  &lt; to_date(#{begin_date}, 'yyyy/MM/dd')
+		                                 and at0.acc_year = #{acc_year}
+		                                 and at0.is_init = '0') t
+		            where l.group_id = #{group_id}
+		              and l.hos_id =  #{hos_id}
+		              and l.copy_code = #{copy_code} 
+		              and l.acc_year = #{acc_year}
+		              and l.acc_month = '00'
+		              and l.subj_code = #{subj_code}) b2
+			order by b1.vouch_date, b1.vouch_no, b1.tell_id
+		  ), 
+		  c_table as (
+		    select null as vouch_date,
+		           null as vouch_no,
+		           '合计' as summary,
+		           null as pay_name,
+		           null as check_no,
+		           nvl(sum(c.debit), 0) as debit,
+		           nvl(sum(c.credit), 0) as credit,
+		           0 as bal,
+		           1 as create_user,
+		           null as is_check
+		    from (
+		    select DISTINCT avc.tell_id,
+		    	   avc.debit,
+		           avc.credit
+		    from acc_tell avc
+		    left join acc_vouch av on avc.group_id = av.group_id
+			    and avc.hos_id = av.hos_id
+			    and avc.copy_code = av.copy_code
+			    and avc.acc_year = av.acc_year
+			    and avc.vouch_id = av.vouch_id 
+			left join ACC_BANK_VERI abv on avc.group_id = abv.group_id
+			    and avc.hos_id = abv.hos_id
+			    and avc.copy_code = abv.copy_code
+			    and avc.tell_id = abv.tell_id
+			    and avc.vouch_id = abv.vouch_id 
+		    <where>
+					<if test="group_id != null and group_id != '' ">
+						  AND avc.group_id =#{group_id}
+					</if>
+					<if test="hos_id != null and hos_id != '' ">
+						  AND avc.hos_id =#{hos_id}
+					</if>
+					<if test="copy_code != null and copy_code !='' ">
+						  AND avc.copy_code = #{copy_code}
+					</if>
+					<if test="acc_year != null and acc_year != ''">
+						  AND avc.acc_year = #{acc_year}
+					</if>
+					<if test="subj_code != null and subj_code !='' ">
+						  AND avc.cash_subj_code = #{subj_code}
+					</if>
+					<if test="state != null and state !=''">
+						and av.state>=#{state}
+					</if>
+					<if test="begin_date !=null and begin_date!='' and end_date !=null and end_date != ''">
+					    and avc.occur_date between to_date(#{begin_date}, 'yyyy/MM/dd') and to_date(#{end_date}, 'yyyy/MM/dd')
+					</if>
+					<if test="isY_check != null and isY_check !='' ">
+					    and CASE WHEN abv.vouch_check_id IS NOT NULL THEN 1 ELSE 0 end = #{isY_check}
+					</if>
+					<if test="isN_check != null and isN_check !='' ">
+						and CASE WHEN abv.vouch_check_id IS NOT NULL THEN 1 ELSE 0 end = #{isN_check}
+					</if>
+				</where>
+				) c
+		  )
+		select  * 
+		from (
+		  select null as vouch_date, null as vouch_no, a.summary, null as pay_name, null as check_no, 0 as debit, 0 as credit, a.bal, null as is_check
+		  from a_table a
+		  union all
+		  select b.vouch_date, b.vouch_no, b.summary, b.pay_name, b.check_no, b.debit, b.credit, b.bal, b.is_check
+		  from b_table b
+		  union all
+		  select c.vouch_date, c.vouch_no, c.summary, c.pay_name, c.check_no, nvl(c.debit, 0), nvl(c.credit, 0), c.bal, c.is_check
+		  from c_table c
+		)
+	</select>
+	
+	<select id="queryAccUnitBankTellPrint" parameterType="java.util.Map" resultType="java.util.Map">
+	<!-- 
+		with a_table as(
+			期初余额
+			select 
+			'' as vouch_date,
+			'' as vouch_no,
+			'期初余额' as summary,
+			'' as pay_name,
+			'' as check_no,
+			0 as debit,
+			0 as credit,
+			nvl(l.end_os,0)+nvl(t.bal,0) as bal,
+			'' as is_check
+			from acc_leder l ,(
+				select nvl(sum(avc.debit),0)-nvl(sum(avc.credit),0) as bal 
+				from acc_vouch_check avc
+				left join acc_vouch v on avc.group_id = v.group_id and avc.hos_id = v.hos_id 
+							  and avc.copy_code= v.copy_code and avc.acc_year = v.acc_year and avc.vouch_check_id = v.vouch_id
+						      where avc.group_id = #{group_id} and avc.hos_id = #{hos_id} and avc.copy_code = #{copy_code} 
+						      and avc.acc_year = #{acc_year} and avc.subj_code = #{subj_code} and v.acc_month&lt;#{acc_month}) 
+						    t
+			where l.group_id=#{group_id} and  l.hos_id=#{hos_id} and l.copy_code=#{copy_code} and l.acc_year=#{acc_year} and l.acc_month='00'
+			and subj_code = #{subj_code}
+			),
+			每日发生数据
+			b_table as(
+			select to_char(av.vouch_date,'yyyy-MM-dd') as vouch_date,
+				av.vouch_no,avc.summary,
+				apt.pay_name,
+				avc.check_no,
+				nvl(avc.debit,0) as debit,
+				nvl(avc.credit,0) as credit,
+				t.bal+sum(debit-credit) over(order by avc.vouch_check_id) as bal,
+				(case when abv.vouch_check_id  is not null then '是' else  '否' end) is_check
+			from (select l.end_os+t.bal as bal from acc_leder l ,
+						(select nvl(sum(avc.debit),0)-nvl(sum(avc.credit),0) as bal from acc_vouch_check avc
+						left join acc_vouch v on avc.group_id = v.group_id and avc.hos_id = v.hos_id 
+						and avc.copy_code= v.copy_code and avc.acc_year = v.acc_year and avc.vouch_check_id = v.vouch_id
+						where avc.group_id = #{group_id} and avc.hos_id = #{hos_id} and avc.copy_code =#{copy_code} 
+						and avc.acc_year = #{acc_year} and avc.subj_code = #{subj_code} and v.acc_month&lt;#{acc_month}) 
+				t
+				  where l.group_id=#{group_id} and  l.hos_id=#{hos_id}
+				  and l.copy_code=#{copy_code} and l.acc_year=#{acc_year} and l.acc_month='00'
+				  and l.subj_code = #{subj_code}) t,acc_vouch_check avc
+			inner join  acc_vouch av 
+				on avc.group_id = av.group_id and avc.hos_id = av.hos_id
+				and avc.copy_code = av.copy_code and avc.acc_year = av.acc_year and avc.vouch_id = av.vouch_id
+			left join acc_pay_type apt 
+				on avc.group_id = apt.group_id and avc.hos_id = apt.hos_id and avc.copy_code = apt.copy_code
+				and avc.pay_type_code = apt.pay_code
+			left join ACC_BANK_VERI abv 
+				on avc.group_id = abv.group_id and avc.hos_id = abv.hos_id
+				and avc.copy_code = abv.copy_code and avc.VOUCH_CHECK_ID=abv.VOUCH_CHECK_ID
+				and avc.vouch_id = abv.vouch_id
+			<where>
+				<if test="group_id !=null and group_id !=''">
+					AND avc.group_id= #{group_id}
+				</if>
+				<if test="hos_id !=null and hos_id !='' ">
+					AND avc.hos_id = #{hos_id}
+				</if>
+				<if test="copy_code != null and copy_code!=''">
+					AND avc.copy_code = #{copy_code}
+				</if>
+				<if test="begin_date !=null and begin_date!='' and end_date !=null and end_date != ''">
+					AND av.vouch_date between to_date(#{begin_date},'yyyy/MM') and to_date(#{end_date},'yyyy/MM')
+				and  av.acc_year || av.acc_month BETWEEN #{begin_date} AND #{end_date}
+				</if>
+				<if test="subj_code != null and subj_code !='' ">
+					and avc.subj_code=#{subj_code}
+				</if>
+				<if test="vouch_no != null and vouch_no !='' ">
+					and av.vouch_no  like  '%'||#{vouch_no}||'%'
+				</if>
+				<if test="check_no != null and check_no !='' ">
+					and avc.check_no  like '%'||#{check_no}||'%'
+				</if>
+				<if test="pay_code != null and pay_code !='' ">
+					and apt.pay_code = #{pay_code}
+				</if>
+				
+				<if test="isY_check != null and isY_check !='' ">
+				    and CASE WHEN abv.vouch_check_id IS NOT NULL THEN 1 ELSE 0 end = #{isY_check}
+				</if>
+				<if test="isN_check != null and isN_check !='' ">
+					and CASE WHEN abv.vouch_check_id IS NOT NULL THEN 1 ELSE 0 end = #{isN_check}
+				</if>
+				<if test="state != null and state !=''">
+					and av.state>=#{state}
+				</if>
+				order by vouch_date
+			</where>  
+			),
+			合计
+			c_table as(
+			
+			select 
+				'' as vouch_date,
+				'' as vouch_no,
+				'合计' as summary,
+				'' as pay_name,
+				'' as check_no,
+				nvl(sum(avc.debit),0)debit,
+				nvl(sum(avc.credit),0) as credit,
+				0 as bal,
+				1 as create_user,
+				'' as is_check  
+			from acc_vouch_check avc
+			left join  acc_vouch av 
+				on avc.group_id = av.group_id and avc.hos_id = av.hos_id
+				and avc.copy_code = av.copy_code and avc.acc_year = av.acc_year and avc.vouch_id = av.vouch_id
+				<where>
+					<if test="group_id != null and group_id != '' ">
+						  AND avc.group_id =#{group_id}
+					</if>
+					<if test="hos_id != null and hos_id != '' ">
+						  AND avc.hos_id =#{hos_id}
+					</if>
+					<if test="copy_code != null and copy_code !='' ">
+						  AND avc.copy_code = #{copy_code}
+					</if>
+					<if test="acc_year != null and acc_year != ''">
+						  AND avc.acc_year = #{acc_year}
+					</if>
+					<if test="subj_code != null and subj_code !='' ">
+						  AND avc.subj_code = #{subj_code}
+					</if>
+					<if test="state != null and state !=''">
+						and av.state>=#{state}
+					</if>
+				</where>
+			)select * from(
+					select 
+						'' as vouch_date,
+						'' as vouch_no,
+						a.summary,
+						'' as pay_name,
+						'' as check_no,
+						0 as debit,
+						0 as credit,
+						a.bal,
+						'' as is_check 
+					from a_table a
+				
+				union all
+					select 
+						b.vouch_date,
+						b.vouch_no,
+						b.summary,
+						b.pay_name,
+						b.check_no,
+						b.debit,
+						b.credit,
+						b.bal,
+						b.is_check 
+					from b_table b
+				
+				union all 
+				
+					select 
+						c.vouch_date,
+						c.vouch_no,
+						c.summary,
+						c.pay_name,
+						c.check_no,
+						nvl(c.debit,0),
+						nvl(c.credit,0),
+						c.bal,
+						c.is_check 
+					from c_table c
+			)	
+		 -->
+		 
+		with a_table as (
+		    select null as vouch_date, 
+		           null as vouch_no, 
+		           '期初余额' as summary, 
+		           null as pay_name, 
+		           null as check_no,
+		           0 as debit, 
+		           0 as credit,
+		           nvl(l.end_os, 0) + nvl(t.bal, 0) as bal,
+		           null as is_check
+		    from acc_leder l, (select nvl(sum(act.debit), 0) - nvl(sum(act.credit), 0) as bal
+					           from acc_tell act
+					           where act.group_id = #{group_id}
+						         and act.hos_id = #{hos_id}
+						         and act.copy_code = #{copy_code} 
+						         and act.cash_subj_code = #{subj_code}
+						         and act.acc_year = #{acc_year}
+						         and act.occur_date &lt; to_date(#{begin_date}, 'yyyy/MM/dd')
+						         and act.is_init = '0') t
+		    where l.group_id = #{group_id}
+		      and l.hos_id = #{hos_id}
+		      and l.copy_code = #{copy_code} 
+		      and l.acc_year = #{acc_year}
+		      and l.acc_month = '00'
+		      and l.subj_code =  #{subj_code}
+		  ), 
+		      
+		  b_table as (
+		      select b1.tell_id,
+		             b1.vouch_date,
+		             b1.vouch_no,
+		             b1.summary,
+		             b1.pay_name,
+		             b1.check_no,
+		             b1.debit,
+		             b1.credit,
+		             b2.bal + sum(b1.debit - b1.credit) over (order by b1.vouch_date, b1.vouch_no, b1.tell_id) as bal,
+		             b1.is_check
+		      from (
+		      select DISTINCT avc.tell_id,
+		             to_char(avc.occur_date, 'yyyy-MM-dd') as vouch_date, 
+		             att.tell_type_name || '-' || av.vouch_no as vouch_no, 
+		             avc.summary,
+		             apt.pay_name, 
+		             avc.check_no, 
+		             nvl(avc.debit, 0) as debit,
+		             nvl(avc.credit, 0) as credit,
+		             case when abv.vouch_check_id is not null then '是' else '否' end as is_check
+		      from acc_tell avc
+		    left join acc_vouch av 
+		           on avc.group_id = av.group_id
+			      and avc.hos_id = av.hos_id
+			      and avc.copy_code = av.copy_code
+			      and avc.acc_year = av.acc_year
+			      and avc.vouch_id = av.vouch_id 
+		    left join acc_tell_type att 
+		           on av.group_id = att.group_id
+		          and av.hos_id = att.hos_id 
+		          and av.copy_code = att.copy_code
+		          and avc.tell_type_code = att.tell_type_code
+		    left join acc_pay_type apt 
+		           on avc.group_id = apt.group_id
+			      and avc.hos_id = apt.hos_id
+			      and avc.copy_code = apt.copy_code
+			      and avc.pay_type_code = apt.pay_code 
+		    left join ACC_BANK_VERI abv 
+		           on avc.group_id = abv.group_id
+			      and avc.hos_id = abv.hos_id
+			      and avc.copy_code = abv.copy_code
+			      and avc.tell_id = abv.tell_id
+			      and avc.vouch_id = abv.vouch_id 
+		    <where>
+				<if test="group_id !=null and group_id !=''">
+					AND avc.group_id= #{group_id}
+				</if>
+				<if test="hos_id !=null and hos_id !='' ">
+					AND avc.hos_id = #{hos_id}
+				</if>
+				<if test="copy_code != null and copy_code!=''">
+					AND avc.copy_code = #{copy_code}
+				</if>
+				<if test="begin_date !=null and begin_date!='' and end_date !=null and end_date != ''">
+				    and avc.occur_date between to_date(#{begin_date}, 'yyyy/MM/dd') and to_date(#{end_date}, 'yyyy/MM/dd')
+				</if>
+				<if test="subj_code != null and subj_code !='' ">
+					and avc.cash_subj_code=#{subj_code}
+				</if>
+				<if test="vouch_no != null and vouch_no !='' ">
+					and av.vouch_no  like  '%'||#{vouch_no}||'%'
+				</if>
+				<if test="check_no != null and check_no !='' ">
+					and avc.check_no  like '%'||#{check_no}||'%'
+				</if>
+				<if test="pay_code != null and pay_code !='' ">
+					and apt.pay_code = #{pay_code}
+				</if>
+				<if test="isY_check != null and isY_check !='' ">
+				    and CASE WHEN abv.vouch_check_id IS NOT NULL THEN 1 ELSE 0 end = #{isY_check}
+				</if>
+				<if test="isN_check != null and isN_check !='' ">
+					and CASE WHEN abv.vouch_check_id IS NOT NULL THEN 1 ELSE 0 end = #{isN_check}
+				</if>
+				<if test="state != null and state !=''">
+					and av.state>=#{state}
+				</if> 
+			</where>  
+			) b1, (select l.end_os + t.bal as bal
+		            from acc_leder l, (select nvl(sum(at0.debit), 0) - nvl(sum(at0.credit), 0) as bal
+		                               from acc_tell at0
+		                               where at0.group_id = #{group_id}
+		                                 and at0.hos_id = #{hos_id}
+		                                 and at0.copy_code = #{copy_code} 
+		                                 and at0.cash_subj_code = #{subj_code}
+		                                 and at0.occur_date  &lt; to_date(#{begin_date}, 'yyyy/MM/dd')
+		                                 and at0.acc_year = #{acc_year}
+		                                 and at0.is_init = '0') t
+		            where l.group_id = #{group_id}
+		              and l.hos_id =  #{hos_id}
+		              and l.copy_code = #{copy_code} 
+		              and l.acc_year = #{acc_year}
+		              and l.acc_month = '00'
+		              and l.subj_code = #{subj_code}) b2
+			order by b1.vouch_date, b1.vouch_no, b1.tell_id
+		  ), 
+		  c_table as (
+		    select null as vouch_date,
+		           null as vouch_no,
+		           '合计' as summary,
+		           null as pay_name,
+		           null as check_no,
+		           nvl(sum(c.debit), 0) as debit,
+		           nvl(sum(c.credit), 0) as credit,
+		           0 as bal,
+		           1 as create_user,
+		           null as is_check
+		    from (
+		    select DISTINCT avc.tell_id,
+		    	   avc.debit,
+		           avc.credit
+		    from acc_tell avc
+		    left join acc_vouch av on avc.group_id = av.group_id
+			    and avc.hos_id = av.hos_id
+			    and avc.copy_code = av.copy_code
+			    and avc.acc_year = av.acc_year
+			    and avc.vouch_id = av.vouch_id 
+			left join ACC_BANK_VERI abv on avc.group_id = abv.group_id
+			    and avc.hos_id = abv.hos_id
+			    and avc.copy_code = abv.copy_code
+			    and avc.tell_id = abv.tell_id
+			    and avc.vouch_id = abv.vouch_id 
+		    <where>
+					<if test="group_id != null and group_id != '' ">
+						  AND avc.group_id =#{group_id}
+					</if>
+					<if test="hos_id != null and hos_id != '' ">
+						  AND avc.hos_id =#{hos_id}
+					</if>
+					<if test="copy_code != null and copy_code !='' ">
+						  AND avc.copy_code = #{copy_code}
+					</if>
+					<if test="acc_year != null and acc_year != ''">
+						  AND avc.acc_year = #{acc_year}
+					</if>
+					<if test="subj_code != null and subj_code !='' ">
+						  AND avc.cash_subj_code = #{subj_code}
+					</if>
+					<if test="state != null and state !=''">
+						and av.state>=#{state}
+					</if>
+					<if test="begin_date !=null and begin_date!='' and end_date !=null and end_date != ''">
+					    and avc.occur_date between to_date(#{begin_date}, 'yyyy/MM/dd') and to_date(#{end_date}, 'yyyy/MM/dd')
+					</if>
+					<if test="isY_check != null and isY_check !='' ">
+					    and CASE WHEN abv.vouch_check_id IS NOT NULL THEN 1 ELSE 0 end = #{isY_check}
+					</if>
+					<if test="isN_check != null and isN_check !='' ">
+						and CASE WHEN abv.vouch_check_id IS NOT NULL THEN 1 ELSE 0 end = #{isN_check}
+					</if>
+				</where>
+				) c
+		  )
+		select  * 
+		from (
+		  select null as vouch_date, null as vouch_no, a.summary, null as pay_name, null as check_no, 0 as debit, 0 as credit, a.bal, null as is_check
+		  from a_table a
+		  union all
+		  select b.vouch_date, b.vouch_no, b.summary, b.pay_name, b.check_no, b.debit, b.credit, b.bal, b.is_check
+		  from b_table b
+		  union all
+		  select c.vouch_date, c.vouch_no, c.summary, c.pay_name, c.check_no, nvl(c.debit, 0), nvl(c.credit, 0), c.bal, c.is_check
+		  from c_table c
+		)
+	</select>
+</mapper>
+

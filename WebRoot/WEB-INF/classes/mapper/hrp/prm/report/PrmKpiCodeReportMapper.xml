@@ -1,0 +1,481 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.prm.dao.report.PrmKpiCodeReportMapper">
+
+	<select id="queryPrmKpiCodeReportGrid" parameterType="java.util.Map" resultType="java.util.Map">
+	
+	 <!-- with tmp_pdks as
+ (select pdks.group_id,
+         pdks.hos_id,
+         pdks.copy_code,
+         pdks.goal_code,
+         pdks.kpi_code,
+         pkl.kpi_name,
+         pdks.acc_year,
+         pdks.dept_id,
+         pdks.dept_no,
+         pdd.dept_code,
+         pdd.dept_name,
+         pdks.acc_month,
+         case when pkl.unit_code = '72'then round(pdks.kpi_value, 2) * 100 else round(pdks.kpi_value, 2) end as kpi_value,
+         pkl.nature_code
+    from PRM_DEPT_KPI_VALUE pdks
+    left join prm_dept_dict pdd
+      on pdks.group_id = pdd.group_id
+     and pdks.hos_id = pdd.hos_id
+     and pdks.dept_id = pdd.dept_id
+     and pdks.dept_no = pdd.dept_no
+      left join PRM_KPI_LIB pkl
+   on pdks.group_id = pkl.group_id
+   and pdks.hos_id = pkl.hos_id
+   and pdks.copy_code = pkl.copy_code
+   and pdks.kpi_code = pkl.kpi_code
+     <where>                     
+			<if test="group_id != null and group_id != ''">
+				AND pdks.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND pdks.hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				AND pdks.copy_code = #{copy_code}
+			</if>
+			<if test="acc_year != null and acc_year != ''">
+				AND pdks.acc_year = #{acc_year}
+			</if>
+			<if test="goal_code != null and goal_code != ''">
+				AND pdks.goal_code = #{goal_code}
+			</if>
+			<if test="kpi_code != null and kpi_code != ''">
+				AND pdks.kpi_code = #{kpi_code}
+			</if>
+			<if test="dept_id != null and dept_id != ''">
+				AND pdks.dept_id = #{dept_id}
+			</if>
+			<if test="dept_no != null and dept_no != ''">
+				AND pdks.dept_no = #{dept_no}
+			</if>
+			<if test="dept_kind_code != null and dept_kind_code != ''">
+				AND pdd.dept_kind_code = #{dept_kind_code}
+			</if>
+			<if test="start_year_month != null and start_year_month != ''">
+				and pdks.acc_year||pdks.acc_month between #{start_year_month} and #{end_year_month}
+			</if>
+			<if test="sql != null and sql != ''">
+				${sql}
+			</if>
+		</where>
+     
+     ),
+
+pdks as (select 
+         tmp_pdks.group_id,
+         tmp_pdks.hos_id,
+         tmp_pdks.copy_code,
+         tmp_pdks.goal_code,
+         tmp_pdks.kpi_code,
+         tmp_pdks.kpi_name,
+         tmp_pdks.acc_year,
+         tmp_pdks.dept_id,
+         tmp_pdks.dept_no,
+         tmp_pdks.dept_code,
+         tmp_pdks.dept_name,
+         tmp_pdks.acc_month,
+         pds.goal_value,tmp_pdks.nature_code,
+         pds.ratio * tmp_pdks.kpi_value as kpi_value,
+       (select pl.led_path
+          from prm_dept_kpi_led t
+          left join prm_led pl
+            on t.group_id = pl.group_id
+           and t.hos_id = pl.hos_id
+           and t.copy_code = pl.copy_code
+           and t.sec_code = pl.sec_code
+        <where>                     
+			<if test="group_id != null and group_id != ''">
+				AND t.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND t.hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				AND t.copy_code = #{copy_code}
+			</if>
+			<if test="acc_year != null and acc_year != ''">
+				AND t.acc_year = #{acc_year}
+			</if>
+			<if test="goal_code != null and goal_code != ''">
+				AND t.goal_code = #{goal_code}
+			</if>
+			<if test="kpi_code != null and kpi_code != ''">
+				AND t.kpi_code = #{kpi_code}
+			</if>
+			<if test="dept_id != null and dept_id != ''">
+				AND t.dept_id = #{dept_id}
+			</if>
+			<if test="dept_no != null and dept_no != ''">
+				AND t.dept_no = #{dept_no}
+			</if>
+			
+			
+		</where>
+           and (       ( t.sec_code = (
+                                      select min(sec_code)
+                                      from prm_dept_kpi_led
+                                      where tmp_pdks.group_id = group_id
+                                        and tmp_pdks.hos_id = hos_id
+                                        and tmp_pdks.copy_code = copy_code
+                                        and tmp_pdks.dept_id = dept_id
+                                        and tmp_pdks.dept_no = dept_no
+                                        and tmp_pdks.goal_code = goal_code
+                                        and tmp_pdks.kpi_code = kpi_code
+                                        and tmp_pdks.acc_year = acc_year
+                                        and tmp_pdks.acc_month = acc_month
+                                      )
+                        and (tmp_pdks.kpi_value &lt; t.kpi_end_score
+                          or tmp_pdks.kpi_value = 0
+                          and tmp_pdks.kpi_value = t.kpi_end_score)
+                        )
+            or    (t.sec_code = (
+                              select max(sec_code)
+                              from prm_dept_kpi_led
+                              where tmp_pdks.group_id = group_id
+                                and tmp_pdks.hos_id = hos_id
+                                and tmp_pdks.copy_code = copy_code
+                                and tmp_pdks.dept_id = dept_id
+                                and tmp_pdks.dept_no = dept_no
+                                and tmp_pdks.goal_code = goal_code
+                                and tmp_pdks.kpi_code = kpi_code
+                                and tmp_pdks.acc_year = acc_year
+                                and tmp_pdks.acc_month = acc_month
+                              )
+                              and tmp_pdks.kpi_value &gt;= t.kpi_beg_score
+                  )
+           or    (t.sec_code &gt; (
+                                  select min(sec_code)
+                                  from prm_dept_kpi_led
+                                  where tmp_pdks.group_id = group_id
+                                    and tmp_pdks.hos_id = hos_id
+                                    and tmp_pdks.copy_code = copy_code
+                                    and tmp_pdks.dept_id = dept_id
+                                    and tmp_pdks.dept_no = dept_no
+                                    and tmp_pdks.goal_code = goal_code
+                                    and tmp_pdks.kpi_code = kpi_code
+                                    and tmp_pdks.acc_year = acc_year
+                                    and tmp_pdks.acc_month = acc_month
+                                  )
+                    and t.sec_code &lt; (
+                      select max(sec_code)
+                      from prm_dept_kpi_led
+                      where tmp_pdks.group_id = group_id
+                        and tmp_pdks.hos_id = hos_id
+                        and tmp_pdks.copy_code = copy_code
+                        and tmp_pdks.dept_id = dept_id
+                        and tmp_pdks.dept_no = dept_no
+                        and tmp_pdks.goal_code = goal_code
+                        and tmp_pdks.kpi_code = kpi_code
+                        and tmp_pdks.acc_year = acc_year
+                        and tmp_pdks.acc_month = acc_month
+                      )
+                  and (tmp_pdks.kpi_value &gt;= t.kpi_beg_score
+                    and tmp_pdks.kpi_value &lt; t.kpi_end_score
+                    or t.kpi_beg_score = t.kpi_end_score
+                    and tmp_pdks.kpi_value = t.kpi_beg_score)
+               )
+        )
+           and tmp_pdks.group_id = t.group_id
+           and tmp_pdks.hos_id = t.hos_id
+           and tmp_pdks.copy_code = t.copy_code
+           and tmp_pdks.dept_id = t.dept_id
+           and tmp_pdks.dept_no = t.dept_no
+           and tmp_pdks.goal_code = t.goal_code
+           and tmp_pdks.kpi_code = t.kpi_code
+           and tmp_pdks.acc_year = t.acc_year
+           and tmp_pdks.acc_month = t.acc_month) as led_path
+
+  from tmp_pdks 
+  left join prm_dept_scheme pds on 
+         tmp_pdks.group_id = pds.group_id and
+         tmp_pdks.hos_id = pds.hos_id and 
+         tmp_pdks.copy_code = pds.copy_code and
+         tmp_pdks.goal_code = pds.group_id and
+         tmp_pdks.kpi_code = pds.kpi_code and
+         tmp_pdks.acc_year = pds.acc_year and
+         tmp_pdks.dept_id = pds.dept_id and
+         tmp_pdks.dept_no = pds.dept_no and
+         tmp_pdks.acc_month = pds.acc_month
+  )
+  
+  select 
+         pdks.kpi_code, pdks.kpi_name,
+         ${sqlCase}
+		 pdks.nature_code,
+		 count (case when pdks.led_path = 'prmLedImage/红卡.png' then pdks.led_path end) as count_led
+  from pdks 
+  group by pdks.kpi_code, pdks.kpi_name,pdks.nature_code -->
+	
+		<!-- with score_tmp as (
+		     select pdks.group_id,pdks.hos_id,pdks.copy_code,pdks.acc_year,pdks.acc_month,pdks.dept_id,pdks.dept_no,pdks.goal_code,
+		            pdks.kpi_code,pdks.kpi_level, pdks.kpi_score,pdks.sec_code
+		     from PRM_DEPT_KPI_SCORE pdks
+		     left join prm_dept_scheme pds on pdks.group_id = pds.group_id
+		        and pdks.hos_id = pds.hos_id and pdks.copy_code = pds.copy_code and pdks.acc_year = pds.acc_year
+		        and pdks.acc_month = pds.acc_month and pdks.goal_code = pds.goal_code
+		        and pdks.kpi_code = pds.kpi_code and pdks.dept_id = pds.dept_id
+		     left join prm_dept_dict pdd on pdks.group_id = pdd.group_id
+     			and pdks.hos_id = pdd.hos_id
+     			and pdks.dept_id = pdd.dept_id
+     			and pdks.dept_no = pdd.dept_no
+		     <where>
+		     	<if test="group_id != null and group_id != ''">
+					AND pdks.group_id = #{group_id}
+				</if>
+				<if test="hos_id != null and hos_id != ''">
+					AND pdks.hos_id = #{hos_id}
+				</if>
+				<if test="copy_code != null and copy_code != ''">
+					AND pdks.copy_code = #{copy_code}
+				</if>
+				<if test="acc_year != null and acc_year != ''">
+					AND pdks.acc_year = #{acc_year}
+				</if>
+				<if test="goal_code != null and goal_code != ''">
+					AND pdks.goal_code = #{goal_code}
+				</if>
+				<if test="kpi_code != null and kpi_code != ''">
+					AND pdks.kpi_code = #{kpi_code}
+				</if>
+				<if test="dept_id != null and dept_id != ''">
+					AND pdks.dept_id = #{dept_id}
+				</if>
+				<if test="dept_no != null and dept_no != ''">
+					AND pdks.dept_no = #{dept_no}
+				</if>
+				<if test="dept_kind_code != null and dept_kind_code != ''">
+					AND pdd.dept_kind_code = #{dept_kind_code}
+				</if>
+				<if test="start_year_month != null and start_year_month != ''">
+					and pdks.acc_year||pdks.acc_month between #{start_year_month} and #{end_year_month}
+				</if>
+				<if test="sql != null and sql != ''">
+					${sql}
+				</if>
+		     </where>
+		),value_tmp as (
+		      select  pdkv.group_id,pdkv.hos_id,pdkv.copy_code,pdkv.acc_year,pdkv.acc_month,pdkv.dept_id,pdkv.dept_no,
+                  pdkv.goal_code,pdkv.kpi_code,pdkv.goal_value
+          	  from prm_dept_scheme pdkv
+		      <where>
+		      	<if test="group_id != null and group_id != ''">
+					AND pdkv.group_id = #{group_id}
+				</if>
+				<if test="hos_id != null and hos_id != ''">
+					AND pdkv.hos_id = #{hos_id}
+				</if>
+				<if test="copy_code != null and copy_code != ''">
+					AND pdkv.copy_code = #{copy_code}
+				</if>
+				<if test="acc_year != null and acc_year != ''">
+					AND pdkv.acc_year = #{acc_year}
+				</if>
+				<if test="goal_code != null and goal_code != ''">
+					AND pdkv.goal_code = #{goal_code}
+				</if>
+				<if test="kpi_code != null and kpi_code != ''">
+					AND pdkv.kpi_code = #{kpi_code}
+				</if>
+				<if test="dept_id != null and dept_id != ''">
+					AND pdkv.dept_id = #{dept_id}
+				</if>
+				<if test="dept_no != null and dept_no != ''">
+					AND pdkv.dept_no = #{dept_no}
+				</if>
+				<if test="start_year_month != null and start_year_month != ''">
+					and pdkv.acc_year||pdkv.acc_month between #{start_year_month} and #{end_year_month}
+				</if>
+		      </where>
+		),led_tmp as (
+		       select pdkl.hos_id, pdkl.group_id, pdkl.copy_code, pdkl.acc_year, pdkl.acc_month, pdkl.goal_code, pdkl.dept_id, pdkl.dept_no, 
+		               pdkl.kpi_code,pdkl.sec_code , pd.led_path
+		      from prm_dept_kpi_led pdkl
+		      left join PRM_LED pd on pdkl.hos_id = pd.hos_id
+		           and pdkl.group_id = pd.group_id
+		           and pdkl.copy_code = pd.copy_code
+		           and pdkl.sec_code = pd.sec_code 
+		      <where>
+		      	<if test="group_id != null and group_id != ''">
+					AND pdkl.group_id = #{group_id}
+				</if>
+				<if test="hos_id != null and hos_id != ''">
+					AND pdkl.hos_id = #{hos_id}
+				</if>
+				<if test="copy_code != null and copy_code != ''">
+					AND pdkl.copy_code = #{copy_code}
+				</if>
+				<if test="acc_year != null and acc_year != ''">
+					AND pdkl.acc_year = #{acc_year}
+				</if>
+				<if test="goal_code != null and goal_code != ''">
+					AND pdkl.goal_code = #{goal_code}
+				</if>
+				<if test="kpi_code != null and kpi_code != ''">
+					AND pdkl.kpi_code = #{kpi_code}
+				</if>
+				<if test="dept_id != null and dept_id != ''">
+					AND pdkl.dept_id = #{dept_id}
+				</if>
+				<if test="dept_no != null and dept_no != ''">
+					AND pdkl.dept_no = #{dept_no}
+				</if>
+				<if test="start_year_month != null and start_year_month != ''">
+					and pdkl.acc_year||pdkl.acc_month between #{start_year_month} and #{end_year_month}
+				</if>
+		      </where>
+		),last_tmp as (
+		      select st.group_id,st.hos_id,st.copy_code,st.goal_code,st.kpi_level,
+		             st.acc_year,st.acc_month ,st.kpi_code,pdk.kpi_name,
+		             st.kpi_score kpi_value,vt.goal_value,lt.led_path,pkl.nature_code
+		      from score_tmp st 
+		      left join value_tmp vt  on st.group_id=vt.group_id and st.hos_id=vt.hos_id and st.copy_code=vt.copy_code  and st.acc_year=vt.acc_year
+		           and st.acc_month=vt.acc_month  and st.goal_code=vt.goal_code and st.dept_id=vt.dept_id and st.dept_no=vt.dept_no 
+		           and st.kpi_code=vt.kpi_code
+		      left join led_tmp lt on st.group_id=lt.group_id and st.hos_id=lt.hos_id and st.copy_code=lt.copy_code  and st.acc_year=lt.acc_year
+		           and st.acc_month=lt.acc_month  and st.goal_code=lt.goal_code and st.dept_id=lt.dept_id and st.dept_no=lt.dept_no 
+		           and st.kpi_code=lt.kpi_code and st.sec_code=lt.sec_code
+		      left join prm_dept_kpi pdk on st.group_id = pdk.group_id and st.hos_id = pdk.hos_id
+		              and st.copy_code = pdk.copy_code and st.acc_year = pdk.acc_year
+		              and st.goal_code = pdk.goal_code and st.kpi_code = pdk.kpi_code
+		      left join PRM_KPI_LIB pkl on st.group_id = pkl.group_id
+		         and st.hos_id = pkl.hos_id and st.copy_code = pkl.copy_code and st.kpi_code = pkl.kpi_code
+		      <where>
+		      	<if test="dim_code !=null and dim_code !=''">
+		      		and pdk.dim_code = #{dim_code}
+		      	</if>
+		      </where>
+		      order by st.acc_month,st.kpi_code
+		)
+		select pdks.kpi_code,pdks.kpi_name,pdks.nature_code,
+         	${sqlCase}
+		 	count (case when pdks.led_path = 'prmLedImage/红卡.png' then pdks.led_path end) as count_led
+  		from last_tmp pdks 
+  		group by pdks.kpi_code,pdks.kpi_name,pdks.nature_code
+        order by pdks.kpi_code -->
+        
+        with tmp_pdks as
+ (select pdks.group_id, pdks.hos_id, pdks.copy_code, pdks.acc_year, pdks.acc_month
+      , pdks.goal_code, pdks.kpi_code, pdk.kpi_name, pdk.nature_code, pkn.nature_name
+      , pdks.dept_no, pdks.dept_id, pdks.super_kpi_code, pdks.order_no, pdks.kpi_level
+      , pdks.is_last, pdks.kpi_score, pds.ratio, pds.full_score, pds.goal_value
+      , case when pkl.unit_code = '72' then round(pdkv.kpi_value, 2) * 100 else round(pdkv.kpi_value, 2) end as kpi_value, b.sec_code,hu.unit_name, b.led_path,ad.dept_code,ad.dept_name
+    from prm_dept_kpi_score pdks
+    left join prm_dept_scheme pds on pdks.group_id = pds.group_id
+    and pdks.hos_id = pds.hos_id
+    and pdks.copy_code = pds.copy_code
+    and pdks.acc_year = pds.acc_year
+    and pdks.acc_month = pds.acc_month
+    and pdks.goal_code = pds.goal_code
+    and pdks.kpi_code = pds.kpi_code
+    and pdks.dept_id = pds.dept_id
+    and pdks.dept_no = pds.dept_no 
+    left join prm_dept_kpi pdk on pdks.group_id = pdk.group_id
+    and pdks.hos_id = pdk.hos_id
+    and pdks.copy_code = pdk.copy_code
+    and pdks.acc_year = pdk.acc_year
+    and pdks.goal_code = pdk.goal_code
+    and pdks.kpi_code = pdk.kpi_code 
+    left join (
+      select pdkl.hos_id, pdkl.group_id, pdkl.copy_code, pdkl.acc_year, pdkl.acc_month
+        , pdkl.goal_code, pdkl.kpi_code, pdkl.dept_id, pdkl.dept_no, pdkl.sec_code
+        , pd.led_path
+      from prm_dept_kpi_led pdkl
+        left join PRM_LED pd on pdkl.hos_id = pd.hos_id
+      and pdkl.group_id = pd.group_id
+      and pdkl.copy_code = pd.copy_code
+      and pdkl.sec_code = pd.sec_code 
+    ) b on pdks.group_id = b.group_id
+    and pdks.hos_id = b.hos_id
+    and pdks.copy_code = b.copy_code
+    and pdks.acc_year = b.acc_year
+    and pdks.acc_month = b.acc_month
+    and pdks.goal_code = b.goal_code
+    and pdks.kpi_code = b.kpi_code
+    and pdks.dept_id = b.dept_id
+    and pdks.dept_no = b.dept_no
+    and pdks.sec_code = b.sec_code 
+    left join prm_kpi_nature pkn on pdk.nature_code = pkn.nature_code 
+    left join PRM_KPI_LIB pkl on pdks.group_id = pkl.group_id
+   and pdks.hos_id = pkl.hos_id
+   and pdks.copy_code = pkl.copy_code
+   and pdks.kpi_code = pkl.kpi_code
+   left join  hos_unit hu on pkl.unit_code = hu.unit_code
+    and pkl.group_id = hu.group_id
+    and pkl.hos_id = hu.hos_id
+    left join prm_dept_kpi_value pdkv on pdks.hos_id = pdkv.hos_id
+    and pdks.group_id = pdkv.group_id
+    and pdks.copy_code = pdkv.copy_code
+    and pdks.acc_year = pdkv.acc_year
+    and pdks.acc_month = pdkv.acc_month
+    and pdks.goal_code = pdkv.goal_code
+    and pdks.kpi_code = pdkv.kpi_code
+    and pdks.dept_id = pdkv.dept_id
+    and pdks.dept_no = pdkv.dept_no 
+      left join PRM_dept_dict ad on pdks.group_id = ad.group_id
+    and pdks.hos_id = ad.hos_id
+    and pdks.copy_code = ad.copy_code
+    and pdks.dept_id = ad.dept_id   and pdks.dept_no = ad.dept_id 
+     <where>                     
+			<if test="group_id != null and group_id != ''">
+				AND pdks.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				AND pdks.hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				AND pdks.copy_code = #{copy_code}
+			</if>
+			<if test="acc_year != null and acc_year != ''">
+				AND pdks.acc_year = #{acc_year}
+			</if>
+			<if test="goal_code != null and goal_code != ''">
+				AND pdks.goal_code = #{goal_code}
+			</if>
+			<if test="kpi_code != null and kpi_code != ''">
+				AND pdks.kpi_code = #{kpi_code}
+			</if>
+			<if test="dept_id != null and dept_id != ''">
+				AND pdks.dept_id = #{dept_id}
+			</if>
+			<if test="dept_no != null and dept_no != ''">
+				AND pdks.dept_no = #{dept_no}
+			</if>
+			<if test="dept_kind_code != null and dept_kind_code != ''">
+				AND ad.dept_kind_code = #{dept_kind_code}
+			</if>
+			<if test="start_year_month != null and start_year_month != ''">
+				and pdks.acc_year||pdks.acc_month between #{start_year_month} and #{end_year_month}
+			</if>
+			<if test="sql != null and sql != ''">
+				${sql}
+			</if>
+			
+			and exists(
+				select 1 from sys_user_perm_data sys where sys.group_id = #{group_id}
+				and sys.hos_id = #{hos_id} and sys.copy_code = #{copy_code}
+				and sys.user_id = #{user_id}
+				and sys.mod_code = '07' and sys.table_code = 'PRM_DEPT_DICT'
+				and sys.perm_code = pdks.dept_id and sys.is_read = 1 and sys.is_write = 1
+			)
+		</where>
+     
+     )
+  
+  select 
+         pdks.kpi_code, pdks.kpi_name,
+         ${sqlCase}
+		 pdks.nature_code,
+		 count (case when pdks.led_path = 'prmLedImage/红卡.png' then pdks.led_path end) as count_led
+  from tmp_pdks pdks 
+  group by  pdks.kpi_code, pdks.kpi_name, pdks.nature_code, pdks.unit_name
+	order by pdks.kpi_code
+	</select>
+</mapper>
+

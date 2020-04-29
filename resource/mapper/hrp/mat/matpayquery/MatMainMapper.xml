@@ -1,0 +1,534 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.mat.dao.matpayquery.MatMainMapper">
+	
+	<resultMap id="matStorageInMain" type="java.util.Map">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="in_id" column="in_id"/>
+		<result property="in_no" column="in_no"/>
+		<result property="year" column="year"/>
+		<result property="month" column="month"/>
+		<result property="bus_type_code" column="bus_type_code"/>
+		<result property="bus_type_name" column="bus_type_name"/>
+		<result property="sup_no" column="sup_no"/>
+		<result property="sup_id" column="sup_id"/>
+		<result property="sup_name" column="sup_name"/>
+		<result property="store_id" column="store_id"/>
+		<result property="store_no" column="store_no"/>
+		<result property="store_name" column="store_name"/>
+		<result property="brief" column="brief"/>
+		<result property="stocker" column="stocker"/>
+		<result property="stocker_name" column="stocker_name"/>
+		<result property="stock_type_code" column="stock_type_code"/>
+		<result property="maker" column="maker"/>
+		<result property="maker_name" column="maker_name"/>
+		<result property="in_date" column="in_date"/>
+		<result property="checker" column="checker"/>
+		<result property="checker_name" column="checker_name"/>
+		<result property="check_date" column="check_date"/>
+		<result property="confirmer" column="confirmer"/>
+		<result property="confirmer_name" column="confirmer_name"/>
+		<result property="confirm_date" column="confirm_date"/>
+		<result property="state" column="state"/>
+		<result property="state_name" column="state_name"/>
+		<result property="is_pay" column="is_pay"/>
+		<result property="pay_date" column="pay_date"/>
+		<result property="pay_money" column="pay_money"/>
+		<result property="is_pay_all" column="is_pay_all"/>
+		<result property="check_code" column="check_code"/>
+		<result property="protocol_code" column="protocol_code"/>
+		<result property="amount_money" column="amount_money"/>
+		<result property="proj_id" column="proj_id"/>
+		<result property="come_from" column="come_from"/>
+		<result property="field_desc" column="field_desc"/>
+		<result property="bill_no" column="bill_no"/>
+		<result property="bill_date" column="bill_date"/>
+		<result property="delivery_code" column="delivery_code"/>
+		<result property="examiner" column="examiner"/>
+		<result property="examiner_code" column="examiner_code"/>
+		<result property="examiner_name" column="examiner_name"/>
+		<result property="ra_state" column="ra_state"/>
+		<result property="bill_state" column="bill_state"/>
+		<result property="pay_money" column="pay_money"/>
+		<result property="bill_money" column="bill_money"/>
+		<result property="un_money" column="un_money"/>
+		<result property="de_money" column="de_money"/>
+		<result property="pay_code" column="pay_code"/>
+		<result property="pay_name" column="pay_name"/>
+	</resultMap>
+	
+	<!-- 主查询 -->
+	<select id="query" parameterType="java.util.Map" resultMap="matStorageInMain" >
+		
+		with a_table AS (
+				SELECT 
+					a.group_id, a.hos_id, a.copy_code, a.in_id, to_char(a.in_no) in_no, brief, a.store_id, a.store_no, c.store_name,
+					a. bus_type_code, d.bus_type_name, a.sup_id, a.sup_no, h.sup_name, i.emp_name stocker_name, 
+					sum(b.amount_money) as amount_money, a.in_date, a.maker, e.user_name as maker_name,  
+					a.confirm_date, f.user_name as confirmer_name, a.state, g.field_desc as state_name,a.proj_id,
+					a.come_from, m.field_desc, a.bill_no,a.delivery_code, a.examiner, hd.emp_code examiner_code,
+					hd.emp_name examiner_name, a.ra_state, decode(nvl(mbd.bill_id,0), 0, 0, 1)  as bill_state, 
+					sum(nvl(mpd.pay_money,0)) as pay_money,sum(nvl(mbd.bill_money, 0)) as bill_money, 
+					case when mbm.state = 2 then 0 else sum(nvl(mbd.bill_money, 0) - nvl(mpd.pay_money, 0))
+          			end as de_money, mbm.note bill_note ,
+					case  when mbm.state=1 then 0 else sum(nvl(mbd.bill_money, 0) - nvl(mpd.pay_money, 0)) end  un_money ,apt.pay_name
+				FROM MAT_IN_MAIN a
+				LEFT JOIN mat_in_detail b 
+					on a.group_id = b.group_id
+					and a.hos_id = b.hos_id
+					and a.copy_code = b.copy_code
+					and a.in_id = b.in_id
+				LEFT JOIN hos_store_dict c
+					on a.group_id = c.group_id
+					and a.hos_id = c.hos_id
+					and a.store_no = c.store_no
+				LEFT JOIN mat_bus_type d
+					on a.bus_type_code = d.bus_type_code
+					and d.is_stop = 0
+				LEFT JOIN sys_user e
+					on a.group_id = e.group_id
+					and a.hos_id = e.hos_id
+					and a.maker = e.user_id
+				LEFT JOIN sys_user f
+					on a.group_id = f.group_id
+					and a.hos_id = f.hos_id
+					and a.confirmer = f.user_id
+				LEFT JOIN mat_sys_list g
+					on g.table_code = 'MAT_IN_MAIN'
+					and g.field_code = 'STATE'
+					and a.state = g.field_value
+				LEFT JOIN hos_sup_dict h
+					on a.group_id = h.group_id
+					and a.hos_id = h.hos_id
+					and a.sup_id = h.sup_id
+					and a.sup_no = h.sup_no
+				left join ASS_SUP_ATTR asa on asa.group_id = h.group_id
+			       and asa.hos_id = h.hos_id
+			       and asa.sup_id = h.sup_id
+			    left join ACC_PAY_TYPE apt on asa.group_id = apt.group_id
+			       and asa.hos_id = apt.hos_id
+			       and apt.pay_code=asa.pay_code
+				LEFT JOIN hos_emp i
+					on a.group_id = i.group_id
+					and a.hos_id = i.hos_id
+					and a.stocker = i.emp_id
+				left join mat_data_dict m on m.data_code='04014'
+					and a.come_from = m.field_value
+					and m.field_code='IN_FROM'
+				left join hos_emp_dict hd on a.group_id=hd.group_id 
+					and a.hos_id=hd.hos_id and a.examiner=hd.emp_id 
+					and hd.is_stop=0
+			    left join mat_bill_detail mbd on mbd.group_id = b.group_id
+        			and mbd.hos_id = b.hos_id and mbd.copy_code = b.copy_code
+        			and mbd.in_id = b.in_id  and mbd.in_detail_id=b.in_detail_id
+        		left join mat_bill_main mbm 
+        			on mbd.group_id = mbm.group_id and mbd.hos_id = mbm.hos_id 
+        			and mbd.copy_code = mbm.copy_code and mbd.bill_id = mbm.bill_id 
+        	left join mat_pay_detail mpd on mbd.group_id = mpd.group_id
+				and mbd.hos_id = mpd.hos_id
+				and mbd.copy_code = mpd.copy_code
+				and mbd.bill_id = mpd.bill_id
+				and mbd.bill_detail_id = mpd.bill_detail_id 
+        	left join mat_pay_main mpm on  mpm.group_id = mpd.group_id
+				and mpm.hos_id = mpd.hos_id
+				and mpm.copy_code = mpd.copy_code
+				and mpm.pay_id = mpd.pay_id
+        		and mpm.state=2
+				<where>
+					a.group_id = #{group_id,jdbcType=INTEGER}
+					AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+					AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+					<if test="begin_confirm_date != null and begin_confirm_date != ''">
+						AND a.confirm_date &gt;= to_date(#{begin_confirm_date,jdbcType=VARCHAR},'yyyy-MM-dd')
+					</if>
+					<if test="end_confirm_date != null and end_confirm_date != ''">
+						AND a.confirm_date &lt;= to_date(#{end_confirm_date,jdbcType=VARCHAR},'yyyy-MM-dd')
+					</if>
+					<if test="state != null and state != ''">
+						AND a.state = #{state,jdbcType=VARCHAR}
+					</if>
+					<if test="store_id != null and store_id != ''">
+						AND a.store_id = #{store_id,jdbcType=VARCHAR}
+					</if>
+					<if test="sup_id != null and sup_id != ''">
+						AND a.sup_id = #{sup_id,jdbcType=VARCHAR}
+					</if>
+					<if test="proj_id != null and proj_id != ''">
+						AND a.proj_id = #{proj_id,jdbcType=VARCHAR}
+					</if>
+					<if test="in_no != null and in_no != ''">
+						AND a.in_no like '%${in_no}%'
+					</if>
+					<if test="invoice_no != null and invoice_no != ''">
+						AND a.bill_no like '${invoice_no}%'
+					</if>
+					<if test="not_invoice != null and not_invoice == 1">
+						AND nvl(a.bill_no, '空') = '空'
+					</if>
+					<if test="brief != null and brief != ''">
+						AND a.brief like '%${brief}%'
+					</if>
+					<if test="pay_code != null and pay_code != ''">
+						AND apt.pay_code = #{pay_code,jdbcType=VARCHAR}
+					</if>
+					<if test="bill_state != null and bill_state != ''">
+					AND decode(nvl(mbd.bill_id,0), 0, 0, 1) = #{bill_state}
+				   </if>
+				   AND a.bus_type_code in ('2','12','47','48')<!-- 查采购入库、采购退货、专购品入库、专购品退货 -->
+<!-- 					AND b.amount_money &gt;= 0 -->
+					
+					<!-- 添加用户数据权限 -->
+					and exists (
+						select 1 from v_user_data_perm vudp 
+						where a.group_id=vudp.group_id and a.hos_id=vudp.hos_id 
+							and to_char(a.store_id)=vudp.perm_code and vudp.is_read=1 and vudp.is_write = 1
+			      			and vudp.table_code='HOS_STORE_DICT'
+							and vudp.user_id=#{user_id}
+					)
+				</where>   
+				group by a.group_id, a.hos_id, a.copy_code, a.in_id, a.in_no, brief, a.store_id, a.store_no, c.store_name,
+					a. bus_type_code, d.bus_type_name, a.sup_id, a.sup_no, h.sup_name, i.emp_name, a.in_date, a.maker, 
+					e.user_name, a.confirm_date, f.user_name, a.state,a.proj_id, g.field_desc,a.come_from,m.field_desc, a.bill_no,
+					a.delivery_code,a.examiner,hd.emp_code,hd.emp_name,a.ra_state,mbd.bill_id, mbm.note, mbm.state,apt.pay_name
+					
+				<!-- <if test="sortname != null and sortname != ''">
+					order by ${sortname} ${sortorder}
+				</if>
+				<if test="sortname == null or sortname == ''">
+					order by in_id desc
+				</if> -->
+		) 
+		SELECT temp.* FROM (
+			SELECT * FROM a_table
+			<where>
+				<!-- 2017/06/05 台州修改 增加金额范围查询条件 -->
+				<if test="begin_amount_money != null and begin_amount_money != '' and end_amount_money != null and end_amount_money != '' ">
+					amount_money between #{begin_amount_money} and #{end_amount_money}
+				</if>
+			</where>
+		
+			order by in_id desc
+		
+		) temp 
+		UNION ALL
+		SELECT 
+			null group_id, null hos_id, null copy_code, null in_id, to_char('合计') in_no, null brief, null store_id, null store_no, null store_name,
+			null bus_type_code, null bus_type_name, null sup_id, null sup_no, null sup_name, null stocker_name, 
+			sum(b.amount_money) as amount_money, null in_date, null maker, null maker_name,  
+			null confirm_date, null confirmer_name, null state, null  state_name,null proj_id,null come_from, 
+			null field_desc, null bill_no,null delivery_code,null examiner,null emp_code,null emp_name,null ra_state,null as bill_state,
+			 sum(b.pay_money) as pay_money, sum(b.bill_money) as bill_money, sum(b.de_money) as de_money, null bill_note, sum(b.un_money) as un_money,null as pay_name
+		FROM a_table b
+		<where>
+			<!-- 2017/06/05 台州修改 增加金额范围查询条件 -->
+			<if test="begin_amount_money != null and begin_amount_money != '' and end_amount_money != null and end_amount_money != '' ">
+				b.amount_money between #{begin_amount_money} and #{end_amount_money}
+			</if>
+		</where>
+	</select>
+	
+	<!-- 明细查询 -->
+	<select id="queryDetails" parameterType="java.util.Map" resultType="java.util.Map" >
+		with detail_list as (
+		     select mid.group_id,mid.hos_id,mid.copy_code,mid.in_id,to_char(mid.in_no) in_no,mim.store_id,mim.store_no,hd.store_code,hd.store_name,
+		       mim.brief,hsd.sup_name,mim.bus_type_code,mbt.bus_type_name,mim.come_from, m.field_desc,to_char(mim.in_date,'yyyy-MM-dd') in_date,mim.maker, e.user_name as maker_name,
+		       to_char(mim.confirm_date,'yyyy-MM-dd') confirm_date,f.user_name as confirmer_name,mim.state, g.field_desc as state_name,i.emp_name stocker_name,
+		       mdd.inv_id,mdd.inv_no,mdd.inv_code,mdd.inv_name,mdd.inv_model,hu.unit_name,mid.price,mid.amount,
+		       mid.amount_money,mid.batch_no,mid.bar_code,hfd.fac_name,mim.bill_no,decode(nvl(mbd.bill_id,0), 0, 0, 1)  as bill_state
+		       ,nvl(mpd.pay_money, 0) as pay_money,nvl(mbd.bill_money, 0) as bill_money, mbm.note bill_note 
+		  from mat_in_detail mid 
+		  left join mat_in_main mim on mid.group_id=mim.group_id and mid.hos_id=mim.hos_id and mid.copy_code=mim.copy_code
+		       and mid.in_id=mim.in_id
+		  left join hos_sup_dict hsd on mim.group_id=hsd.group_id and mim.hos_id=hsd.hos_id and mim.sup_id=hsd.sup_id
+		       <if test="show_history == 1">
+			    	and mim.sup_no=hsd.sup_no 
+			   </if>
+			   <if test="show_history == 0">
+		         	and hsd.is_stop=0
+			   </if> 
+		  left join hos_store_dict hd on mim.group_id=hd.group_id and mim.hos_id=hd.hos_id and mim.store_id=hd.store_id
+		       <if test="show_history == 1">
+			    	and mim.store_no=hd.store_no 
+			   </if>
+			   <if test="show_history == 0">
+		         	and hd.is_stop=0
+			   </if> 
+		  left join mat_sys_list g on g.table_code = 'MAT_IN_MAIN' and g.field_code = 'STATE' and mim.state = g.field_value
+		  left join mat_data_dict m on m.data_code='04014' and mim.come_from = m.field_value and m.field_code='IN_FROM'
+		  left join mat_bus_type mbt on mim.bus_type_code=mbt.bus_type_code and mbt.is_stop=0
+		  left join hos_emp i on mim.group_id = i.group_id and mim.hos_id = i.hos_id and mim.stocker = i.emp_id
+		  left join sys_user e on mim.group_id = e.group_id and mim.hos_id = e.hos_id and mim.maker = e.user_id
+		  left join sys_user f  on mim.group_id = f.group_id  and mim.hos_id = f.hos_id and mim.confirmer = f.user_id
+		  left join mat_inv_dict mdd on mid.group_id=mdd.group_id  and mid.hos_id=mdd.hos_id and mid.copy_code=mdd.copy_code
+		       and mid.inv_id=mdd.inv_id and mid.inv_no=mdd.inv_no 
+		  left join hos_unit hu on mdd.group_id=hu.group_id and mdd.hos_id=hu.hos_id and mdd.unit_code=hu.unit_code and hu.is_stop=0
+		  left join hos_fac_dict hfd on mdd.group_id=hfd.group_id and mdd.hos_id=hfd.hos_id and mdd.fac_id=hfd.fac_id and mdd.fac_no = hfd.fac_no
+		  left join mat_bill_detail mbd on mbd.group_id=mid.group_id and mbd.hos_id=mid.hos_id 
+        	and mbd.copy_code=mid.copy_code and mbd.in_id=mid.in_id and mbd.in_detail_id=mid.in_detail_id
+		left join mat_bill_main mbm 
+  			on mbd.group_id = mbm.group_id and mbd.hos_id = mbm.hos_id 
+  			and mbd.copy_code = mbm.copy_code and mbd.bill_id = mbm.bill_id 
+         left join mat_pay_detail mpd on mbd.group_id = mpd.group_id
+        and mbd.hos_id = mpd.hos_id
+        and mbd.copy_code = mpd.copy_code
+        and mbd.bill_id = mpd.bill_id
+        and mbd.bill_detail_id = mpd.bill_detail_id 
+          left join mat_pay_main mpm on mpm.group_id = mpd.group_id
+        and mpm.hos_id = mpd.hos_id
+        and mpm.copy_code = mpd.copy_code
+        and mpm.pay_id = mpd.pay_id
+        and mpm.state = 2 
+		  <where>
+		  			mim.group_id = #{group_id,jdbcType=INTEGER}
+				AND mim.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND mim.copy_code = #{copy_code,jdbcType=VARCHAR}
+				<if test="begin_confirm_date != null and begin_confirm_date != ''">
+					AND mim.confirm_date &gt;= to_date(#{begin_confirm_date,jdbcType=VARCHAR},'yyyy-MM-dd')
+				</if>
+				<if test="end_confirm_date != null and end_confirm_date != ''">
+					AND mim.confirm_date &lt;= to_date(#{end_confirm_date,jdbcType=VARCHAR},'yyyy-MM-dd')
+				</if>
+				 AND mim.bus_type_code in ('2','12')<!-- 查采购入库和采购退货 -->
+<!-- 				and mid.amount_money &gt;= 0 -->
+				<if test="state != null and state != ''">
+					AND mim.state = #{state,jdbcType=VARCHAR}
+				</if>
+				<if test="store_id != null and store_id != ''">
+					AND mim.store_id = #{store_id,jdbcType=VARCHAR}
+				</if>
+				<if test="sup_id != null and sup_id != ''">
+					AND mim.sup_id = #{sup_id,jdbcType=VARCHAR}
+				</if>
+				<if test="proj_id != null and proj_id != ''">
+					AND mim.proj_id = #{proj_id,jdbcType=VARCHAR}
+				</if>
+				<if test="in_no != null and in_no != ''">
+					AND mim.in_no like '${in_no}%'
+				</if>
+				<if test="invoice_no != null and invoice_no != ''">
+					AND mim.bill_no like '${invoice_no}%'
+				</if>
+				<if test="not_invoice != null and not_invoice == 1">
+					AND nvl(mim.bill_no, '空') = '空'
+				</if>
+				<if test="brief != null and brief != ''">
+					AND mim.brief like '%${brief}%'
+				</if>
+				<if test="batch_no != null and batch_no != ''">
+					AND mid.batch_no like '%${batch_no}%'
+				</if>
+				<if test="inv_code != null and inv_code != ''">
+					AND (
+							mdd.inv_code like '%${inv_code}%'
+							or upper(mdd.inv_name) like '%${inv_code}%'
+							or upper(mdd.inv_model) like '%${inv_code}%'
+							or upper(mdd.spell_code) like '%${inv_code}%'
+							or upper(mdd.wbx_code) like '%${inv_code}%'
+							or upper(mdd.bid_code) like '%${inv_code}%'
+							or lower(mdd.spell_code) like '%${inv_code}%'
+							or lower(mdd.bid_code) like '%${inv_code}%'
+							or lower(mdd.wbx_code) like '%${inv_code}%'
+							or lower(mdd.inv_name) like '%${inv_code}%'
+							or mdd.alias like '%${inv_code}%'
+						
+					)
+				</if>
+				<if test="bill_state != null and bill_state != ''">
+					AND decode(nvl(mbd.bill_id,0), 0, 0, 1) = #{bill_state}
+				</if>
+				<!-- 添加用户数据权限 -->
+				and exists (
+					select 1 from v_user_data_perm b 
+					where mim.group_id=b.group_id and mim.hos_id=b.hos_id 
+						and to_char(mim.store_id)=b.perm_code and b.is_read=1
+		      			and b.table_code='HOS_STORE_DICT'
+						and user_id=#{user_id}
+				)
+		  </where>
+		),sum_list as (
+		   select null group_id,null hos_id,null copy_code,null in_id,'合计' in_no, null store_id, null store_no,null store_code,null store_name,
+		       null brief,null sup_name,null bus_type_code,null bus_type_name,null come_from, null field_desc,null in_date,null maker, null maker_name,
+		       null confirm_date,null confirmer_name,null state, null  state_name,null stocker_name,
+		       null inv_id,null inv_no,null inv_code,null inv_name,null inv_model,null unit_name,null price,sum(amount) amount,
+		       sum(amount_money) amount_money,null batch_no,null bar_code,null fac_name,null bill_no,null bill_state, 
+		       null as pay_money, null as bill_money, null bill_note
+		   from detail_list
+		   <where>
+			<!-- 2017/06/05 台州修改 增加金额范围查询条件 -->
+			<if test="begin_amount_money != null and begin_amount_money != '' and end_amount_money != null and end_amount_money != '' ">
+				amount_money between #{begin_amount_money} and #{end_amount_money}
+			</if>
+			</where>
+		)
+		select group_id,hos_id,copy_code, in_id, in_no,  store_id,  store_no, store_code, store_name,
+		        brief, sup_name,bus_type_code, bus_type_name, come_from,  field_desc, in_date, maker,  maker_name,
+		        confirm_date, confirmer_name, state,   state_name, stocker_name,
+		         inv_code, inv_name, inv_model, unit_name, price,amount, amount_money, batch_no, 
+		         bar_code, fac_name, bill_no,bill_state, pay_money,bill_money, bill_note
+		from detail_list
+		<where>
+			<!-- 2017/06/05 台州修改 增加金额范围查询条件 -->
+			<if test="begin_amount_money != null and begin_amount_money != '' and end_amount_money != null and end_amount_money != '' ">
+				amount_money between #{begin_amount_money} and #{end_amount_money}
+			</if>
+		</where>
+		union all
+		select  group_id,hos_id,copy_code, in_id,in_no,  store_id,  store_no, store_code, store_name,
+		        brief, sup_name,bus_type_code, bus_type_name, come_from,  field_desc, in_date, maker,  maker_name,
+		        confirm_date, confirmer_name, state,   state_name, stocker_name,
+		        inv_code, inv_name, inv_model, unit_name, price,amount,
+		        amount_money, batch_no, bar_code, fac_name, bill_no ,bill_state, pay_money,bill_money, bill_note
+		from sum_list
+		order by in_id desc,in_no,in_date,inv_code
+	</select>
+	
+	<!-- 	汇总查询-供应商 -->
+	<select id="querySum" parameterType="java.util.Map" resultMap="matStorageInMain" >
+		
+		with un_pay AS(
+			select mbm.sup_id, sum(mbd.bill_money) begin_money 
+			from mat_bill_main mbm
+			left join mat_bill_detail mbd 
+				on mbm.group_id = mbd.group_id 
+				and mbm.hos_id = mbd.hos_id 
+				and mbm.copy_code = mbd.copy_code 
+				and mbm.bill_id = mbd.bill_id 
+			left join mat_in_main mim 
+				on mbd.group_id = mim.group_id 
+				and mbd.hos_id = mim.hos_id 
+				and mbd.copy_code = mim.copy_code 
+				and mbd.in_id = mim.in_id 
+			where mbm.group_id = #{group_id,jdbcType=INTEGER}
+				AND mbm.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND mbm.copy_code = #{copy_code,jdbcType=VARCHAR}
+				<if test="store_id != null and store_id != ''">
+					AND mim.store_id = #{store_id,jdbcType=VARCHAR}
+				</if>
+				<if test="sup_id != null and sup_id != ''">
+					AND mbm.sup_id = #{sup_id,jdbcType=VARCHAR}
+				</if>
+				AND not exists(
+					select 1 from mat_pay_main mpm 
+					left join mat_pay_detail mpd 
+					on mpm.group_id = mpd.group_id 
+						and mpm.hos_id = mpd.hos_id 
+						and mpm.copy_code = mpd.copy_code 
+						and mpm.pay_id = mpd.pay_id 
+					where mpm.group_id = mbm.group_id 
+						and mpm.hos_id = mbm.hos_id 
+						and mpm.copy_code = mbm.copy_code 
+						and mpd.bill_id = mbm.bill_id 
+						and mpd.bill_detail_id = mbd.bill_detail_id
+						and mpm.state = 2
+				) 
+				<if test="begin_confirm_date != null and begin_confirm_date != ''">
+					AND mim.confirm_date &lt;=to_date(#{begin_confirm_date,jdbcType=VARCHAR},'yyyy-MM-dd')
+				</if>
+			group by mbm.sup_id 
+		), a_table AS (
+			select a.group_id, a.hos_id, a.copy_code, a.sup_id, a.sup_no, to_char(h.sup_name) as sup_name,  
+				sum(b.amount_money) as amount_money, sum(nvl(mpd.pay_money, 0)) as pay_money, 
+				sum(nvl(mbd.bill_money, 0)) as bill_money, 
+				(sum(nvl(b.amount_money, 0)) - sum(nvl(mpd.pay_money, 0))) as un_money
+		FROM MAT_IN_MAIN a
+		LEFT JOIN mat_in_detail b 
+			on a.group_id = b.group_id
+			and a.hos_id = b.hos_id
+			and a.copy_code = b.copy_code
+			and a.in_id = b.in_id
+		LEFT JOIN hos_store_dict c
+			on a.group_id = c.group_id
+			and a.hos_id = c.hos_id
+			and a.store_no = c.store_no
+		LEFT JOIN mat_bus_type d
+			on a.bus_type_code = d.bus_type_code
+			and d.is_stop = 0
+		LEFT JOIN sys_user e
+			on a.group_id = e.group_id
+			and a.hos_id = e.hos_id
+			and a.maker = e.user_id
+		LEFT JOIN sys_user f
+			on a.group_id = f.group_id
+			and a.hos_id = f.hos_id
+			and a.confirmer = f.user_id
+		LEFT JOIN mat_sys_list g
+			on g.table_code = 'MAT_IN_MAIN'
+			and g.field_code = 'STATE'
+			and a.state = g.field_value
+		LEFT JOIN hos_sup_dict h
+			on a.group_id = h.group_id
+			and a.hos_id = h.hos_id
+			and a.sup_id = h.sup_id
+			and a.sup_no = h.sup_no
+		LEFT JOIN hos_emp i
+			on a.group_id = i.group_id
+			and a.hos_id = i.hos_id
+			and a.stocker = i.emp_id
+		left join mat_data_dict m on m.data_code='04014'
+			and a.come_from = m.field_value
+			and m.field_code='IN_FROM'
+		left join hos_emp_dict hd on a.group_id=hd.group_id 
+			and a.hos_id=hd.hos_id and a.examiner=hd.emp_id 
+			and hd.is_stop=0
+	    left join mat_bill_detail mbd 
+	    	on mbd.group_id = b.group_id and mbd.hos_id = b.hos_id 
+	    	and mbd.copy_code = b.copy_code and mbd.in_id = b.in_id  
+	    	and mbd.in_detail_id=b.in_detail_id
+		left join mat_pay_detail mpd 
+			on mbd.group_id = mpd.group_id
+			and mbd.hos_id = mpd.hos_id
+			and mbd.copy_code = mpd.copy_code
+			and mbd.bill_id = mpd.bill_id
+			and mbd.bill_detail_id = mpd.bill_detail_id 
+      	left join mat_pay_main mpm 
+      		on  mpm.group_id = mpd.group_id
+			and mpm.hos_id = mpd.hos_id
+			and mpm.copy_code = mpd.copy_code
+			and mpm.pay_id = mpd.pay_id
+      		and mpm.state=2
+		WHERE
+			a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			<if test="begin_confirm_date != null and begin_confirm_date != ''">
+				AND a.confirm_date &gt;= to_date(#{begin_confirm_date,jdbcType=VARCHAR},'yyyy-MM-dd')
+			</if>
+			<if test="end_confirm_date != null and end_confirm_date != ''">
+				AND a.confirm_date &lt;= to_date(#{end_confirm_date,jdbcType=VARCHAR},'yyyy-MM-dd')
+			</if>
+			<if test="store_id != null and store_id != ''">
+				AND a.store_id = #{store_id,jdbcType=VARCHAR}
+			</if>
+			<if test="sup_id != null and sup_id != ''">
+				AND a.sup_id = #{sup_id,jdbcType=VARCHAR}
+			</if>
+		   AND a.bus_type_code in ('2','12','47','48')<!-- 查采购入库、采购退货、专购品入库、专购品退货 -->
+		<!-- AND b.amount_money &gt;= 0 -->
+			<!-- 添加用户数据权限 -->
+			and exists (
+				select 1 from v_user_data_perm vudp 
+				where a.group_id=vudp.group_id and a.hos_id=vudp.hos_id 
+					and to_char(a.store_id)=vudp.perm_code and vudp.is_read=1 and vudp.is_write = 1
+	      			and vudp.table_code='HOS_STORE_DICT'
+					and vudp.user_id=#{user_id}
+			)
+			group by a.group_id, a.hos_id, a.copy_code, a.sup_id, a.sup_no, h.sup_name
+		) 
+		SELECT temp.* FROM (
+			SELECT a_table.*, un_pay.begin_money 
+			FROM a_table 
+			LEFT JOIN un_pay 
+				ON a_table.sup_id = un_pay.sup_id 
+			order by a_table.sup_id desc
+		) temp 
+		UNION ALL
+		 select null as group_id, null as hos_id, null as copy_code, null as sup_id
+      		, null as sup_no, to_char('合计') as sup_name, sum(b.amount_money) as amount_money
+      		,sum(b.pay_money) as pay_money, sum(b.bill_money) as bill_money,
+      		(sum(b.amount_money)-sum(b.pay_money)) as un_money, null
+		FROM a_table b
+	</select>
+</mapper>
+

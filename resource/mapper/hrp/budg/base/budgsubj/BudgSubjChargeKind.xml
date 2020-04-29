@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.budg.dao.base.budgsubj.BudgSubjChargeKindMapper">
+	
+	
+	
+	
+	
+	<insert id="addBatchBudgSubjChargeKind" parameterType="java.util.List" >
+	
+		INSERT INTO BUDG_SUBJ_CHARGE_KIND (
+			group_id
+			,
+			hos_id
+			,
+			copy_code
+			,
+			budg_year
+			,
+			budg_subj_code
+			,
+			budg_subj_name
+			,
+			charge_kind_code
+			,
+			charge_kind_name
+		
+		) 
+		<foreach collection="list" item="item" index="index" separator=" union all " >
+			select 		
+			#{item.group_id}			,
+			#{item.hos_id}			,
+			#{item.copy_code}			,
+			#{item.budg_year}			,
+			#{item.budg_subj_code}			,
+			#{item.budg_subj_name}			,
+			#{item.charge_kind_code},
+			#{item.charge_kind_name}			
+		from dual
+		</foreach>
+	</insert>
+	<update id="updateBatchBudgSubjChargeKind" parameterType="java.util.List">
+    
+        <foreach collection="list" item="item" index="index" open="begin" close=";end;" separator=";" >
+            UPDATE BUDG_SUBJ_CHARGE_KIND SET
+                budg_subj_code = #{item.budg_subj_code}
+                ,
+                budg_subj_name = #{item.budg_subj_name}
+                ,
+                charge_kind_code = #{item.charge_kind_code}
+                ,
+                charge_kind_name = #{item.charge_kind_name}
+            WHERE 
+            group_id = #{item.group_id}
+             and 
+            hos_id = #{item.hos_id}
+             and 
+            copy_code = #{item.copy_code}
+             and 
+            budg_year = #{item.budg_year}
+             and 
+            budg_subj_code = #{item.budg_subj_code_old}
+             and 
+            charge_kind_code = #{item.charge_kind_code_old}
+        </foreach>
+    </update>
+
+	
+	<update id="updateBudgAccSubjShip" parameterType="java.util.Map">
+	
+		UPDATE BUDG_ACC_SUBJ_SHIP SET
+			subj_code = #{subj_code}
+			,
+			acc_subj_code2 = #{acc_subj_code2}
+			,
+			subj_type = #{subj_type}
+		<where>                     
+			<if test="group_id != null and group_id != ''">
+			AND group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+			AND hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+			AND copy_code = #{copy_code}
+			</if>
+			<if test="budg_year != null and budg_year != ''">
+			AND budg_year = #{budg_year}
+			</if>
+			<if test="acc_subj_code2 != null and acc_subj_code2 != ''">
+			AND acc_subj_code2 = #{acc_subj_code2}
+			</if>
+		</where>
+	</update>
+	<update id="updateBatchBudgAccSubjShip" parameterType="java.util.List">
+	
+		<foreach collection="list" item="item" index="index" open="begin" close=";end;" separator=";" >
+			UPDATE BUDG_ACC_SUBJ_SHIP SET
+				subj_code = #{item.subj_code}
+				,
+				acc_subj_code2 = #{item.acc_subj_code2}
+				,
+				subj_type = #{item.subj_type}
+			WHERE 
+			group_id = #{item.group_id}
+			 and 
+			hos_id = #{item.hos_id}
+			 and 
+			copy_code = #{item.copy_code}
+			 and 
+			budg_year = #{item.budg_year}
+			 and 
+			acc_subj_code2 = #{item.acc_subj_code2_old}
+			
+		</foreach>
+	</update>
+	
+	
+	
+	<delete id="deleteBatch" parameterType="java.util.List">
+		DELETE FROM BUDG_SUBJ_CHARGE_KIND WHERE
+			<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+				group_id = #{item.group_id}
+				 and 
+				hos_id = #{item.hos_id}
+				 and 
+				copy_code = #{item.copy_code}
+				 and 
+				budg_year = #{item.budg_year}
+				 and 
+				budg_subj_code = #{item.budg_subj_code}
+				and
+				charge_kind_code= #{item.charge_kind_code}
+			</foreach>
+	
+	</delete>
+	<select id="queryBudgSubjChargeKind" parameterType="java.util.Map" resultType="java.util.Map" >
+	
+		select group_id,hos_id,copy_code,budg_year,budg_subj_code,budg_subj_code budg_subj_code_old,charge_kind_code,charge_kind_code charge_kind_code_old,charge_kind_name,budg_subj_name 
+        from  BUDG_SUBJ_CHARGE_KIND
+		<where>
+				group_id = #{group_id}
+				and hos_id = #{hos_id}
+				and copy_code = #{copy_code}
+				<if test="budg_subj_code != null and budg_subj_code != '' ">
+					and budg_subj_code=#{budg_subj_code}
+				</if>
+				<if test="charge_kind_name != null and charge_kind_name != '' ">
+					and charge_kind_name like '%${charge_kind_name}%'
+				</if>		
+		</where>   
+	</select>
+	
+	<!-- 	继承功能  查询上年数据信息  并将年度更换 -->
+	
+	
+	<!-- 	继承功能  查询当前年度是否存在数据 -->
+	<select id="queryDataExist" parameterType="java.util.Map" resultType="java.lang.Integer" >
+		SELECT 
+			count(0)
+		FROM BUDG_SUBJ_CHARGE_KIND bass
+		WHERE                     
+		bass.group_id = #{group_id}
+		AND bass.hos_id = #{hos_id}
+		AND bass.copy_code = #{copy_code}
+		AND bass.budg_year = #{budg_year}
+		AND  bass.budg_subj_code=#{budg_subj_code}
+		AND bass.charge_kind_code=#{charge_kind_code}
+	</select>
+	<select id="queryUpdateDataExist" parameterType="java.util.Map" resultType="java.lang.Integer" >
+        SELECT 
+            count(0)
+        FROM BUDG_SUBJ_CHARGE_KIND bass
+        WHERE                     
+        bass.group_id = #{group_id}
+        AND bass.hos_id = #{hos_id}
+        AND bass.copy_code = #{copy_code}
+        AND bass.budg_year = #{budg_year}
+        AND bass.budg_subj_code=#{budg_subj_code}
+        AND bass.charge_kind_code=#{charge_kind_code}
+        and (
+           #{budg_subj_code}!=#{budg_subj_code_old}
+           or #{charge_kind_code}!=#{charge_kind_code_old}
+        )
+    </select>
+	
+	
+	<!-- 添加页面  支出预算科目下拉框 -->
+	<select id="queryBudgCostTypeSet" resultType="java.util.Map">
+		SELECT
+			subj_code  id,
+			subj_code || ' ' || subj_name text
+		FROM BUDG_COST_SUBJ 
+		where
+			group_id = #{group_id}
+			AND hos_id = #{hos_id} 
+			AND copy_code = #{copy_code}
+			AND budg_year = #{budg_year}
+			<if test="key != null and key != ''">
+				and (
+					subj_code like '${key}%' or
+					subj_name like '%${key}%' or
+					spell_code like '%${key}%' or
+					wbx_code like '%${key}%'
+				)
+			</if>
+		order by subj_code
+	</select>
+	
+	
+	
+	<select id="queryIsExist" parameterType="java.util.Map" resultType="java.lang.Integer">
+		SELECT
+			count(subj_code)
+			from BUDG_ACC_SUBJ_SHIP
+		<where>
+			<if test="group_id != null and group_id != '' ">
+				group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != '' ">
+				AND hos_id = #{hos_id} 
+			</if>
+			<if test="copy_code != null and copy_code != '' ">
+				AND copy_code = #{copy_code}
+			</if>
+			<if test="budg_year != null and budg_year != '' ">
+				AND budg_year = #{budg_year}
+			</if>
+			<if test="acc_subj_code2 != null and acc_subj_code2 != '' ">
+				AND acc_subj_code2 = #{acc_subj_code2}
+			</if>
+			<if test="subj_code != null and subj_code != '' ">
+				AND subj_code = #{subj_code}
+			</if>
+		</where>
+		order by subj_code
+	</select>
+	
+</mapper>
+

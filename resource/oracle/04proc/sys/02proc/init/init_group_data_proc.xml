@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+
+	<sql id="init_group_data_proc" type="proc"><![CDATA[
+	create or replace procedure init_group_data_proc(GROUP_ID IN number,
+                                                 HOS_ID   IN number)
+  ------------------------------------------
+    --初始化数据
+    ------------------------------------------
+   is
+    V_GROUP_ID number(18, 0);
+    V_HOS_ID   number(18, 0);
+    v_num       NUMBER;
+  begin
+    V_GROUP_ID := GROUP_ID;
+    V_HOS_ID   := HOS_ID;
+
+    begin
+    
+     
+      --添加计量单位初始化
+      insert into hos_unit
+        (GROUP_ID, HOS_ID, UNIT_CODE, UNIT_NAME, IS_STOP)
+        SELECT V_GROUP_ID, V_HOS_ID, UNIT_CODE, UNIT_NAME, IS_STOP
+          FROM init_hos_unit a
+         where not exists (select 1
+                  from hos_unit b
+                 where b.group_id = V_GROUP_ID
+                   and b.hos_id = V_HOS_ID
+                   and a.unit_code = b.unit_code);
+    --系统编码规则表HOS_RULES
+      insert into HOS_RULES
+        (GROUP_ID,
+         HOS_ID,
+         MOD_CODE,
+         PROJ_CODE,
+         PROJ_NAME,
+         MAX_LEVEL,
+         MAX_LENGTH,
+         IS_AUTO,
+         LEVEL1,
+         LEVEL2,
+         LEVEL3,
+         LEVEL4,
+         LEVEL5,
+         LEVEL6,
+         LEVEL7,
+         LEVEL8,
+         LEVEL9,
+         LEVEL10)
+        SELECT V_GROUP_ID,
+               V_HOS_ID,
+               mod_code,
+               PROJ_CODE,
+               PROJ_NAME,
+               MAX_LEVEL,
+               MAX_LENGTH,
+               IS_AUTO,
+               LEVEL1,
+               LEVEL2,
+               LEVEL3,
+               LEVEL4,
+               LEVEL5,
+               LEVEL6,
+               LEVEL7,
+               LEVEL8,
+               LEVEL9,
+               LEVEL10
+          FROM INIT_HOS_RULES a
+         where not exists (select 1
+                  from hos_rules b
+                 where b.GROUP_ID = V_GROUP_ID
+                   AND b.HOS_ID = V_HOS_ID
+                   AND a.MOD_CODE = b.MOD_CODE
+                   and a.proj_code = b.proj_code);
+                   --and a.is_copy=0;
+      --系统资金来源表
+      insert into hos_source
+      (group_id, hos_id, source_id, source_code, source_name, source_attr, spell_code, wbx_code, is_stop, note)
+        SELECT V_GROUP_ID,
+               V_HOS_ID,
+               source_id, source_code, source_name, source_attr, spell_code, wbx_code, is_stop, note 
+          FROM INIT_HOS_SOURCE a
+         where not exists (select 1
+                  from hos_source b
+                 where b.GROUP_ID = V_GROUP_ID
+                   AND b.HOS_ID = V_HOS_ID
+                   AND a.source_id = b.source_id);
+      
+      --插入集团参数       
+	    INSERT into ACC_PARA
+	      (GROUP_ID,
+	       HOS_ID,
+	       COPY_CODE,
+	       MOD_CODE,
+	       PARA_CODE,
+	       PARA_NAME,
+	       PARA_TYPE,
+	       PARA_JSON,
+	       PARA_VALUE,
+	       NOTE,
+	       IS_STOP)
+	      SELECT V_GROUP_ID,
+	             0,
+	             '0',
+	             MOD_CODE,
+	             PARA_CODE,
+	             PARA_NAME,
+	             PARA_TYPE,
+	             PARA_JSON,
+	             PARA_VALUE,
+	             NOTE,
+	             IS_STOP
+	        FROM INIT_ACC_PARA a
+	       WHERE a.attr_code=3 and not exists (select 1
+	                from ACC_PARA b
+	               WHERE GROUP_ID = V_GROUP_ID	             
+	                 AND a.MOD_CODE = b.MOD_CODE
+	                 and a.para_code = b.para_code);
+         
+         
+         
+      --科目性质表ACC_SUBJ_NATURE
+	    insert into ACC_SUBJ_NATURE
+	      (GROUP_ID, HOS_ID, COPY_CODE, SUBJ_NATURE_CODE, SUBJ_NATURE_NAME)
+	      SELECT V_GROUP_ID,
+	             V_HOS_ID,
+	             '0',
+	             SUBJ_NATURE_CODE,
+	             SUBJ_NATURE_NAME
+	        FROM INIT_ACC_SUBJ_NATURE a
+	       where not exists
+	       (select 1
+	                from acc_subj_nature b
+	               where b.GROUP_ID = V_GROUP_ID
+	                 AND b.HOS_ID = V_HOS_ID
+	                 AND b.COPY_CODE = '0'
+	                 AND a.subj_nature_code = b.subj_nature_code);
+	   	  
+	    --凭证状态表ACC_VOUCH_STATE
+	    insert into ACC_VOUCH_STATE
+	      (GROUP_ID, HOS_ID, COPY_CODE, STATE, STATE_NAME, FLOW_FLAG)
+	      SELECT V_GROUP_ID,
+	             V_HOS_ID,
+	             '0',
+	             STATE,
+	             STATE_NAME,
+	             FLOW_FLAG
+	        FROM INIT_ACC_VOUCH_STATE a
+	       where not exists (select 1
+	                from acc_vouch_state b
+	               where b.GROUP_ID = V_GROUP_ID
+	                 AND b.HOS_ID = V_HOS_ID
+	                 AND b.COPY_CODE = '0'
+	                 AND a.state = b.state);
+                   
+       --核算类表ACC_CHECK_TYPE
+	    SELECT COUNT(1)
+	      INTO v_num
+	      FROM ACC_CHECK_TYPE
+	     WHERE GROUP_ID = V_GROUP_ID
+	       AND HOS_ID = V_HOS_ID
+	       AND COPY_CODE = '0';
+	    IF v_num = 0 THEN
+	      insert into ACC_CHECK_TYPE
+	        (CHECK_TYPE_ID,
+	         GROUP_ID,
+	         HOS_ID,
+	         COPY_CODE,
+	         CHECK_TABLE,
+	         CHECK_TYPE_NAME,
+	         SORT_CODE,
+	         SPELL_CODE,
+	         WBX_CODE,
+	         IS_STOP,
+	         IS_SYS,
+	         COLUMN_ID,
+	         COLUMN_NO,
+	         COLUMN_CODE,
+	         COLUMN_NAME,
+	         IS_CHANGE,
+	         COLUMN_CHECK)
+	        SELECT ACC_CHECK_TYPE_SEQ.NEXTVAL,
+	               V_GROUP_ID,
+	               V_HOS_ID,
+	               '0',
+	               CHECK_TABLE,
+	               CHECK_TYPE_NAME,
+	               SORT_CODE,
+	               SPELL_CODE,
+	               WBX_CODE,
+	               IS_STOP,
+	               IS_SYS,
+	               COLUMN_ID,
+	               COLUMN_NO,
+	               COLUMN_CODE,
+	               COLUMN_NAME,
+	               IS_CHANGE,
+	               COLUMN_CHECK
+	          FROM INIT_ACC_CHECK_TYPE;
+	    END IF;
+      
+      --币种规则内置
+	    insert when
+	      (not exists (select 1
+	          from ACC_CUR
+	         WHERE GROUP_ID = V_GROUP_ID
+	           AND HOS_ID = V_HOS_ID
+	           AND COPY_CODE = '0' 
+             AND ACC_YEAR='0')) 
+             then into 
+               ACC_CUR
+	      (GROUP_ID,
+	       HOS_ID,
+	       COPY_CODE,ACC_YEAR,CUR_CODE, CUR_NAME,  WBX_CODE, SPELL_CODE, CUR_NUM,CUR_RATE,CUR_PLAN,IS_SELF,IS_STOP)
+	      SELECT V_GROUP_ID,
+	             V_HOS_ID,
+	             '0'as COPY_CODE, '0' as ACC_YEAR,CUR_CODE, CUR_NAME, WBX_CODE, SPELL_CODE, CUR_NUM,CUR_RATE,CUR_PLAN,IS_SELF,IS_STOP
+	        FROM INIT_ACC_CUR;
+      
+      
+    end;
+
+  end init_group_data_proc;
+	
+
+	]]></sql>
+	
+</root>
+

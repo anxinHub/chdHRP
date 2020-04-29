@@ -1,0 +1,323 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.med.dao.medpur.MedPurCollectMapper">
+
+	<resultMap id="medPurCollectMap" type="java.util.Map">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="confirm_date" column="confirm_date" />
+		<result property="in_id" column="in_id" />
+		<result property="in_no" column="in_no" />
+		<result property="store_id" column="store_id" />
+		<result property="store_no" column="store_no" />
+		<result property="store_code" column="store_code" />
+		<result property="sup_id" column="sup_id" />
+		<result property="sup_no" column="sup_no" />
+		<result property="sup_code" column="sup_code" />
+		<result property="sup_name" column="sup_name" />
+		<result property="med_type_id" column="med_type_id" />
+		<result property="med_type_no" column="med_type_no" />
+		<result property="inv_code" column="inv_code" />
+		<result property="inv_name" column="inv_name" />
+		<result property="inv_model" column="inv_model" />
+		<result property="amount" column="amount" />
+		<result property="price" column="price" />
+		<result property="amount_money" column="amount_money" />
+		<result property="fac_name" column="fac_name" />
+		<result property="fac_code" column="fac_code" />
+		<result property="bus_type_code" column="bus_type_code" />
+		<result property="set_name" column="set_name" />
+		<result property="store_name" column="store_name" />
+		<result property="med_type_name" column="med_type_name" />
+	</resultMap>
+
+	<!-- 采购汇总查询 -->
+	<select id="queryMedPurCollect" parameterType="java.util.Map"
+		resultMap="medPurCollectMap">
+		WITH a_table as(
+		SELECT mim.group_id, mim.hos_id, mim.copy_code,
+		to_char (hsd.sup_code || ' ' || hsd.sup_name) AS sup_name, mi.inv_code || ' ' || mi.inv_name
+		AS inv_name,
+		mi.inv_model, nvl(mid.price, 0) AS price, sum(mid.amount) as
+		amount,sum(mid.amount_money) as amount_money,
+		hfd.fac_name,mss.set_name
+		<if test="is_showStore != null and is_showStore != '' ">
+			, hsdd.store_name
+		</if>
+		FROM med_in_main mim
+		LEFT JOIN med_in_detail mid ON mim.group_id = mid.group_id
+		AND mim.hos_id = mid.hos_id
+		AND mim.copy_code = mid.copy_code
+		AND mim.in_id = mid.in_id
+		AND mim.in_no = mid.in_no
+		LEFT JOIN hos_sup_dict hsd ON mim.group_id = hsd.group_id
+		AND mim.hos_id = hsd.hos_id
+		AND mim.sup_id = hsd.sup_id
+		AND hsd.is_stop = 0
+		LEFT JOIN med_inv_dict mi ON mid.group_id = mi.group_id
+		AND mid.hos_id = mi.hos_id
+		AND mid.copy_code = mi.copy_code
+		AND mid.inv_id = mi.inv_id
+		AND mi.is_stop = 0
+		LEFT JOIN hos_fac_dict hfd ON hfd.group_id = mi.group_id
+		AND hfd.hos_id = mi.hos_id
+		AND hfd.fac_id = mi.fac_id
+		AND hfd.fac_no = mi.fac_no
+		LEFT JOIN med_store_detail msd ON mim.group_id = msd.group_id
+		AND mim.hos_id = msd.hos_id
+		AND mim.store_id = msd.store_id
+		LEFT JOIN hos_store_dict hsdd ON mim.group_id = hsdd.group_id
+		AND mim.hos_id = hsdd.hos_id
+		AND mim.store_id = hsdd.store_id
+		AND hsdd.is_stop = 0
+		LEFT JOIN med_store_set mss ON msd.group_id = mss.group_id
+		AND msd.hos_id = mss.hos_id
+		AND msd.set_id = mss.set_id
+		<where>
+			mim.bus_type_code in ( 2 ,47 
+			<!-- 2017/03/09是否包含退货 -->
+			<if test="is_back == 1">
+				,12 , 48 
+			</if>
+			)
+			<if test="group_id != null and group_id != ''">
+				and mim.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and mim.hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				and mim.copy_code = #{copy_code}
+			</if>
+			<!-- 2017/03/09增加制单日期条件 -->
+			<if test="begin_in_date != null and begin_in_date != '' 
+				and end_in_date != null and end_in_date != ''">
+				and mim.in_date between
+				to_date(#{begin_in_date},'yyyy-MM-dd') and
+				to_date(#{end_in_date},'yyyy-MM-dd')
+			</if>
+			<if test="inv_model != null and inv_model != ''">
+					and (
+					mi.inv_model like '%${inv_model}%'
+					 	or mi.inv_name like '%${inv_model}%'
+				         or mi.inv_code like '%${inv_model}%'
+					     or upper(mi.spell_code) like '%${inv_model}%'
+					     or upper(mi.wbx_code) like '%${inv_model}%'
+					     or lower(mi.spell_code) like '%${inv_model}%'
+					     or lower(mi.wbx_code) like '%${inv_model}%'
+					     )
+			</if>  
+			<if
+				test="begin_confirm_date != null and begin_confirm_date != '' and end_confirm_date != null and end_confirm_date != ''">
+				AND mim.confirm_date between
+				to_date(#{begin_confirm_date},'yyyy-MM-dd') and
+				to_date(#{end_confirm_date},'yyyy-MM-dd')
+			</if>
+			<if test="store_id != null and store_id != ''">
+				and mim.store_id = #{store_id}
+			</if>
+			<if test="store_no!= null and store_no != ''">
+				and mim.store_no= #{store_no}
+			</if>
+			<if test="med_type_id != null and med_type_id != ''">
+				and mi.med_type_id = #{med_type_id}
+			</if>
+			<if test="med_type_no !=null and med_type_no != ''">
+				and mi.med_type_no= #{med_type_no}
+			</if>
+			<if test="sup_id != null and sup_id != ''">
+				and mim.sup_id = #{sup_id}
+			</if>
+			<if test="sup_no !=null and sup_no != ''">
+				and mim.sup_no= #{sup_no}
+			</if>
+			<if test="inv_id !=null and inv_id != ''">
+				and (  mi.inv_id like '%${inv_id}%' or
+				mi.inv_model like '%${inv_id}%'
+					 or mi.inv_name like '%${inv_id}%'
+				         or mi.inv_code like '%${inv_id}%'
+					     or upper(mi.spell_code) like '%${inv_id}%'
+					     or upper(mi.wbx_code) like '%${inv_id}%'
+					     or lower(mi.spell_code) like '%${inv_id}%'
+					     or lower(mi.wbx_code) like '%${inv_id}%'
+					     )
+			</if>
+			<if test="inv_no !=null and inv_no != ''">
+				and mi.inv_no = #{inv_no}
+			</if>
+			<if test="set_id != null and set_id != '' ">
+				and mss.set_id = #{set_id}
+			</if>
+			
+			<!-- 2017/03/09增加是否收费条件 -->
+			<if test="is_charge != null and is_charge != ''">
+				and mi.is_charge = #{is_charge}
+			</if>
+		</where>
+		GROUP BY mim.group_id, mim.hos_id,
+		mim.copy_code,hsd.sup_code,hsd.sup_name,
+		mi.inv_code,mi.inv_name,mi.inv_model,hfd.fac_name,mss.set_name,
+		mid.price, mss.set_code
+		<if test="is_showStore != null and is_showStore != '' ">
+			,hsdd.store_code, hsdd.store_name
+		</if>
+		ORDER BY mim.group_id, mim.hos_id, mim.copy_code, mss.set_code,
+		<if test="is_showStore != null and is_showStore != '' ">
+			hsdd.store_code,
+		</if>
+		hsd.sup_code, hsd.sup_name
+		)
+		SELECT a.* FROM a_table a
+		UNION ALL
+		SELECT
+		NULL, NULL, NULL, to_char('合计') AS sup_name, NULL, NULL, NULL, SUM(b.amount) AS
+		amount,
+		SUM(b.amount_money) AS amount_money, NULL, NULL
+		<if test="is_showStore != null and is_showStore != '' ">
+			,NULL
+		</if>
+		FROM a_table b
+
+	</select>
+
+	<!-- 采购汇总查询 -->
+	<select id="queryMedPurCollectType" parameterType="java.util.Map"
+		resultMap="medPurCollectMap">
+
+		WITH a_table as
+		(SELECT mim.group_id,
+		mim.hos_id,
+		mim.copy_code,
+		hsd.sup_code || ' ' || hsd.sup_name AS sup_name,
+		mtd.med_type_name,
+		sum(mid.amount_money) as amount_money,
+		mss.set_name
+		<if test="is_showStore != null and is_showStore != '' ">
+			, hsdd.store_name
+		</if>
+		FROM med_in_main mim
+		LEFT JOIN med_in_detail mid
+		ON mim.group_id = mid.group_id
+		AND mim.hos_id = mid.hos_id
+		AND mim.copy_code = mid.copy_code
+		AND mim.in_id = mid.in_id
+		AND mim.in_no = mid.in_no
+		LEFT JOIN hos_sup_dict hsd
+		ON mim.group_id = hsd.group_id
+		AND mim.hos_id = hsd.hos_id
+		AND mim.sup_id = hsd.sup_id
+		AND hsd.is_stop = 0
+		LEFT JOIN med_inv_dict mi
+		ON mid.group_id = mi.group_id
+		AND mid.hos_id = mi.hos_id
+		AND mid.copy_code = mi.copy_code
+		AND mid.inv_id = mi.inv_id
+		AND mi.is_stop = 0
+		left join med_type_dict mtd
+		on mtd.med_type_id = mi.med_type_id
+		and mtd.group_id = mi.group_id
+		and mtd.hos_id = mi.hos_id
+		and mtd.copy_code = mi.copy_code
+		and mtd.is_stop = 0
+		LEFT JOIN med_store_detail msd
+		ON mim.group_id = msd.group_id
+		AND mim.hos_id = msd.hos_id
+		AND mim.store_id = msd.store_id
+		LEFT JOIN hos_store_dict hsdd
+		ON mim.group_id = hsdd.group_id
+		AND mim.hos_id = hsdd.hos_id
+		AND mim.store_id = hsdd.store_id
+		AND hsdd.is_stop = 0
+		LEFT JOIN med_store_set mss
+		ON msd.group_id = mss.group_id
+		AND msd.hos_id = mss.hos_id
+		AND msd.set_id = mss.set_id
+		<where>
+			mim.bus_type_code in ( 2 ,12 ,47 , 48 )
+			<if test="group_id != null and group_id != ''">
+				and mim.group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and mim.hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				and mim.copy_code = #{copy_code}
+			</if>
+			<if
+				test="begin_confirm_date != null and begin_confirm_date != '' and end_confirm_date != null and end_confirm_date != ''">
+				AND mim.confirm_date between
+				to_date(#{begin_confirm_date},'yyyy-MM-dd') and
+				to_date(#{end_confirm_date},'yyyy-MM-dd')
+			</if>
+			<if test="store_id != null and store_id != ''">
+				and mim.store_id = #{store_id}
+			</if>
+			<if test="store_no!= null and store_no != ''">
+				and mim.store_no= #{store_no}
+			</if>
+			<if test="med_type_id != null and med_type_id != ''">
+				and mi.med_type_id = #{med_type_id}
+			</if>
+			<if test="med_type_no !=null and med_type_no != ''">
+				and mi.med_type_no= #{med_type_no}
+			</if>
+			<if test="sup_id != null and sup_id != ''">
+				and mim.sup_id = #{sup_id}
+			</if>
+			<if test="sup_no !=null and sup_no != ''">
+				and mim.sup_no= #{sup_no}
+			</if>
+			<if test="inv_id !=null and inv_id != ''">
+				and mi.inv_id= #{inv_id}
+			</if>
+			<if test="inv_no !=null and inv_no != ''">
+				and mi.inv_no = #{inv_no}
+			</if>
+			<if test="set_id != null and set_id != '' ">
+				and mss.set_id = #{set_id}
+			</if>
+		</where>
+		GROUP BY mim.group_id,
+		mim.hos_id,
+		mim.copy_code,
+		hsd.sup_code,
+		hsd.sup_name,
+		mtd.med_type_name,
+		mss.set_name,
+		mss.set_code
+		<if test="is_showStore != null and is_showStore != '' ">
+			,hsdd.store_code, hsdd.store_name
+		</if>
+		ORDER BY mim.group_id,
+		mim.hos_id,
+		mim.copy_code,
+		mss.set_code
+		<if test="is_showStore != null and is_showStore != '' ">
+			,hsdd.store_code,
+		</if>
+		hsd.sup_code,
+		hsd.sup_name
+
+		),
+       b_table as(
+         SELECT a.*
+           FROM a_table a
+         UNION ALL
+         SELECT NULL,
+                NULL,
+                NULL,
+                to_char('合计') AS sup_name,
+                NULL,
+                SUM(b.amount_money) AS amount_money,
+                NULL
+                <if test="is_showStore != null and is_showStore != '' ">
+			,NULL
+		</if>
+           FROM a_table b )
+
+           select * from b_table  pivot  (sum(amount_money) for med_type_name in ${sql_type})
+
+	</select>
+</mapper>
+

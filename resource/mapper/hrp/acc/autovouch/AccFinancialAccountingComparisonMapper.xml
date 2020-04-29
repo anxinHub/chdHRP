@@ -1,0 +1,476 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.acc.dao.autovouch.AccFinancialAccountingComparisonMapper">
+	
+	<select id="queryFinancialAccountingComparison" resultType="java.util.Map">
+	SELECT 
+		P1.SUBJ_CODE,
+		P3.SUBJ_CODE SUBJ_CODE_K,
+		p2.SOURCE_ID,
+		P1.SUBJ_CODE||' '||P1.SUBJ_NAME_ALL caiwu,
+		P3.SUBJ_CODE||' '||P3.SUBJ_NAME_ALL  yusuan
+	FROM
+	ACC_SUBJ P1
+	LEFT JOIN ACC_SUBJ_ACC_BUDG P2
+		ON P1.GROUP_ID = P2.GROUP_ID
+		AND P1.HOS_ID = P2.HOS_ID
+		AND P1.COPY_CODE = P2.COPY_CODE
+		AND P1.SUBJ_CODE = P2.ACC_SUBJ_CODE
+	LEFT JOIN ACC_SUBJ P3
+		ON P1.GROUP_ID = P3.GROUP_ID
+		AND P1.HOS_ID = P3.HOS_ID
+		AND P1.COPY_CODE = P3.COPY_CODE
+		AND P1.ACC_YEAR = P3.ACC_YEAR
+		AND P2.BUDG_SUBJ_CODE = P3.SUBJ_CODE
+		AND P3.KIND_CODE = '02'
+		AND P3.IS_LAST = 1
+	WHERE P1.GROUP_ID = #{group_id,jdbcType=INTEGER}
+		AND P1.HOS_ID = #{hos_id,jdbcType=INTEGER}
+		AND P1.COPY_CODE = #{copy_code,jdbcType=VARCHAR}
+		AND P1.ACC_YEAR = #{acc_year,jdbcType=VARCHAR}
+		AND P1.KIND_CODE = '01'
+		AND P1.IS_STOP = 0
+		AND P1.IS_LAST = 1
+		<if test="subj_code_c != null and subj_code_c != '' ">
+		AND (P1.SUBJ_CODE LIKE '${subj_code_c}%' OR
+			 P1.SUBJ_NAME_ALL LIKE '%${subj_code_c}%' OR
+			 P1.SUBJ_NAME_EN LIKE '%${subj_code_c}%' OR
+			 P1.SPELL_CODE LIKE '${subj_code_c}%' OR
+			 P1.WBX_CODE LIKE '${subj_code_c}%')
+		</if>
+		<if test="subj_code_k != null and subj_code_k != '' ">
+		AND (P3.SUBJ_CODE LIKE '${subj_code_k}%' OR
+			 P3.SUBJ_NAME_ALL LIKE '%${subj_code_k}%' OR
+			 P3.SUBJ_NAME_EN LIKE '%${subj_code_k}%' OR
+			 P3.SPELL_CODE LIKE '${subj_code_k}%' OR
+			 P3.WBX_CODE LIKE '${subj_code_k}%')
+		</if>
+		<if test="code != 1 and code != null and code != '' ">
+		AND P3.SUBJ_CODE IS NULL
+		</if>
+		<if test="code != 0 and code != null and code != '' ">
+		AND P3.SUBJ_CODE IS NOT NULL
+		</if>
+		<!-- <if test="show_way != null and show_way == 1">
+		AND (
+			P1.check1 &lt;&gt; #{check_type_id,jdbcType=INTEGER}
+			and P1.check2 &lt;&gt; #{check_type_id,jdbcType=INTEGER}
+			and P1.check3 &lt;&gt; #{check_type_id,jdbcType=INTEGER}
+			and P1.check4 &lt;&gt; #{check_type_id,jdbcType=INTEGER}
+		)
+		</if> -->
+		<if test="show_way != null and show_way == 2">
+		AND (
+			P1.check1 = #{check_type_id,jdbcType=INTEGER}
+			or P1.check2 = #{check_type_id,jdbcType=INTEGER}
+			or P1.check3 = #{check_type_id,jdbcType=INTEGER}
+			or P1.check4 = #{check_type_id,jdbcType=INTEGER}
+		)
+		</if>
+	ORDER BY
+		P1.SUBJ_CODE
+	</select>
+	
+	<select id="queryFinancialAccountingComparisonSubjC" resultType="java.util.Map">
+	SELECT
+		SUBJ_CODE "id",
+		SUBJ_CODE||' '||SUBJ_NAME_ALL "text"
+	FROM 
+		ACC_SUBJ
+	WHERE
+		GROUP_ID = #{group_id,jdbcType=INTEGER}
+		AND HOS_ID = #{hos_id,jdbcType=INTEGER}
+		AND COPY_CODE = #{copy_code,jdbcType=VARCHAR}
+		AND ACC_YEAR = #{acc_year,jdbcType=VARCHAR}
+		AND KIND_CODE = '01'
+		AND IS_STOP = 0
+		AND IS_LAST = 1
+		<if test="key != null and key != '' ">
+		AND (SUBJ_CODE LIKE '${key}%' OR
+			 SUBJ_NAME_ALL LIKE '%${key}%' OR
+			 SPELL_CODE LIKE '${key}%' OR
+			 WBX_CODE LIKE '${key}%'
+			)
+		</if>
+	</select>
+	
+	<select id="queryFinancialAccountingComparisonSubjK" resultType="java.util.Map">
+	SELECT
+		SUBJ_CODE "id",
+		SUBJ_CODE||' '||SUBJ_NAME_ALL "text", 
+		subj_name "subj_name",
+		spell_code "spell_code",
+		wbx_code "wbx_code"
+	FROM 
+		ACC_SUBJ
+	WHERE
+		GROUP_ID = #{group_id,jdbcType=INTEGER}
+		AND HOS_ID = #{hos_id,jdbcType=INTEGER}
+		AND COPY_CODE = #{copy_code,jdbcType=VARCHAR}
+		AND ACC_YEAR = #{acc_year,jdbcType=VARCHAR}
+		AND KIND_CODE = '02'
+		AND IS_STOP = 0
+		AND IS_LAST = 1
+		<if test="key != null and key != '' ">
+		AND (SUBJ_CODE LIKE '${key}%' OR
+			 SUBJ_NAME_ALL LIKE '%${key}%' OR
+			 SPELL_CODE LIKE '${key}%' OR
+			 WBX_CODE LIKE '${key}%'
+			)
+		</if>
+	order by
+		subj_code
+	</select>
+	
+	<delete id="deleteFinancialAccountingComparison">
+	DELETE FROM 
+		ACC_SUBJ_ACC_BUDG
+	WHERE
+		GROUP_ID = #{group_id,jdbcType=INTEGER}
+		AND HOS_ID = #{hos_id,jdbcType=INTEGER}
+		AND COPY_CODE = #{copy_code,jdbcType=VARCHAR}
+		AND ACC_SUBJ_CODE = #{subj_code_c,jdbcType=VARCHAR}		
+	</delete>
+	
+	<insert id="addFinancialAccountingComparison">
+	INSERT INTO
+		ACC_SUBJ_ACC_BUDG(GROUP_ID,HOS_ID,COPY_CODE,ACC_SUBJ_CODE,BUDG_SUBJ_CODE)
+		VALUES (#{group_id,jdbcType=INTEGER},#{hos_id,jdbcType=INTEGER},#{copy_code,jdbcType=VARCHAR},
+				#{subj_code_c,jdbcType=VARCHAR},#{subj_code_k,jdbcType=VARCHAR}
+				)
+	</insert>
+	
+	<insert id="addBatchFinancialAccountingComparison">
+		INSERT INTO ACC_SUBJ_ACC_BUDG(
+			group_id, hos_id, copy_code, acc_subj_code, budg_subj_code, source_id
+		)
+		SELECT #{map.group_id,jdbcType=INTEGER} group_id,
+			#{map.hos_id,jdbcType=INTEGER} hos_id,
+			#{map.copy_code,jdbcType=VARCHAR} copy_code,
+			#{map.subj_code_c,jdbcType=VARCHAR} acc_subj_code, 
+			budg_subj_code, source_id
+		FROM (
+			<foreach collection="list" item="item" separator="union all">
+			SELECT 
+				#{item.subj_code_k,jdbcType=VARCHAR} budg_subj_code,
+				#{item.source_id,jdbcType=INTEGER} source_id
+			FROM DUAL
+			</foreach>
+		) tmp
+	</insert>
+	
+	<!-- 查询已经存在的Code -->
+	<select id="queryFinancialSubjCode" resultType="String">
+		SELECT
+			ACC_SUBJ_CODE
+		FROM
+			ACC_SUBJ_ACC_BUDG
+		WHERE
+			GROUP_ID = #{group_id,jdbcType=INTEGER}
+			AND HOS_ID = #{hos_id,jdbcType=INTEGER}
+			AND COPY_CODE = #{copy_code,jdbcType=VARCHAR}
+	</select>
+	
+	<!-- 导入 -->
+	<insert id="importFinancialAccountingComparison">
+		insert into ACC_SUBJ_ACC_BUDG
+			select tt.* from ( 
+			<foreach collection="list" open=" ( " close=" ) " separator=" union all " item="it">
+				select
+					#{vo.group_id,jdbcType=INTEGER},
+					#{vo.hos_id,jdbcType=INTEGER},
+					#{vo.copy_code,jdbcType=VARCHAR},
+					#{it.ACC_SUBJ_CODE,jdbcType=VARCHAR},
+					#{it.BUDG_SUBJ_CODE,jdbcType=VARCHAR}
+				from
+					dual
+			</foreach> ) tt
+	</insert>
+	
+	<!-- 自动对照 -->
+	<update id="updateSmartSubj" parameterType="java.util.Map">
+	<![CDATA[
+	declare    
+      TYPE ref_type IS REF CURSOR;--定义游标指针
+      v_cursor ref_type;--定义游标变量
+     
+      v_group_id number;
+      v_hos_id number;
+      v_copy_code varchar2(20);
+      v_acc_year varchar2(20);
+      v_subj_code varchar2(50);           
+      v_subj_type_code varchar2(20);
+      v_subj_name varchar2(500);
+      v_subj_name_all varchar2(1000);
+      v_subj_nature_code varchar2(20);
+      v_budg_subj_code varchar2(50);  
+      v_count number;
+      v_sum number;
+  begin
+      v_group_id:=#{group_id};
+      v_hos_id:=#{hos_id};
+      v_copy_code:=#{copy_code};
+      v_acc_year:=#{acc_year};
+      v_sum:=0;
+      
+      open v_cursor for
+          /*取没有对应的会计科目*/
+          select s.subj_code,s.subj_type_code,s.subj_name,s.subj_name_all,s.subj_nature_code from acc_subj s
+          where s.group_id=v_group_id and s.hos_id=v_hos_id and s.copy_code=v_copy_code and s.acc_year=v_acc_year
+          and s.is_last=1 and s.subj_type_code in('01','02','03','04','05')
+          and not exists(
+              select 1 from ACC_SUBJ_ACC_BUDG b 
+              where  b.group_id=s.group_id and  b.hos_id=s.hos_id and b.copy_code=s.copy_code
+              and  b.ACC_SUBJ_CODE=s.subj_code
+          )
+          order by subj_code;
+       
+      loop
+      fetch v_cursor into v_subj_code,v_subj_type_code,v_subj_name,v_subj_name_all,v_subj_nature_code;
+      exit when v_cursor%notfound;
+           
+          if(v_subj_name='应收在院病人医疗款' or v_subj_name='应收医疗款' or instr(v_subj_name,'借款') > 0 or instr(v_subj_name,'报销') > 0) then
+               continue;      
+          end if;
+          
+          v_budg_subj_code:='';
+          if(v_subj_code='300104') then
+              select count(1) into v_count from acc_subj
+              where group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code and acc_year=v_acc_year
+              and is_last=1 and subj_code = '820201' and rownum=1;
+              
+              if(v_count>0) then
+                   select subj_code into v_budg_subj_code from acc_subj
+                   where group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code and acc_year=v_acc_year
+                   and is_last=1 and subj_code = '820201' and rownum=1;
+              end if;
+          
+          elsif(v_subj_name='零余额账户用款额度' and v_subj_type_code='01') then
+              select count(1) into v_count from acc_subj
+              where group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code and acc_year=v_acc_year
+              and is_last=1 and subj_type_code='08' and subj_name = '零余额账户用款额度' and rownum=1;
+              
+              if(v_count>0) then
+                   select subj_code into v_budg_subj_code from acc_subj
+                   where group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code and acc_year=v_acc_year
+                   and is_last=1 and subj_type_code='08' and subj_name = '零余额账户用款额度' and rownum=1;
+              end if;
+          
+          elsif(v_subj_name='财政直接支付' and v_subj_type_code='01') then
+                select count(1) into v_count from acc_subj
+                where group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code and acc_year=v_acc_year
+                and is_last=1 and subj_type_code='08' and subj_name in('财政直接支付','财政应返还额度') and rownum=1;
+                
+                if(v_count>0) then
+                    select subj_code into v_budg_subj_code from acc_subj
+                    where group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code and acc_year=v_acc_year
+                    and is_last=1 and subj_type_code='08' and subj_name in('财政直接支付','财政应返还额度') and rownum=1;
+                end if;
+          elsif(v_subj_name='财政授权支付' and v_subj_type_code='01') then
+                select count(1) into v_count from acc_subj
+                where group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code and acc_year=v_acc_year
+                and is_last=1 and subj_type_code='08' and subj_name in('财政授权支付','财政应返还额度') and rownum=1;
+                
+                if(v_count>0) then
+                    select subj_code into v_budg_subj_code from acc_subj
+                    where group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code and acc_year=v_acc_year
+                    and is_last=1 and subj_type_code='08' and subj_name in('财政授权支付','财政应返还额度') and rownum=1;
+                end if;
+          
+              
+          elsif((v_subj_name='其他' or v_subj_name='其他收入') and v_subj_type_code='04') then
+                select count(1) into v_count from acc_subj
+                where group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code and acc_year=v_acc_year
+                and is_last=1 and subj_type_code='06' and subj_name in('其他','其他收入','其他预算收入') and rownum=1;
+                
+                if(v_count>0) then
+                    select subj_code into v_budg_subj_code from acc_subj
+                    where group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code and acc_year=v_acc_year
+                    and is_last=1 and subj_type_code='06' and subj_name in('其他','其他收入','其他预算收入') and rownum=1;
+                end if;
+                
+          elsif((v_subj_name='其他' or v_subj_name='其他费用') and v_subj_type_code='05') then
+                select count(1) into v_count from acc_subj
+                where group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code and acc_year=v_acc_year
+                and is_last=1 and subj_type_code='07' and subj_name in('其他','其他支出','其他预算支出') and rownum=1;
+                
+                if(v_count>0) then
+                    select subj_code into v_budg_subj_code from acc_subj
+                    where group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code and acc_year=v_acc_year
+                    and is_last=1 and subj_type_code='07' and subj_name in('其他','其他支出','其他预算支出') and rownum=1;
+                end if;           
+          
+          elsif(v_subj_nature_code='02' or v_subj_nature_code='03') then
+                select count(1) into v_count from acc_subj
+                where group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code and acc_year=v_acc_year
+                and is_last=1 and subj_type_code='08' and subj_name='货币资金' and rownum=1;
+                
+                if(v_count>0) then
+                   select subj_code into v_budg_subj_code from acc_subj
+                   where group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code and acc_year=v_acc_year
+                   and is_last=1 and subj_type_code='08' and subj_name='货币资金' and rownum=1;
+                end if;
+                                
+          elsif(v_subj_nature_code='04') then
+              /*应收->预算收入*/
+              v_subj_name:=replace(v_subj_name,'应收');
+              select count(1) into v_count from acc_subj
+              where group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code and acc_year=v_acc_year
+              and is_last=1 and subj_type_code in('06') and replace(subj_name,'预算')=v_subj_name and rownum=1;
+              
+              if(v_count>0) then                      
+                  select subj_code into v_budg_subj_code from acc_subj
+                  where group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code and acc_year=v_acc_year
+                  and is_last=1 and subj_type_code in('06') and replace(subj_name,'预算')=v_subj_name and rownum=1;
+                  --dbms_output.put_line(v_subj_code||'-'||v_budg_subj_code||'-');
+               end if;    
+       
+          elsif(v_subj_nature_code='05') then
+              /*应付->预算支付*/
+              v_subj_name:=replace(v_subj_name,'应付');
+              select count(1) into v_count from acc_subj
+              where group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code and acc_year=v_acc_year
+              and is_last=1 and subj_type_code in('06') and replace(subj_name,'预算')=v_subj_name and rownum=1;             
+              
+              if(v_count>0) then                      
+                  select subj_code into v_budg_subj_code from acc_subj
+                  where group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code and acc_year=v_acc_year
+                  and is_last=1 and subj_type_code in('06') and replace(subj_name,'预算')=v_subj_name and rownum=1;                 
+                  --dbms_output.put_line(v_subj_code||'-'||v_budg_subj_code||'-');
+               end if; 
+      
+          elsif(substr(v_subj_code,0,4)='5001' or substr(v_subj_code,0,4)='5101') then
+              /*单位管理费用、业务活动费用->事业支出*/
+              /*1、检查是否包含预算科目名称*/
+              select count(1) into v_count from acc_subj
+              where group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code and acc_year=v_acc_year
+              and is_last=1 and subj_code like '7201%' and replace(subj_name,'预算')=v_subj_name and rownum=1; 
+                           
+              if(v_count>0) then                  
+                  select subj_code into v_budg_subj_code from acc_subj
+                  where group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code and acc_year=v_acc_year
+                  and is_last=1 and subj_code like '7201%' and replace(subj_name,'预算')=v_subj_name and rownum=1;
+                  --dbms_output.put_line(v_subj_code||'-'||v_budg_subj_code||'-');
+              end if;
+                    
+          elsif(v_subj_type_code='03') then
+              /*净资产->预算结余*/
+              select count(1) into v_count from acc_subj
+              where group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code and acc_year=v_acc_year
+              and is_last=1 and subj_type_code in('08') and replace(subj_name,'预算')=v_subj_name and rownum=1;
+              
+              if(v_count>0) then                      
+                  select subj_code into v_budg_subj_code from acc_subj
+                  where group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code and acc_year=v_acc_year
+                  and is_last=1 and subj_type_code in('08') and replace(subj_name,'预算')=v_subj_name and rownum=1;
+                  --dbms_output.put_line(v_subj_code||'-'||v_budg_subj_code||'-');
+               end if;
+           
+          elsif(v_subj_type_code='04') then
+              /*收入->预算收入*/
+              select count(1) into v_count from acc_subj
+              where group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code and acc_year=v_acc_year
+              and is_last=1 and subj_type_code in('06') and replace(subj_name,'预算')=v_subj_name and rownum=1;
+              
+              if(v_count>0) then                      
+                  select subj_code into v_budg_subj_code from acc_subj
+                  where group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code and acc_year=v_acc_year
+                  and is_last=1 and subj_type_code in('06') and replace(subj_name,'预算')=v_subj_name and rownum=1;
+                  --dbms_output.put_line(v_subj_code||'-'||v_budg_subj_code||'-');
+               end if;
+              
+           elsif(v_subj_type_code='05') then
+              /*费用->预算支出*/
+              select count(1) into v_count from acc_subj
+              where group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code and acc_year=v_acc_year
+              and is_last=1 and subj_type_code in('07') and replace(subj_name,'预算')=v_subj_name and rownum=1;
+              
+              if(v_count>0) then                      
+                  select subj_code into v_budg_subj_code from acc_subj
+                  where group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code and acc_year=v_acc_year
+                  and is_last=1 and subj_type_code in('07') and replace(subj_name,'预算')=v_subj_name and rownum=1;
+                  --dbms_output.put_line(v_subj_code||'-'||v_budg_subj_code||'-');
+              end if; 
+                            
+           end if;
+                      
+           if(nvl(v_budg_subj_code,'abc')!='abc') then
+             /*更新对照关系表*/
+            /* update ACC_SUBJ_ACC_BUDG b set budg_subj_code=v_budg_subj_code 
+             where group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code and acc_subj_code=v_subj_code;                                   
+             v_count := sql%rowcount; */
+              
+             /*没有插入对应关系表*/ 
+             insert into ACC_SUBJ_ACC_BUDG (GROUP_ID, HOS_ID, COPY_CODE, ACC_SUBJ_CODE, BUDG_SUBJ_CODE)
+             values( v_group_id, v_hos_id, v_copy_code, v_subj_code, v_budg_subj_code);
+                         
+             v_count := sql%rowcount;              
+             v_sum:=v_sum+v_count;
+           end if;
+           
+           
+      end loop;
+      close v_cursor;
+      dbms_output.put_line(v_sum);
+  	end;
+		
+	]]>
+	</update>
+	
+	<!-- 导入前删除 -->
+	<delete id="deleteimportFinancial">
+		delete from
+			ACC_SUBJ_ACC_BUDG
+		where
+			GROUP_ID = #{vo.group_id,jdbcType=INTEGER}
+			AND HOS_ID = #{vo.hos_id,jdbcType=INTEGER}
+			AND COPY_CODE = #{vo.copy_code,jdbcType=VARCHAR}
+			AND ACC_SUBJ_CODE IN
+				<foreach collection="list" close=" ) " open=" ( " separator=" , " item="item">
+					#{item.ACC_SUBJ_CODE,jdbcType=VARCHAR}
+				</foreach>
+	</delete>
+	
+	<!-- 查询重复编码 -->
+	<select id="queryFinancialCode" resultType="String">
+	select acc_subj_code from acc_subj_acc_budg 
+	where
+			GROUP_ID = #{group_id,jdbcType=INTEGER}
+			AND HOS_ID = #{hos_id,jdbcType=INTEGER}
+			AND COPY_CODE = #{copy_code,jdbcType=VARCHAR}
+	AND acc_subj_code not
+	in (select subj_code from acc_subj where
+			GROUP_ID = #{group_id,jdbcType=INTEGER}
+			AND HOS_ID = #{hos_id,jdbcType=INTEGER}
+			AND COPY_CODE = #{copy_code,jdbcType=VARCHAR}
+			AND ACC_YEAR = #{acc_year,jdbcType=VARCHAR})
+	union all
+	select budg_subj_code from acc_subj_acc_budg 
+	where
+			GROUP_ID = #{group_id,jdbcType=INTEGER}
+			AND HOS_ID = #{hos_id,jdbcType=INTEGER}
+			AND COPY_CODE = #{copy_code,jdbcType=VARCHAR}
+	AND budg_subj_code not
+	in(select subj_code from acc_subj where
+			GROUP_ID = #{group_id,jdbcType=INTEGER}
+			AND HOS_ID = #{hos_id,jdbcType=INTEGER}
+			AND COPY_CODE = #{copy_code,jdbcType=VARCHAR}
+			AND ACC_YEAR = #{acc_year,jdbcType=VARCHAR})
+	</select>
+	
+	<select id="queryHosSource" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT source_id "source_id", source_code "source_code", source_name "source_name"
+		FROM hos_source 
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND is_stop = 0
+	</select>
+	<select id="getSourceCheckId" parameterType="java.util.Map" resultType="java.lang.Integer">
+		SELECT check_type_id "check_type_id"
+		FROM acc_check_type 
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND check_table = 'HOS_SOURCE'
+	</select>
+</mapper>

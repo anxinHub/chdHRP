@@ -1,0 +1,597 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.acc.dao.paper.AccPaperIncomeMapper">
+
+	<!-- 票据类型下拉加载 -->
+	<select id="queryAccPaperIncomeType_code" resultType="java.util.Map">
+	SELECT TYPE_CODE "id", TYPE_NAME "text" FROM ACC_PAPER_TYPE
+	WHERE IS_AUTO = 0 AND  GROUP_ID = #{group_id} AND HOS_ID = #{hos_id} AND COPY_CODE = #{copy_code}
+	</select>
+
+	<!-- 币种下拉加载 -->
+	<select id="queryAccPaperIncomeMoney" resultType="java.util.Map">
+	SELECT CUR_CODE "id", CUR_NAME "text" FROM ACC_CUR 
+	WHERE GROUP_ID = #{group_id}
+	   AND HOS_ID = #{hos_id}
+	   AND COPY_CODE = #{copy_code}
+	   AND ACC_YEAR = #{acc_year}
+	   AND IS_STOP = 0
+	</select>
+
+	<!-- 汇率下拉加载 -->
+	<select id="queryAccPaperIncomeRatename" resultType="java.util.Map">
+	SELECT RATE_CODE||'|'||TO_CHAR(RATE,'fm999999999999.000000') "id", RATE_NAME "text" FROM ACC_RATE
+	 WHERE GROUP_ID = #{group_id}
+	   AND HOS_ID = #{hos_id}
+	   AND COPY_CODE = #{copy_code}
+	   AND IS_STOP = 2
+	</select>
+	
+	<!-- 核算项下拉加载 -->
+	<select id="queryAccPaperIncomeCheckItemNo" resultType="java.util.Map">
+	SELECT T1.SUP_NO||'|'||T1.SUP_ID|| '|' || T3.BANK_NAME || '|' || T3.BANK_NUMBER||'|'||T3.REGION||'|'||T3.LEGAL "id",
+    T1.SUP_NAME "text"
+    FROM HOS_SUP_DICT T1
+                     LEFT JOIN HOS_SUP_TYPE T2 ON T1.TYPE_CODE =
+                                                  T2.TYPE_CODE
+                                              AND T1.GROUP_ID = T2.GROUP_ID
+                                              AND T1.HOS_ID = T2.HOS_ID
+                     LEFT JOIN ACC_SUP_ATTR T3 ON T1.SUP_ID = T3.SUP_ID
+                                              AND T1.GROUP_ID = T3.GROUP_ID
+                                              AND T1.HOS_ID = T3.HOS_ID
+                    WHERE T1.GROUP_ID = #{group_id,jdbcType=INTEGER}
+                      AND T1.HOS_ID = #{hos_id,jdbcType=INTEGER}
+                      AND T1.IS_DISABLE = 0
+                      AND T2.IS_STOP = 0
+                      AND T1.IS_STOP = 0
+      				  AND ROWNUM &lt; 10
+      		<if test="key != null and key != ''">
+				and (
+				T1.SPELL_CODE like '${key}%' or
+				T1.SUP_NAME like '%${key}%'
+				)
+			</if>		
+		order by T1.SPELL_CODE
+	</select>
+	
+	<!-- 核算类下拉加载 -->
+	<select id="queryAccPaperIncomeCheckTypeId" resultType="java.util.Map">
+	   SELECT CHECK_TYPE_ID "id",CHECK_TYPE_NAME "text" 
+	   FROM ACC_CHECK_TYPE 
+	   WHERE GROUP_ID = #{group_id} 
+	   AND HOS_ID = #{hos_id} 
+	   AND COPY_CODE = #{copy_code}  
+	   AND CHECK_TABLE = 'HOS_SUP_DICT'
+	</select>
+
+	<!-- 应收新增页面 -->
+	<insert id="addPaperIncome">
+	INSERT INTO ACC_PAPER_SF
+	 (GROUP_ID,
+	   HOS_ID,
+	   COPY_CODE,
+	   BUSI_TYPE_CODE,
+	   TYPE_CODE,
+	   PAPER_NUM,
+	   CUR_CODE,
+	   QF_DATE,
+	   CW_DATE,
+	   DQ_DATE,
+	   RATE_CODE,
+	   FKQX,
+	   PM_MONEY,
+	   PM_MONEY_B,
+	   PMLL,
+	   DQZ,
+	   DQZ_B,
+	   DQLL,
+	   CDR,
+	   CHECK_TYPE_ID,
+	   CHECK_ITEM_ID,
+	   CHECK_ITEM_NO,
+	   BANK_NAME,
+	   BANK_NUMBER,
+	   CON_NO,
+	   SF_MEN,
+	   SF_ADD,
+	   CP_MEN,
+	   SUMMARY,
+	   CP_ADD,
+	   CREATE_USER,
+	   STATE,
+	   PRINT_COUNT)
+
+	VALUES
+	(#{group_id,jdbcType=INTEGER},
+	   #{hos_id,jdbcType=INTEGER},
+	   #{copy_code,jdbcType=VARCHAR},
+	   #{busi_type_code,jdbcType=VARCHAR},
+	   #{type_code_val,jdbcType=VARCHAR},
+	   #{paper_num,jdbcType=VARCHAR},
+	   #{cur_code_val,jdbcType=VARCHAR},
+	   TO_DATE(#{qf_date,jdbcType=VARCHAR},'yyyy-MM-dd'),
+	   TO_DATE(#{cw_date,jdbcType=VARCHAR},'yyyy-MM-dd'),
+	   TO_DATE(#{dq_date,jdbcType=VARCHAR},'yyyy-MM-dd'),
+	   #{rate_code_val,jdbcType=VARCHAR},<!-- id需要切割 -->
+	   #{fkqx,jdbcType=INTEGER},
+	   #{pm_money,jdbcType=INTEGER},
+	   #{pm_money_b,jdbcType=INTEGER},
+	   #{pmll,jdbcType=INTEGER},
+	   #{dqz,jdbcType=INTEGER},
+	   #{dqz_b,jdbcType=INTEGER},
+	   #{dqll,jdbcType=INTEGER},
+	   #{cdr,jdbcType=VARCHAR},
+	   #{check_type_id_val,jdbcType=INTEGER},
+	   #{check_item_id,jdbcType=INTEGER},
+	   #{check_item_no,jdbcType=INTEGER},
+	   #{bank_name,jdbcType=VARCHAR},
+	   #{bank_number,jdbcType=VARCHAR},
+	   #{con_no,jdbcType=VARCHAR},
+	   #{sf_men,jdbcType=VARCHAR},
+	   #{sf_add,jdbcType=VARCHAR},
+	   #{cp_men,jdbcType=VARCHAR},
+	   #{summary,jdbcType=VARCHAR},
+	   #{cp_add,jdbcType=VARCHAR},
+	   #{username,jdbcType=INTEGER},
+	   1,
+	   0)
+	</insert>
+
+	<!-- 应收票据查询 -->
+	<select id="queryAccPaperIncome" resultType="java.util.Map">
+ 
+  SELECT P1.STATE,
+         P2.VALUE_NAME,
+         P3.TYPE_CODE,
+         P3.TYPE_NAME,
+         P1.PAPER_NUM,
+         P4.CUR_NAME,
+         P1.QF_DATE,
+         P1.CW_DATE,
+         P1.DQ_DATE,
+         TO_CHAR(P1.PM_MONEY, 'fm999999999999.00') PM_MONEY,
+         P5.CHECK_TYPE_NAME,
+         P6.SUP_NAME,
+         P8.USER_NAME AUDIT_USER,
+         P7.USER_NAME
+    FROM ACC_PAPER_SF P1
+    LEFT JOIN SYS_USER P8 on p1.audit_user = p8.user_id
+    LEFT JOIN BUDG_SYS_DICT P2 on P1.STATE = P2.VALUE_CODE
+    LEFT JOIN ACC_PAPER_TYPE P3 on P1.TYPE_CODE = P3.TYPE_CODE
+                               AND P1.GROUP_ID = P3.GROUP_ID
+                               AND P1.HOS_ID = P3.HOS_ID
+                               AND P1.COPY_CODE = P3.COPY_CODE
+    LEFT JOIN ACC_CUR P4 on P1.GROUP_ID = P4.GROUP_ID
+                        AND P1.HOS_ID = P4.HOS_ID
+                        AND P1.COPY_CODE = P4.COPY_CODE
+                        AND P4.IS_STOP = 0
+                        AND P1.CUR_CODE = P4.CUR_CODE
+                        AND SUBSTR(TO_CHAR(P1.CW_DATE,'yyyy-MM-dd'),1,4) = P4.ACC_YEAR
+    LEFT JOIN ACC_CHECK_TYPE P5 on P1.GROUP_ID = P5.GROUP_ID
+                               AND P1.HOS_ID = P5.HOS_ID
+                               AND P1.COPY_CODE = P5.COPY_CODE
+                               AND P1.CHECK_TYPE_ID = P5.CHECK_TYPE_ID
+    LEFT JOIN HOS_SUP_DICT P6 on P1.CHECK_ITEM_NO = P6.SUP_NO
+                             AND P1.CHECK_ITEM_ID = P6.SUP_ID
+    LEFT JOIN SYS_USER P7 on P1.CREATE_USER = P7.USER_ID
+   WHERE 
+   		P1.QF_DATE &gt;= TO_DATE(#{qf_date_state,jdbcType=VARCHAR},'yyyy-MM-dd') AND
+		P1.QF_DATE &lt;= TO_DATE(#{qf_date_end,jdbcType=VARCHAR},'yyyy-MM-dd') AND
+		<if test="type_code != null and type_code != '' ">P1.TYPE_CODE = #{type_code,jdbcType=VARCHAR} AND</if>
+		<if test="state != null and state != '' ">P1.STATE = #{state,jdbcType=INTEGER} AND</if>
+		<if test="cw_date_state != null and cw_date_state != '' ">P1.CW_DATE &gt;= TO_DATE(#{cw_date_state,jdbcType=VARCHAR},'yyyy-MM-dd') AND</if>
+		<if test="cw_date_end != null and cw_date_end != '' ">P1.CW_DATE &lt;= TO_DATE(#{cw_date_end,jdbcType=VARCHAR},'yyyy-MM-dd') AND</if>
+		<if test="check_type_id != null and check_type_id != '' ">P1.CHECK_TYPE_ID = #{check_type_id,jdbcType=INTEGER} AND</if>
+		<if test="create_user != null and create_user != '' ">P1.CREATE_USER = #{create_user,jdbcType=INTEGER} AND</if>
+		<if test="paper_num_state != null and paper_num_state != '' ">P1.PAPER_NUM &gt;= #{paper_num_state,jdbcType=VARCHAR} AND</if>
+		<if test="paper_num_end != null and paper_num_end != '' ">P1.PAPER_NUM &lt;= #{paper_num_end,jdbcType=VARCHAR} AND</if>
+		<if test="check_item_no != null and check_item_no != '' ">P1.CHECK_ITEM_NO = #{check_item_no,jdbcType=INTEGER} AND</if>
+		<if test="audit_user != null and audit_user != '' ">P1.AUDIT_USER = #{audit_user,jdbcType=INTEGER} AND</if>
+   	 P2.F_CODE = 'ACC_PAPER_S'
+     AND P5.CHECK_TABLE = 'HOS_SUP_DICT'
+     AND P1.GROUP_ID = #{group_id,jdbcType=INTEGER}
+     AND P1.HOS_ID = #{hos_id,jdbcType=INTEGER}
+     AND P1.COPY_CODE = #{copy_code,jdbcType=VARCHAR}
+     AND P1.BUSI_TYPE_CODE = #{busi_type_code}
+   ORDER BY P1.QF_DATE DESC
+	</select>
+
+	<!-- 查询-票据编号是否存在 -->
+	<select id="queryPaperIncomeCounts" resultType="int">
+	SELECT COUNT(1) FROM  ACC_PAPER_SF 
+	WHERE 
+		GROUP_ID = #{group_id,jdbcType=INTEGER}
+		AND HOS_ID = #{hos_id,jdbcType=INTEGER}
+		AND COPY_CODE = #{copy_code,jdbcType=VARCHAR}
+		AND PAPER_NUM = #{paper_num,jdbcType=VARCHAR}
+		AND BUSI_TYPE_CODE = #{busi_type_code,jdbcType=VARCHAR}
+	</select>
+	
+	<!-- 背书数据新增 -->
+	<insert id="addBeishu" parameterType="java.util.List">
+	
+		INSERT INTO ACC_PAPER_SF_DETAIL (
+		GROUP_ID ,
+		HOS_ID ,
+		COPY_CODE ,
+		BUSI_TYPE_CODE ,
+		TYPE_CODE ,
+		PAPER_NUM ,
+		BS_DATE ,
+		BSR ,
+		BSZR_DATE ,
+		TX_DATE ,
+		TXL ,
+		TXJE 
+		) (
+		<foreach collection="alllistVo" item="item" index="index" separator=" union all " >
+			SELECT 		
+			#{mapVo.group_id,jdbcType=INTEGER},
+			#{mapVo.hos_id,jdbcType=INTEGER},
+			#{mapVo.copy_code,jdbcType=VARCHAR},
+			#{mapVo.busi_type_code,jdbcType=VARCHAR},
+			#{mapVo.type_code_val,jdbcType=VARCHAR},
+			#{mapVo.paper_num,jdbcType=VARCHAR},
+			TO_DATE(substr(#{item.bs_date,jdbcType=VARCHAR},1,10),'yyyy-MM-dd'),
+			#{item.bsr,jdbcType=VARCHAR},
+			TO_DATE(substr(#{item.bszr_date,jdbcType=VARCHAR},1,10),'yyyy-MM-dd'),
+			TO_DATE(substr(#{item.tx_date,jdbcType=VARCHAR},1,10),'yyyy-MM-dd'),
+		    TO_CHAR(#{item.txl,jdbcType=INTEGER}, 'fm999999999999.000000'),
+		    TO_CHAR(#{item.txje,jdbcType=INTEGER}, 'fm999999999999.00')
+		    FROM DUAL
+		</foreach>
+		)
+	</insert>
+	
+	<!-- 查询是否可以修改 -->
+	<select id="accPaperIncomeUpdateQueryCount" resultType="int">
+	SELECT COUNT(1) FROM 
+		ACC_PAPER_SF 
+	WHERE
+		GROUP_ID = #{group_id,jdbcType=INTEGER}
+		AND HOS_ID = #{hos_id,jdbcType=INTEGER}
+		AND COPY_CODE = #{copy_code,jdbcType=VARCHAR}
+		AND PAPER_NUM = #{paper_num,jdbcType=VARCHAR} 
+		AND STATE = #{state,jdbcType=INTEGER}
+		AND BUSI_TYPE_CODE = #{busi_type_code,jdbcType=VARCHAR}
+	</select>
+	
+	<!-- 修改之回显票据 -->
+	<select id="accPaperIncomeUpdateQuery" resultType="java.util.Map">
+
+  SELECT T6.SUP_NAME CHECK_ITEM_NAME,
+  		 T1.TYPE_CODE,
+         T1.PAPER_NUM,
+         T1.CUR_CODE,
+         T1.STATE,
+         TO_CHAR(T1.QF_DATE, 'yyyy-MM-dd') QF_DATE,
+         TO_CHAR(t1.cw_date, 'yyyy-MM-dd') CW_DATE,
+         TO_CHAR(T1.DQ_DATE, 'yyyy-MM-dd') DQ_DATE,
+         T1.RATE_CODE || '|' || TO_CHAR(T2.RATE, 'fm999999999999.000000') RATE_CODE,
+         T1.FKQX,
+         TO_CHAR(T1.PM_MONEY, 'fm999999999999.00') pm_money,
+         TO_CHAR(T1.PM_MONEY_B, 'fm999999999999.00') pm_money_b,
+         TO_CHAR(T1.PMLL, 'fm999999999999.000000') PMLL,
+         TO_CHAR(T1.DQZ, 'fm999999999999.00') DQZ,
+         TO_CHAR(T1.DQZ_B, 'fm999999999999.00') DQZ_B,
+         TO_CHAR(T1.DQLL, 'fm999999999999.000000') DQLL,
+         T1.CDR,
+         T1.CHECK_TYPE_ID,
+         T1.BANK_NAME,
+         T1.BANK_NUMBER,
+         T1.CON_NO,
+         T1.SF_MEN,
+         T1.SF_ADD,
+         T1.CP_MEN,
+         T1.SUMMARY,
+         T1.CP_ADD,
+         T1.CHECK_ITEM_NO || '|' || T1.CHECK_ITEM_ID || '|' || T3.BANK_NAME || '|' ||
+         T3.BANK_NUMBER || '|' || T3.REGION || '|' || T3.LEGAL CHECK_ITEM,
+         T4.USER_NAME CREATENAME,
+         T5.USER_NAME AUDITNAME,
+         T1.PRINT_COUNT PRINTCOUNT,
+         T1.STATE,
+         (CASE
+              WHEN STATE = 3 THEN T1.TP_NOTE
+              WHEN STATE = 4 THEN T1.NOTE
+              ELSE '' END) STATEVAL
+    FROM ACC_PAPER_SF T1
+    LEFT JOIN ACC_RATE T2 
+		ON T1.RATE_CODE = T2.RATE_CODE
+		   AND T1.GROUP_ID = T2.GROUP_ID
+		   AND T1.HOS_ID = T2.HOS_ID
+		   AND T1.COPY_CODE = T2.COPY_CODE
+    LEFT JOIN ACC_SUP_ATTR T3 
+    			ON T1.GROUP_ID = T3.GROUP_ID
+                 AND T1.HOS_ID = T3.HOS_ID
+                 AND T1.CHECK_ITEM_ID = T3.SUP_ID
+    LEFT JOIN SYS_USER T4
+             ON T1.CREATE_USER = T4.USER_ID
+    LEFT JOIN SYS_USER T5
+             ON T1.AUDIT_USER = T5.USER_ID
+    LEFT JOIN HOS_SUP_DICT T6
+	      	ON T1.GROUP_ID = T6.GROUP_ID
+	     	AND T1.HOS_ID = T6.HOS_ID
+	     	AND T1.CHECK_ITEM_ID = T6.SUP_ID
+	     	AND T1.CHECK_ITEM_NO = T6.SUP_NO
+   		WHERE
+			T1.GROUP_ID = #{group_id,jdbcType=INTEGER} 
+			AND T1.HOS_ID = #{hos_id,jdbcType=INTEGER} 
+			AND T1.COPY_CODE = #{copy_code,jdbcType=VARCHAR} 
+			AND  T1.BUSI_TYPE_CODE = #{busi_type_code,jdbcType=VARCHAR}
+			AND  T1.PAPER_NUM = #{paper_num,jdbcType=VARCHAR}
+	</select>
+	
+	<!-- 修改票据 -->
+	<update id="updatePaperIncome">
+		UPDATE ACC_PAPER_SF SET
+
+  	   TYPE_CODE = #{type_code_val,jdbcType=VARCHAR},
+  	   CUR_CODE = #{cur_code_val,jdbcType=VARCHAR},
+  	   QF_DATE = TO_DATE(#{qf_date,jdbcType=VARCHAR},'yyyy-MM-dd'),
+  	   CW_DATE = TO_DATE(#{cw_date,jdbcType=VARCHAR},'yyyy-MM-dd'),
+  	   DQ_DATE = TO_DATE(#{dq_date,jdbcType=VARCHAR},'yyyy-MM-dd'),
+  	   RATE_CODE = #{rate_code_val,jdbcType=VARCHAR},<!-- id需要切割 -->
+  	   FKQX = #{fkqx,jdbcType=INTEGER},
+  	   PM_MONEY = #{pm_money,jdbcType=INTEGER},
+  	   PM_MONEY_B = #{pm_money_b,jdbcType=INTEGER},
+  	   PMLL = #{pmll,jdbcType=INTEGER},
+  	   DQZ = #{dqz,jdbcType=INTEGER},
+  	   DQZ_B = #{dqz_b,jdbcType=INTEGER},
+  	   DQLL = #{dqll,jdbcType=INTEGER},
+  	   CDR = #{cdr,jdbcType=VARCHAR},
+  	   CHECK_TYPE_ID = #{check_type_id_val,jdbcType=INTEGER},
+  	   CHECK_ITEM_ID = #{check_item_id,jdbcType=INTEGER},
+  	   CHECK_ITEM_NO = #{check_item_no,jdbcType=INTEGER},
+  	   BANK_NAME = #{bank_name,jdbcType=VARCHAR},
+  	   BANK_NUMBER = #{bank_number,jdbcType=VARCHAR},
+  	   CON_NO = #{con_no,jdbcType=VARCHAR},
+  	   SF_MEN = #{sf_men,jdbcType=VARCHAR},
+  	   SF_ADD = #{sf_add,jdbcType=VARCHAR},
+  	   CP_MEN = #{cp_men,jdbcType=VARCHAR},
+  	   SUMMARY = #{summary,jdbcType=VARCHAR},
+  	   CP_ADD = #{cp_add,jdbcType=VARCHAR}
+  	   
+  	   WHERE 
+	  	   GROUP_ID = #{group_id,jdbcType=INTEGER}
+	  	   AND HOS_ID = #{hos_id,jdbcType=INTEGER}
+	  	   AND COPY_CODE = #{copy_code,jdbcType=VARCHAR}
+	  	   AND BUSI_TYPE_CODE = #{busi_type_code,jdbcType=VARCHAR}
+	  	   AND PAPER_NUM = #{paper_num,jdbcType=VARCHAR}
+	</update>
+	
+	<!-- 查询票据的背书信息 -->
+	<select id="queryAccPaperIncomeBook" resultType="java.util.Map">
+	SELECT 
+		BS_DATE "bs_date",
+		BSR "bsr", 
+		BSZR_DATE "bszr_date", 
+		TX_DATE "tx_date", 
+		TO_CHAR(TXL, 'fm999999999999.000000') "txl", 
+		TO_CHAR(TXJE, 'fm999999999999.00')  "txje"
+	FROM 
+		ACC_PAPER_SF_DETAIL
+   	WHERE
+       GROUP_ID = #{group_id,jdbcType=INTEGER}
+       AND HOS_ID = #{hos_id,jdbcType=INTEGER}
+       AND COPY_CODE = #{copy_code,jdbcType=VARCHAR}
+       AND BUSI_TYPE_CODE = #{busi_type_code,jdbcType=VARCHAR}
+       AND PAPER_NUM = #{paper_num,jdbcType=VARCHAR}
+       AND TYPE_CODE = #{type_code,jdbcType=VARCHAR}
+	</select>
+	
+	<!-- 修改之删除背书人 -->
+	<delete id="accPaperIncomeUpdateBeiShuDelete">
+	DELETE 
+		FROM ACC_PAPER_SF_DETAIL
+	WHERE 
+		GROUP_ID = #{group_id,jdbcType=INTEGER}
+	   	AND HOS_ID = #{hos_id,jdbcType=INTEGER}
+	   	AND COPY_CODE = #{copy_code,jdbcType=VARCHAR}
+       	AND BUSI_TYPE_CODE = #{busi_type_code,jdbcType=VARCHAR}
+       	AND PAPER_NUM = #{paper_num,jdbcType=VARCHAR}
+	</delete>
+	
+	<!-- 删除背书信息 -->
+	<delete id="deleteAccPaperIncomeBeiShu">
+		DELETE FROM  ACC_PAPER_SF_DETAIL 
+			WHERE PAPER_NUM IN
+		<foreach collection="list" open=" ( " close = " ) " item="item" separator=" , " >
+				#{item.paper_num,jdbcType=VARCHAR}
+		</foreach>
+					AND GROUP_ID = #{vo.group_id,jdbcType=INTEGER}
+					AND HOS_ID = #{vo.hos_id,jdbcType=INTEGER}
+					AND COPY_CODE = #{vo.copy_code,jdbcType=VARCHAR}
+					AND BUSI_TYPE_CODE = #{vo.busi_type_code,jdbcType=VARCHAR}
+	</delete>
+	
+	<!-- 删除票据信息 -->
+	<delete id="deleteAccPaperIncome">
+		DELETE FROM  ACC_PAPER_SF 
+			WHERE PAPER_NUM IN
+		<foreach collection="list" open=" ( " close = " ) " item="item" separator=" , " >
+				#{item.paper_num,jdbcType=VARCHAR}
+		</foreach>
+					AND GROUP_ID = #{vo.group_id,jdbcType=INTEGER}
+					AND HOS_ID = #{vo.hos_id,jdbcType=INTEGER}
+					AND COPY_CODE = #{vo.copy_code,jdbcType=VARCHAR}
+					AND BUSI_TYPE_CODE = #{vo.busi_type_code,jdbcType=VARCHAR}
+	</delete>
+	
+	<!-- 批量验证票据是否有修改权限 -->
+	<select id="queryPaperIncomeCountState" resultType="java.util.Map">
+		SELECT TYPE_CODE "type_code",PAPER_NUM "paper_num" FROM
+	     	<foreach collection="list" open=" ( " close = " ) " item="item" separator=" union all " >
+				SELECT 
+					TYPE_CODE,
+					PAPER_NUM 
+				FROM 
+					ACC_PAPER_SF 
+				WHERE 
+					GROUP_ID = #{vo.group_id,jdbcType=INTEGER}
+					AND HOS_ID = #{vo.hos_id,jdbcType=INTEGER}
+					AND COPY_CODE = #{vo.copy_code,jdbcType=VARCHAR}
+					AND TYPE_CODE = #{item.type_code,jdbcType=VARCHAR}
+					AND PAPER_NUM = #{item.paper_num,jdbcType=VARCHAR}
+					AND BUSI_TYPE_CODE = #{vo.busi_type_code,jdbcType=VARCHAR}
+					AND STATE = #{vo.state,jdbcType=INTEGER}
+			</foreach>
+	</select>
+	
+	<!-- 审核票据 -->
+	<update id="updateAuditAccPaperIncome">
+		UPDATE ACC_PAPER_SF SET
+		AUDIT_USER = #{vo.user_id,jdbcType=INTEGER},
+		STATE = 2,
+		AUDIT_DATE = sysdate
+		WHERE PAPER_NUM IN
+		<foreach collection="list" open=" ( " close = " ) " item="item" separator=" , " >
+			#{item.paper_num,jdbcType=VARCHAR}
+		</foreach>
+			AND GROUP_ID = #{vo.group_id,jdbcType=INTEGER}
+			AND HOS_ID = #{vo.hos_id,jdbcType=INTEGER}
+			AND COPY_CODE = #{vo.copy_code,jdbcType=VARCHAR}
+			AND BUSI_TYPE_CODE = #{vo.busi_type_code,jdbcType=VARCHAR}
+	</update>
+	
+	<!-- 取审票据 -->
+	<update id="updateCancelAccPaperIncome">
+		UPDATE ACC_PAPER_SF SET
+		AUDIT_USER = null,
+		STATE = 1,
+		AUDIT_DATE = null
+		WHERE PAPER_NUM IN
+		<foreach collection="list" open=" ( " close = " ) " item="item" separator=" , " >
+			#{item.paper_num,jdbcType=VARCHAR}
+		</foreach>
+			AND GROUP_ID = #{vo.group_id,jdbcType=INTEGER}
+			AND HOS_ID = #{vo.hos_id,jdbcType=INTEGER}
+			AND COPY_CODE = #{vo.copy_code,jdbcType=VARCHAR}
+			AND BUSI_TYPE_CODE = #{vo.busi_type_code,jdbcType=VARCHAR}
+	</update>
+	
+	<!-- 作废票据 -->
+	<update id="updateZuofeiAccPaperIncome">
+		UPDATE ACC_PAPER_SF SET
+		STATE = 5
+		WHERE PAPER_NUM IN
+		<foreach collection="list" open=" ( " close = " ) " item="item" separator=" , " >
+			#{item.paper_num,jdbcType=VARCHAR}
+		</foreach>
+			AND GROUP_ID = #{vo.group_id,jdbcType=INTEGER}
+			AND HOS_ID = #{vo.hos_id,jdbcType=INTEGER}
+			AND COPY_CODE = #{vo.copy_code,jdbcType=VARCHAR}
+			AND BUSI_TYPE_CODE = #{vo.busi_type_code,jdbcType=VARCHAR}
+	</update>
+	
+	<!-- 退票 -->
+	<update id="updateRefundAccPaperIncome">
+		UPDATE ACC_PAPER_SF 
+		SET
+			TP_DATE = SYSDATE,
+			TP_MONEY = PM_MONEY,
+			<if test="tp_note != null and tp_note != '' ">TP_NOTE = #{tp_note,jdbcType=VARCHAR},</if>
+			STATE = 3
+		WHERE
+			TYPE_CODE = #{type_code_val,jdbcType=VARCHAR}
+			AND PAPER_NUM = #{paper_num,jdbcType=VARCHAR}
+			AND GROUP_ID = #{group_id,jdbcType=INTEGER}
+			AND HOS_ID = #{hos_id,jdbcType=INTEGER}
+			AND COPY_CODE = #{copy_code,jdbcType=VARCHAR}
+			AND BUSI_TYPE_CODE = #{busi_type_code,jdbcType=VARCHAR}
+	</update>
+	
+	<!-- 收款 -->
+	<update id="updatePutAccPaperIncome">
+		UPDATE ACC_PAPER_SF 
+		SET
+			PAY_DATE = SYSDATE,
+			SF_MONEY = PM_MONEY,
+			<if test="note != null and note != '' ">NOTE = #{note,jdbcType=VARCHAR},</if>
+			<if test="lx != null and lx != '' ">LX = #{lx,jdbcType=INTEGER},</if>
+			<if test="fy != null and fy != '' ">FY = #{lx,jdbcType=INTEGER},</if>
+			STATE = 4
+		WHERE
+			TYPE_CODE = #{type_code_val,jdbcType=VARCHAR}
+			AND PAPER_NUM = #{paper_num,jdbcType=VARCHAR}
+			AND GROUP_ID = #{group_id,jdbcType=INTEGER}
+			AND HOS_ID = #{hos_id,jdbcType=INTEGER}
+			AND COPY_CODE = #{copy_code,jdbcType=VARCHAR}
+			AND BUSI_TYPE_CODE = #{busi_type_code,jdbcType=VARCHAR}
+	</update>
+	
+	<!-- 制单人下拉加载 -->
+	<select id="queryAccPaperIncomeOpCreateuser" resultType="java.util.Map">
+	SELECT 
+		DISTINCT K2.USER_ID "id", 
+		K2.USER_NAME "text"
+	FROM 
+		ACC_PAPER_SF K1, 
+		SYS_USER K2
+	WHERE K1.GROUP_ID = K2.GROUP_ID
+      AND K1.HOS_ID = K2.HOS_ID
+      AND K1.GROUP_ID = #{group_id}
+      AND K1.HOS_ID = #{hos_id}
+      AND K1.COPY_CODE = #{copy_code}
+      AND K1.BUSI_TYPE_CODE = #{busi_type_code}
+      AND K1.CREATE_USER = K2.USER_ID
+	</select>
+	
+	<!-- 制单人下拉加载 -->
+	<select id="queryAccPaperIncomeOpAudituser" resultType="java.util.Map">
+	SELECT 
+		DISTINCT K2.USER_ID "id", 
+		K2.USER_NAME "text" 
+	FROM 
+		ACC_PAPER_SF K1, 
+		SYS_USER K2
+	WHERE K1.GROUP_ID = K2.GROUP_ID
+      AND K1.HOS_ID = K2.HOS_ID
+      AND K1.GROUP_ID = #{group_id}
+      AND K1.HOS_ID = #{hos_id}
+      AND K1.COPY_CODE = #{copy_code}
+      AND K1.BUSI_TYPE_CODE = #{busi_type_code}
+      AND K1.AUDIT_USER = K2.USER_ID
+	</select>
+	
+	<!-- 删除背书信息 -->
+	<delete id="deletePaperIncomeBeishu">
+		DELETE FROM ACC_PAPER_SF_DETAIL
+			WHERE 
+				GROUP_ID = #{vo.group_id,jdbcType=INTEGER}
+				AND HOS_ID =  #{vo.hos_id,jdbcType=INTEGER}
+				AND COPY_CODE =  #{vo.copy_code,jdbcType=VARCHAR}
+				AND BUSI_TYPE_CODE =  #{vo.busi_type_code,jdbcType=VARCHAR}
+				AND PAPER_NUM = #{vo.paper_num,jdbcType=VARCHAR}
+				AND BS_DATE||'|'||BSR IN
+			<foreach collection="list" open=" ( " close = " ) " item="item" separator=" , " >
+					TO_DATE(SUBSTR(#{item.bs_date,jdbcType=VARCHAR},1,10),'yyyy-MM-dd')||'|'||#{item.bsr,jdbcType=VARCHAR}
+			</foreach>
+	</delete>
+	
+	<select id="queryAccPaperIncomeCheckNo" resultType="java.util.Map">
+	SELECT T1.SUP_NO||'|'||T1.SUP_ID|| '|' || T3.BANK_NAME || '|' || T3.BANK_NUMBER||'|'||T3.REGION||'|'||T3.LEGAL "id",
+    T1.SUP_NAME "text"
+    FROM HOS_SUP_DICT T1
+                     LEFT JOIN HOS_SUP_TYPE T2 ON T1.TYPE_CODE =
+                                                  T2.TYPE_CODE
+                                              AND T1.GROUP_ID = T2.GROUP_ID
+                                              AND T1.HOS_ID = T2.HOS_ID
+                     LEFT JOIN ACC_SUP_ATTR T3 ON T1.SUP_ID = T3.SUP_ID
+                                              AND T1.GROUP_ID = T3.GROUP_ID
+                                              AND T1.HOS_ID = T3.HOS_ID
+                    WHERE T1.GROUP_ID = #{group_id,jdbcType=INTEGER}
+                      AND T1.HOS_ID = #{hos_id,jdbcType=INTEGER}
+                      AND T2.IS_STOP = 0
+      				  AND ROWNUM &lt; 10
+      		<if test="key != null and key != ''">
+				AND (
+				T1.SPELL_CODE like '${key}%' or
+				T1.SUP_NAME like '%${key}%'
+				)
+			</if>
+		order by T1.SPELL_CODE
+	</select>
+	
+</mapper>
+

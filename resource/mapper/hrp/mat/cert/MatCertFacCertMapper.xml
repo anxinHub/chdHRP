@@ -1,0 +1,475 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.mat.dao.cert.MatCertFacCertMapper">
+	<!-- 定义供应商数据集 -->
+	<resultMap id="matCertFac" type="java.util.Map">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="fac_id" column="fac_id"/>
+		<result property="fac_code" column="fac_code"/>
+		<result property="fac_name" column="fac_name"/>
+		<result property="cert_num" column="cert_num"/>
+		<result property="inv_num" column="inv_num"/>
+	</resultMap>
+	
+	<!-- 供应商查询 -->
+	<select id="queryMatFacCert" parameterType="java.util.Map" resultMap="matCertFac">
+		select hf.group_id,
+		       hf.hos_id,
+		       hf.fac_id,
+		       hf.fac_code,
+		       hf.fac_name,
+		       nvl(mfc.cert_num, 0) cert_num,
+		       nvl(mif.inv_num, 0) inv_num
+		  from hos_fac_dict hf 
+		  left join (select group_id, hos_id, copy_code, fac_id, nvl(count(1), 0) cert_num
+		               from mat_fac_cert
+		               <where>
+		               	<if test="group_id != null and group_id != ''">
+		               		and group_id = #{group_id, jdbcType=INTEGER}
+		               	</if>
+		               	<if test="hos_id != null and hos_id != ''">
+		               		and hos_id = #{hos_id, jdbcType=INTEGER}
+		               	</if>
+		               	<if test="copy_code != null and copy_code != ''">
+		               		and copy_code = #{copy_code, jdbcType=VARCHAR}
+		               	</if>
+		               </where>
+		              group by group_id, hos_id, copy_code, fac_id) mfc
+		    on hf.group_id = mfc.group_id
+		   and hf.hos_id = mfc.hos_id
+		   and hf.fac_id = mfc.fac_id
+		  left join (select group_id, hos_id, copy_code, fac_id, nvl(count(1), 0) inv_num
+		               from MAT_INV
+		               <where>
+		               	<if test="group_id != null and group_id != ''">
+		               		and group_id = #{group_id, jdbcType=INTEGER}
+		               	</if>
+		               	<if test="hos_id != null and hos_id != ''">
+		               		and hos_id = #{hos_id, jdbcType=INTEGER}
+		               	</if>
+		               	<if test="copy_code != null and copy_code != ''">
+		               		and copy_code = #{copy_code, jdbcType=VARCHAR}
+		               	</if>
+		               </where>
+                  		group by group_id, hos_id, copy_code, fac_id) mif
+		    on hf.group_id = mif.group_id
+		   and hf.hos_id = mif.hos_id
+		   and hf.fac_id = mif.fac_id
+		 where is_mat = 1
+		   and is_stop = 0
+			<if test="group_id != null and group_id != ''">
+		 		and hf.group_id = #{group_id, jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and hf.hos_id = #{hos_id, jdbcType=INTEGER}
+			</if>
+			<if test="type_code != null and type_code != ''">
+				and hf.type_code = #{type_code, jdbcType=VARCHAR}
+			</if>
+			<if test="is_disable != null and is_disable != ''">
+				and hf.is_disable = #{is_disable, jdbcType=INTEGER}
+			</if>
+			<if test="exist_cert == 1">
+				and mfc.cert_num &gt; 0
+			</if>
+			<if test="exist_cert == 0 and exist_cert != ''">
+				and (mfc.cert_num &lt;= 0 or mfc.cert_num is null)
+			</if>
+			<if test="fac_name != null and fac_name != ''">
+				and (
+					hf.fac_code like '%${fac_name}%'
+				 or hf.fac_name like '%${fac_name}%'
+				 or hf.spell_code like upper('%${fac_name}%')	
+				 or hf.spell_code like lower('%${fac_name}%')
+				 or hf.wbx_code like upper('%${fac_name}%')
+				 or hf.wbx_code like lower('%${fac_name}%')
+				)
+			</if>
+		 order by hf.fac_code
+	</select>
+	
+	<!-- 证件查询 -->
+	<select id="queryMatFacCertInfo" parameterType="java.util.Map" resultType="java.util.Map">
+		select mfc.group_id,
+		       mfc.hos_id,
+		       mfc.copy_code,
+		       mfc.cert_id,
+		       mfc.fac_id,
+		       mfc.cert_code,
+		       mfc.cert_type_code,
+		       mct.cert_type_name,
+		       mfc.start_date,
+		       mfc.end_date,
+		       mfc.cert_date,
+		       mfc.is_stop,
+		       mfc.authent_state,
+		       mfc.check_state,
+		       mfc.is_long
+		  from mat_fac_cert mfc
+		  left join mat_cert_type mct
+		    on mfc.group_id = mct.group_id
+		   and mfc.hos_id = mct.hos_id
+		   and mfc.copy_code = mct.copy_code
+		   and mfc.cert_type_code = mct.cert_type_code
+		  <where>
+			<if test="group_id != null and group_id != ''">
+				and mfc.group_id = #{group_id, jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and mfc.hos_id = #{hos_id, jdbcType=INTEGER}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				and mfc.copy_code = #{copy_code, jdbcType=VARCHAR}
+			</if>
+			<if test="fac_id != null and fac_id != ''">
+				and mfc.fac_id = #{fac_id, jdbcType=INTEGER}
+			</if>
+			<if test="is_stop != null and is_stop != ''">
+				and mfc.is_stop = #{is_stop, jdbcType=INTEGER}
+			</if>
+		  </where>
+		  order by mfc.oper_date desc
+	</select>
+	
+	<!-- 材料查询 -->
+	<select id="queryMatFacCertInv" parameterType="java.util.Map" resultType="java.util.Map">
+		select mi.group_id,
+		       mi.hos_id,
+		       mi.copy_code,
+		       mi.fac_id,
+		       mi.inv_id,
+		       mi.inv_code,
+		       mi.inv_name,
+		       mi.inv_model,
+		       mi.unit_code, 
+		       hu.unit_name,
+		       mi.plan_price,
+		       mi.use_state
+		  from mat_inv mi
+		  left join hos_unit hu
+		    on mi.group_id = hu.group_id
+		   and mi.hos_id = hu.hos_id
+		   and mi.unit_code = hu.unit_code
+		  <where>
+		  	<if test="group_id != null and group_id != ''">
+				and mi.group_id = #{group_id, jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and mi.hos_id = #{hos_id, jdbcType=INTEGER}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				and mi.copy_code = #{copy_code, jdbcType=VARCHAR}
+			</if>
+			<if test="fac_id != null and fac_id != ''">
+				and mi.fac_id = #{fac_id, jdbcType=INTEGER}
+			</if>		
+		  </where>
+	</select>
+	
+	<!-- 产品注册证新增 -->
+	<insert id="saveMatFacCert" parameterType="java.util.Map">
+		INSERT INTO MAT_FAC_CERT(
+			group_id, hos_id, copy_code, cert_id, fac_id, cert_type_code, cert_code, cert_name, 
+			start_date, end_date, is_long, cert_date, cert_busi, com_from, 
+			is_stop, oper_date, oper_name, check_state, authent_state, check_note
+		)
+		VALUES(
+			#{group_id,jdbcType=INTEGER}, 
+			#{hos_id,jdbcType=INTEGER},
+			#{copy_code,jdbcType=VARCHAR}, 
+			#{cert_id,jdbcType=BIGINT}, 
+			#{fac_id,jdbcType=BIGINT}, 
+			#{cert_type_code,jdbcType=VARCHAR},
+			#{cert_code,jdbcType=VARCHAR}, 
+			#{cert_name,jdbcType=VARCHAR}, 
+			#{start_date,jdbcType=DATE}, 
+			#{end_date,jdbcType=DATE}, 
+			#{is_long,jdbcType=INTEGER}, 
+			#{cert_date,jdbcType=VARCHAR}, 
+			#{cert_busi,jdbcType=VARCHAR}, 
+			#{com_from,jdbcType=INTEGER},
+			#{is_stop,jdbcType=INTEGER},
+			#{oper_date,jdbcType=TIMESTAMP},
+			#{oper_name,jdbcType=VARCHAR}, 
+			#{check_state,jdbcType=INTEGER}, 
+			#{authent_state,jdbcType=INTEGER}, 
+			#{check_note,jdbcType=VARCHAR}
+		)
+	</insert>
+	
+	<delete id="deleteMatCertFacFile" parameterType="java.util.Map">
+		delete from MAT_FAC_CERT_FILE
+		<where>
+			<if test="group_id != null and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				and copy_code = #{copy_code}
+			</if>
+			<if test="cert_ids != null and cert_ids != ''">
+				and cert_id in (${cert_ids})
+			</if>
+		</where>
+	</delete>
+	
+	<delete id="deleteMatCertFac" parameterType="java.util.Map">
+		delete from MAT_FAC_CERT
+		<where>
+			<if test="group_id != null and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				and copy_code = #{copy_code}
+			</if>
+			<if test="cert_ids != null and cert_ids != ''">
+				and cert_id in (${cert_ids})
+			</if>
+		</where>
+	</delete>
+	
+	<update id="updateMatCertFacState" parameterType="java.util.Map">
+		update MAT_FAC_CERT
+		<set>
+			<if test="oper == 'authent'">
+				authent_state = 2,
+				authent_date = #{oper_date,jdbcType=DATE},
+				authenter = #{oper_name,jdbcType=VARCHAR}
+			</if>
+			<if test="oper == 'unAuthent'">
+				authent_state = 1,
+				authent_date = null,
+				authenter = ''
+			</if>
+			<if test="oper == 'check'">
+				check_state = 2,
+				check_date = #{oper_date,jdbcType=DATE},
+				checker = #{oper_name,jdbcType=VARCHAR}
+			</if>
+			<if test="oper == 'unCheck'">
+				check_state = 1,
+				check_date = null,
+				checker = ''
+			</if>
+		</set>
+		<where>
+			<if test="group_id != null and group_id != ''">
+				and group_id = #{group_id}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and hos_id = #{hos_id}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				and copy_code = #{copy_code}
+			</if>
+			<if test="cert_ids != null and cert_ids != ''">
+				and cert_id in (${cert_ids})
+			</if>
+		</where>
+	</update>
+	
+	<resultMap type="java.util.Map" id="certType">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="cert_type_code" column="cert_type_code"/>
+		<result property="cert_type_name" column="cert_type_name"/>
+		<result property="is_cert_busi" column="is_cert_busi"/>
+		<result property="is_cert_name" column="is_cert_name"/>
+		<result property="is_stop" column="is_stop"/>
+	</resultMap>
+	
+	<!-- 证件查询 -->
+	<select id="queryCertType" parameterType="java.util.Map" resultMap="certType">
+		select mct.group_id,
+		       mct.hos_id,
+		       mct.copy_code,
+		       mct.cert_type_code,
+		       mct.cert_type_name,
+		       mct.is_cert_busi,
+		       mct.is_cert_name,
+		       mct.is_stop
+		  from mat_cert_type mct
+		  <where>
+			<if test="group_id != null and group_id != ''">
+				and mct.group_id = #{group_id, jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and mct.hos_id = #{hos_id, jdbcType=INTEGER}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				and mct.copy_code = #{copy_code, jdbcType=VARCHAR}
+			</if>
+			<if test="cert_type_code != null and cert_type_code != ''">
+				and mct.cert_type_code = #{cert_type_code, jdbcType=VARCHAR}
+			</if>
+		  </where>
+	</select>
+	
+	<!-- 证件查询 -->
+	<select id="queryMatFacCertByCode" parameterType="java.util.Map" resultType="java.util.Map">
+		select mfc.group_id,
+		       mfc.hos_id,
+		       mfc.copy_code,
+		       mfc.cert_id,
+		       mfc.fac_id,
+		       mfc.cert_code,
+		       mfc.cert_type_code,
+		       mfc.start_date,
+		       mfc.end_date,
+		       mfc.cert_date,
+		       mfc.is_stop,
+		       mfc.authent_state,
+		       mfc.check_state,
+		       mfc.is_long
+		  from mat_fac_cert mfc
+		  <where>
+			<if test="group_id != null and group_id != ''">
+				and mfc.group_id = #{group_id, jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and mfc.hos_id = #{hos_id, jdbcType=INTEGER}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				and mfc.copy_code = #{copy_code, jdbcType=VARCHAR}
+			</if>
+			<if test="cert_code != null and cert_code != ''">
+				and mfc.cert_code = #{cert_code, jdbcType=VARCHAR}
+			</if>
+		  </where>
+		  order by mfc.oper_date desc
+	</select>
+	
+	<resultMap id="matFacCertMap" type="java.util.Map">
+		<result column="group_id" property="group_id" />
+		<result column="hos_id" property="hos_id" />
+		<result column="copy_code" property="copy_code" />
+		<result column="cert_id" property="cert_id" />
+		<result column="cert_code" property="cert_code" />
+		<result column="cert_name" property="cert_name" />
+		<result column="cert_type_code" property="cert_type_code" />
+		<result column="cert_type_name" property="cert_type_name" />
+		<result column="start_date" property="start_date" />
+		<result column="end_date" property="end_date" />
+		<result column="is_long" property="is_long" />
+		<result column="cert_busi" property="cert_busi" />
+		<result column="file_path" property="file_path" />
+		<result column="check_state" property="check_state" />
+	</resultMap>
+	
+	<select id="queryMatFacCertById" parameterType="java.util.Map" resultMap="matFacCertMap">
+		select mfc.group_id,
+		       mfc.hos_id,
+		       mfc.copy_code,
+		       mfc.cert_id,
+		       mfc.cert_code,
+		       mfc.cert_name,
+		       mfc.cert_type_code,
+		       mct.cert_type_name,
+		       to_char(mfc.start_date, 'yyyy-MM-dd') start_date,
+		       to_char(mfc.end_date, 'yyyy-MM-dd') end_date,
+		       mfc.is_long,
+		       mfc.cert_busi,
+		       mfc.check_state,
+		       to_char(wm_concat(mfcf.file_path || mfcf.file_name)) file_path
+		  from mat_fac_cert mfc
+		  left join mat_cert_type mct
+		    on mfc.group_id = mct.group_id
+		   and mfc.hos_id = mct.hos_id
+		   and mfc.copy_code = mct.copy_code
+		   and mfc.cert_type_code = mct.cert_type_code
+		  left join mat_fac_cert_file mfcf
+		    on mfc.group_id = mfcf.group_id
+		   and mfc.hos_id = mfcf.hos_id
+		   and mfc.copy_code = mfcf.copy_code
+		   and mfc.cert_id = mfcf.cert_id
+		<where>
+			<if test="group_id != null and group_id != ''">
+				and mfc.group_id = #{group_id, jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and mfc.hos_id = #{hos_id, jdbcType=INTEGER}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				and mfc.copy_code = #{copy_code, jdbcType=VARCHAR}
+			</if>
+			<if test="cert_id != null and cert_id != ''">
+				and mfc.cert_id = #{cert_id, jdbcType=INTEGER}
+			</if>
+		</where>
+		 group by mfc.group_id,
+		          mfc.hos_id,
+		          mfc.copy_code,
+		          mfc.cert_id,
+		          mfc.cert_code,
+		          mfc.cert_name,
+		          mfc.cert_type_code,
+		          mct.cert_type_name,
+		          mfc.start_date,
+		          mfc.end_date,
+		          mfc.is_long,
+		          mfc.cert_busi,
+		          mfc.check_state
+	</select>
+	
+	<update id="updateMatFacCert" parameterType="java.util.Map">
+		update MAT_FAC_CERT
+		<set>
+			<if test="cert_code != null and cert_code != ''">
+				cert_code = #{cert_code, jdbcType=VARCHAR},
+			</if>
+			<if test="cert_name != null and cert_name != ''">
+				cert_name = #{cert_name, jdbcType=VARCHAR},
+			</if>
+			<if test="cert_type_code != null and cert_type_code != ''">
+				cert_type_code = #{cert_type_code, jdbcType=VARCHAR},
+			</if>
+			<if test="start_date != null and start_date != ''">
+				start_date = #{start_date, jdbcType=DATE},
+			</if>
+			<if test="end_date != null and end_date != ''">
+				end_date = #{end_date, jdbcType=DATE},
+			</if>
+			<if test="is_long != null and is_long != ''">
+				is_long = #{is_long, jdbcType=INTEGER},
+			</if>
+			<if test="cert_busi != null and cert_busi != ''">
+				cert_busi = #{cert_busi, jdbcType=VARCHAR},
+			</if>
+			<if test="cert_date != null and cert_date != ''">
+				cert_date = #{cert_date, jdbcType=VARCHAR},
+			</if>
+			<if test="oper_date != null and oper_date != ''">
+				oper_date = #{oper_date, jdbcType=DATE},
+			</if>
+			<if test="oper_name != null and oper_name != ''">
+				oper_name = #{oper_name, jdbcType=VARCHAR},
+			</if>
+		</set>
+		<where>
+			<if test="group_id != null and group_id != ''">
+				and group_id = #{group_id, jdbcType=INTEGER}
+			</if>
+			<if test="hos_id != null and hos_id != ''">
+				and hos_id = #{hos_id, jdbcType=INTEGER}
+			</if>
+			<if test="copy_code != null and copy_code != ''">
+				and copy_code = #{copy_code, jdbcType=VARCHAR}
+			</if>
+			<if test="cert_id != null and cert_id != ''">
+				and cert_id = #{cert_id, jdbcType=INTEGER}
+			</if>
+			<if test="fac_id != null and fac_id != ''">
+				and fac_id = #{fac_id, jdbcType=INTEGER}
+			</if>
+		</where>
+	</update>
+</mapper>
+

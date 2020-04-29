@@ -1,0 +1,684 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.mat.dao.dura.scrap.MatDuraScrapDeptMapper">
+
+	<resultMap id="matDuraScrapDept" type="java.util.Map">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" /> 
+		<result property="copy_code" column="copy_code" />
+		<result property="scrap_id" column="scrap_id" />
+		<result property="scrap_no" column="scrap_no" />
+		<result property="year" column="year"/>
+		<result property="month" column="month"/>
+		<result property="bus_type_code" column="bus_type_code"/>
+		<result property="dept_id" column="dept_id" />
+		<result property="dept_no" column="dept_no" />
+		<result property="dept_code" column="dept_code" />  
+		<result property="dept_name" column="dept_name" />
+		<result property="maker" column="maker" />
+		<result property="maker_name" column="maker_name" />
+		<result property="make_date" column="make_date" />
+		<result property="checker" column="checker" />
+		<result property="checker_name" column="checker_name" />
+		<result property="check_date" column="check_date" />
+		<result property="confirmer" column="confirmer" />
+		<result property="confirmer_name" column="confirmer_name" />
+		<result property="confirm_date" column="confirm_date" />
+		<result property="brief" column="brief" />
+		<result property="state" column="state" />
+		<result property="sum_pay_money" column="sum_pay_money" />
+		<result property="sum_inc_money" column="sum_inc_money" />
+		
+		<result property="approve_emp" column="approve_emp" />
+		<result property="approve_name" column="approve_name" />
+		<result property="approve_date" column="approve_date" />
+	</resultMap>
+
+	<resultMap id="matDuraScrapDeptD" type="java.util.Map">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="scrap_id" column="scrap_id" />
+		<result property="detail_id" column="detail_id" />
+		<result property="inv_id" column="inv_id" />
+		<result property="inv_no" column="inv_no" />
+		<result property="inv_code" column="inv_code" />
+		<result property="inv_name" column="inv_name" />
+		<result property="inv_model" column="inv_model" />
+		<result property="unit_name" column="unit_name" />
+		<result property="fac_name" column="fac_name" />
+		<result property="price" column="price" />
+		<result property="amount" column="amount" />
+		<result property="pay_money" column="pay_money" />
+		<result property="income_money" column="income_money" />
+		<result property="bar_code" column="bar_code" />
+		<result property="note" column="note" />
+		<result property="cur_amount" column="cur_amount" />
+		<result property="cur_money" column="cur_money" />
+		<result property="imme_amount" column="imme_amount" />
+		<result property="imme_money" column="imme_money" />
+	</resultMap>
+
+	<resultMap id="matDuraScrapDeptForConfirm" type="java.util.Map">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="year" column="year" />
+		<result property="month" column="month" />
+		<result property="scrap_id" column="scrap_id" />
+		<result property="scrap_no" column="scrap_no" />
+		<result property="dept_id" column="dept_id" />
+		<result property="detail_id" column="detail_id" />
+		<result property="inv_id" column="inv_id" />
+		<result property="inv_no" column="inv_no" />
+		<result property="inv_code" column="inv_code" />
+		<result property="inv_name" column="inv_name" />
+		<result property="price" column="price" />
+		<result property="amount" column="amount" />
+		<result property="amount_money" column="amount_money" />
+		<result property="pay_money" column="pay_money" />
+		<result property="income_money" column="income_money" />
+		<result property="bar_code" column="bar_code" />
+		
+		
+	</resultMap>
+
+	<!-- 获取一个主表序列 -->
+	<select id="queryMainSeq" resultType="java.lang.Long" useCache="false" flushCache="true">
+		SELECT MAT_DURA_DEPT_SCRAP_SEQ.nextval FROM DUAL
+	</select>
+
+	<!-- 获取一个明细表序列 -->
+	<select id="queryDetailSeq" resultType="java.lang.Long" useCache="false" flushCache="true">
+		SELECT MAT_DURA_DEPT_SCRAP_D_SEQ.nextval FROM DUAL
+	</select>
+
+	<select id="query" resultMap="matDuraScrapDept" parameterType="java.util.Map">
+		WITH t_result AS (
+			SELECT a.group_id, a.hos_id, a.copy_code, a.scrap_id, a.scrap_no, a.brief, a.make_date, 
+				a.dept_id, a.dept_no, c.dept_code, c.dept_name, b.sum_pay_money, b.sum_inc_money, a.maker, 
+				e.user_name maker_name, a.checker, f.user_name checker_name, a.check_date, 
+				a.confirmer, g.user_name confirmer_name, a.confirm_date, a.state,
+				a.approve_emp,h.user_name approve_name,a.approve_date  
+			FROM mat_dura_dept_scrap a 
+			LEFT JOIN (
+				SELECT scrap_id, sum(pay_money) sum_pay_money, sum(income_money) sum_inc_money 
+				FROM mat_dura_dept_scrap_d 
+				WHERE group_id = #{group_id,jdbcType=INTEGER}
+					AND hos_id = #{hos_id,jdbcType=INTEGER}
+					AND copy_code = #{copy_code,jdbcType=VARCHAR}
+				GROUP BY scrap_id 
+			) b
+				ON a.scrap_id = b.scrap_id 
+			LEFT JOIN hos_dept_dict c
+				ON a.group_id = c.group_id AND a.hos_id = c.hos_id 
+				AND a.dept_id = c.dept_id 
+				<if test="show_history != null and show_history == 1">
+					AND a.dept_no = c.dept_no
+				</if>
+				<if test="show_history == null or show_history == ''">
+					AND c.is_stop = 0
+				</if> 
+			LEFT JOIN sys_user e 
+				ON a.group_id = e.group_id AND a.hos_id = e.hos_id 
+				AND a.maker = e.user_id 
+			LEFT JOIN sys_user f 
+				ON a.group_id = f.group_id AND a.hos_id = f.hos_id 
+				AND a.checker = f.user_id 
+			LEFT JOIN sys_user g 
+				ON a.group_id = g.group_id AND a.hos_id = g.hos_id 
+				AND a.confirmer = g.user_id 
+			left join sys_user h 
+				on a.group_id = h.group_id and a.hos_id = h.hos_id 
+				and a.approve_emp = h.user_id
+			WHERE a.group_id = #{group_id,jdbcType=INTEGER}
+				AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+				AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+				<if test="begin_make_date != null and begin_make_date != ''">
+					AND a.make_date &gt;= #{begin_make_date,jdbcType=DATE} 
+				</if>
+				<if test="end_make_date != null and end_make_date != ''">
+					AND a.make_date &lt;= #{end_make_date,jdbcType=DATE} 
+				</if>
+				<if test="begin_confirm_date != null and begin_confirm_date != ''">
+				    AND (a.check_date &gt;= #{begin_confirm_date,jdbcType=DATE} 
+				        OR a.confirm_date &gt;= #{begin_confirm_date,jdbcType=DATE}
+				    )
+				</if>
+				<if test="end_confirm_date != null and end_confirm_date != ''">
+				    AND ( a.check_date &lt;= #{end_confirm_date,jdbcType=DATE} 
+				        OR a.confirm_date &lt;= #{end_confirm_date,jdbcType=DATE}
+				    )
+				</if>
+				<if test="scrap_no != null and scrap_no != ''">
+				    AND a.scrap_no = #{scrap_no}
+				</if>
+				<if test="brief != null and brief != ''">
+				    AND a.brief like '%' || #{brief} || '%'
+				</if>
+				<if test="state != null and state != ''">
+				    AND a.state = #{state}
+				</if>
+				<if test="dept_id != null and dept_id != ''">
+					AND a.dept_id = #{dept_id,jdbcType=INTEGER}
+				</if>
+				<if test="dept_id ==null or dept_id == ''">
+					AND EXISTS (
+						SELECT 1
+						FROM v_user_data_perm
+						WHERE group_id = #{group_id,jdbcType=INTEGER} 
+							AND hos_id = #{hos_id,jdbcType=INTEGER} 
+							AND user_id = #{user_id,jdbcType=INTEGER} 
+							AND table_code = 'HOS_DEPT_DICT'
+							AND is_read = 1 AND is_write = 1 
+							AND perm_code = a.dept_id
+					)
+				</if>
+			order by scrap_id desc
+		)
+		SELECT NULL group_id, NULL hos_id, NULL copy_code, NULL scrap_id, to_char('合计') scrap_no, 
+			NULL brief, NULL make_date, NULL dept_id, NULL dept_no, NULL dept_code, NULL dept_name, 
+			sum(sum_pay_money) sum_pay_money, sum(sum_inc_money) sum_inc_money, 
+			NULL maker, NULL maker_name, NULL checker, NULL checker_name, NULL check_date, 
+			NULL confirmer, NULL confirmer_name, NULL confirm_date, NULL state ,
+			null approve_emp,null approve_name,null approve_date
+		FROM t_result 
+		UNION ALL
+		SELECT group_id, hos_id, copy_code, scrap_id, to_char(scrap_no) scrap_no, brief, make_date, dept_id, dept_no, 
+				dept_code, dept_name, sum_pay_money, sum_inc_money, maker, maker_name, checker, 
+				checker_name, check_date, confirmer, confirmer_name, confirm_date, state,
+				approve_emp,approve_name,approve_date  
+		FROM t_result 
+	</select>
+
+	<!-- 主表添加 -->
+	<insert id="addMain" parameterType="java.util.Map">
+		INSERT INTO mat_dura_dept_scrap (
+			group_id, hos_id, copy_code, scrap_id, scrap_no, year, month, bus_type_code, dept_id, dept_no, 
+			maker, make_date, state, brief
+			<if test="checker != null and checker != ''">, checker</if>
+			<if test="check_date != null and check_date != ''">, check_date</if>
+			<if test="confirmer != null and confirmer != ''">, confirmer</if>
+			<if test="confirm_date != null and confirm_date != ''">, confirm_date</if>
+		) VALUES (
+			#{group_id,jdbcType=INTEGER},
+			#{hos_id,jdbcType=INTEGER},
+			#{copy_code,jdbcType=VARCHAR},
+			#{scrap_id,jdbcType=BIGINT},
+			#{scrap_no,jdbcType=VARCHAR},
+			#{year,jdbcType=VARCHAR},
+			#{month,jdbcType=VARCHAR},
+			#{bus_type_code,jdbcType=VARCHAR},
+			#{dept_id,jdbcType=INTEGER},
+			#{dept_no,jdbcType=INTEGER},
+			#{maker,jdbcType=INTEGER},
+			#{make_date,jdbcType=DATE},
+			#{state,jdbcType=INTEGER},
+			#{brief,jdbcType=VARCHAR}
+			<if test="checker != null and checker != ''">, #{checker,jdbcType=INTEGER}</if>
+			<if test="check_date != null and check_date != ''">, #{check_date,jdbcType=DATE}</if>
+			<if test="confirmer != null and confirmer != ''">, #{confirmer,jdbcType=INTEGER}</if>
+			<if test="confirm_date != null and confirm_date != ''">, #{confirm_date,jdbcType=DATE}</if>
+		)
+	</insert>
+
+	<!-- 批量插入主表数据 -->
+	<insert id="addMainBatch" parameterType="java.util.List">
+		INSERT INTO mat_dura_dept_scrap (
+			group_id, hos_id, copy_code, scrap_id, scrap_no, year, month, bus_type_code, dept_id, dept_no, 
+			maker, make_date, state, brief, checker, check_date, confirmer, confirm_date
+		)
+		<foreach collection="list" item="item" index="index" separator="union all">
+			SELECT
+				#{item.group_id,jdbcType=INTEGER},
+				#{item.hos_id,jdbcType=INTEGER},
+				#{item.copy_code,jdbcType=VARCHAR},
+				#{item.scrap_id,jdbcType=BIGINT},
+				#{item.scrap_no,jdbcType=VARCHAR},
+				#{item.year,jdbcType=VARCHAR},
+				#{item.month,jdbcType=VARCHAR},
+				#{item.bus_type_code,jdbcType=VARCHAR},
+				#{item.dept_id,jdbcType=INTEGER},
+				#{item.dept_no,jdbcType=INTEGER},
+				#{item.maker,jdbcType=INTEGER},
+				#{item.make_date,jdbcType=DATE},
+				#{item.state,jdbcType=INTEGER},
+				#{item.brief,jdbcType=VARCHAR},
+				#{item.checker,jdbcType=INTEGER},
+				#{item.check_date,jdbcType=DATE},
+				#{item.confirmer,jdbcType=INTEGER},
+				#{item.confirm_date,jdbcType=DATE},
+			FROM DUAL
+		</foreach>
+	</insert>
+	
+	<!-- 明细表添加（批量） -->
+	<insert id="addDetail" parameterType="java.util.List">
+		INSERT INTO mat_dura_dept_scrap_d (
+			group_id, hos_id, copy_code, scrap_id, detail_id, inv_id, inv_no, 
+			price, amount, pay_money, income_money, bar_code, note
+		)
+		<foreach collection="list" item="item" index="index" separator="union all">
+			select
+				#{item.group_id,jdbcType=INTEGER},
+				#{item.hos_id,jdbcType=INTEGER},
+				#{item.copy_code,jdbcType=VARCHAR},
+				#{item.scrap_id,jdbcType=BIGINT},
+				#{item.detail_id,jdbcType=BIGINT},
+				#{item.inv_id,jdbcType=INTEGER},
+				#{item.inv_no,jdbcType=VARCHAR},
+				#{item.price,jdbcType=NUMERIC},
+				#{item.amount,jdbcType=NUMERIC},
+				#{item.pay_money,jdbcType=NUMERIC},
+				#{item.income_money,jdbcType=NUMERIC},
+				#{item.bar_code,jdbcType=VARCHAR}, 
+				#{item.note,jdbcType=VARCHAR} 
+			from dual
+		</foreach>
+	</insert>
+
+	<!-- 主表修改 -->
+	<update id="updateMain" parameterType="java.util.Map">
+		UPDATE mat_dura_dept_scrap
+		<trim prefix="set" suffixOverrides=",">
+			<if test="dept_id != null and dept_id != ''">
+				dept_id = #{dept_id,jdbcType=INTEGER},
+			</if>
+			<if test="dept_no != null and dept_no != ''">
+				dept_no = #{dept_no,jdbcType=INTEGER},
+			</if>
+			<if test="make_date != null and make_date != ''">
+				make_date = #{make_date,jdbcType=DATE},
+			</if>
+			<if test="brief != null">
+				brief = #{brief,jdbcType=VARCHAR},
+			</if>
+		</trim>
+		WHERE group_id =#{group_id,jdbcType=INTEGER}
+			AND hos_id =#{hos_id,jdbcType=INTEGER}
+			AND copy_code =#{copy_code,jdbcType=VARCHAR}
+			AND scrap_id =#{scrap_id,jdbcType=BIGINT}
+	</update>
+
+	<!-- 明细表修改（批量） -->
+	<update id="updateDetail" parameterType="java.util.List">
+		<foreach collection="list" item="item" index="index" open="begin" close=";end;" separator=";">
+			UPDATE mat_dura_dept_scrap_d
+			<trim prefix="set" suffixOverrides=",">
+				<if test="item.inv_id != null and item.inv_id != ''">
+					inv_id = #{item.inv_id,jdbcType=INTEGER},
+				</if>
+				<if test="item.inv_no != null and item.inv_no != ''">
+					inv_no = #{item.inv_no,jdbcType=INTEGER},
+				</if>
+				<if test="item.price != null and item.price != ''">
+					price = #{item.price,jdbcType=NUMERIC},
+				</if>
+				<if test="item.amount != null and item.amount != ''">
+					amount = #{item.amount,jdbcType=NUMERIC},
+				</if>
+				<if test="item.pay_money != null and item.pay_money != ''">
+					pay_money = #{item.pay_money,jdbcType=NUMERIC},
+				</if>
+				<if test="item.income_money != null and item.income_money != ''">
+					income_money = #{item.income_money,jdbcType=NUMERIC},
+				</if>
+				<if test="item.bar_code != null and item.bar_code != ''">
+					bar_code = #{item.bar_code,jdbcType=VARCHAR},
+				</if>
+				<if test="item.note != null">
+					note = #{item.note,jdbcType=VARCHAR},
+				</if>
+			</trim>
+			WHERE group_id = #{item.group_id,jdbcType=INTEGER}
+				AND hos_id = #{item.hos_id,jdbcType=INTEGER}
+				AND copy_code = #{item.copy_code,jdbcType=VARCHAR}
+				AND scrap_id = #{item.scrap_id,jdbcType=BIGINT}
+				AND detail_id = #{item.detail_id,jdbcType=BIGINT}
+		</foreach>
+	</update>
+
+	<!-- 主表删除 -->
+	<delete id="deleteMain" parameterType="java.util.Map">
+		DELETE FROM mat_dura_dept_scrap
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND scrap_id = #{scrap_id,jdbcType=BIGINT}
+	</delete>
+
+	<!-- 明细表删除 -->
+	<delete id="deleteDetail" parameterType="java.util.Map">
+		DELETE FROM mat_dura_dept_scrap_d
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND scrap_id = #{scrap_id,jdbcType=BIGINT}
+	</delete>
+
+	<!-- 主表批量删除 -->
+	<delete id="deleteMainBatch" parameterType="java.util.List">
+		DELETE FROM mat_dura_dept_scrap
+		WHERE
+		<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+			group_id = #{item.group_id,jdbcType=INTEGER}
+			AND hos_id = #{item.hos_id,jdbcType=INTEGER}
+			AND copy_code = #{item.copy_code,jdbcType=VARCHAR}
+			AND scrap_id = #{item.scrap_id,jdbcType=BIGINT}
+		</foreach>
+	</delete>
+
+	<!-- 明细表批量删除 -->
+	<delete id="deleteDetailBatch" parameterType="java.util.List">
+		DELETE FROM mat_dura_dept_scrap_d
+		WHERE
+		<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+			group_id = #{item.group_id,jdbcType=INTEGER}
+			AND hos_id = #{item.hos_id,jdbcType=INTEGER}
+			AND copy_code = #{item.copy_code,jdbcType=VARCHAR}
+			AND scrap_id = #{item.scrap_id,jdbcType=BIGINT}
+		</foreach>
+	</delete>
+
+	<!-- 用于主表加载 -->
+	<select id="queryMainByCode" resultMap="matDuraScrapDept" parameterType="java.util.Map">
+		SELECT
+			a.group_id, a.hos_id, a.copy_code, a.scrap_id, a.scrap_no, a.year, a.month, a.bus_type_code, 
+			a.dept_id, a.dept_no, b.dept_code, b.dept_name, a.make_date, a.brief, a.state, 
+			d.user_name maker_name, e.user_name checker_name, f.user_name confirmer_name 
+		FROM mat_dura_dept_scrap a
+		LEFT JOIN hos_dept_dict b
+			ON a.group_id = b.group_id AND a.hos_id = b.hos_id
+			AND a.dept_id = b.dept_id
+			<if test="show_history == 1">
+				AND a.dept_no = b.dept_no
+			</if>
+			<if test="show_history == null or show_history == 0">
+				AND b.is_stop = 0
+			</if>
+		LEFT JOIN sys_user d 
+			ON a.group_id = d.group_id AND a.hos_id = d.hos_id 
+			AND a.maker = d.user_id 
+		LEFT JOIN sys_user e 
+			ON a.group_id = e.group_id AND a.hos_id = e.hos_id 
+			AND a.checker = e.user_id 
+		LEFT JOIN sys_user f 
+			ON a.group_id = f.group_id AND a.hos_id = f.hos_id 
+			AND a.confirmer = f.user_id 
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND a.scrap_id = #{scrap_id,jdbcType=BIGINT}
+	</select>
+
+	<!-- 用于明细表加载 -->
+	<select id="queryDetailByCode" resultMap="matDuraScrapDeptD" parameterType="java.util.Map">
+		SELECT
+			a.group_id, a.hos_id, a.copy_code, a.scrap_id, a.detail_id, a.inv_id, a.inv_no,
+			b.inv_code,b.bid_code, b.inv_name, b.inv_model, c.unit_name, d.fac_name, 
+			a.price, a.amount, a.pay_money, a.income_money, a.bar_code, a.note,nvl(md.left_amount,0) as cur_amount, 
+			case e.state when 3 then 0 else a.amount end + nvl(f.left_amount, 0) - nvl(g.amount, 0) imme_amount
+		FROM mat_dura_dept_scrap_d a 
+		LEFT JOIN mat_inv_dict b 
+			ON a.group_id = b.group_id AND a.hos_id = b.hos_id 
+			AND a.copy_code = b.copy_code AND a.inv_id = b.inv_id 
+			<if test="show_history == 1"> 
+				AND a.inv_no = b.inv_no 
+			</if> 
+			<if test="show_history == 0"> 
+				AND b.is_stop = 0 
+			</if> 
+		LEFT JOIN hos_unit c 
+			ON b.group_id = c.group_id
+			AND b.hos_id = c.hos_id
+			AND b.unit_code = c.unit_code
+		LEFT JOIN hos_fac_dict d
+			ON b.group_id = d.group_id AND b.hos_id = d.hos_id
+			AND b.fac_id = d.fac_id
+			<if test="show_history == 1">
+				AND b.fac_no = d.fac_no
+			</if>
+			<if test="show_history == 0">
+				AND d.is_stop = 0
+			</if>
+		LEFT JOIN mat_dura_dept_scrap e 
+			ON a.group_id = e.group_id AND a.hos_id = e.hos_id 
+			AND a.copy_code = e.copy_code AND a.scrap_id = e.scrap_id 
+		LEFT JOIN mat_dura_dept_balance f 
+			ON a.group_id = f.group_id AND a.hos_id = f.hos_id 
+			AND a.copy_code = f.copy_code AND e.dept_id = f.dept_id 
+			AND a.inv_id = f.inv_id AND a.price = f.price  
+			AND a.bar_code = f.bar_code 
+		LEFT JOIN v_mat_dura_dept_stock_imme g
+			ON a.group_id = g.group_id AND a.hos_id = g.hos_id 
+			AND a.copy_code = g.copy_code AND e.dept_id = g.dept_id 
+			AND a.inv_id = g.inv_id AND a.price = g.price  
+			AND a.bar_code = g.bar_code 
+		left join mat_dura_dept_balance md on a.group_id=md.group_id and a.hos_id=md.hos_id
+			and a.hos_id=md.hos_id and a.inv_id=md.inv_id and e.dept_id=md.dept_id and a.price = md.price and a.bar_code=md.bar_code
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND a.scrap_id = #{scrap_id,jdbcType=BIGINT}
+			<if test="dept_id !=null and dept_id !='' ">
+				and md.dept_id = #{dept_id,jdbcType=INTEGER}
+			</if>
+	</select>
+	
+	<!-- 审核或消审有待修改传入包含list的Map -->
+	<update id="auditOrUnAuditBatch" parameterType="java.util.List">
+		<foreach collection="list" index="index" item="item" open="begin" separator=";" close=";end;">
+			UPDATE mat_dura_dept_scrap set
+				state = #{item.state,jdbcType=INTEGER},
+				checker = #{item.checker,jdbcType=INTEGER},
+				check_date = #{item.check_date,jdbcType=DATE}
+			WHERE
+				group_id = #{item.group_id,jdbcType=INTEGER}
+				AND hos_id = #{item.hos_id,jdbcType=INTEGER}
+				AND copy_code = #{item.copy_code,jdbcType=VARCHAR}
+				AND scrap_id = #{item.scrap_id,jdbcType=BIGINT}
+		</foreach>
+	</update>
+	
+	<!-- 确认 -->
+	<update id="confirmBatch" parameterType="java.util.List">
+		<foreach collection="list" index="index" item="item" open="begin"
+			separator=";" close=";end;">
+			update mat_dura_dept_scrap set
+				year = #{item.year,jdbcType=VARCHAR},
+				month = #{item.month,jdbcType=VARCHAR},
+				state = #{item.state,jdbcType=INTEGER},
+				confirmer = #{item.confirmer,jdbcType=INTEGER},
+				confirm_date = #{item.confirm_date,jdbcType=DATE}
+			WHERE
+				group_id = #{item.group_id,jdbcType=INTEGER}
+				AND hos_id = #{item.hos_id,jdbcType=INTEGER}
+				AND copy_code = #{item.copy_code,jdbcType=VARCHAR}
+				AND scrap_id = #{item.scrap_id,jdbcType=BIGINT}
+		</foreach>
+	</update>
+	
+	<!-- 判断是否存在不等于该状态的单据 -->
+	<select id="existsState" parameterType="java.util.Map" resultType="java.lang.Integer">
+		SELECT COUNT(*) 
+		FROM mat_dura_dept_scrap 
+		WHERE group_id = #{group_id,jdbcType=INTEGER}
+			AND hos_id = #{hos_id,jdbcType=INTEGER}
+			AND copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND scrap_id = #{scrap_id,jdbcType=BIGINT}
+			AND state &lt;&gt; #{check_state,jdbcType=INTEGER}
+	</select>
+	
+	<!-- 批量判断是否存在不等于该状态的单据 -->
+	<select id="existsStateBatch" parameterType="java.util.List" resultType="java.lang.Integer">
+		SELECT COUNT(*) 
+		FROM mat_dura_dept_scrap 
+		WHERE
+		<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+			group_id = #{item.group_id,jdbcType=INTEGER}
+			AND hos_id = #{item.hos_id,jdbcType=INTEGER}
+			AND copy_code = #{item.copy_code,jdbcType=VARCHAR}
+			AND scrap_id = #{item.scrap_id,jdbcType=BIGINT}
+			AND state &lt;&gt; #{item.check_state,jdbcType=INTEGER}
+		</foreach>
+	</select>
+	
+	<!-- 获取要确认的明细数据 -->
+	<select id="queryDetailListForConfirm" parameterType="java.util.List" resultMap="matDuraScrapDeptForConfirm">
+		SELECT a.group_id, a.hos_id, a.copy_code, a.year, a.month, a.scrap_id, a.scrap_no, a.dept_id, b.detail_id, 
+			b.inv_id, b.inv_no, c.inv_code, c.inv_name, b.price, b.amount, b.price*b.amount amount_money, 
+			b.pay_money, b.income_money, b.bar_code 
+		FROM mat_dura_dept_scrap a
+		LEFT JOIN mat_dura_dept_scrap_d b
+			ON a.group_id = b.group_id AND a.hos_id = b.hos_id 
+			AND a.copy_code = b.copy_code AND a.scrap_id = b.scrap_id 
+		LEFT JOIN mat_inv_dict c 
+			ON b.group_id = c.group_id AND b.hos_id = b.hos_id 
+			AND b.copy_code = c.copy_code AND b.inv_id = c.inv_id 
+			AND c.is_stop = 0
+		WHERE
+		<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+			a.group_id = #{item.group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{item.hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{item.copy_code,jdbcType=VARCHAR}
+			AND a.scrap_id = #{item.scrap_id,jdbcType=BIGINT}
+		</foreach>
+	</select>
+	
+	<!-- 主表模板打印 -->
+	<select id="queryMainForPrintTemlate" parameterType="java.util.Map" resultType="java.util.Map" >
+		SELECT a.group_id, a.hos_id, a.copy_code, a.scrap_id, a.scrap_no, a.brief, 
+			to_char(a.make_date, 'yyyy-MM-dd hh24:mi:ss') make_date, a.dept_id, a.dept_no, 
+			c.dept_code, c.dept_name, b.sum_pay_money, b.sum_pay_money sum_pay_money_upper, 
+			b.sum_inc_money, b.sum_inc_money sum_inc_money_upper, 
+			a.maker, e.user_name maker_name, a.checker, f.user_name checker_name, 
+			to_char(a.check_date, 'yyyy-MM-dd hh24:mi:ss') check_date, a.confirmer, 
+			g.user_name confirmer_name, to_char(a.confirm_date, 'yyyy-MM-dd hh24:mi:ss') confirm_date,
+			h.user_name as approve_name, to_char(a.approve_date, 'yyyy-MM-dd hh24:mi:ss') as approve_date, 
+			case a.state 
+				when 1 then '新建'
+				when 2 then '审核'
+				when 3 then '审批'
+				else '已确认'
+			end as STATE_NAME
+		FROM mat_dura_dept_scrap a 
+		LEFT JOIN (
+			SELECT scrap_id, sum(pay_money) sum_pay_money, sum(income_money) sum_inc_money 
+			FROM mat_dura_dept_scrap_d 
+			WHERE group_id = #{group_id,jdbcType=INTEGER}
+				AND hos_id = #{hos_id,jdbcType=INTEGER}
+				AND copy_code = #{copy_code,jdbcType=VARCHAR}
+				AND scrap_id=#{scrap_id,jdbcType=BIGINT}	
+			GROUP BY scrap_id 
+		) b
+			ON a.scrap_id = b.scrap_id 
+		LEFT JOIN hos_dept_dict c
+			ON a.group_id = c.group_id AND a.hos_id = c.hos_id 
+			AND a.dept_id = c.dept_id AND a.dept_no = c.dept_no
+		LEFT JOIN sys_user e 
+			ON a.group_id = e.group_id AND a.hos_id = e.hos_id 
+			AND a.maker = e.user_id 
+		LEFT JOIN sys_user f 
+			ON a.group_id = f.group_id AND a.hos_id = f.hos_id 
+			AND a.checker = f.user_id 
+		LEFT JOIN sys_user g 
+			ON a.group_id = g.group_id AND a.hos_id = g.hos_id 
+			AND a.confirmer = g.user_id
+		left join sys_user h on a.group_id = h.group_id
+			and a.hos_id = h.hos_id
+			and a.confirmer = h.user_id 
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND a.scrap_id=#{scrap_id,jdbcType=BIGINT}	
+	</select>
+	
+	<!-- 主表模板批量打印 -->
+	<select id="queryMainForPrintTemlateBatch" parameterType="java.util.Map" resultType="java.util.Map" >
+		SELECT a.scrap_id id, a.group_id, a.hos_id, a.copy_code, a.scrap_id, a.scrap_no, a.brief, 
+			to_char(a.make_date, 'yyyy-MM-dd hh24:mi:ss') make_date, a.dept_id, a.dept_no, 
+			c.dept_code, c.dept_name, b.sum_pay_money, b.sum_pay_money sum_pay_money_upper, 
+			b.sum_inc_money, b.sum_inc_money sum_inc_money_upper, 
+			a.maker, e.user_name maker_name, a.checker, f.user_name checker_name, 
+			to_char(a.check_date, 'yyyy-MM-dd hh24:mi:ss') check_date, a.confirmer, 
+			g.user_name confirmer_name, to_char(a.confirm_date, 'yyyy-MM-dd hh24:mi:ss') confirm_date, 
+			case a.state 
+				when 1 then '新建'
+				when 2 then '审核'
+				when 3 then '审批'
+				else '已确认'
+			end as STATE_NAME  
+		FROM mat_dura_dept_scrap a 
+		LEFT JOIN (
+			SELECT scrap_id, sum(pay_money) sum_pay_money, sum(income_money) sum_inc_money 
+			FROM mat_dura_dept_scrap_d 
+			WHERE group_id = #{group_id,jdbcType=INTEGER}
+				AND hos_id = #{hos_id,jdbcType=INTEGER}
+				AND copy_code = #{copy_code,jdbcType=VARCHAR}
+				AND scrap_id in  (${paraId})
+			GROUP BY scrap_id 
+		) b
+			ON a.scrap_id = b.scrap_id 
+		LEFT JOIN hos_dept_dict c
+			ON a.group_id = c.group_id AND a.hos_id = c.hos_id 
+			AND a.dept_id = c.dept_id AND a.dept_no = c.dept_no
+		LEFT JOIN sys_user e 
+			ON a.group_id = e.group_id AND a.hos_id = e.hos_id 
+			AND a.maker = e.user_id 
+		LEFT JOIN sys_user f 
+			ON a.group_id = f.group_id AND a.hos_id = f.hos_id 
+			AND a.checker = f.user_id 
+		LEFT JOIN sys_user g 
+			ON a.group_id = g.group_id AND a.hos_id = g.hos_id 
+			AND a.confirmer = g.user_id 
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			AND a.scrap_id in  (${paraId})
+		ORDER BY a.scrap_id desc	
+	</select>
+	
+	<!-- 明细表模板打印 -->
+	<select id="queryDetailForPrintTemlate" parameterType="java.util.Map" resultType="java.util.Map" >
+		SELECT
+			a.scrap_id id, a.group_id, a.hos_id, a.copy_code, a.detail_id, a.inv_id, a.inv_no,
+			b.inv_code,b.bid_code, b.inv_name, b.inv_model, c.unit_name, d.fac_name, 
+			a.price, a.amount, a.pay_money, a.income_money, a.bar_code, a.note 
+		FROM mat_dura_dept_scrap_d a 
+		LEFT JOIN mat_inv_dict b 
+			ON a.group_id = b.group_id AND a.hos_id = b.hos_id 
+			AND a.copy_code = b.copy_code AND a.inv_id = b.inv_id 
+			AND a.inv_no = b.inv_no 
+		LEFT JOIN hos_unit c 
+			ON b.group_id = c.group_id AND b.hos_id = c.hos_id
+			AND b.unit_code = c.unit_code and c.is_stop = 0
+		LEFT JOIN hos_fac_dict d
+			ON b.group_id = d.group_id AND b.hos_id = d.hos_id
+			AND b.fac_id = d.fac_id AND b.fac_no = d.fac_no
+		WHERE a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			<if test="p_num ==1">
+				AND a.scrap_id in (${paraId})
+			</if>
+			<if test="p_num ==0">
+				AND a.scrap_id=#{scrap_id,jdbcType=BIGINT}
+			</if>	
+		ORDER BY a.detail_id
+	</select>
+	
+	<!-- 审批、销审批 -->
+	<update id="auditOrUnApproveBatch" parameterType="java.util.List">
+		<foreach collection="list" index="index" item="item" open="begin" separator=";" close=";end;">
+			UPDATE mat_dura_dept_scrap set
+				state = #{item.state,jdbcType=INTEGER},
+				approve_emp = #{item.approve_emp,jdbcType=INTEGER},
+				approve_date = #{item.approve_date,jdbcType=DATE}
+			WHERE
+				group_id = #{item.group_id,jdbcType=INTEGER}
+				AND hos_id = #{item.hos_id,jdbcType=INTEGER}
+				AND copy_code = #{item.copy_code,jdbcType=VARCHAR}
+				AND scrap_id = #{item.scrap_id,jdbcType=BIGINT}
+		</foreach>
+	</update>
+</mapper>

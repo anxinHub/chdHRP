@@ -1,0 +1,1475 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.cost.dao.CostReportMapper">
+
+   <select id="queryCostTypeDictThead" parameterType="java.util.Map" resultType="java.util.Map">
+						 select 
+						     cost_type_id cost_type_id,
+							 cost_type_code cost_type_code,
+							 cost_type_name cost_type_name
+						 from cost_type_dict
+						 order by cost_type_id
+   </select> 
+
+	<select id="queryCostDeptReport_1" parameterType="java.util.Map" resultType="java.util.Map">
+				with dept as (
+						select 
+							 hdd.dept_id
+							,dept_code
+							,dept_name
+							,ada.type_code
+							,hdd.super_code
+							,hdd.is_last
+							,hdd.dept_level
+						from hos_dept_dict hdd
+						left join acc_dept_attr ada 
+						on ada.group_id = hdd.group_id
+						and ada.hos_id = hdd.hos_id
+						and ada.dept_id = hdd.dept_id 
+						where hdd.group_id = #{group_id}
+							and hdd.hos_id = #{hos_id}
+							and hdd.is_stop=0
+						order by dept_code
+					), 
+					dept_dir as (
+						      select cddd.dept_id
+									, hdd.dept_code
+									, hdd.dept_name
+									, ada.type_code
+						<foreach collection="type" item="item" index="index" separator="" >
+                          ,sum(decode(cidn.cost_type_id, ${item.cost_type_id}, cddd.dir_amount, 0))  t_${item.cost_type_code}  
+                         </foreach>
+                         ,
+                        <foreach collection="type" item="item" index="index" separator="+" >
+							 sum(decode(cidn.cost_type_id, ${item.cost_type_id}, cddd.dir_amount, 0))
+						</foreach> sum_amount
+								from cost_dept_dri_data cddd
+								left join hos_source hs on cddd.group_id = hs.group_id
+								and cddd.hos_id = hs.hos_id
+								and cddd.source_id = hs.source_id 
+								left join cost_item_dict_no cidn on cddd.group_id = cidn.group_id
+								and cddd.hos_id = cidn.hos_id
+								and cddd.copy_code = cidn.copy_code
+								and cddd.cost_item_id = cidn.cost_item_id
+								left join hos_dept_dict hdd on cddd.group_id = hdd.group_id
+								and cddd.hos_id = hdd.hos_id
+								and cddd.dept_id = hdd.dept_id
+								and hdd.is_stop=0
+									left join acc_dept_attr ada on hdd.group_id = ada.group_id
+								and hdd.hos_id = ada.hos_id
+								and hdd.dept_id = ada.dept_id 
+								where cddd.group_id = #{group_id}
+									and cddd.hos_id = #{hos_id}
+									and cddd.copy_code = #{copy_code}
+									and cddd.acc_year || cddd.acc_month between #{year_month_begin} and #{year_month_end}
+									and source_attr in ${source_attr} 
+								group by cddd.dept_id,
+										 hdd.dept_code,
+										 hdd.dept_name,
+										 ada.type_code
+					) ,temp as (
+						select
+								'01' type_code 
+								,t1.dept_code
+								,t1.dept_name
+								,t1.super_code
+								,t1.is_last
+								,t1.dept_level
+								<foreach collection="type" item="item" index="index" separator="" >
+							    ,t_${item.cost_type_code}
+						        </foreach>
+						        ,sum_amount
+						from dept t1
+						left join dept_dir t2
+						on  t1.dept_id = t2.dept_id
+						and t2.type_code = '01'
+						union all
+						select 
+								'02' type_code
+								,t1.dept_code
+								,t1.dept_name
+								,t1.super_code
+								,t1.is_last
+								,t1.dept_level
+								<foreach collection="type" item="item" index="index" separator="" >
+							    ,t_${item.cost_type_code}
+						        </foreach>
+						        ,sum_amount
+						from dept t1
+						left join dept_dir t2
+						on  t1.dept_id = t2.dept_id
+						and t2.type_code = '02'
+						union all
+						select 
+								'03' type_code
+								,t1.dept_code
+								,t1.dept_name
+								,t1.super_code
+								,t1.is_last
+								,t1.dept_level
+								<foreach collection="type" item="item" index="index" separator="" >
+							    ,t_${item.cost_type_code}
+						        </foreach>
+						        ,sum_amount
+						from dept t1
+						left join dept_dir t2
+						on  t1.dept_id = t2.dept_id
+						and t2.type_code = '03'
+						union all
+						select 
+								'04' type_code
+								,t1.dept_code
+								,t1.dept_name
+								,t1.super_code
+								,t1.is_last
+								,t1.dept_level
+								<foreach collection="type" item="item" index="index" separator="" >
+							    ,t_${item.cost_type_code}
+						        </foreach>
+						        ,sum_amount
+						from dept t1
+						left join dept_dir t2
+						on  t1.dept_id = t2.dept_id
+						and t2.type_code = '04'
+					), result as(
+						select  
+									 decode(type_code,'','9999',type_code) type_code
+									,decode(grouping(type_code)+grouping(dept_code),1,'小计',2,'合计',dept_code) dept_code
+									,decode(
+										type_code,
+									 '01',decode(dept_name,'','临床服务类',dept_name),
+									 '02',decode(dept_name,'','医疗技术类',dept_name),
+									 '03',decode(dept_name,'','医疗辅助类',dept_name),
+									 '04',decode(dept_name,'','行政后勤类',dept_name)
+									)dept_name
+									,decode(super_code,'','0',super_code) super_code
+									,is_last
+									,dept_level
+									<foreach collection="type" item="item" index="index" separator="" >
+								    ,sum(t_${item.cost_type_code}) t_${item.cost_type_code}
+							        </foreach>
+							        ,sum(sum_amount) sum_amount
+							from temp
+							group by grouping sets ((
+													 type_code 
+													,dept_code
+													,dept_name
+													,super_code
+													,is_last
+													,dept_level), 
+													(type_code), null)
+					),temporary as(
+					     select 
+							  type_code
+							 ,dept_code
+							 ,dept_name
+							 ,is_last
+							 ,dept_level
+							 <foreach collection="type" item="item" index="index" separator="" >
+								   ,(select sum(nvl(t_${item.cost_type_code}, 0))
+									from result t
+									start with t.type_code = tt.type_code
+									and t.dept_code = tt.dept_code
+									connect by t.type_code = prior t.type_code  
+									and t.super_code = prior t.dept_code 
+								) t_${item.cost_type_code}
+							 </foreach>
+								,(
+									 select sum(nvl(sum_amount, 0))
+									from result t
+									start with t.type_code = tt.type_code
+									and t.dept_code = tt.dept_code
+									connect by t.type_code = prior t.type_code  
+									and t.super_code = prior t.dept_code 
+								) sum_amount
+						 from result tt
+					 ) select  type_code
+							  ,dept_code
+							  ,dept_name
+							  ,is_last
+							  ,dept_level
+							  <foreach collection="type" item="item" index="index" separator="" >
+							  ,t_${item.cost_type_code}
+						      </foreach>
+							  ,sum_amount
+					   from temporary
+					   <where>
+					     	 sum_amount &gt; 0
+					     <if test="dept_level != null and dept_level != ''"> 
+				           <choose>
+						        <when test="dept_level !=0 and dept_level != '0'">
+						            and (dept_level = #{dept_level} or dept_level is null)
+						        </when> 
+						        <otherwise>
+						           and (is_last = 1 or is_last is null)
+						        </otherwise>
+						    </choose>
+					     </if> 
+					   </where>
+               order by type_code,dept_code
+	</select>
+
+   <select id="queryCostDeptReport_1_old" parameterType="java.util.Map" resultType="java.util.Map">
+			        with dept as (
+           select hdd.dept_id,  dept_code, dept_name, ada.type_code
+            , hdd.super_code, hdd.is_last
+          from hos_dept_dict hdd
+            left join acc_dept_attr ada on ada.group_id = hdd.group_id
+          and ada.hos_id = hdd.hos_id
+          and ada.dept_id = hdd.dept_id 
+          where hdd.group_id = #{group_id}
+            and hdd.hos_id = #{hos_id}
+            and hdd.is_stop = '0'
+            order by ada.type_code,dept_code
+        ),dept_dir as (
+            select a.dept_id,
+                   d.dept_code,
+                   d.dept_name,
+                   sum(decode(b.cost_type_id, 1, a.dir_amount, 0)) as cost_emp_amount,
+                   sum(decode(b.cost_type_id, 2, a.dir_amount, 0)) as cost_mate_amount,
+                   sum(decode(b.cost_type_id, 3, a.dir_amount, 0)) as cost_drug_amount,
+                   sum(decode(b.cost_type_id, 4, a.dir_amount, 0)) as cost_fasset_amount,
+                   sum(decode(b.cost_type_id, 5, a.dir_amount, 0)) as cost_iasset_amount,
+                   sum(decode(b.cost_type_id, 6, a.dir_amount, 0)) as cost_risk_amount,
+                   sum(decode(b.cost_type_id, 7, a.dir_amount, 0)) as cost_other_amount,
+                   sum(decode(b.cost_type_id, 1, a.dir_amount, 0)) +
+                   sum(decode(b.cost_type_id, 2, a.dir_amount, 0)) +
+                   sum(decode(b.cost_type_id, 3, a.dir_amount, 0)) +
+                   sum(decode(b.cost_type_id, 4, a.dir_amount, 0)) +
+                   sum(decode(b.cost_type_id, 5, a.dir_amount, 0)) +
+                   sum(decode(b.cost_type_id, 6, a.dir_amount, 0)) +
+                   sum(decode(b.cost_type_id, 7, a.dir_amount, 0)) as sum_amount
+              from cost_dept_dri_data a
+             inner join hos_source t1
+                on a.group_id = t1.group_id
+               and a.hos_id = t1.hos_id
+               and a.source_id = t1.source_id
+              left join cost_item_dict b
+                on a.group_id = b.group_id
+               and a.hos_id = b.hos_id
+               and a.copy_code = b.copy_code
+               and a.cost_item_id = b.cost_item_id
+              left join hos_dept_dict d
+                on a.group_id = d.group_id
+               and a.hos_id = d.hos_id
+               and a.dept_id = d.dept_id
+               and  d.is_stop=0
+              left join acc_dept_attr e
+                on d.group_id = e.group_id
+               and d.hos_id = e.hos_id
+               and d.dept_id = e.dept_id
+             where a.group_id = #{group_id}
+               and a.hos_id = #{hos_id}
+               and a.copy_code = #{copy_code}
+               and a.acc_year || a.acc_month between #{year_month_begin} and #{year_month_end}
+               and source_attr in ${source_attr}
+              group by a.dept_id,d.dept_code,d.dept_name
+        ) , temp as (
+           select 
+           a.type_code,
+           a.dept_code,
+           a.dept_name,
+		   a.super_code,
+           cost_emp_amount,
+           cost_mate_amount,
+           cost_drug_amount,
+           cost_fasset_amount,
+           cost_iasset_amount,
+           cost_risk_amount,
+           cost_other_amount,
+           sum_amount
+           from dept a
+           left join dept_dir b
+           on a.dept_id = b.dept_id
+        ), calculate as (select 
+				   type_code,
+           dept_code,
+					 dept_name,
+					 (select sum(nvl(cost_emp_amount, 0)) from temp p
+             start with p.dept_code = a.dept_code
+            connect by p.super_code = prior p.dept_code) cost_emp_amount,
+					 (select sum(nvl(cost_mate_amount, 0)) from temp p
+             start with p.dept_code = a.dept_code
+            connect by p.super_code = prior p.dept_code) cost_mate_amount,
+						 (select sum(nvl(cost_drug_amount, 0)) from temp p
+             start with p.dept_code = a.dept_code
+            connect by p.super_code = prior p.dept_code) cost_drug_amount,
+						 (select sum(nvl(cost_fasset_amount, 0)) from temp p
+             start with p.dept_code = a.dept_code
+            connect by p.super_code = prior p.dept_code) cost_fasset_amount,
+						 (select sum(nvl(cost_iasset_amount, 0)) from temp p
+             start with p.dept_code = a.dept_code
+            connect by p.super_code = prior p.dept_code) cost_iasset_amount,
+						 (select sum(nvl(cost_risk_amount, 0)) from temp p
+             start with p.dept_code = a.dept_code
+            connect by p.super_code = prior p.dept_code) cost_risk_amount,
+						 (select sum(nvl(cost_other_amount, 0)) from temp p
+             start with p.dept_code = a.dept_code
+            connect by p.super_code = prior p.dept_code) cost_other_amount,
+						 (select sum(nvl(sum_amount, 0)) from temp p
+             start with p.dept_code = a.dept_code
+            connect by p.super_code = prior p.dept_code) sum_amount
+        from temp a
+				)select type_code,dept_code,dept_name,cost_emp_amount,cost_mate_amount,cost_drug_amount,cost_fasset_amount,
+				 cost_iasset_amount,cost_risk_amount,cost_other_amount,sum_amount
+				 from calculate where type_code = '01'
+				 union all
+				 select '01' type_code,'小计' dept_code,'临床服务类' dept_name,sum(cost_emp_amount),sum(cost_mate_amount),
+				 sum(cost_drug_amount),sum(cost_fasset_amount), sum(cost_iasset_amount),sum(cost_risk_amount),sum(cost_other_amount),
+				 sum(sum_amount)
+				 from temp where type_code = '01'
+				 union all
+				 select type_code,dept_code,dept_name,cost_emp_amount,cost_mate_amount,cost_drug_amount,cost_fasset_amount,
+				 cost_iasset_amount,cost_risk_amount,cost_other_amount,sum_amount
+				 from calculate where type_code = '02'
+				 union all
+				 select '02' type_code,'小计' dept_code,'医疗技术类' dept_name,sum(cost_emp_amount),sum(cost_mate_amount),
+				 sum(cost_drug_amount),sum(cost_fasset_amount),sum(cost_iasset_amount),sum(cost_risk_amount),sum(cost_other_amount),
+				 sum(sum_amount)
+				 from temp where type_code = '02'
+				 union all
+				 select type_code,dept_code,dept_name,cost_emp_amount,cost_mate_amount,cost_drug_amount,cost_fasset_amount,
+				 cost_iasset_amount,cost_risk_amount,cost_other_amount,sum_amount
+				 from calculate where type_code = '03'
+				 union all
+				 select '03' type_code,'小计' dept_code,'医疗辅助类' dept_name,sum(cost_emp_amount),sum(cost_mate_amount),
+				 sum(cost_drug_amount),sum(cost_fasset_amount), sum(cost_iasset_amount),sum(cost_risk_amount),sum(cost_other_amount),
+				 sum(sum_amount)
+				 from temp where type_code = '03'
+				 union all
+				 select type_code,dept_code,dept_name,cost_emp_amount,cost_mate_amount,cost_drug_amount,cost_fasset_amount,
+				 cost_iasset_amount,cost_risk_amount,cost_other_amount,sum_amount
+				 from calculate where type_code = '04'
+				 union all
+				 select '04' type_code,'小计' dept_code,'管理类' dept_name,sum(cost_emp_amount),sum(cost_mate_amount),
+				 sum(cost_drug_amount),sum(cost_fasset_amount), sum(cost_iasset_amount),sum(cost_risk_amount),sum(cost_other_amount),
+				 sum(sum_amount)
+				 from temp where type_code = '04'
+				 union all
+				 select '' type_code,'合计' dept_code,'' dept_name,sum(cost_emp_amount),sum(cost_mate_amount),
+				 sum(cost_drug_amount),sum(cost_fasset_amount), sum(cost_iasset_amount),sum(cost_risk_amount),sum(cost_other_amount),
+				 sum(sum_amount)
+				 from temp 
+				 order by type_code,dept_code
+   </select>
+
+	
+	<select id="queryCostDeptReport_2" parameterType="java.util.Map"
+		resultType="java.util.Map">
+		
+			with dept as
+			 (select hdd.dept_id,
+							 dept_code,
+							 dept_name,
+							 hdd.super_code,
+							 hdd.is_last,
+							 hdd.dept_level
+					from hos_dept_dict hdd
+					left join acc_dept_attr ada
+						on ada.group_id = hdd.group_id
+					 and ada.hos_id = hdd.hos_id
+					 and ada.dept_id = hdd.dept_id
+				 where hdd.group_id = #{group_id}
+					 and hdd.hos_id = #{hos_id}
+			),
+			dept_dri as
+			 (select  a.dept_id
+					 
+					 ,d.dept_code
+					 ,d.dept_name
+					 <foreach collection="type" item="item" index="index" separator="" >
+                       ,sum(decode(b.cost_type_id, ${item.cost_type_id}, a.dir_amount, 0)) as t_${item.cost_type_code}_1
+                       ,sum(decode(b.cost_type_id,${item.cost_type_id},
+							nvl(a.dir_man_amount, 0) + nvl(a.indir_ass_man_amount, 0) +
+							nvl(a.indir_med_man_amount, 0) +
+							nvl(a.indir_ass_med_man_amount, 0) +
+							nvl(a.dir_ass_amount, 0) + nvl(a.indir_med_ass_amount, 0) +
+							nvl(a.dir_med_amount, 0),
+							0)) as t_${item.cost_type_code}_2
+					   ,sum(decode(b.cost_type_id,${item.cost_type_id},
+							nvl(a.dir_amount, 0) + nvl(a.dir_man_amount, 0) +
+							nvl(a.indir_ass_man_amount, 0) +
+							nvl(a.indir_med_man_amount, 0) +
+							nvl(a.indir_ass_med_man_amount, 0) +
+							nvl(a.dir_ass_amount, 0) + nvl(a.indir_med_ass_amount, 0) +
+							nvl(a.dir_med_amount, 0),
+							0)) as t_${item.cost_type_code}_3
+                     </foreach>
+			from cost_dept_cost a
+		 inner join hos_source t1
+				on a.group_id = t1.group_id
+			 and a.hos_id = t1.hos_id
+			 and a.source_id = t1.source_id
+			left join cost_item_dict b
+				on a.group_id = b.group_id
+			 and a.hos_id = b.hos_id
+			 and a.copy_code = b.copy_code
+			 and a.cost_item_id = b.cost_item_id
+			left join acc_dept_attr c
+				on a.group_id = c.group_id
+			 and a.hos_id = c.hos_id
+			 and c.dept_id = a.dept_id
+			left join hos_dept_dict d
+				on a.group_id = d.group_id
+			 and a.hos_id = d.hos_id
+			 and a.dept_id = d.dept_id
+			 and d.is_stop=0
+		 where a.group_id = #{group_id}
+			 and a.hos_id = #{hos_id}
+			 and a.copy_code = #{copy_code}
+			 and a.acc_year || a.acc_month between #{year_month_begin} and #{year_month_end}
+			 and c.type_code = '01'
+			 and source_attr in ${source_attr} 
+		 group by a.dept_id, d.dept_code, d.dept_name),
+	temp as
+	 (select dept.dept_code
+			 ,dept.dept_name
+			 ,dept.super_code
+			 ,dept.dept_level
+			 ,dept.is_last
+		 	 <foreach collection="type" item="item" index="index" separator="" >
+	         ,t_${item.cost_type_code}_1
+	         ,t_${item.cost_type_code}_2
+	         ,t_${item.cost_type_code}_3
+	         </foreach>
+             ,
+	         <foreach collection="type" item="item" index="index" separator="+" >
+				t_${item.cost_type_code}_1
+			 </foreach> t_sum_amount_1
+			 ,
+	         <foreach collection="type" item="item" index="index" separator="+" >
+				t_${item.cost_type_code}_2
+			 </foreach> t_sum_amount_2
+			 ,
+	         <foreach collection="type" item="item" index="index" separator="+" >
+				t_${item.cost_type_code}_3
+			 </foreach> t_sum_amount_3
+			from dept
+			left join dept_dri
+				on dept.dept_id = dept_dri.dept_id
+			 
+		), result as
+		  (select 
+				  decode(grouping(dept_code),1,'临床服务类科室合计',dept_code) dept_code
+				 ,dept_name
+				 ,super_code
+				 ,dept_level
+				 ,is_last
+				 <foreach collection="type" item="item" index="index" separator="" >
+		         ,sum(t_${item.cost_type_code}_1) t_${item.cost_type_code}_1
+		         ,sum(t_${item.cost_type_code}_2) t_${item.cost_type_code}_2
+		         ,sum(t_${item.cost_type_code}_3) t_${item.cost_type_code}_3
+		         </foreach>
+				 ,sum(t_sum_amount_1) t_sum_amount_1
+				 ,sum(t_sum_amount_2) t_sum_amount_2
+				 ,sum(t_sum_amount_3) t_sum_amount_3
+		 from temp
+         group by grouping sets ((
+							 dept_code
+							,dept_name
+							,super_code
+							,is_last
+							,dept_level), null)
+	 ), temporary as
+	  (select 
+			  dept_code
+			 ,dept_name
+			 ,dept_level
+			 ,is_last
+			<foreach collection="type" item="item" index="index" separator="" >
+				,( select sum(nvl(t_${item.cost_type_code}_1, 0))
+				 from result t
+				 start with t.dept_code = tt.dept_code
+				 connect by t.super_code = prior t.dept_code
+				) t_${item.cost_type_code}_1
+			
+			  ,( select sum(nvl(t_${item.cost_type_code}_2, 0))
+				 from result t
+				 start with t.dept_code = tt.dept_code
+				 connect by t.super_code = prior t.dept_code
+				) t_${item.cost_type_code}_2
+				
+			   ,( select sum(nvl(t_${item.cost_type_code}_3, 0))
+				 from result t
+				 start with t.dept_code = tt.dept_code
+				 connect by t.super_code = prior t.dept_code
+				) t_${item.cost_type_code}_3
+			</foreach>
+			   ,( 	
+				 select sum(nvl(t_sum_amount_1, 0))
+				 from result t
+				 start with t.dept_code = tt.dept_code
+				 connect by t.super_code = prior t.dept_code
+				) t_sum_amount_1
+				,( 	
+				 select sum(nvl(t_sum_amount_2, 0))
+				 from result t
+				 start with t.dept_code = tt.dept_code
+				 connect by t.super_code = prior t.dept_code
+				) t_sum_amount_2
+				,( 	
+				 select sum(nvl(t_sum_amount_3, 0))
+				 from result t
+				 start with t.dept_code = tt.dept_code
+				 connect by t.super_code = prior t.dept_code
+				) t_sum_amount_3
+			from result tt
+	 )select 
+	      dept_code
+		 ,dept_name
+		 <foreach collection="type" item="item" index="index" separator="" >
+         ,t_${item.cost_type_code}_1
+         ,t_${item.cost_type_code}_2
+         ,t_${item.cost_type_code}_3
+		 </foreach>
+		 ,t_sum_amount_1
+		 ,t_sum_amount_2
+		 ,t_sum_amount_3
+		from temporary
+		where t_sum_amount_3 &gt;0
+		<if test="dept_level != null and dept_level != ''"> 
+           <choose>
+		        <when test="dept_level !=0 and dept_level != '0'">
+		            and (dept_level = #{dept_level} or dept_level is null)
+		        </when> 
+		        <otherwise>
+		           and (is_last = 1 or is_last is null)
+		        </otherwise>
+		    </choose>
+		</if> 
+		order by dept_code
+	</select>
+
+
+    <select id="queryCostDeptReport_2_old" parameterType="java.util.Map"
+		resultType="java.util.Map">
+		 
+		  with dept as (
+							select hdd.dept_id,
+                     
+                     dept_code,
+                     dept_name,
+                     ada.type_code,
+                     hdd.super_code,
+                     hdd.is_last
+                from hos_dept_dict hdd
+                left join acc_dept_attr ada
+                  on ada.group_id = hdd.group_id
+                 and ada.hos_id = hdd.hos_id
+                 and ada.dept_id = hdd.dept_id
+               where hdd.group_id = #{group_id}
+                 and hdd.hos_id =  #{hos_id}
+                 and hdd.is_stop = '0'
+				 and ada.type_code in ('01')
+				), dept_dri as (
+		   select  a.dept_id,
+			        
+			         d.dept_code,
+					 d.dept_name,
+					 sum(decode(b.cost_type_id, 1, a.dir_amount, 0)) as cost_emp_amount_1,
+					 sum(decode(b.cost_type_id,
+											1,
+											nvl(a.dir_man_amount, 0) + nvl(a.indir_ass_man_amount, 0) +
+											nvl(a.indir_med_man_amount, 0) +
+											nvl(a.indir_ass_med_man_amount, 0) +
+											nvl(a.dir_ass_amount, 0) + nvl(a.indir_med_ass_amount, 0) +
+											nvl(a.dir_med_amount, 0),
+											0)) as cost_emp_amount_2,
+					 sum(decode(b.cost_type_id,
+											1,
+											nvl(a.dir_amount, 0) + nvl(a.dir_man_amount, 0) +
+											nvl(a.indir_ass_man_amount, 0) +
+											nvl(a.indir_med_man_amount, 0) +
+											nvl(a.indir_ass_med_man_amount, 0) +
+											nvl(a.dir_ass_amount, 0) + nvl(a.indir_med_ass_amount, 0) +
+											nvl(a.dir_med_amount, 0),
+											0)) as cost_emp_amount_3,
+					 sum(decode(b.cost_type_id, 2, a.dir_amount, 0)) as cost_mate_amount_1,
+					 sum(decode(b.cost_type_id,
+											2,
+											nvl(a.dir_man_amount, 0) + nvl(a.indir_ass_man_amount, 0) +
+											nvl(a.indir_med_man_amount, 0) +
+											nvl(a.indir_ass_med_man_amount, 0) +
+											nvl(a.dir_ass_amount, 0) + nvl(a.indir_med_ass_amount, 0) +
+											nvl(a.dir_med_amount, 0),
+											0)) as cost_mate_amount_2,
+					 sum(decode(b.cost_type_id,
+											2,
+											nvl(a.dir_amount, 0) + nvl(a.dir_man_amount, 0) +
+											nvl(a.indir_ass_man_amount, 0) +
+											nvl(a.indir_med_man_amount, 0) +
+											nvl(a.indir_ass_med_man_amount, 0) +
+											nvl(a.dir_ass_amount, 0) + nvl(a.indir_med_ass_amount, 0) +
+											nvl(a.dir_med_amount, 0),
+											0)) as cost_mate_amount_3,
+					 sum(decode(b.cost_type_id, 3, a.dir_amount, 0)) as cost_drug_amount_1,
+					 sum(decode(b.cost_type_id,
+											3,
+											nvl(a.dir_man_amount, 0) + nvl(a.indir_ass_man_amount, 0) +
+											nvl(a.indir_med_man_amount, 0) +
+											nvl(a.indir_ass_med_man_amount, 0) +
+											nvl(a.dir_ass_amount, 0) + nvl(a.indir_med_ass_amount, 0) +
+											nvl(a.dir_med_amount, 0),
+											0)) as cost_drug_amount_2,
+					 sum(decode(b.cost_type_id,
+											3,
+											nvl(a.dir_amount, 0) + nvl(a.dir_man_amount, 0) +
+											nvl(a.indir_ass_man_amount, 0) +
+											nvl(a.indir_med_man_amount, 0) +
+											nvl(a.indir_ass_med_man_amount, 0) +
+											nvl(a.dir_ass_amount, 0) + nvl(a.indir_med_ass_amount, 0) +
+											nvl(a.dir_med_amount, 0),
+											0)) as cost_drug_amount_3,
+					 sum(decode(b.cost_type_id, 4, a.dir_amount, 0)) as cost_fasset_amount_1,
+					 sum(decode(b.cost_type_id,
+											4,
+											nvl(a.dir_man_amount, 0) + nvl(a.indir_ass_man_amount, 0) +
+											nvl(a.indir_med_man_amount, 0) +
+											nvl(a.indir_ass_med_man_amount, 0) +
+											nvl(a.dir_ass_amount, 0) + nvl(a.indir_med_ass_amount, 0) +
+											nvl(a.dir_med_amount, 0),
+											0)) as cost_fasset_amount_2,
+					 sum(decode(b.cost_type_id,
+											4,
+											nvl(a.dir_amount, 0) + nvl(a.dir_man_amount, 0) +
+											nvl(a.indir_ass_man_amount, 0) +
+											nvl(a.indir_med_man_amount, 0) +
+											nvl(a.indir_ass_med_man_amount, 0) +
+											nvl(a.dir_ass_amount, 0) + nvl(a.indir_med_ass_amount, 0) +
+											nvl(a.dir_med_amount, 0),
+											0)) as cost_fasset_amount_3,
+					 sum(decode(b.cost_type_id, 5, a.dir_amount, 0)) as cost_iasset_amount_1,
+					 sum(decode(b.cost_type_id,
+											5,
+											nvl(a.dir_man_amount, 0) + nvl(a.indir_ass_man_amount, 0) +
+											nvl(a.indir_med_man_amount, 0) +
+											nvl(a.indir_ass_med_man_amount, 0) +
+											nvl(a.dir_ass_amount, 0) + nvl(a.indir_med_ass_amount, 0) +
+											nvl(a.dir_med_amount, 0),
+											0)) as cost_iasset_amount_2,
+					 sum(decode(b.cost_type_id,
+											5,
+											nvl(a.dir_amount, 0) + nvl(a.dir_man_amount, 0) +
+											nvl(a.indir_ass_man_amount, 0) +
+											nvl(a.indir_med_man_amount, 0) +
+											nvl(a.indir_ass_med_man_amount, 0) +
+											nvl(a.dir_ass_amount, 0) + nvl(a.indir_med_ass_amount, 0) +
+											nvl(a.dir_med_amount, 0),
+											0)) as cost_iasset_amount_3,
+					 sum(decode(b.cost_type_id, 6, a.dir_amount, 0)) as cost_risk_amount_1,
+					 sum(decode(b.cost_type_id,
+											6,
+											nvl(a.dir_man_amount, 0) + nvl(a.indir_ass_man_amount, 0) +
+											nvl(a.indir_med_man_amount, 0) +
+											nvl(a.indir_ass_med_man_amount, 0) +
+											nvl(a.dir_ass_amount, 0) + nvl(a.indir_med_ass_amount, 0) +
+											nvl(a.dir_med_amount, 0),
+											0)) as cost_risk_amount_2,
+					 sum(decode(b.cost_type_id,
+											6,
+											nvl(a.dir_amount, 0) + nvl(a.dir_man_amount, 0) +
+											nvl(a.indir_ass_man_amount, 0) +
+											nvl(a.indir_med_man_amount, 0) +
+											nvl(a.indir_ass_med_man_amount, 0) +
+											nvl(a.dir_ass_amount, 0) + nvl(a.indir_med_ass_amount, 0) +
+											nvl(a.dir_med_amount, 0),
+											0)) as cost_risk_amount_3,
+					 sum(decode(b.cost_type_id, 7, a.dir_amount, 0)) as cost_other_amount_1,
+					 sum(decode(b.cost_type_id,
+											7,
+											nvl(a.dir_man_amount, 0) + nvl(a.indir_ass_man_amount, 0) +
+											nvl(a.indir_med_man_amount, 0) +
+											nvl(a.indir_ass_med_man_amount, 0) +
+											nvl(a.dir_ass_amount, 0) + nvl(a.indir_med_ass_amount, 0) +
+											nvl(a.dir_med_amount, 0),
+											0)) as cost_other_amount_2,
+					 sum(decode(b.cost_type_id,
+											7,
+											nvl(a.dir_amount, 0) + nvl(a.dir_man_amount, 0) +
+											nvl(a.indir_ass_man_amount, 0) +
+											nvl(a.indir_med_man_amount, 0) +
+											nvl(a.indir_ass_med_man_amount, 0) +
+											nvl(a.dir_ass_amount, 0) + nvl(a.indir_med_ass_amount, 0) +
+											nvl(a.dir_med_amount, 0),
+											0)) as cost_other_amount_3
+					from cost_dept_cost a
+				 inner join hos_source t1
+						on a.group_id = t1.group_id
+					 and a.hos_id = t1.hos_id
+					 and a.source_id = t1.source_id
+					left join cost_item_dict b
+						on a.group_id = b.group_id
+					 and a.hos_id = b.hos_id
+					 and a.copy_code = b.copy_code
+					 and a.cost_item_id = b.cost_item_id
+					left join acc_dept_attr c
+						on a.group_id = c.group_id
+					 and a.hos_id = c.hos_id
+					 and c.dept_id = a.dept_id
+					left join hos_dept_dict d
+						on a.group_id = d.group_id
+					 and a.hos_id = d.hos_id
+					 and a.dept_id = d.dept_id
+					 and d.is_stop=0
+			    	<where>
+						   a.group_id = #{group_id}
+						and a.hos_id = #{hos_id}
+						and a.copy_code = #{copy_code}
+						<if test="year_month_begin != null and year_month_begin != ''">
+						 and a.acc_year || a.acc_month between #{year_month_begin} and #{year_month_end}
+						</if>
+						and c.type_code = '01'
+						<if test="source_attr != null and source_attr != ''">
+							AND source_attr in ${source_attr}
+						</if>
+					</where>
+				 group by a.dept_id,d.dept_code, d.dept_name
+						), temp as (select 
+						  dept.dept_code,
+							dept.dept_name,
+							dept.super_code,
+							cost_emp_amount_1,
+							cost_emp_amount_2,
+							cost_emp_amount_3,
+							cost_mate_amount_1,
+							cost_mate_amount_2,
+							cost_mate_amount_3,
+							cost_drug_amount_1,
+							cost_drug_amount_2,
+							cost_drug_amount_3,
+							cost_fasset_amount_1,
+							cost_fasset_amount_2,
+							cost_fasset_amount_3,
+							cost_iasset_amount_1,
+							cost_iasset_amount_2,
+							cost_iasset_amount_3,
+							cost_risk_amount_1,
+							cost_risk_amount_2,
+							cost_risk_amount_3,
+							cost_other_amount_1,
+							cost_other_amount_2,
+							cost_other_amount_3,
+							cost_emp_amount_1 + 
+							cost_mate_amount_1 +
+							cost_drug_amount_1 + 
+							cost_fasset_amount_1 +
+							cost_iasset_amount_1 +
+							cost_risk_amount_1 + 
+							cost_other_amount_1 dir_amount,
+							cost_emp_amount_2 + 
+							cost_mate_amount_2 +
+							cost_drug_amount_2 + 
+							cost_fasset_amount_2 +
+							cost_iasset_amount_2 +
+							cost_risk_amount_2 + 
+							cost_other_amount_2 idir_amount,
+							cost_emp_amount_3 + 
+							cost_mate_amount_3 +
+							cost_drug_amount_3 + 
+							cost_fasset_amount_3 +
+							cost_iasset_amount_3 +
+							cost_risk_amount_3 + 
+							cost_other_amount_3 sum_amount
+						 from dept
+						 left join dept_dri
+						 on  dept.dept_id = dept_dri.dept_id
+						)select 
+						 dept_code,
+						 dept_name,
+						(
+            select sum(nvl(cost_emp_amount_1, 0))
+              from temp p
+             start with p.dept_code = a.dept_code
+            connect by p.super_code = prior p.dept_code) cost_emp_amount_1,
+						(
+            select sum(nvl(cost_emp_amount_2, 0))
+              from temp p
+             start with p.dept_code = a.dept_code
+            connect by p.super_code = prior p.dept_code) cost_emp_amount_2,
+						(
+            select sum(nvl(cost_emp_amount_3, 0))
+              from temp p
+             start with p.dept_code = a.dept_code
+            connect by p.super_code = prior p.dept_code) cost_emp_amount_3,
+							(
+            select sum(nvl(cost_mate_amount_1, 0))
+              from temp p
+             start with p.dept_code = a.dept_code
+            connect by p.super_code = prior p.dept_code) cost_mate_amount_1,
+						(
+            select sum(nvl(cost_mate_amount_2, 0))
+              from temp p
+             start with p.dept_code = a.dept_code
+            connect by p.super_code = prior p.dept_code) cost_mate_amount_2,
+						(
+            select sum(nvl(cost_mate_amount_3, 0))
+              from temp p
+             start with p.dept_code = a.dept_code
+            connect by p.super_code = prior p.dept_code) cost_mate_amount_3,
+						(select sum(nvl(cost_drug_amount_1, 0))
+              from temp p
+             start with p.dept_code = a.dept_code
+            connect by p.super_code = prior p.dept_code) cost_drug_amount_1,
+						(
+            select sum(nvl(cost_drug_amount_2, 0))
+              from temp p
+             start with p.dept_code = a.dept_code
+            connect by p.super_code = prior p.dept_code) cost_drug_amount_2,
+						(
+            select sum(nvl(cost_drug_amount_3, 0))
+              from temp p
+             start with p.dept_code = a.dept_code
+            connect by p.super_code = prior p.dept_code) cost_drug_amount_3,
+						(select sum(nvl(cost_fasset_amount_1, 0))
+              from temp p
+             start with p.dept_code = a.dept_code
+            connect by p.super_code = prior p.dept_code) cost_fasset_amount_1,
+						(
+            select sum(nvl(cost_fasset_amount_2, 0))
+              from temp p
+             start with p.dept_code = a.dept_code
+            connect by p.super_code = prior p.dept_code) cost_fasset_amount_2,
+						(
+            select sum(nvl(cost_fasset_amount_3, 0))
+              from temp p
+             start with p.dept_code = a.dept_code
+            connect by p.super_code = prior p.dept_code) cost_fasset_amount_3,
+							(select sum(nvl(cost_iasset_amount_1, 0))
+              from temp p
+             start with p.dept_code = a.dept_code
+            connect by p.super_code = prior p.dept_code) cost_iasset_amount_1,
+						(
+            select sum(nvl(cost_iasset_amount_2, 0))
+              from temp p
+             start with p.dept_code = a.dept_code
+            connect by p.super_code = prior p.dept_code) cost_iasset_amount_2,
+						(
+            select sum(nvl(cost_iasset_amount_3, 0))
+              from temp p
+             start with p.dept_code = a.dept_code
+            connect by p.super_code = prior p.dept_code) cost_iasset_amount_3,
+								(select sum(nvl(cost_risk_amount_1, 0))
+              from temp p
+             start with p.dept_code = a.dept_code
+            connect by p.super_code = prior p.dept_code) cost_risk_amount_1,
+						(
+            select sum(nvl(cost_risk_amount_2, 0))
+              from temp p
+             start with p.dept_code = a.dept_code
+            connect by p.super_code = prior p.dept_code) cost_risk_amount_2,
+						(
+            select sum(nvl(cost_risk_amount_3, 0))
+              from temp p
+             start with p.dept_code = a.dept_code
+            connect by p.super_code = prior p.dept_code) cost_risk_amount_3,
+						(select sum(nvl(cost_other_amount_1, 0))
+              from temp p
+             start with p.dept_code = a.dept_code
+            connect by p.super_code = prior p.dept_code) cost_other_amount_1,
+						(
+            select sum(nvl(cost_other_amount_2, 0))
+              from temp p
+             start with p.dept_code = a.dept_code
+            connect by p.super_code = prior p.dept_code) cost_other_amount_2,
+						(
+            select sum(nvl(cost_other_amount_3, 0))
+              from temp p
+             start with p.dept_code = a.dept_code
+            connect by p.super_code = prior p.dept_code) cost_other_amount_3,
+							(select sum(nvl(dir_amount, 0))
+              from temp p
+             start with p.dept_code = a.dept_code
+            connect by p.super_code = prior p.dept_code) dir_amount,
+						(
+            select sum(nvl(idir_amount, 0))
+              from temp p
+             start with p.dept_code = a.dept_code
+            connect by p.super_code = prior p.dept_code) idir_amount,
+						(
+            select sum(nvl(sum_amount, 0))
+              from temp p
+             start with p.dept_code = a.dept_code
+            connect by p.super_code = prior p.dept_code) sum_amount
+						from temp a
+						union all
+						select '','临床服务类科室合计',
+						  sum(cost_emp_amount_1),
+							sum(cost_emp_amount_2),
+							sum(cost_emp_amount_3),
+							sum(cost_mate_amount_1),
+							sum(cost_mate_amount_2),
+							sum(cost_mate_amount_3),
+							sum(cost_drug_amount_1),
+							sum(cost_drug_amount_2),
+							sum(cost_drug_amount_3),
+							sum(cost_fasset_amount_1),
+							sum(cost_fasset_amount_2),
+							sum(cost_fasset_amount_3),
+							sum(cost_iasset_amount_1),
+							sum(cost_iasset_amount_2),
+							sum(cost_iasset_amount_3),
+							sum(cost_risk_amount_1),
+							sum(cost_risk_amount_2),
+							sum(cost_risk_amount_3),
+							sum(cost_other_amount_1),
+							sum(cost_other_amount_2),
+							sum(cost_other_amount_3),
+							sum(dir_amount),
+						    sum(idir_amount),
+			                sum(sum_amount)
+						    from temp
+						 order by dept_code
+		
+	</select>
+
+	<select id="queryCostDeptReport_3" parameterType="java.util.Map"
+		resultType="java.util.Map">
+                  
+     with dept as (
+		select 
+		   hdd.dept_id
+			
+			,dept_code
+			,dept_name
+			,ada.type_code
+			,hdd.super_code
+			,hdd.is_last
+			,hdd.dept_level
+		from hos_dept_dict hdd
+			left join acc_dept_attr ada on ada.group_id = hdd.group_id
+		and ada.hos_id = hdd.hos_id
+		and ada.dept_id = hdd.dept_id 
+		where hdd.group_id = #{group_id}
+			and hdd.hos_id = #{hos_id}
+			and hdd.is_stop = '0'
+      ), 
+      dept_dir as (
+        select 
+			 d.dept_id
+			
+			,d.dept_code
+			,d.dept_name
+		<foreach collection="type" item="item" index="index" separator="" >
+            ,sum(decode(b.cost_type_id, ${item.cost_type_id}, nvl(dir_amount, 0) + nvl(dir_man_amount, 0) + nvl(dir_ass_amount, 0) + nvl(dir_med_amount, 0) + nvl(indir_ass_man_amount, 0) + nvl(indir_med_man_amount, 0) + nvl(indir_ass_med_man_amount, 0) + nvl(indir_med_ass_amount, 0), 0)) t_${item.cost_type_code} 
+        </foreach>
+        from cost_dept_cost a
+        inner join hos_source t1 on a.group_id = t1.group_id
+        and a.hos_id = t1.hos_id
+        and a.source_id = t1.source_id 
+        left join cost_item_dict b on a.group_id = b.group_id
+        and a.hos_id = b.hos_id
+        and a.copy_code = b.copy_code
+        and a.cost_item_id = b.cost_item_id 
+        left join acc_dept_attr c on a.group_id = c.group_id
+        and a.hos_id = c.hos_id
+        and c.dept_id = a.dept_id 
+          left join hos_dept_dict d on a.group_id = d.group_id
+        and a.hos_id = d.hos_id
+        and a.dept_id = d.dept_id
+        and d.is_stop = 0 
+        where a.group_id = #{group_id}
+          and a.hos_id = #{hos_id}
+          and a.copy_code = #{copy_code}
+          and a.acc_year || a.acc_month between #{year_month_begin} and #{year_month_end}
+          and source_attr in ${source_attr} 
+          and c.type_code = '01'
+          and d.is_stop = 0
+        group by d.dept_id,  d.dept_code, d.dept_name
+      ), 
+      dept_income as (
+        select a.dept_id,  dept_code, dept_name
+          , sum(sum_money) as sum_money, sum(clinic_num) as clinic_num
+          , sum(bed_use_day_num) as bed_use_day_num
+        from (
+          select a.appl_dept_id as dept_id,  sum(money) as sum_money, 0 as clinic_num
+            , 0 as bed_use_day_num
+          from cost_income a
+          where a.group_id = #{group_id}
+            and a.hos_id = #{hos_id}
+            and a.copy_code = #{copy_code}
+            and a.acc_year || a.acc_month between #{year_month_begin} and #{year_month_end}
+          group by appl_dept_id
+          union all
+          select dept_id, 0, sum(a.clinic_num) as clinic_num
+            , 0
+          from cost_clinic_work a
+          where a.group_id = #{group_id}
+            and a.hos_id = #{hos_id}
+            and a.copy_code = #{copy_code}
+            and a.acc_year || a.acc_month between #{year_month_begin} and #{year_month_end}
+          group by dept_id
+          union all
+          select dept_id, 0, 0
+            , sum(a.bed_use_day_num) as bed_use_day_num
+          from cost_inhos_work a
+          where a.group_id = #{group_id}
+            and a.hos_id =  #{hos_id}
+            and a.copy_code =  #{copy_code}
+            and a.acc_year || a.acc_month  between #{year_month_begin} and #{year_month_end}
+          group by dept_id
+        ) a
+        left join hos_dept_dict d 
+        on d.group_id = #{group_id}
+        and d.hos_id = #{hos_id}
+        and a.dept_id = d.dept_id
+        and  d.is_stop=0
+        group by a.dept_id,  dept_code, dept_name
+      ), 
+      dept_type as (
+        select d.dept_code
+             , sum(nvl(a.dir_amount, 0) + nvl(a.dir_man_amount, 0) + nvl(a.indir_ass_man_amount, 0) + nvl(a.indir_med_man_amount, 0) + nvl(a.indir_ass_med_man_amount, 0) + nvl(a.dir_ass_amount, 0) + nvl(a.indir_med_ass_amount, 0) + nvl(a.dir_med_amount, 0)) as dept_sum
+        from cost_dept_cost a
+        inner join hos_source t1 on a.group_id = t1.group_id
+        and a.hos_id = t1.hos_id
+        and a.source_id = t1.source_id 
+        left join cost_item_dict b on a.group_id = b.group_id
+        and a.hos_id = b.hos_id
+        and a.copy_code = b.copy_code
+        and a.cost_item_id = b.cost_item_id 
+        left join hos_dept_dict d on a.group_id = d.group_id
+        and a.hos_id = d.hos_id
+        and a.dept_id = d.dept_id
+        and d.is_stop = 0 
+          left join acc_dept_attr c on a.group_id = c.group_id
+        and a.hos_id = c.hos_id
+        and a.dept_id = c.dept_id 
+        where a.group_id = #{group_id}
+          and a.hos_id = #{hos_id}
+          and a.copy_code = #{copy_code}
+          and a.acc_year || a.acc_month between #{year_month_begin} and #{year_month_end}
+          and source_attr in ${source_attr} 
+          and c.type_code = '01'
+        group by d.dept_code
+      ),temp as ( 
+			        select 
+						      a.dept_code
+							 ,a.dept_name
+							 ,a.super_code
+							 ,a.dept_level
+							 ,a.is_last
+							<foreach collection="type" item="item" index="index" separator="" >
+				            ,t_${item.cost_type_code} 
+				            </foreach>
+							 ,c.dept_sum
+							 ,d.sum_money
+							 ,0 sum_ce
+							 ,d.clinic_num
+							 ,d.bed_use_day_num
+						from dept a
+						left join dept_dir b on a.dept_id = b.dept_id
+						
+						left join dept_type c on c.dept_code = a.dept_code 
+						left join dept_income d on d.dept_id = a.dept_id
+						
+					),result as(
+					  select 
+						  dept_code
+						 ,dept_name
+						 ,super_code
+						 ,dept_level
+						 ,is_last
+						<foreach collection="type" item="item" index="index" separator="" >
+				         ,(
+			              select sum(nvl(t_${item.cost_type_code}, 0))
+			              from temp t
+			              start with t.dept_code = tt.dept_code
+			              connect by t.super_code = PRIOR t.dept_code
+			             ) as t_${item.cost_type_code}
+				        </foreach>
+						  ,(
+			              select sum(nvl(dept_sum, 0))
+			              from temp t
+			              start with t.dept_code = tt.dept_code
+			              connect by t.super_code = PRIOR t.dept_code
+			             ) as dept_sum
+						 ,(
+			              select sum(nvl(sum_money, 0))
+			              from temp t
+			              start with t.dept_code = tt.dept_code
+			              connect by t.super_code = PRIOR t.dept_code
+			             ) as sum_money
+						 	,0 sum_ce
+						 ,(
+			              select sum(nvl(clinic_num, 0))
+			              from temp t
+			              start with t.dept_code = tt.dept_code
+			              connect by t.super_code = PRIOR t.dept_code
+			             ) as clinic_num
+						  ,(
+			              select sum(nvl(bed_use_day_num, 0))
+			              from temp t
+			              start with t.dept_code = tt.dept_code
+			              connect by t.super_code = PRIOR t.dept_code
+			             ) as bed_use_day_num
+					 from temp tt
+					)select
+					      dept_code
+						 ,dept_name
+						  <foreach collection="type" item="item" index="index" separator="" >
+				          ,t_${item.cost_type_code}
+				          ,divide(t_${item.cost_type_code},dept_sum)  * 100  t_${item.cost_type_code}_bl
+				          </foreach>
+						 ,dept_sum
+						 ,sum_money
+						 ,sum_money - dept_sum sum_ce
+						 ,divide(dept_sum,clinic_num) clinic_cost
+						 ,divide(dept_sum,bed_use_day_num) bed_cost
+					 from result
+					 <where>
+					   dept_sum &gt;0
+					   <if test="dept_level != null and dept_level != ''"> 
+				           <choose>
+						        <when test="dept_level !=0 and dept_level != '0'">
+						            and (dept_level = #{dept_level} or dept_level is null)
+						        </when> 
+						        <otherwise>
+						           and (is_last = 1 or is_last is null)
+						        </otherwise>
+						    </choose>
+						</if> 
+					 </where>
+					 union all
+					 select
+					 '各临床服务类科室合计'
+					 ,null
+				 	  <foreach collection="type" item="item" index="index" separator="" >
+			          ,sum(t_${item.cost_type_code})
+			          ,divide(sum(t_${item.cost_type_code}),sum(dept_sum)) * 100 t_${item.cost_type_code}_bl
+			          </foreach>
+					 ,sum(dept_sum)
+					 ,sum(sum_money)
+					 ,sum(sum_money) - sum(dept_sum) sum_ce
+					 ,divide(sum(dept_sum),sum(clinic_num)) clinic_cost
+					 ,divide(sum(dept_sum),sum(bed_use_day_num)) bed_cost
+					 from temp
+					 having sum(dept_sum) &gt;0
+					 order by dept_code
+	</select>
+	
+	<select id="queryCostDeptReport_3_old" parameterType="java.util.Map" resultType="java.util.Map">
+                   with dept as
+					 (select hdd.dept_id,
+									 
+									 dept_code,
+									 dept_name,
+									 ada.type_code,
+									 hdd.super_code,
+									 hdd.is_last
+							from hos_dept_dict hdd
+							left join acc_dept_attr ada
+								on ada.group_id = hdd.group_id
+							 and ada.hos_id = hdd.hos_id
+							 and ada.dept_id = hdd.dept_id
+						 where hdd.group_id = #{group_id}
+							 and hdd.hos_id = #{hos_id}
+							 and hdd.is_stop = '0'
+							 and ada.type_code in ('01')),
+					dept_dir as
+					 (select d.dept_id,
+					        
+									 d.dept_code,
+									 d.dept_name,
+									 sum(decode(b.cost_type_id,
+															1,
+															nvl(dir_amount, 0) + nvl(dir_man_amount, 0) +
+															nvl(dir_ass_amount, 0) + nvl(dir_med_amount, 0) +
+															nvl(indir_ass_man_amount, 0) +
+															nvl(indir_med_man_amount, 0) +
+															nvl(indir_ass_med_man_amount, 0) +
+															nvl(indir_med_ass_amount, 0),
+															0)) as cost_emp_amount,
+									 sum(decode(b.cost_type_id,
+															2,
+															nvl(dir_amount, 0) + nvl(dir_man_amount, 0) +
+															nvl(dir_ass_amount, 0) + nvl(dir_med_amount, 0) +
+															nvl(indir_ass_man_amount, 0) +
+															nvl(indir_med_man_amount, 0) +
+															nvl(indir_ass_med_man_amount, 0) +
+															nvl(indir_med_ass_amount, 0),
+															0)) as cost_mate_amount,
+									 sum(decode(b.cost_type_id,
+															3,
+															nvl(dir_amount, 0) + nvl(dir_man_amount, 0) +
+															nvl(dir_ass_amount, 0) + nvl(dir_med_amount, 0) +
+															nvl(indir_ass_man_amount, 0) +
+															nvl(indir_med_man_amount, 0) +
+															nvl(indir_ass_med_man_amount, 0) +
+															nvl(indir_med_ass_amount, 0),
+															0)) as cost_drug_amount,
+									 sum(decode(b.cost_type_id,
+															4,
+															nvl(dir_amount, 0) + nvl(dir_man_amount, 0) +
+															nvl(dir_ass_amount, 0) + nvl(dir_med_amount, 0) +
+															nvl(indir_ass_man_amount, 0) +
+															nvl(indir_med_man_amount, 0) +
+															nvl(indir_ass_med_man_amount, 0) +
+															nvl(indir_med_ass_amount, 0),
+															0)) as cost_fasset_amount,
+									 sum(decode(b.cost_type_id,
+															5,
+															nvl(dir_amount, 0) + nvl(dir_man_amount, 0) +
+															nvl(dir_ass_amount, 0) + nvl(dir_med_amount, 0) +
+															nvl(indir_ass_man_amount, 0) +
+															nvl(indir_med_man_amount, 0) +
+															nvl(indir_ass_med_man_amount, 0) +
+															nvl(indir_med_ass_amount, 0),
+															0)) as cost_iasset_amount,
+									 sum(decode(b.cost_type_id,
+															6,
+															nvl(dir_amount, 0) + nvl(dir_man_amount, 0) +
+															nvl(dir_ass_amount, 0) + nvl(dir_med_amount, 0) +
+															nvl(indir_ass_man_amount, 0) +
+															nvl(indir_med_man_amount, 0) +
+															nvl(indir_ass_med_man_amount, 0) +
+															nvl(indir_med_ass_amount, 0),
+															0)) as cost_risk_amount,
+									 sum(decode(b.cost_type_id,
+															7,
+															nvl(dir_amount, 0) + nvl(dir_man_amount, 0) +
+															nvl(dir_ass_amount, 0) + nvl(dir_med_amount, 0) +
+															nvl(indir_ass_man_amount, 0) +
+															nvl(indir_med_man_amount, 0) +
+															nvl(indir_ass_med_man_amount, 0) +
+															nvl(indir_med_ass_amount, 0),
+															0)) as cost_other_amount
+							from cost_dept_cost a
+						 inner join hos_source t1
+								on a.group_id = t1.group_id
+							 and a.hos_id = t1.hos_id
+							 and a.source_id = t1.source_id
+							left join cost_item_dict b
+								on a.group_id = b.group_id
+							 and a.hos_id = b.hos_id
+							 and a.copy_code = b.copy_code
+							 and a.cost_item_id = b.cost_item_id
+							left join acc_dept_attr c
+								on a.group_id = c.group_id
+							 and a.hos_id = c.hos_id
+							 and c.dept_id = a.dept_id
+							left join hos_dept_dict d
+								on a.group_id = d.group_id
+							 and a.hos_id = d.hos_id
+							 and a.dept_id = d.dept_id
+							 
+						 where a.group_id = #{group_id}
+							 and a.hos_id = #{hos_id}
+							 and a.copy_code = #{copy_code}
+							 and a.acc_year || a.acc_month between #{year_month_begin} and #{year_month_end}
+							 and source_attr in ${source_attr}
+							 and c.type_code = '01'
+							 and d.is_stop = 0
+						 group by d.dept_id, d.dept_code, d.dept_name),
+				  dept_income as
+					 (select a.dept_id,
+									
+									 dept_code,
+									 dept_name,
+									 sum(sum_money) as sum_money,
+									 sum(clinic_num) as clinic_num,
+									 sum(bed_use_day_num) as bed_use_day_num
+				from (select a.appl_dept_id as dept_id,
+								 sum(money) as sum_money,
+								 0 as clinic_num,
+								 0 as bed_use_day_num
+								from cost_income a
+							 where a.group_id = #{group_id} 
+								 and a.hos_id = #{hos_id} 
+								 and a.copy_code = #{copy_code} 
+								 and a.acc_year || a.acc_month  between #{year_month_begin} and #{year_month_end}
+							 group by appl_dept_id
+							union all
+							select dept_id, 0, sum(a.clinic_num) as clinic_num, 0
+								from cost_clinic_work a
+							 where a.group_id = #{group_id} 
+								 and a.hos_id = #{hos_id} 
+								 and a.copy_code = #{copy_code} 
+								 and a.acc_year || a.acc_month between #{year_month_begin} and #{year_month_end}
+							 group by dept_id
+							union all
+							select dept_id,
+										 
+										 0,
+										 0,
+										 sum(a.bed_use_day_num) as bed_use_day_num
+								from cost_inhos_work a
+							 where a.group_id = #{group_id} 
+								 and a.hos_id = #{hos_id} 
+								 and a.copy_code = #{copy_code} 
+								 and a.acc_year || a.acc_month between  #{year_month_begin} and #{year_month_end}
+							 group by dept_id) a
+							left join hos_dept_dict d
+								on d.group_id = #{group_id} 
+							 and d.hos_id = #{hos_id} 
+							 and a.dept_id = d.dept_id
+							 and d.is_stop=0
+						 group by a.dept_id,  dept_code, dept_name),
+					dept_type as
+					 (select d.dept_code,
+									 sum(nvl(a.dir_amount, 0) + nvl(a.dir_man_amount, 0) +
+											 nvl(a.indir_ass_man_amount, 0) + nvl(a.indir_med_man_amount, 0) +
+											 nvl(a.indir_ass_med_man_amount, 0) + nvl(a.dir_ass_amount, 0) +
+											 nvl(a.indir_med_ass_amount, 0) + nvl(a.dir_med_amount, 0)) as dept_sum
+							from cost_dept_cost a
+						 inner join hos_source t1
+								on a.group_id = t1.group_id
+							 and a.hos_id = t1.hos_id
+							 and a.source_id = t1.source_id
+							left join cost_item_dict b
+								on a.group_id = b.group_id
+							 and a.hos_id = b.hos_id
+							 and a.copy_code = b.copy_code
+							 and a.cost_item_id = b.cost_item_id
+							left join acc_dept_attr c
+								on a.group_id = c.group_id
+							 and a.hos_id = c.hos_id
+							 and c.dept_id = a.dept_id
+							left join hos_dept_dict d
+								on a.group_id = d.group_id
+							 and a.hos_id = d.hos_id
+							 and a.dept_id = d.dept_id
+						 where a.group_id = #{group_id}
+							 and a.hos_id = #{hos_id}
+							 and a.copy_code = #{copy_code}
+							 and a.acc_year || a.acc_month between  #{year_month_begin} and #{year_month_end}
+							 and source_attr in ${source_attr}
+							 and c.type_code = '01'
+							 and a.dept_id = d.dept_id
+						 group by d.dept_code),
+						 temp as (
+						 select 
+						   a.dept_code,
+							 a.dept_name,
+							 a.super_code,
+							 cost_emp_amount,
+							 divide(cost_emp_amount * 100, dept_sum) as emp_bl,
+							 cost_mate_amount,
+							 divide(cost_mate_amount * 100, dept_sum) as mat_bl,
+							 cost_drug_amount,
+							 divide(cost_drug_amount * 100, dept_sum) as drug_bl,
+							 cost_fasset_amount,
+							 divide(cost_fasset_amount * 100, dept_sum) as fasset_bl,
+							 cost_iasset_amount,
+							 divide(cost_iasset_amount * 100, dept_sum) as iasset_bl,
+							 cost_risk_amount,
+							 divide(cost_risk_amount * 100, dept_sum) as risk_bl,
+							 cost_other_amount,
+							 divide(cost_other_amount * 100, dept_sum) as other_bl,
+							 c.dept_sum,
+							 d.sum_money,
+							 d.sum_money - c.dept_sum as sum_ce,
+							 divide(c.dept_sum, d.clinic_num) as clinic_cost,
+							 divide(c.dept_sum, d.bed_use_day_num) as bed_cost
+						 from dept a
+						 left join dept_dir b
+						 on a.dept_id = b.dept_id
+						 left join dept_type c
+						 on c.dept_code = a.dept_code
+						 left join dept_income  d
+						 on d.dept_id = a.dept_id)
+						 select 
+						 dept_code,
+						 dept_name,
+						 (select sum(nvl(cost_emp_amount, 0))
+              from temp p
+             start with p.dept_code = a.dept_code
+             connect by p.super_code = prior p.dept_code) cost_emp_amount,
+						 (select sum(nvl(emp_bl, 0))
+              from temp p
+             start with p.dept_code = a.dept_code
+             connect by p.super_code = prior p.dept_code) emp_bl,
+						 (select sum(nvl(cost_mate_amount, 0))
+              from temp p
+             start with p.dept_code = a.dept_code
+             connect by p.super_code = prior p.dept_code) cost_mate_amount,
+						 (select sum(nvl(mat_bl, 0))
+              from temp p
+             start with p.dept_code = a.dept_code
+             connect by p.super_code = prior p.dept_code) mat_bl,
+						  (select sum(nvl(cost_drug_amount, 0))
+              from temp p
+             start with p.dept_code = a.dept_code
+             connect by p.super_code = prior p.dept_code) cost_drug_amount,
+						 (select sum(nvl(drug_bl, 0))
+              from temp p
+             start with p.dept_code = a.dept_code
+             connect by p.super_code = prior p.dept_code) drug_bl,
+						  (select sum(nvl(cost_fasset_amount, 0))
+              from temp p
+             start with p.dept_code = a.dept_code
+             connect by p.super_code = prior p.dept_code) cost_fasset_amount,
+						 (select sum(nvl(fasset_bl, 0))
+              from temp p
+             start with p.dept_code = a.dept_code
+             connect by p.super_code = prior p.dept_code) fasset_bl,
+						  (select sum(nvl(cost_iasset_amount, 0))
+              from temp p
+             start with p.dept_code = a.dept_code
+             connect by p.super_code = prior p.dept_code) cost_iasset_amount,
+						 (select sum(nvl(iasset_bl, 0))
+              from temp p
+             start with p.dept_code = a.dept_code
+             connect by p.super_code = prior p.dept_code) iasset_bl,
+						   (select sum(nvl(cost_risk_amount, 0))
+              from temp p
+             start with p.dept_code = a.dept_code
+             connect by p.super_code = prior p.dept_code) cost_risk_amount,
+						 (select sum(nvl(risk_bl, 0))
+              from temp p
+             start with p.dept_code = a.dept_code
+             connect by p.super_code = prior p.dept_code) risk_bl,
+						   (select sum(nvl(cost_other_amount, 0))
+              from temp p
+             start with p.dept_code = a.dept_code
+             connect by p.super_code = prior p.dept_code) cost_other_amount,
+						 (select sum(nvl(other_bl, 0))
+              from temp p
+             start with p.dept_code = a.dept_code
+             connect by p.super_code = prior p.dept_code) other_bl,
+						 (select sum(nvl(dept_sum, 0))
+              from temp p
+             start with p.dept_code = a.dept_code
+             connect by p.super_code = prior p.dept_code) dept_sum,
+						 (select sum(nvl(sum_money, 0))
+              from temp p
+             start with p.dept_code = a.dept_code
+             connect by p.super_code = prior p.dept_code) sum_money,
+						 (select sum(nvl(sum_ce, 0))
+              from temp p
+             start with p.dept_code = a.dept_code
+             connect by p.super_code = prior p.dept_code) sum_ce,
+						 (select sum(nvl(clinic_cost, 0))
+              from temp p
+             start with p.dept_code = a.dept_code
+             connect by p.super_code = prior p.dept_code) clinic_cost,
+						 (select sum(nvl(bed_cost, 0))
+              from temp p
+             start with p.dept_code = a.dept_code
+             connect by p.super_code = prior p.dept_code) bed_cost
+						 from temp a
+						 union all
+						 select '' as dept_code,
+							 '各临床服务类科室合计' as dept_name,
+							 sum(cost_emp_amount),
+							 divide(sum(cost_emp_amount) * 100, sum(dept_sum)) as emp_bl,
+							 sum(cost_mate_amount),
+							 divide(sum(cost_mate_amount) * 100, sum(dept_sum)) as mat_bl,
+							 sum(cost_drug_amount),
+							 divide(sum(cost_drug_amount) * 100, sum(dept_sum)) as drug_bl,
+							 sum(cost_fasset_amount),
+							 divide(sum(cost_fasset_amount) * 100, sum(dept_sum)) as fasset_bl,
+							 sum(cost_iasset_amount),
+							 divide(sum(cost_iasset_amount) * 100, sum(dept_sum)) as iasset_bl,
+							 sum(cost_risk_amount),
+							 divide(sum(cost_risk_amount) * 100, sum(dept_sum)) as risk_bl,
+							 sum(cost_other_amount),
+							 divide(sum(cost_other_amount) * 100, sum(dept_sum)) as other_bl,
+							 sum(dept_sum),
+							 sum(sum_money),
+							 sum(sum_ce),
+							 sum(clinic_cost),
+							 sum(bed_cost)
+								from temp
+						 order by dept_code
+     
+	</select>
+</mapper>

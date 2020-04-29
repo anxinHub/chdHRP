@@ -1,0 +1,584 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.hip.dao.DataTypeMapper">
+	<resultMap id="hipSyncLog" type="com.chd.hrp.hip.entity.HipSyncLog">
+		<result property="log_id" column="log_id" />
+		<result property="type_id" column="type_id" />
+		<result property="type_name" column="type_name" />
+		<result property="start_time" column="start_time" />
+		<result property="end_time" column="end_time" />
+		<result property="user_name" column="user_name" />
+		<result property="type" column="type" />
+		<result property="state" column="state" />
+		<result property="note" column="note" />
+	</resultMap>
+	
+
+	<select id="queryHipDataType" parameterType="java.util.Map" resultType="java.util.Map">
+		select t1.type_id "type_id",
+		       t1.group_id "group_id",
+		       t1.hos_id "hos_id",
+		       t1.dgroup_id "dgroup_id",
+		       t1.dhos_id "dhos_id",
+		       t1.dcopy_code "dcopy_code",
+		       t1.data_type "data_type",
+		       case when t1.data_type = 0 then '无' else '按日期取数' end "data_type_name",
+		       t1.sync_type "sync_type",
+		       case when t1.sync_type = 0 then '删除同步' else '增量同步' end "sync_type_name",
+		       t1.mod_code "mod_code",
+		       t2.mod_name "mod_name",
+		       t1.type_code "type_code",
+		       t1.type_name "type_name",
+		       t1.source_code "source_code",
+		       t3.source_name "source_name",
+		       t1.to_table "to_table",
+		       case t1.is_stop when 0 then '启用' else '停用' end "is_stop",
+		       t1.note "note",
+		       t1.pk_col "pk_col"
+	  from hip_data_type t1
+	  left join sys_mod t2 on
+	  t1.mod_code = t2.mod_code
+	  
+	  left join HIP_DATA_SOURCE t3 on
+	  t1.source_code = t3.source_code
+		
+		where t1.group_id=#{group_id}
+		<if test="hos_id != null and hos_id != ''">
+			and t1.hos_id=#{hos_id}
+		</if>
+		<if test="mod_code != null and mod_code != ''">
+			and t1.mod_code=#{mod_code}
+		</if>
+		<if test="data_type != null and data_type != ''">
+			and t1.data_type=#{data_type}
+		</if>
+		<if test="sync_type != null and sync_type != ''">
+			and t1.sync_type=#{sync_type}
+		</if>
+		<if test="type_code != null and type_code != ''">
+			and (t1.type_code like '${type_code}%' or t1.type_name like '%${type_code}%')
+		</if>
+		order by t1.mod_code,t1.type_code
+	</select>
+	
+	
+	<select id="queryHipSyncLog" parameterType="java.util.Map" resultMap="hipSyncLog">
+		select 
+		       t1.log_id "log_id",
+			   t1.type_id "type_id",
+		       to_char(t1.start_time,'YYYY-MM-DD HH24:mi:ss') "start_time",
+		       to_char(t1.end_time,'YYYY-MM-DD HH24:mi:ss') "end_time",
+		       t1.user_name "user_name",
+		       case when t1.type = 0 then '手动' else '自动' end "type",
+		       case when t1.state = 0 then '成功' else '失败' end "state",
+		       substr(t1.note,0,66) "note",
+		       t2.type_name "type_name"
+	  from hip_sync_log t1 left join hip_data_type t2
+	  on t1.type_id = t2.type_id
+		where t1.group_id=#{group_id} and t1.hos_id=#{hos_id}
+			<if test="log_id != null and log_id != ''">
+			AND t1.log_id=#{log_id}
+			</if>
+			<if test="type_id != null and type_id != ''">
+			AND t1.type_id=#{type_id}
+			</if>
+			<if test="start_time != null and start_time != ''">
+			AND t1.start_time &gt;= to_date(#{start_time},'YYYY-MM-DD')
+			</if>
+			<if test="end_time != null and end_time != ''">
+			AND t1.end_time &lt;= to_date(#{end_time},'YYYY-MM-DD')
+			</if>
+			<if test="type != null and type != ''">
+			AND t1.type = #{type}
+			</if>
+			<if test="state != null and state != ''">
+			AND t1.state = #{state}
+			</if>
+			<if test="type_code != null and type_code != ''">
+			and (t2.type_code like '${type_code}%' or t2.type_name like '%${type_code}%')
+			</if>
+		order by t1.start_time desc
+	</select>
+	
+	<select id="queryHipSyncLogByTypeId" parameterType="java.util.Map" resultMap="hipSyncLog">
+		select t1.note "note"
+		  from hip_sync_log t1 
+			where
+				 t1.type_id=#{type_id}
+				 and t1.log_id = #{log_id}
+	</select>
+	
+	<select id="queryHrpTable" parameterType="java.util.Map" resultType="java.util.Map">
+		select 
+			b.mod_name "mod_name",
+			a.table_code "table_code",
+			a.table_name "table_name",
+			case when a.is_group = 0 then '否' else '是' end "is_group_name",
+			case when a.is_hos = 0 then '否' else '是' end "is_hos_name",
+			case when a.is_copy = 0 then '否' else '是' end "is_copy_name",
+			a.is_group "is_group",
+			a.is_hos "is_hos",
+			a.is_copy "is_copy_code"
+		from HIP_DATA_TABLE a
+		left join sys_mod b on a.mod_code = b.mod_code
+		<where> 
+			<if test="mod_code != null and mod_code != ''">
+				and a.mod_code = #{mod_code}
+			</if> 
+			<if test="table_name != null and table_name != ''">
+				and (upper(a.table_name) like '%${table_name}%' or upper(a.table_code) like '%${table_name}%')
+			</if>
+		</where>
+		order by a.mod_code,a.table_code
+			
+	</select>
+	
+	<!-- 查询colunm -->
+	<select id="queryHrpTableColumn" parameterType="java.util.Map" resultType="java.util.Map">
+				
+		select a.column_name "column_name",b.comments "comments",
+		case when a.data_type='NUMBER' then 'NUMBER('||a.data_precision||','||a.data_scale||')' 
+		  when a.data_type='VARCHAR2' then 'VARCHAR2('||a.data_length||')' 
+		  when a.data_type='CHAR' then 'CHAR('||a.data_length||')' 
+		  else a.data_type end "data_type",
+		a.nullable "nullable"
+		  from user_tab_cols a
+		left join user_col_comments b on a.table_name=b.table_name and a.column_name=b.column_name
+		where upper(a.table_name) = upper(#{table_name})
+		order by COLUMN_ID
+			
+	</select>
+	
+	
+	<!-- 查询要执行的sql -->
+	<select id="queryHipDataTypeBySql" parameterType="java.util.Map" resultType="com.chd.hrp.hip.entity.HipDataType">
+				
+		select a.type_id,a.group_id,a.hos_id,a.dgroup_id,a.dhos_id,a.dcopy_code,a.type_code,a.q_sql,a.to_table,a.source_code,a.data_type,a.sync_type,a.pk_col
+		  from hip_data_type a		
+		where a.type_id in(${type_id})
+			
+	</select>
+	
+	<!-- 保存同步日志 -->
+	<insert id="saveHipSyncLog" parameterType="java.util.List">
+		begin
+		<foreach collection="list" item="item" index="index" separator=";">
+			insert into HIP_SYNC_LOG(log_id,group_id,hos_id,type_id,start_time,end_time,user_name,type,state,note)
+			values(#{item.log_id},#{item.group_id},#{item.hos_id},#{item.type_id},#{item.start_time},#{item.end_time},#{item.user_name},#{item.type},#{item.state},#{item.note})
+		</foreach>;
+		end;
+	</insert>
+	
+	<select id="queryHipDataTypeById" parameterType="java.util.Map" resultType="com.chd.hrp.hip.entity.HipDataType">
+		select t1.group_id,
+		       t1.hos_id,
+		       t1.dgroup_id,
+		       t3.group_name dgroup_name,
+		       t1.dhos_id,
+		       t4.hos_name dhos_name,
+		       t1.dcopy_code,
+		       t5.copy_name dcopy_name,
+		       t1.type_code,
+		       t1.type_name,
+		       t1.data_type,
+		       t1.sync_type,
+		       t1.mod_code,
+		       t1.source_code,
+		       t6.source_name,
+		       t1.to_table,
+		       t1.q_sql,
+		       t1.is_stop,
+		       t1.note,
+		       t1.type_id,
+		       t1.pk_col,
+		       t2.is_group,
+		       t2.is_hos,
+		       t2.is_copy
+		  from hip_data_type t1
+		  left join HIP_DATA_TABLE t2 on
+			 t1.to_table = t2.table_code
+		   
+		  left join sys_group_dict t3 on
+		  t1.dgroup_id = t3.group_id
+		  and t3.is_stop = 0
+		  
+		  left join hos_info_dict t4 on
+		  t1.dgroup_id = t4.group_id
+		  and t1.dhos_id = t4.hos_id  	 
+		  and t4.is_stop = 0
+		  
+		  left join hos_copy t5 on
+		  t1.dgroup_id = t5.group_id
+		  and t1.dhos_id = t5.hos_id  	
+		  and t1.dcopy_code = t5.copy_code
+		  and t5.is_stop = 0 
+		  
+		  left join HIP_DATA_SOURCE t6 on
+		  t1.source_code = t6.source_code
+		  
+			 
+		 where t1.type_id = #{type_id}
+			
+	</select>
+	
+	<insert id="addHipDataType" useGeneratedKeys="true" >
+	
+		INSERT INTO HIP_DATA_TYPE (
+			GROUP_ID
+			,
+			HOS_ID
+			,
+			DGROUP_ID
+			,
+			DHOS_ID
+			,
+			DCOPY_CODE
+			,
+			TYPE_ID
+			,
+			TYPE_CODE
+			,
+			TYPE_NAME
+			,
+			DATA_TYPE
+			,
+			SYNC_TYPE
+			,
+			MOD_CODE
+			,
+			SOURCE_CODE
+			,
+			TO_TABLE
+			,
+			Q_SQL
+			,
+			IS_STOP
+			,
+			NOTE
+			,
+			PK_COL
+		) VALUES (
+			#{group_id}
+			,
+			#{hos_id}
+			,
+			#{dgroup_id}
+			,
+			#{dhos_id}
+			,
+			#{dcopy_code}
+			,
+			#{type_id}
+			,
+			#{type_code}
+			,
+			#{type_name}
+			,
+			#{data_type}
+			,
+			#{sync_type}
+			,
+			#{mod_code}
+			,
+			#{source_code}
+			,
+			#{to_table}
+			,
+			#{q_sql}
+			,
+			#{is_stop}
+			,
+			#{note}
+			,
+			#{pk_col}
+		)
+	
+	</insert>
+	
+	
+	<update id="updateHipDataType" parameterType="java.util.Map">
+	
+		UPDATE HIP_DATA_TYPE set
+			type_code = #{type_code}
+			,
+			type_name = #{type_name}
+			,
+			mod_code = #{mod_code}
+			,
+			source_code = #{source_code}
+			,
+			to_table = #{to_table}
+			,
+			q_sql = #{q_sql}
+			,
+			is_stop = #{is_stop}
+			,
+			note = #{note}
+			,
+			dgroup_id = #{dgroup_id}
+			,
+			dhos_id = #{dhos_id}
+			,
+			dcopy_code = #{dcopy_code}
+			,
+			data_type = #{data_type}
+			,
+			sync_type = #{sync_type}
+			,
+			pk_col = #{pk_col}
+		where                     
+			 type_id = #{type_id}
+		
+	</update>
+
+	<delete id="deleteHipDataType" parameterType="java.util.List">
+		DELETE FROM HIP_DATA_TYPE 
+		<where>
+			<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+				 type_id = #{item.type_id}
+			</foreach>
+	    </where>  
+	</delete>
+	
+	<delete id="deleteBatchHipSyncLog" parameterType="java.util.List">
+		DELETE FROM HIP_SYNC_LOG 
+		<where>
+			<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+				 type_id = #{item.type_id}
+			</foreach>
+	    </where>  
+	</delete>
+	
+	<delete id="deleteBatchHipDataDecode" parameterType="java.util.List">
+		DELETE FROM hip_data_decode 
+		<where>
+			<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+				 type_id = #{item.type_id}
+			</foreach>
+	    </where>  
+	</delete>
+	
+	
+	<select id="queryQSqlByType" parameterType="java.util.Map" resultType="java.lang.String">
+		SELECT q_sql FROM hip_data_type WHERE type_id = #{type_id,jdbcType=BIGINT}
+	</select>
+	
+	<select id="queryHipDataDecodeById" parameterType="java.lang.Long" resultType="com.chd.hrp.hip.entity.DataDecode">
+		SELECT a.decode_id,a.table_col,a.source_col,a.decode_table,a.decode_col,a.decode_type,a.rela_col,a.create_type,a.join_table,a.el,b.is_group,b.is_hos,b.is_copy,b.query_sql
+		FROM hip_data_decode a
+		left join hip_data_table b on a.decode_table=b.table_code
+		WHERE type_id = #{type_id,jdbcType=BIGINT}
+	</select>
+	
+	<select id="queryHipDataDecodeList" parameterType="java.util.Map" resultType="java.util.Map">
+		SELECT c.decode_id "decode_id", c.type_id "type_id", a.column_name "table_col", b.comments "comments",  
+			case a.nullable when 'N' then '必填' when 'Y' then '非必填' end "nullable", 
+			c.source_col "source_col", c.decode_table "decode_table", d.table_name "decode_table_name", 
+			c.decode_col "decode_col", c.decode_type "decode_type", c.rela_col "rela_col", c.create_type "create_type", 
+			c.join_table "join_table", e.table_name "join_table_name", c.el "el", c.note "note", 
+			case c.decode_type when 1 then '对应转换' when 2 then '系统生成' end "decode_type_name" 
+		FROM user_tab_cols a 
+		LEFT JOIN user_col_comments b 
+			ON a.table_name = b.table_name 
+			AND a.column_name = b.column_name 
+		LEFT JOIN hip_data_decode c 
+			ON c.type_id = #{type_id,jdbcType=BIGINT}
+			AND upper(a.column_name) = upper(c.table_col)
+		LEFT JOIN hip_data_table d 
+			ON c.decode_table = d.table_code 
+		LEFT JOIN hip_data_table e 
+			ON c.join_table = e.table_code 
+		WHERE upper(a.table_name) = upper(#{table_name,jdbcType=VARCHAR})
+			AND upper(a.column_name) not in('GROUP_ID', 'HOS_ID', 'COPY_CODE')
+		ORDER BY a.column_id
+	</select>
+	
+	<insert id="addHipDataDecode" parameterType="java.util.List">
+		INSERT INTO hip_data_decode(
+			decode_id, type_id, table_col, source_col, decode_table, 
+			decode_col, decode_type, rela_col, create_type, join_table, el, note 
+		)
+		SELECT decode_id, type_id, table_col, source_col, decode_table, 
+			decode_col, decode_type, rela_col, create_type, join_table, el, note 
+		FROM (
+		<foreach collection="list" item="item" index="index" separator=" union all ">
+			SELECT 
+				#{item.decode_id,jdbcType=BIGINT} decode_id, 
+				#{item.type_id,jdbcType=BIGINT} type_id, 
+				#{item.table_col,jdbcType=VARCHAR} table_col, 
+				#{item.source_col,jdbcType=VARCHAR} source_col, 
+				#{item.decode_table,jdbcType=VARCHAR} decode_table, 
+				#{item.decode_col,jdbcType=VARCHAR} decode_col, 
+				#{item.decode_type,jdbcType=INTEGER} decode_type, 
+				#{item.rela_col,jdbcType=VARCHAR} rela_col, 
+				#{item.create_type,jdbcType=VARCHAR} create_type, 
+				#{item.join_table,jdbcType=VARCHAR} join_table, 
+				#{item.el,jdbcType=VARCHAR} el, 
+				#{item.note,jdbcType=VARCHAR} note 
+			FROM dual 
+		</foreach>
+		) tmp
+	</insert>
+	
+	<delete id="deleteHipDataDecode" parameterType="java.util.Map">
+		DELETE FROM hip_data_decode 
+		WHERE type_id = #{type_id,jdbcType=BIGINT}
+	</delete>
+	
+	<!-- 多数据源同步-删除数据 -->
+	<delete id="deleteHrpData" parameterType="java.util.List">
+				
+		delete from ${map.hip_table} 
+		<where>
+			<if test="map.group_id != null">
+				and group_id=#{map.group_id}
+			</if>
+			<if test="map.hos_id != null">
+				and hos_id=#{map.hos_id}
+			</if>
+			<if test="map.copy_code != null">
+				and copy_code=#{map.copy_code}
+			</if>
+			<choose>
+				<when test="map.is_date != null and map.is_date != ''">
+					${map.is_date}
+				</when>
+				<otherwise>
+					<if test="map.where_sql != null and map.where_sql != ''">
+						and exists(
+							select * from (
+							<foreach collection="list" item="item" index="index" separator=" union all ">
+								select
+									<foreach collection="item" index="key" item="value" separator=",">#{value} ${key}</foreach>
+								from dual
+							</foreach>
+							) temp
+							where ${map.where_sql}
+						)
+					</if>
+				</otherwise>
+			</choose>
+		</where>
+		
+	</delete>
+	
+	<!-- 多数据源同步-保存数据 -->
+	<insert id="saveHrpData" parameterType="java.util.List">
+	declare
+		v_row number;
+	begin
+		v_row:=0;
+		
+		<if test='map.commit_index==1 and map.sync_type==0 and map.data_type==1 and map.del_where_sql != null and map.del_where_sql != "" '>
+			delete from ${map.hip_table}
+			<where>
+			<if test="map.group_id != null">
+				and group_id=#{map.group_id}
+			</if>
+			<if test="map.hos_id != null">
+				and hos_id=#{map.hos_id}
+			</if>
+			<if test="map.copy_code != null">
+				and copy_code=#{map.copy_code}
+			</if>
+			<if test="map.del_where_sql != null and map.del_where_sql != ''">
+				${map.del_where_sql}
+			</if>
+			<if test="map.insert_where_sql != null and map.insert_where_sql != ''">
+				${map.insert_where_sql}
+			</if>
+			</where>;
+		</if>
+		
+		<foreach collection="list" item="item" index="index" separator=";">
+		
+			<if test='map.sync_type==0 and map.data_type==0'>
+				delete from ${map.hip_table}
+				<where>
+				<if test="map.group_id != null">
+					and group_id=#{map.group_id}
+				</if>
+				<if test="map.hos_id != null">
+					and hos_id=#{map.hos_id}
+				</if>
+				<if test="map.copy_code != null">
+					and copy_code=#{map.copy_code}
+				</if>
+				<if test="map.del_where_sql != null and map.del_where_sql != ''">
+					${map.del_where_sql}
+				</if>
+				<if test="map.insert_where_sql != null and map.insert_where_sql != ''">
+					${map.insert_where_sql}
+				</if>
+				</where>;
+			</if>
+			
+		
+			insert into ${map.hip_table}(${map.hip_inscolumn}<if test="map.group_id != null">,group_id</if><if test="map.hos_id != null">,hos_id</if><if test="map.copy_code != null">,copy_code</if>)
+			select 
+				<if test="map.hip_seq != null and map.hip_seq != ''">${map.hip_seq},</if>
+				${map.hip_column}
+				<if test="map.group_id != null">,group_id</if>
+				<if test="map.hos_id != null">,hos_id</if>
+				<if test="map.copy_code != null">,copy_code</if> 
+			from (
+				select
+					<foreach collection="item" index="key" item="value" separator=",">
+					#{value} ${key}
+					</foreach>
+					<if test="map.group_id != null">,#{map.group_id} group_id</if><if test="map.hos_id != null">,#{map.hos_id} hos_id</if><if test="map.copy_code != null">,#{map.copy_code} copy_code</if>
+				from dual
+			) temp
+			<where>
+			<if test="map.where_sql != null and map.where_sql != ''">
+				not exists(${map.where_sql})
+			</if>
+			<if test="map.insert_where_sql != null and map.insert_where_sql != ''">
+				${map.insert_where_sql}
+			</if>
+			</where>;
+			v_row:=v_row+sql%rowcount
+ 		</foreach>;
+ 		
+ 		
+ 		<choose>
+	 		<when test="map.commit_index==1 ">
+	 			update hip_data_type set count=v_row where type_id=#{map.type_id};
+	 		</when>
+	 		<otherwise>
+	 			update hip_data_type set count=count+v_row where type_id=#{map.type_id};
+	 		</otherwise>
+ 		</choose>
+ 		
+ 	end;
+	</insert>
+	
+	<!-- 多数据源同步-查询动态sql数据 -->
+	<select id="queryDataList" parameterType="java.lang.String" resultType="java.util.Map">
+		${sql}
+	</select>
+	
+	<!-- 多数据源同步-查询同步条数 -->
+	<select id="queryDataCount" parameterType="java.lang.Long" resultType="java.lang.Integer">
+		select nvl(count,0) from hip_data_type where type_id=#{type_id}
+	</select>
+	
+	<!-- insert 检查 colunm 类型-->
+	<select id="queryHrpTableColumnType" parameterType="java.lang.String" resultType="java.util.Map">
+				
+		select a.column_name "column_name",a.data_type "data_type" from user_tab_cols a   
+		where upper(a.table_name) = upper(#{table_name})
+			
+	</select>
+	
+	<delete id="deleteHipSyncLog" parameterType="java.util.Map">
+		DELETE FROM hip_sync_log 
+		WHERE group_id=#{group_id} and hos_id=#{hos_id}
+		and to_char(start_time,'YYYYMM') &lt; to_char(add_months(sysdate,-3),'YYYYMM') 
+		<if test="type_id != null and type_id != ''">
+		AND type_id=#{type_id}
+		</if>
+	</delete>
+	
+</mapper>
+

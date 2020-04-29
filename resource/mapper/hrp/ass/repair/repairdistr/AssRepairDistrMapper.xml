@@ -1,0 +1,272 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.ass.dao.repair.repairdistr.AssRepairDistrMapper">
+	
+	 	
+	 	<select id="queryAssRepairByState" resultType="java.util.Map">
+		 	with fdx_h as (
+			select a.rep_code,(ceil((sysdate-a.order_time ) * 24)-s.fdx_hour) as hours
+			from ass_repair a
+			left join ASS_REPAIR_STATUS s on a.eme_status = s.status_id 
+			where a.state=2
+			)
+	 		select ar.group_id,
+					ar.hos_id,
+					ar.copy_code,
+					ar.rep_code,
+					ar.fau_code,
+					aft.fau_name,
+					ar.loc_code,
+					al.loc_name,
+					case ar.eme_status
+					when 1 then
+					'非常紧急'
+					when 2 then
+					'紧急'
+					when 3 then
+					'一般'
+					end as eme_status,
+					ar.rep_user,
+					su.user_name,
+					ar.rep_dept,
+					hd.dept_name,
+					ar.phone,
+					ar.fau_note,
+					to_char(ar.app_time,'yyyy-mm-dd hh24:mi:ss') as app_time,
+					ar.rep_bz,
+					case ar.is_base
+					when 1 then
+					'是'
+					when 0 then
+					'否'
+					end as is_base,
+					case ar.is_card
+					when 1 then
+					'是'
+					when 0 then
+					'否'
+					end as is_card,
+					ar.rep_comp,
+					ar.rep_comp_user,
+					ar.ass_card_no,
+					ar.ass_name,
+					ar.rep_note,
+					to_char(ar.order_time,'yyyy-mm-dd hh24:mi:ss') as order_time ,
+					to_char(ar.comp_time,'yyyy-mm-dd hh24:mi:ss') as comp_time ,
+					to_char(ar.send_time, 'yyyy-mm-dd hh24:mi:ss') as send_time,
+					ar.rep_hours,
+					case ar.is_urg
+					when 0 then
+					'否'
+					when 1 then
+					'是'
+					end as is_urg,
+					ar.urg_note,
+					bsd.value_name as state,
+					ar.voice,
+					case ar.flag
+					when 1 then
+					'PC端'
+					when 2 then
+					'移动端'
+					end flag,h.hours
+					from ass_repair ar
+				  left join sys_user su
+					on ar.group_id = su.group_id
+					and ar.hos_id = su.hos_id
+					and ar.copy_code = su.copy_code
+					and ar.rep_user = su.user_id
+				  left join hos_dept hd
+					on ar.group_id = hd.group_id
+					and ar.hos_id = hd.hos_id
+					and ar.rep_dept = hd.dept_id
+					and hd.is_stop = 0
+				  left join ass_location al
+					on ar.group_id = al.group_id
+					and ar.hos_id = al.hos_id
+					and ar.copy_code = al.copy_code
+					and ar.loc_code = al.loc_code
+					and al.is_stop = 0
+			      left join ass_fault_type aft
+					on ar.group_id = aft.group_id
+					and ar.hos_id = aft.hos_id
+					and ar.copy_code = aft.copy_code
+					and ar.fau_code = aft.fau_code
+				left join budg_sys_dict bsd
+		          on ar.state = bsd.value_code
+		         and bsd.F_CODE = 'ASS_REPAIR_STATE'
+		         left join fdx_h h on ar.rep_code = h.rep_code
+				  where ar.group_id = #{group_id}
+					and ar.hos_id = #{hos_id}
+					and ar.copy_code = #{copy_code}
+					<!--  and not exists(
+					select 1 from ASS_REPAIR_TASK  b 
+					where b.group_id = #{group_id}
+					and b.hos_id = #{hos_id}
+					and b.copy_code = #{copy_code}
+					and ar.rep_code = b.rep_code  ) -->
+					and ar.state = 2
+					<if test="rep_code != null and rep_code != '' ">
+						and ar.rep_code like '%${rep_code}%'
+					</if>
+					<if test="app_time_begin != null and app_time_begin != '' ">
+						and ar.app_time between to_date('${app_time_begin} 00:00:00','yyyy-mm-dd
+						hh24:mi:ss')
+						and to_date('${app_time_end} 23:59:59','yyyy-mm-dd hh24:mi:ss')
+					</if>
+					<if test="eme_status != null and eme_status != '' ">
+						and ar.eme_status = #{eme_status}
+					</if>
+					<if test="rep_dept != null and rep_dept != '' ">
+						and ar.rep_dept = #{rep_dept}
+					</if>
+					<if test="fau_note != null and fau_note != '' ">
+						and ar.fau_note like '%${fau_note}%'
+					</if>
+					<if test="fau_code != null and fau_code != '' ">
+						and ar.fau_code = #{fau_code}
+					</if>
+	 	</select>
+	 	
+	 	<select id="queryImgUrlByRepCode" parameterType="java.util.Map" resultType="java.util.Map">
+		select  ara.att_path,
+				ara.att_name_n
+			from ass_repair_att ara
+			where ara.group_id = #{group_id}
+				and ara.hos_id = #{hos_id}
+				and ara.copy_code = #{copy_code}
+				and ara.rep_code = #{rep_code}
+		</select>
+	
+		<!-- 检查单据是否存在待办任务 -->
+		<select id="queryAssRepairExist" parameterType="java.util.Map" resultType="String">
+			select  rep_code
+				from ass_repair_task
+				where group_id = #{group_id}
+					and hos_id = #{hos_id}
+					and copy_code = #{copy_code}
+					and rep_code in(${rep_code}) 
+					group by rep_code
+		</select>
+	
+	 	<select id="queryAssRepairByCode" resultType="java.util.Map" parameterType="java.util.Map">
+		select a.group_id,
+		       a.hos_id,
+		       a.copy_code,
+		       a.rep_code,
+		       a.fau_code,
+		       a.loc_code,
+		       a.eme_status,
+		       a.rep_user,
+		       a.rep_dept||'@'||b.dept_no as rep_dept,
+		       a.phone,
+		       a.fau_note,
+		       a.app_time,
+		       a.rep_bz,
+		       a.is_base,
+		       a.is_card,
+		       a.rep_comp,
+		       a.rep_comp_user,
+		       a.ass_card_no,
+		       a.ass_name,
+		       a.rep_note,
+		       a.order_time,
+		       a.comp_time,
+		       a.rep_hours,
+		       a.is_urg,
+		       a.urg_note,
+		       a.state,
+		       a.voice,
+		       a.flag,
+		       a.score,
+		       a.score_note
+		  from ass_repair a
+  	left join HOS_DEPT_DICT b 
+  	 on a.group_id = b.group_id
+  	 and a.hos_id = b.hos_id
+  	 and a.rep_dept = b.dept_id
+  	 and b.is_stop=0
+		 where a.group_id = #{group_id}
+		   and a.hos_id = #{hos_id}
+		   and a.copy_code = #{copy_code}
+		   and a.rep_code = #{rep_code}
+	</select>
+	
+	<!-- 退回 -->
+	<update id="backAssRepair" parameterType="java.util.Map" >
+		update  ass_repair 
+		set 
+			state=1 
+			<if test="back_note != null and back_note != '' ">
+				,back_note = #{back_note}
+			</if>
+			where group_id = #{group_id}
+				and hos_id = #{hos_id}
+				and copy_code = #{copy_code}				
+				and rep_code in (${rep_code})
+	</update>
+	<update id="updateUserWorkByUserId" parameterType="java.util.Map">
+	
+		  update ass_rep_user_work
+		    set 
+		        u_work = u_work+#{amount,jdbcType=INTEGER}
+		  where group_id = #{group_id,jdbcType=INTEGER}
+		    and hos_id = #{hos_id,jdbcType=INTEGER}
+		    and copy_code = #{copy_code,jdbcType=VARCHAR}
+		    and user_id = #{task_user,jdbcType=INTEGER}
+	</update>
+	<select id="queryUserWorkByUserId" parameterType="java.util.Map" resultType="java.util.Map" >
+	
+		  select  u_work ,
+			      group_id, 
+			      hos_id,
+			      copy_code,
+			      user_id  
+	      from ass_rep_user_work
+		  where group_id = #{group_id}
+		    and hos_id = #{hos_id}
+		    and copy_code = #{copy_code}
+		    and user_id = #{user_id}
+	</select>
+	<insert id="addUserWork" parameterType="java.util.Map">
+		
+	insert into ass_rep_user_work
+	  (group_id, hos_id, copy_code, user_id, u_work)
+	values
+	  (#{group_id},  #{hos_id},  #{copy_code}, #{user_id}, ${amount})
+			
+	</insert>
+	
+	<insert id="addAssRepairTask" parameterType="java.util.Map">
+		 insert into ass_repair_task
+				   (group_id,
+				    hos_id,
+				    copy_code,
+				    rep_code,
+				    task_id,
+				    task_user,
+				    task_time,
+				    state
+				    )
+				 values
+				   (#{group_id},
+				    #{hos_id},
+				    #{copy_code},
+				    ${rep_code},
+				    #{task_id},
+				    #{task_user},
+				    sysdate,
+				    2
+				    )
+		
+	</insert>
+	
+	<!--  更新单据发送状态 -->
+	<update id="updateAssRepairSend" parameterType="java.util.Map" >
+		update  ass_repair set state=2,send_time=sysdate			
+			where group_id = #{group_id}
+				and hos_id = #{hos_id}
+				and copy_code = #{copy_code}				
+				and rep_code in (${rep_code})
+	</update>
+</mapper>

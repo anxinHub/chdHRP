@@ -1,0 +1,496 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.ass.dao.biandongdept.AssBianDongDeptMainMapper">
+	
+	<resultMap id="AssBianDongDeptMain" type="com.chd.hrp.ass.entity.biandongdept.AssBianDongDeptMain">
+	<result property="group_id" column="group_id"/>
+	<result property="hos_id" column="hos_id"/>
+	<result property="copy_code" column="copy_code"/>
+	<result property="year_month" column="year_month"/>
+	<result property="ass_id" column="ass_id"/>
+	<result property="dept_id" column="dept_id"/>
+	<result property="store_id" column="store_id"/>
+	<result property="dept_code" column="dept_code"/>
+	<result property="dept_name" column="dept_name"/>
+	<result property="begin_amount" column="begin_amount"/>
+	<result property="begin_money" column="begin_money"/>
+	<result property="add_amount" column="add_amount"/>
+	<result property="add_money" column="add_money"/>
+	<result property="dec_amount" column="dec_amount"/>
+	<result property="dec_money" column="dec_money"/>
+	<result property="end_amount" column="end_amount"/>
+	<result property="end_money" column="end_money"/>
+	
+	</resultMap>
+	
+	<resultMap id="AssBianDongDeptMainMap" type="java.util.Map">
+	<result property="group_id" column="group_id"/>
+	<result property="hos_id" column="hos_id"/>
+	<result property="copy_code" column="copy_code"/>
+	<result property="year_month" column="year_month"/>
+	<result property="ass_id" column="ass_id"/>
+	<result property="dept_id" column="dept_id"/>
+	<result property="store_id" column="store_id"/>
+	<result property="dept_code" column="dept_code"/>
+	<result property="dept_name" column="dept_name"/>
+	<result property="begin_amount" column="begin_amount"/>
+	<result property="begin_money" column="begin_money"/>
+	<result property="add_amount" column="add_amount"/>
+	<result property="add_money" column="add_money"/>
+	<result property="dec_amount" column="dec_amount"/>
+	<result property="dec_money" column="dec_money"/>
+	<result property="end_amount" column="end_amount"/>
+	<result property="end_money" column="end_money"/>
+	
+	</resultMap>
+	<select id="queryAssBianDongDept" parameterType="java.util.Map" resultMap="AssBianDongDeptMain" >
+		with temp2 AS
+		 (SELECT t1.dept_code,
+		         t1.dept_name,
+		         t1.dept_level,
+		         nvl(t1.super_code, 0) super_code,
+		         nvl(t2.r_begin, 0) AS begin_money,
+		         nvl(t2.r_add, 0) AS add_money,
+		         nvl(t2.r_dec, 0) AS dec_money,
+		         nvl(t2.r_end, 0) AS end_money
+		    FROM HOS_DEPT_DICT t1
+		  
+		    left join ass_collect_dept_main t2
+		      on t1.group_id = t2.group_id
+		     and t1.hos_id = t2.hos_id
+		     and t1.dept_id = t2.dept_id
+		     and t1.dept_no = t2.dept_no
+		     and t2.copy_code = #{copy_code}
+		     <if test="acc_year != null and acc_year != ''">
+		     and t2.acc_year = #{acc_year}
+		     </if>
+		     <if test="acc_month != null and acc_month != ''">
+		     and t2.acc_month = #{acc_month}
+		     </if>
+		  
+		   where t1.group_id = #{group_id}
+		     and t1.hos_id = #{hos_id}
+		  
+		  ),
+      temp3 AS (
+        SELECT 
+          t2.dept_code,
+          t2.dept_name,
+          sum(t2.begin_money) begin_money,
+          sum(t2.add_money) add_money,
+          sum(t2.dec_money) dec_money,
+          sum(t2.end_money) end_money
+        FROM (
+          SELECT 
+            connect_by_root(t1.dept_code) dept_code,
+            connect_by_root(t1.dept_name) dept_name,
+            t1.begin_money,
+            t1.add_money,
+            t1.dec_money,
+            t1.end_money
+          FROM temp2 t1
+          START WITH t1.super_code IN (
+            SELECT super_code FROM temp2
+            <if test="dept_level != null and dept_level != ''">
+            where dept_level = #{dept_level}
+            </if> 
+            )
+          CONNECT BY PRIOR t1.dept_code = t1.super_code
+          ) t2
+        GROUP BY t2.dept_code,t2.dept_name
+        ORDER BY t2.dept_code
+      ),
+      temp4 as (
+           SELECT 
+          t.dept_code,
+          cast(lpad(chr(41377), level * 2 - 1,chr(41377)) || t.dept_name as varchar2(50)) dept_name
+        FROM temp2 t
+        START WITH t.super_code = '0'
+        CONNECT BY PRIOR t.dept_code = t.super_code  
+      )
+     SELECT * FROM (
+	     SELECT
+	        t2.dept_code,
+	        t2.dept_name,
+	        t1.begin_money,
+	        t1.add_money,
+	        t1.dec_money,
+	        t1.end_money
+	      FROM  temp3 t1, temp4 t2
+	      WHERE t1.dept_code = t2.dept_code
+	        
+	      UNION ALL
+	      
+	      SELECT 
+	        '合计' AS dept_code,
+	        null AS dept_name,
+	        nvl(sum(t3.begin_money),0) AS begin_money,
+	        nvl(sum(t3.add_money),0) AS add_money,
+	        nvl(sum(t3.dec_money),0) AS dec_money,
+	        nvl(sum(t3.end_money),0) as end_money
+	        FROM temp2 t3  
+	        <if test="dept_level != null and dept_level != ''">
+	        START WITH t3.super_code IN (
+	            SELECT super_code FROM temp2
+	            where dept_level = #{dept_level}
+	            
+            )
+            CONNECT BY PRIOR t3.dept_code = t3.super_code
+            </if> 
+      )
+    	<!-- WITH init_t AS(期初卡片
+		     SELECT '02' AS ass_naturs,t1_d.dept_id,t1_d.dept_no,nvl(t1.price,0) AS price,nvl(t1.depre_money,0) AS depre_money,nvl(t1.cur_money,0) AS cur_money FROM ASS_CARD_INIT_SPECIAL t1
+		     LEFT JOIN ASS_SHARE_DEPT_INIT_SPECIAL t1_d
+		       ON t1.group_id = t1_d.group_id AND t1.hos_id = t1_d.hos_id AND t1.copy_code = t1_d.copy_code
+		       AND t1.ass_card_no = t1_d.ass_card_no
+		     WHERE t1.group_id = #{group_id} AND t1.hos_id = #{hos_id} AND t1.copy_code = #{copy_code}
+		       AND to_char(t1.in_date,'YYYYMM') = #{year_month}
+		       
+		     UNION ALL
+		     
+		     SELECT '03' AS ass_naturs,t2_d.dept_id,t2_d.dept_no,nvl(t2.price,0) AS price,nvl(t2.depre_money,0) AS depre_money,nvl(t2.cur_money,0) AS cur_money FROM ASS_CARD_INIT_GENERAL t2
+		     LEFT JOIN ASS_SHARE_DEPT_INIT_GENERAL t2_d
+		       ON t2.group_id = t2_d.group_id AND t2.hos_id = t2_d.hos_id AND t2.copy_code = t2_d.copy_code
+		       AND t2.ass_card_no = t2_d.ass_card_no
+		     WHERE t2.group_id = #{group_id} AND t2.hos_id = #{hos_id} AND t2.copy_code = #{copy_code}
+		       AND to_char(t2.in_date,'YYYYMM') = #{year_month}
+		     
+		     UNION ALL
+		     
+		     SELECT '01' AS ass_naturs,t3_d.dept_id,t3_d.dept_no,nvl(t3.price,0) AS price,nvl(t3.depre_money,0) AS depre_money,nvl(t3.cur_money,0) AS cur_money FROM ASS_CARD_INIT_HOUSE t3
+		     LEFT JOIN ASS_SHARE_DEPT_INIT_HOUSE t3_d
+		       ON t3.group_id = t3_d.group_id AND t3.hos_id = t3_d.hos_id AND t3.copy_code = t3_d.copy_code
+		       AND t3.ass_card_no = t3_d.ass_card_no
+		     WHERE t3.group_id = #{group_id} AND t3.hos_id = #{hos_id} AND t3.copy_code = #{copy_code}
+		       AND to_char(t3.in_date,'YYYYMM') = #{year_month}
+		     
+		     UNION ALL
+		     
+		     SELECT '04' AS ass_naturs,t4_d.dept_id,t4_d.dept_no,nvl(t4.price,0) AS price,nvl(t4.depre_money,0) AS depre_money,nvl(t4.cur_money,0) AS cur_money from ASS_CARD_INIT_OTHER t4
+		     LEFT JOIN ASS_SHARE_DEPT_INIT_OTHER t4_d
+		       ON t4.group_id = t4_d.group_id AND t4.hos_id = t4_d.hos_id AND t4.copy_code = t4_d.copy_code
+		       AND t4.ass_card_no = t4_d.ass_card_no
+		     WHERE t4.group_id = #{group_id} AND t4.hos_id = #{hos_id} AND t4.copy_code = #{copy_code}
+		       AND to_char(t4.in_date,'YYYYMM') = #{year_month}
+		     
+		     UNION ALL
+		     
+		     SELECT '05' AS ass_naturs,t5_d.dept_id,t5_d.dept_no,nvl(t5.price,0) AS price,nvl(t5.depre_money,0) AS depre_money,nvl(t5.cur_money,0) AS cur_money from ASS_CARD_INIT_INASSETS t5
+		     LEFT JOIN ASS_SHARE_DEPT_INIT_INASSETS t5_d
+		       ON t5.group_id = t5_d.group_id AND t5.hos_id = t5_d.hos_id AND t5.copy_code = t5_d.copy_code
+		       AND t5.ass_card_no = t5_d.ass_card_no
+		     WHERE t5.group_id = #{group_id} AND t5.hos_id = #{hos_id} AND t5.copy_code = #{copy_code}
+		       AND to_char(t5.in_date,'YYYYMM') = #{year_month}
+		     
+		     UNION ALL
+		     
+		     SELECT '06' AS ass_naturs,t6_d.dept_id,t6_d.dept_no,nvl(t6.price,0) AS price,nvl(t6.depre_money,0) AS depre_money,nvl(t6.cur_money,0) from ASS_CARD_INIT_SPECIAL t6
+		     LEFT JOIN ASS_SHARE_DEPT_INIT_SPECIAL t6_d
+		       ON t6.group_id = t6_d.group_id AND t6.hos_id = t6_d.hos_id AND t6.copy_code = t6_d.copy_code
+		       AND t6.ass_card_no = t6_d.ass_card_no
+		     WHERE t6.group_id = #{group_id} AND t6.hos_id = #{hos_id} AND t6.copy_code = #{copy_code}
+		       AND to_char(t6.in_date,'YYYYMM') = #{year_month}
+		),
+		store_dept AS ( 库房与科室对应关系
+		    SELECT a.store_id,a.store_no,c.dept_id,c.dept_no
+		    FROM HOS_STORE_DICT a
+		    LEFT JOIN MAT_STORE ms 
+		      ON ms.group_id = a.group_id
+		      AND ms.hos_id = a.hos_id
+		      AND ms.store_id = a.store_id  
+		    INNER JOIN hos_dept_dict c 
+		      ON ms.group_id = c.group_id
+		      AND ms.hos_id = c.hos_id
+			  AND ms.dept_id = c.dept_id
+			  AND c.is_stop = 0
+		    WHERE a.is_stop = 0
+		      AND a.is_ass = 1
+		      AND a.group_id = #{group_id} AND a.hos_id = #{hos_id}
+		)
+		SELECT 
+		  dept.dept_code,decode(grouping(dept.dept_code) ,1,'合计',dept.dept_name) dept_name,
+		  nvl(sum(init_t.price),0) AS begin_money,期初原值
+		  nvl(sum(in_t.in_money),0) AS add_money,原值 借方
+		  nvl(sum(out_t.out_money),0) AS dec_money,原值 贷方
+		  nvl(sum(init_t.price),0)+nvl(sum(in_t.in_money),0)-nvl(sum(out_t.out_money),0) AS end_money原值 余额
+		
+		FROM HOS_DEPT_DICT dept 
+		LEFT JOIN (
+		     SELECT  t1.ass_naturs, nvl(t1_c.price,0) AS in_money,nvl(t1_c.depre_money,0) AS depre_money,t1.dept_id,t1.dept_no FROM V_ASS_IN_MAIN t1采购入库
+		     LEFT JOIN V_ASS_CARD t1_c ON t1.ass_in_no = t1_c.ass_in_no
+		       AND t1.group_id = t1_c.group_id AND t1.hos_id = t1_c.hos_id AND t1.copy_code = t1_c.copy_code
+		     WHERE t1.group_id = #{group_id} AND t1.hos_id = #{hos_id} AND t1.copy_code = #{copy_code} AND t1.state = 2
+		       AND to_char(t1.in_date,'YYYYMM') = #{year_month}
+		     
+		     UNION ALL
+		     
+		     SELECT  t2.ass_naturs, nvl(t2_c.price,0) AS in_money,nvl(t2_c.depre_money,0) AS depre_money,t2.dept_id,t2.dept_no FROM V_ASS_IN_REST_MAIN t2其它入库
+		     LEFT JOIN V_ASS_CARD t2_c ON t2.ass_in_no = t2_c.ass_in_no
+		       AND t2.group_id = t2_c.group_id AND t2.hos_id = t2_c.hos_id AND t2.copy_code = t2_c.copy_code
+		     WHERE t2.group_id = #{group_id} AND t2.hos_id = #{hos_id} AND t2.copy_code = #{copy_code} AND t2.state = 2
+		       AND to_char(t2.in_date,'YYYYMM') = #{year_month}
+		     
+		     UNION ALL
+		     
+		     SELECT  t3.ass_naturs, nvl(t3_c.price,0) AS in_money,nvl(t3_c.depre_money,0) AS depre_money,t3.dept_id,t3.dept_no FROM V_ASS_CHK_IN_MAIN t3盘盈入库
+		     LEFT JOIN V_ASS_CARD t3_c on t3.ass_in_no = t3_c.ass_in_no
+		       AND t3.group_id = t3_c.group_id AND t3.hos_id = t3_c.hos_id AND t3.copy_code = t3_c.copy_code
+		     WHERE t3.group_id = #{group_id} AND t3.hos_id = #{hos_id} AND t3.copy_code = #{copy_code} AND t3.state = 2
+		       AND to_char(t3.in_date,'YYYYMM') = #{year_month}
+		     
+		     UNION ALL
+		     
+		     SELECT t4.ass_naturs, nvl(t4_c.price,0) AS in_money,nvl(t4_c.depre_money,0) AS depre_money,sd.dept_id,sd.dept_no FROM V_ASS_ALLOT_IN_MAIN t4调剂入库
+		     LEFT JOIN V_ASS_CARD t4_c ON t4.allot_in_no = t4_c.ass_in_no
+		       AND t4.group_id = t4_c.group_id AND t4.hos_id = t4_c.hos_id AND t4.copy_code = t4_c.copy_code
+		     LEFT JOIN STORE_DEPT sd
+		       ON t4.in_store_id = sd.store_id
+		       AND t4.in_store_no = sd.store_no
+		     WHERE t4.group_id = #{group_id} AND t4.hos_id = #{hos_id} AND t4.copy_code = #{copy_code} AND t4.state = 2
+		       AND to_char(t4.audit_date,'YYYYMM') = #{year_month}
+		     
+		     UNION ALL
+		     
+		     SELECT t5.ass_naturs, nvl(t5_c.price,0) AS in_money,nvl(t5_c.depre_money,0) AS depre_money,sd.dept_id,sd.dept_no FROM V_ASS_SELL_IN_MAIN t5调拨入库
+		     LEFT JOIN V_ASS_CARD t5_c ON t5.sell_in_no = t5_c.ass_in_no
+		       AND t5.group_id = t5_c.group_id AND t5.hos_id = t5_c.hos_id AND t5.copy_code = t5_c.copy_code
+		     LEFT JOIN STORE_DEPT sd
+		       ON t5.in_store_id = sd.store_id
+		       AND t5.in_store_no = sd.store_no
+		     WHERE t5.group_id = #{group_id} AND t5.hos_id = #{hos_id} AND t5.copy_code = #{copy_code} AND t5.state = 2
+			   AND to_char(t5.audit_date,'YYYYMM') = #{year_month}
+		)in_t
+		  ON dept.dept_id = in_t.dept_id
+		  AND dept.dept_no = in_t.dept_no
+		  <if test="ass_nature != null and ass_nature != ''">
+		  AND in_t.ass_naturs = #{ass_nature}
+		  </if>
+		LEFT JOIN (
+		     SELECT  t1.ass_naturs, nvl(t1_c.price,0) AS out_money,nvl(t1_c.depre_money,0) AS depre_money,sd.dept_id,sd.dept_no FROM V_ASS_BACK_MAIN t1采购退库
+		     LEFT JOIN V_ASS_BACK_DETAIL t1_d
+		       ON t1.ass_back_no = t1_d.ass_back_no
+		       AND t1.group_id = t1_d.group_id AND t1_d.hos_id = t1.hos_id AND t1_d.copy_code = t1.copy_code
+		     LEFT JOIN V_ASS_CARD t1_c
+		       ON t1_d.ass_card_no = t1_c.ass_card_no
+		       AND t1_c.group_id = t1_d.group_id AND t1_c.hos_id = t1_d.hos_id AND t1_c.copy_code = t1_d.copy_code
+		     LEFT JOIN STORE_DEPT sd
+		       ON t1.store_id = sd.store_id
+		       AND t1.store_no = sd.store_no
+		     WHERE t1.group_id = #{group_id} and t1.hos_id = #{hos_id} AND t1.copy_code = #{copy_code} AND t1.state = 2
+		       AND to_char(t1.back_date,'YYYYMM') = #{year_month}
+		     
+		     UNION ALL
+		     
+		     SELECT  t2.ass_naturs, nvl(t2_c.price,0) as out_money,nvl(t2_c.depre_money,0) AS depre_money,sd.dept_id,sd.dept_no FROM V_ASS_REST_BACK_MAIN t2其它退库
+		     LEFT JOIN V_ASS_BACK_REST_DETAIL t2_d
+		       ON t2.ass_back_no = t2_d.ass_back_no
+		       AND t2.group_id = t2_d.group_id AND t2_d.hos_id = t2.hos_id AND t2_d.copy_code = t2.copy_code
+		     LEFT JOIN V_ASS_CARD t2_c
+		       ON t2_d.ass_card_no = t2_c.ass_card_no
+		       AND t2_c.group_id = t2_d.group_id AND t2_c.hos_id = t2_d.hos_id AND t2_c.copy_code = t2_d.copy_code
+		     LEFT JOIN STORE_DEPT sd
+		       ON t2.store_id = sd.store_id
+		       AND t2.store_no = sd.store_no
+		     WHERE t2.group_id = #{group_id} AND t2.hos_id = #{hos_id} AND t2.copy_code = #{copy_code} AND t2.state = 2
+		       AND to_char(t2.back_date,'YYYYMM') = #{year_month}
+		     
+		     UNION ALL
+		     
+		     SELECT  t3.ass_naturs, nvl(t3_c.price,0) as out_money,nvl(t3_c.depre_money,0) AS depre_money,sd.dept_id,sd.dept_no FROM V_ASS_ALLOT_OUT_MAIN t3调剂出库
+		     LEFT JOIN V_ASS_ALLOT_OUT_DETAIL t3_d
+		       ON t3.allot_out_no = t3_d.allot_out_no
+		       AND t3.group_id = t3_d.group_id AND t3_d.hos_id = t3.hos_id AND t3_d.copy_code = t3.copy_code
+		     LEFT JOIN V_ASS_CARD t3_c
+		       ON t3_d.ass_card_no = t3_c.ass_card_no
+		       AND t3_c.group_id = t3_d.group_id AND t3_c.hos_id = t3_d.hos_id AND t3_c.copy_code = t3_d.copy_code
+		     LEFT JOIN STORE_DEPT sd
+		       ON t3.out_store_id = sd.store_id
+		       AND t3.out_store_no = sd.store_no
+		     WHERE t3.group_id = #{group_id} AND t3.hos_id = #{hos_id} AND t3.copy_code = #{copy_code} AND t3.state = 2
+		       AND to_char(t3.audit_date,'YYYYMM') = #{year_month}
+		     
+		     UNION ALL
+		     
+		     SELECT  t4.ass_naturs, nvl(t4_c.price,0) as out_money,nvl(t4_c.depre_money,0) AS depre_money,sd.dept_id,sd.dept_no FROM V_ASS_SELL_OUT_MAIN t4调拨出库
+		     LEFT JOIN V_ASS_SELL_OUT_DETAIL t4_d
+		       ON t4.sell_out_no = t4_d.sell_out_no
+		       AND t4.group_id = t4_d.group_id AND t4_d.hos_id = t4.hos_id AND t4_d.copy_code = t4.copy_code
+		     LEFT JOIN V_ASS_CARD t4_c
+		       ON t4_d.ass_card_no = t4_c.ass_card_no
+		       AND t4_c.group_id = t4_d.group_id AND t4_c.hos_id = t4_d.hos_id AND t4_c.copy_code = t4_d.copy_code
+		     LEFT JOIN STORE_DEPT sd
+		       ON t4.out_store_id = sd.store_id
+		       AND t4.out_store_no = sd.store_no
+		     WHERE t4.group_id = #{group_id} AND t4.hos_id = #{hos_id} AND t4.copy_code = #{copy_code} AND t4.state = 2
+		       AND to_char(t4.audit_date,'YYYYMM') = #{year_month}
+		     
+		     UNION ALL
+		     
+		     SELECT  t5.ass_naturs, nvl(t5_c.price,0) as out_money,nvl(t5_c.depre_money,0) AS depre_money,sd.dept_id,sd.dept_no FROM V_ASS_CHK_R_MAIN t5盘亏
+	         LEFT JOIN V_ASS_CHK_R_DETAIL t5_d
+	           ON t5.ass_chk_no = t5_d.ass_chk_no
+	           AND t5.group_id = t5_d.group_id AND t5_d.hos_id = t5.hos_id AND t5_d.copy_code = t5.copy_code
+	         LEFT JOIN V_ASS_CARD t5_c
+	           ON t5_d.ass_card_no = t5_c.ass_card_no
+	           AND t5_c.group_id = t5_d.group_id AND t5_c.hos_id = t5_d.hos_id AND t5_c.copy_code = t5_d.copy_code
+	         LEFT JOIN STORE_DEPT sd
+	           ON t5_c.store_id = sd.store_id
+	           AND t5_c.store_no = sd.store_no
+	         WHERE t5.group_id = #{group_id} AND t5.hos_id = #{hos_id} AND t5.copy_code = #{copy_code} AND t5.state = 2
+	           AND to_char(t5.apply_date,'YYYYMM') = #{year_month}
+	         
+		     UNION ALL
+		     
+		     SELECT  t6.ass_naturs, nvl(t6_c.price,0) as out_money,nvl(t6_c.depre_money,0) AS depre_money,sd.dept_id,sd.dept_no FROM V_ASS_REMOULD_R_MAIN t6改造
+	         LEFT JOIN V_ASS_REMOULD_R_DETAIL t6_d
+	           ON t6.RECORD_NO = t6_d.RECORD_NO
+	           AND t6.group_id = t6_d.group_id AND t6_d.hos_id = t6.hos_id AND t6_d.copy_code = t6.copy_code
+	         LEFT JOIN V_ASS_CARD t6_c
+	           ON t6_d.ass_card_no = t6_c.ass_card_no
+	           AND t6_c.group_id = t6_d.group_id AND t6_c.hos_id = t6_d.hos_id AND t6_c.copy_code = t6_d.copy_code
+	         LEFT JOIN STORE_DEPT sd
+	           ON t6_c.store_id = sd.store_id
+	           AND t6_c.store_no = sd.store_no
+	         WHERE t6.group_id = #{group_id} AND t6.hos_id = #{hos_id} AND t6.copy_code = #{copy_code} AND t6.state = 2
+	           AND to_char(t6.record_date,'YYYYMM') = #{year_month}
+	         
+		     UNION ALL
+		     
+		     SELECT  t7.ass_naturs, nvl(t7_c.price,0) as out_money,nvl(t7_c.depre_money,0) AS depre_money,sd.dept_id,sd.dept_no FROM V_ASS_DISPOSAL_R_MAIN t7处置
+	         LEFT JOIN V_ASS_DISPOSAL_R_DETAIL t7_d
+	           ON t7.DIS_R_NO = t7_d.DIS_R_NO
+	           AND t7.group_id = t7_d.group_id AND t7_d.hos_id = t7.hos_id AND t7_d.copy_code = t7.copy_code
+	         LEFT JOIN V_ASS_CARD t7_c
+	           ON t7_d.ass_card_no = t7_c.ass_card_no
+	           AND t7_c.group_id = t7_d.group_id AND t7_c.hos_id = t7_d.hos_id AND t7_c.copy_code = t7_d.copy_code
+	         LEFT JOIN STORE_DEPT sd
+	           ON t7_c.store_id = sd.store_id
+	           AND t7_c.store_no = sd.store_no
+	         WHERE t7.group_id = #{group_id} AND t7.hos_id = #{hos_id} AND t7.copy_code = #{copy_code} AND t7.state = 2
+	           AND to_char(t7.apply_date,'YYYYMM') = #{year_month}
+	         
+		) out_t
+		  ON dept.dept_id = out_t.dept_id
+		  AND dept.dept_no = out_t.dept_no
+		  <if test="ass_nature != null and ass_nature != ''">
+		  AND out_t.ass_naturs = #{ass_nature}
+		  </if>
+		
+		LEFT JOIN init_t init_t
+		  ON init_t.dept_id = dept.dept_id
+		  AND init_t.dept_no = dept.dept_no
+		  <if test="ass_nature != null and ass_nature != ''">
+		  AND init_t.ass_naturs = #{ass_nature}
+		  </if>
+		
+		WHERE dept.group_id = #{group_id}
+		  AND dept.hos_id = #{hos_id}
+		  AND dept.is_last = 1
+		  <if test="dept_level != null and dept_level != ''">
+		  AND dept.dept_level = #{dept_level}
+		  </if>
+		
+		GROUP BY rollup((dept.dept_code, dept.dept_name))
+		ORDER BY dept.dept_code -->
+	</select>
+	
+	
+	<!-- 打印 -->
+	<select id="queryAssBianDongDeptPrint" parameterType="java.util.Map" resultMap="AssBianDongDeptMainMap" >
+	with temp2 AS
+		 (SELECT t1.dept_code,
+		         t1.dept_name,
+		         t1.dept_level,
+		         nvl(t1.super_code, 0) super_code,
+		         nvl(t2.r_begin, 0) AS begin_money,
+		         nvl(t2.r_add, 0) AS add_money,
+		         nvl(t2.r_dec, 0) AS dec_money,
+		         nvl(t2.r_end, 0) AS end_money
+		    FROM HOS_DEPT_DICT t1
+		  
+		    left join ass_collect_dept_main t2
+		      on t1.group_id = t2.group_id
+		     and t1.hos_id = t2.hos_id
+		     and t1.dept_id = t2.dept_id
+		     and t1.dept_no = t2.dept_no
+		     and t2.copy_code = #{copy_code}
+		     <if test="acc_year != null and acc_year != ''">
+		     and t2.acc_year = #{acc_year}
+		     </if>
+		     <if test="acc_month != null and acc_month != ''">
+		     and t2.acc_month = #{acc_month}
+		     </if>
+		  
+		   where t1.group_id = #{group_id}
+		     and t1.hos_id = #{hos_id}
+		  
+		  ),
+      temp3 AS (
+        SELECT 
+          t2.dept_code,
+          t2.dept_name,
+          sum(t2.begin_money) begin_money,
+          sum(t2.add_money) add_money,
+          sum(t2.dec_money) dec_money,
+          sum(t2.end_money) end_money
+        FROM (
+          SELECT 
+            connect_by_root(t1.dept_code) dept_code,
+            connect_by_root(t1.dept_name) dept_name,
+            t1.begin_money,
+            t1.add_money,
+            t1.dec_money,
+            t1.end_money
+          FROM temp2 t1
+          START WITH t1.super_code IN (
+            SELECT super_code FROM temp2
+            <if test="dept_level != null and dept_level != ''">
+            where dept_level = #{dept_level}
+            </if> 
+            )
+          CONNECT BY PRIOR t1.dept_code = t1.super_code
+          ) t2
+        GROUP BY t2.dept_code,t2.dept_name
+        ORDER BY t2.dept_code
+      ),
+      temp4 as (
+           SELECT 
+          t.dept_code,
+          cast(lpad(chr(41377), level * 2 - 1,chr(41377)) || t.dept_name as varchar2(50)) dept_name
+        FROM temp2 t
+        START WITH t.super_code = '0'
+        CONNECT BY PRIOR t.dept_code = t.super_code  
+      )
+     SELECT * FROM (
+	     SELECT
+	        t2.dept_code,
+	        t2.dept_name,
+	        t1.begin_money,
+	        t1.add_money,
+	        t1.dec_money,
+	        t1.end_money
+	      FROM  temp3 t1, temp4 t2
+	      WHERE t1.dept_code = t2.dept_code
+	        
+	      UNION ALL
+	      
+	      SELECT 
+	        '合计' AS dept_code,
+	        null AS dept_name,
+	        nvl(sum(t3.begin_money),0) AS begin_money,
+	        nvl(sum(t3.add_money),0) AS add_money,
+	        nvl(sum(t3.dec_money),0) AS dec_money,
+	        nvl(sum(t3.end_money),0) as end_money
+	        FROM temp2 t3  
+	        <if test="dept_level != null and dept_level != ''">
+	        START WITH t3.super_code IN (
+	            SELECT super_code FROM temp2
+	            where dept_level = #{dept_level}
+	            
+            )
+            CONNECT BY PRIOR t3.dept_code = t3.super_code
+            </if> 
+      )
+	</select>
+</mapper>
+

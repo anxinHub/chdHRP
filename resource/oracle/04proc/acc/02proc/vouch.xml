@@ -1,0 +1,339 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<root>
+
+	<sql id="acc_super_vouch_del" type="proc"><![CDATA[
+CREATE OR REPLACE PROCEDURE ACC_SUPER_VOUCH_DEL
+  /*删除凭证相关联的表*/
+  (
+   p_vouch_id number,--凭证ID
+   p_group_id number,
+   p_hos_id number,
+   p_copy_code varchar2,
+   p_user_id number,--当前系统用户  
+   p_note out varchar2--返回提示:正常返回ok
+   )
+  IS
+     v_001 number;--根据凭证号的位数，将会在凭证号前面补0
+     v_005 number;--允许修改他人凭证
+     v_013 number;--删除中间凭证处理方式（0:不处理,1:凭证作废,2:凭证缩号）
+     v_state number;
+     v_user_id number;--凭证用户
+     v_vouch_no varchar2(20);--当前凭证号
+     v_vouch_n_no varchar2(20);--下一个凭证号
+     v_vouch_diff_no number;--凭证号差
+     v_vouch_name varchar2(20);
+     v_vouch_type_code varchar2(20);
+     v_acc_year varchar2(4);
+     v_acc_month varchar2(4);
+     v_busi_type_code varchar2(20);
+     v_busi_log_table varchar2(50);
+     v_count number;
+     v_subj_code varchar2(20);
+  BEGIN
+   
+     begin
+       SELECT v.create_user,v.state,t.vouch_type_short||'-'||v.vouch_no,v.vouch_no,v.vouch_type_code,v.acc_year,v.acc_month,v.busi_type_code,bt.log_name
+       INTO v_user_id,v_state,v_vouch_name,v_vouch_no,v_vouch_type_code,v_acc_year,v_acc_month,v_busi_type_code,v_busi_log_table
+       from acc_vouch v
+       left join acc_vouch_type t on v.group_id=t.group_id and v.hos_id=t.hos_id and v.copy_code=t.copy_code and v.vouch_type_code=t.vouch_type_code
+       left join sys_busi_type bt on v.busi_type_code=bt.busi_type_code
+       where v.group_id = p_group_id AND v.hos_id = p_hos_id AND v.copy_code = p_copy_code and v.vouch_id=p_vouch_id;
+       exception
+         when NO_DATA_FOUND then
+         p_note:='ok';
+      end;
+
+     if p_note='ok' then     
+        return;
+     end if;
+
+     if v_state>1 or v_state=0 then
+        p_note:=v_vouch_name||'：只能删除草稿、新建的凭证.';
+        return;
+     end if;
+
+     select para_value into v_005 from acc_para where para_code='005' and group_id = p_group_id AND hos_id = p_hos_id AND copy_code = p_copy_code;
+     /*v_005=0不允许修改他人凭证*/
+     if v_005=0 and p_user_id<>v_user_id then
+        p_note:=v_vouch_name||'：不允许删除他人的凭证.';
+        return;
+     end if;
+
+	 select count(1) into v_count from acc_bank_veri v
+     inner join acc_vouch_check c on v.vouch_check_id=c.vouch_check_id
+     where v.group_id = p_group_id AND v.hos_id = p_hos_id AND v.copy_code = p_copy_code and v.vouch_id=p_vouch_id;
+     if v_count>0 then
+        select c.subj_code into v_subj_code from acc_bank_veri v
+        inner join acc_vouch_check c on v.vouch_check_id=c.vouch_check_id
+        where v.group_id = p_group_id AND v.hos_id = p_hos_id AND v.copy_code = p_copy_code and v.vouch_id=p_vouch_id
+        and rownum=1;
+        p_note:=v_vouch_name||'，'||v_subj_code||'：有单位银行对账数据不能删除.';
+        return;
+     end if;
+
+     select para_value into v_013 from acc_para where para_code='013' and group_id = p_group_id AND hos_id = p_hos_id AND copy_code = p_copy_code;
+     /*v_013=1删除中间凭证，凭证作废*/
+     if v_013=1 then
+           --查找当前凭证的下一个凭证号
+           select min(vouch_no) into v_vouch_n_no from ACC_VOUCH
+           where group_id =p_group_id AND hos_id = p_hos_id AND copy_code = p_copy_code
+           and acc_year=v_acc_year and acc_month=v_acc_month AND vouch_type_code = v_vouch_type_code
+           and vouch_no>v_vouch_no;
+
+           if v_vouch_n_no is not null then
+              update  acc_vouch set state=0 where group_id = p_group_id AND hos_id = p_hos_id AND copy_code = p_copy_code and vouch_id=p_vouch_id;
+              p_note:='ok';
+              return;
+           end if;
+
+     end if;
+
+
+    --更新票据核销状态 
+    update ACC_PAPER_DETAIL set CHECK_USER_ID=NULL,CHECK_DATE=NULL,is_check=0,vouch_id=NULL,check_money=0.00 
+    where group_id=p_group_id and hos_id=p_hos_id and copy_code=p_copy_code and is_check=1
+    and exists(select 1 from acc_vouch_check c where  c.group_id=p_group_id and c.hos_id=p_hos_id and c.copy_code=p_copy_code
+    and c.vouch_id=p_vouch_id and c.paper_type_code=ACC_PAPER_DETAIL.type_code and c.check_no=ACC_PAPER_DETAIL.PAPER_NUM); 
+     
+     --删除差异标注表
+	delete from acc_vouch_diff where group_id = p_group_id AND hos_id = p_hos_id AND copy_code = p_copy_code and vouch_id=p_vouch_id;
+	
+     --删除辅助核算表
+     delete from acc_vouch_check where group_id = p_group_id AND hos_id = p_hos_id AND copy_code = p_copy_code and vouch_id=p_vouch_id;
+
+     --删除现金流量表
+     delete from acc_cash_flow where group_id = p_group_id AND hos_id = p_hos_id AND copy_code = p_copy_code
+     and vouch_detail_id in(select vouch_detail_id from acc_vouch_detail
+     where group_id = p_group_id AND hos_id = p_hos_id AND copy_code = p_copy_code and vouch_id=p_vouch_id);
+
+     --删除凭证明细表
+     delete from acc_vouch_detail where group_id = p_group_id AND hos_id = p_hos_id AND copy_code = p_copy_code and vouch_id=p_vouch_id;
+     
+     if (v_busi_type_code='Z011') then
+         --更新出纳登记表
+         update ACC_TELL set vouch_id=null,vouch_detail_id=null,vouch_check_id=null 
+         where group_id = p_group_id AND hos_id = p_hos_id AND copy_code = p_copy_code and vouch_id=p_vouch_id;     
+     
+     else if(v_busi_type_code is not null and v_busi_log_table is not null) then
+     
+          execute immediate 'delete from '||v_busi_log_table||' where group_id = '||p_group_id||' AND hos_id = '||p_hos_id||' AND copy_code = '||p_copy_code||' and vouch_id='||p_vouch_id;
+     end if;
+     end if;
+     
+     --删除凭证附件表
+     delete from acc_vouch_att where group_id = p_group_id AND hos_id = p_hos_id AND copy_code = p_copy_code and vouch_id=p_vouch_id;
+     
+     --删除凭证表
+     delete from acc_vouch where group_id = p_group_id AND hos_id = p_hos_id AND copy_code = p_copy_code and vouch_id=p_vouch_id;
+     
+     /*v_013=2凭证缩号*/
+     if v_013=2 then
+         --查找当前凭证的下一个凭证号
+         select min(vouch_no) into v_vouch_n_no from ACC_VOUCH
+         where group_id =p_group_id AND hos_id = p_hos_id AND copy_code = p_copy_code
+         and acc_year=v_acc_year and acc_month=v_acc_month AND vouch_type_code = v_vouch_type_code
+         and vouch_no>v_vouch_no;
+
+         --dbms_output.put_line(v_vouch_n_no);
+         if v_vouch_n_no is not null then
+
+            v_vouch_diff_no:=to_number(v_vouch_n_no)-to_number(v_vouch_no);
+            --凭证缩号
+            --select replace('0010',substr('0010',REGEXP_INSTR('0010','[1-9]',1,1)),'') from dual;
+            update acc_vouch set vouch_no=to_number(vouch_no)-v_vouch_diff_no
+            where group_id = p_group_id AND hos_id = p_hos_id AND copy_code = p_copy_code
+            and acc_year=v_acc_year and acc_month=v_acc_month AND vouch_type_code = v_vouch_type_code and vouch_no>v_vouch_no;
+
+            --凭证号位数
+            select para_value into v_001 from acc_para where para_code='001' and group_id = p_group_id AND hos_id = p_hos_id AND copy_code = p_copy_code;
+
+            declare
+              TYPE ref_type IS REF CURSOR;--定义游标指针
+              v_cursor ref_type;--定义游标变量
+              c_vouch_id number;--凭证ID
+              c_vouch_no varchar2(20);--凭证号
+              c_vouch_no_new varchar2(20);--新凭证号
+            begin
+
+              --循环遍历补齐0
+              open v_cursor for select vouch_id,vouch_no from ACC_VOUCH
+                   where group_id =p_group_id AND hos_id = p_hos_id AND copy_code = p_copy_code
+                   and acc_year=v_acc_year and acc_month=v_acc_month AND vouch_type_code = v_vouch_type_code
+                   and vouch_no>v_vouch_no;
+              loop
+              fetch v_cursor into c_vouch_id,c_vouch_no;
+              exit when v_cursor%notfound;
+
+                   c_vouch_no_new:='';
+                   --补齐0
+                   FOR i IN length(c_vouch_no) .. v_001-1 LOOP
+                     c_vouch_no_new:=c_vouch_no_new||'0';
+
+                   END LOOP;
+
+                   --dbms_output.put_line('c_vouch_no_new: '|| c_vouch_no_new||c_vouch_no);
+                   update acc_vouch set vouch_no=c_vouch_no_new||c_vouch_no
+                   where group_id = p_group_id AND hos_id = p_hos_id AND copy_code = p_copy_code
+                   and vouch_id=c_vouch_id;
+              end loop;
+              close v_cursor;
+            end;
+         end if;
+     end if;
+
+     p_note:='ok';
+  END ACC_SUPER_VOUCH_DEL;
+
+	]]></sql>
+	
+	<sql id="acc_vouch_neaten" type="proc" desc="凭证断号处理"><![CDATA[
+	CREATE OR REPLACE PROCEDURE ACC_VOUCH_NEATEN
+	/*处理断号凭证*/
+	(
+	 p_vouch_no varchar2,
+	 p_group_id number,
+	 p_hos_id number,
+	 p_copy_code varchar2,
+	 p_acc_year varchar2,
+	 p_acc_month varchar2,
+	 p_vouch_type_code varchar2
+	 )
+	IS
+	   v_leng number(19,0);--凭证号前面补充0的个数
+	   v_vouch_no varchar2(20);--当前凭证号
+	   v_vouch_n_no varchar2(20);--下一个凭证号
+	   v_vouch_diff_no number;--凭证号差
+     vouch_num number;--记录
+     flag number;
+     min_vouchNo varchar2(20);
+     max_vouchNo varchar2(20);
+
+	BEGIN
+	          --凭证号位数
+	          select para_value into v_leng from acc_para where para_code='001' and group_id = p_group_id AND hos_id = p_hos_id AND copy_code = p_copy_code;
+
+            SELECT  min(av.vouch_no) into min_vouchNo FROM (
+            SELECT group_id, hos_id, copy_code, vouch_id, vouch_no
+            , vouch_att_num, acc_year, acc_month, vouch_type_code, vouch_date
+            , create_user AS create_id, cash_user AS cash_id, audit_user AS audit_id, acc_user AS acc_id, LEAD(vouch_no) OVER (ORDER BY vouch_type_code, vouch_no) AS next_vouch_no
+              FROM acc_vouch a
+              WHERE a.group_id = p_group_id
+                AND a.hos_id = p_hos_id
+                AND a.copy_code = p_copy_code
+                AND a.acc_year = p_acc_year
+                AND a.acc_month = p_acc_month
+                AND a.vouch_type_code = p_vouch_type_code
+            ) av
+            WHERE av.group_id = p_group_id
+              AND av.hos_id = p_hos_id
+              AND av.copy_code =p_copy_code
+              AND av.acc_year =p_acc_year
+              AND av.acc_month =p_acc_month
+              AND next_vouch_no - vouch_no > 1;
+              
+              SELECT  max(av.vouch_no) into max_vouchNo FROM (
+            SELECT group_id, hos_id, copy_code, vouch_id, vouch_no
+            , vouch_att_num, acc_year, acc_month, vouch_type_code, vouch_date
+            , create_user AS create_id, cash_user AS cash_id, audit_user AS audit_id, acc_user AS acc_id, LEAD(vouch_no) OVER (ORDER BY vouch_type_code, vouch_no) AS next_vouch_no
+              FROM acc_vouch a
+              WHERE a.group_id = p_group_id
+                AND a.hos_id = p_hos_id
+                AND a.copy_code = p_copy_code
+                AND a.acc_year = p_acc_year
+                AND a.acc_month = p_acc_month
+                AND a.vouch_type_code = p_vouch_type_code
+            ) av
+            WHERE av.group_id = p_group_id
+              AND av.hos_id = p_hos_id
+              AND av.copy_code =p_copy_code
+              AND av.acc_year =p_acc_year
+              AND av.acc_month =p_acc_month;
+
+	          declare
+	            TYPE ref_type IS REF CURSOR;--定义游标指针
+	            v_cursor ref_type;--定义游标变量
+	            c_vouch_id number;--凭证ID
+	            c_vouch_no varchar2(20);--凭证号
+	            c_vouch_no_new varchar2(20);--新凭证号
+	            --c_begin_number number(19,0);
+	          begin
+
+	           flag:=0;
+	           --dbms_output.put_line(p_vouch_no);
+	          for cr in (SELECT vouch_no FROM acc_vouch a
+              WHERE a.group_id = p_group_id
+                AND a.hos_id = p_hos_id
+                AND a.copy_code = p_copy_code
+                AND a.acc_year = p_acc_year
+                AND a.acc_month = p_acc_month
+                AND a.vouch_type_code = p_vouch_type_code
+                and to_number(a.vouch_no)>= min_vouchNo and to_number(a.vouch_no)<= max_vouchNo
+                order by vouch_no
+            ) loop
+              
+	                if flag = 1
+                    then
+                     update acc_vouch set vouch_no=to_number(v_vouch_n_no)+1
+	                 where group_id = p_group_id AND hos_id = p_hos_id AND copy_code = p_copy_code
+	                 and acc_year=p_acc_year and acc_month=p_acc_month AND vouch_type_code = p_vouch_type_code
+	                 and to_number(vouch_no)=to_number(cr.vouch_no);
+	                 --查找当前凭证的下一个凭证号
+                   v_vouch_n_no:=to_number(v_vouch_n_no)+1;
+                   elsif flag = 0
+                    then
+                   select min(vouch_no) into v_vouch_n_no from ACC_VOUCH
+                     where group_id =p_group_id AND hos_id = p_hos_id AND copy_code = p_copy_code
+                     and acc_year=p_acc_year and acc_month=p_acc_month AND vouch_type_code = p_vouch_type_code
+                     and vouch_no=cr.vouch_no;
+                     dbms_output.put_line(v_vouch_n_no);
+                     flag := 1; 
+                     
+                     end if;
+
+	                 if v_vouch_n_no is not null then
+	                 --计算凭证号差
+	                /* v_vouch_diff_no:=to_number(v_vouch_n_no)-to_number(cr.vouch_no)-1;
+	                 dbms_output.put_line('cr.vouch_no='||cr.vouch_no||'----v_vouch_n_no='||v_vouch_n_no||'---'||v_vouch_diff_no);*/
+	                 --大于当前凭证号减去凭证号差
+	                /* update acc_vouch set vouch_no=to_number(cr.vouch_no)+1
+	                 where group_id = p_group_id AND hos_id = p_hos_id AND copy_code = p_copy_code
+	                 and acc_year=p_acc_year and acc_month=p_acc_month AND vouch_type_code = p_vouch_type_code
+	                 and to_number(vouch_no)=to_number(v_vouch_n_no);*/
+	                 
+                   
+                    --循环遍历补齐0
+                    open v_cursor for select vouch_id,vouch_no from ACC_VOUCH
+                         where group_id =p_group_id AND hos_id = p_hos_id AND copy_code = p_copy_code
+                         and acc_year=p_acc_year and acc_month=p_acc_month AND vouch_type_code = p_vouch_type_code
+                         and vouch_no > (cr.vouch_no);
+
+                      loop
+                      fetch v_cursor into c_vouch_id,c_vouch_no;
+                      exit when v_cursor%notfound;
+
+                         c_vouch_no_new:='';
+                         --补齐0
+                         FOR i IN length(c_vouch_no) .. v_leng-1 LOOP
+                           c_vouch_no_new:=c_vouch_no_new||'0';
+
+                         END LOOP;
+
+                         update acc_vouch set vouch_no=c_vouch_no_new||c_vouch_no
+                         where group_id = p_group_id AND hos_id = p_hos_id AND copy_code = p_copy_code
+                         and vouch_id=c_vouch_id;
+
+	                       end loop;
+                   
+                   end if;
+	                 end loop;
+                   
+	            close v_cursor;
+	          end;
+
+	END ACC_VOUCH_NEATEN;
+
+
+	]]></sql>
+
+</root>
+

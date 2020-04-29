@@ -1,0 +1,309 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.budg.dao.budgincome.reportforms.monitoring.BudgMedElseIncomeExeMapper">
+	
+	<resultMap id="budgMedElseIncomeExeMap" type="java.util.Map">
+	<result property="group_id" column="group_id"/>
+	<result property="hos_id" column="hos_id"/>
+	<result property="copy_code" column="copy_code"/>
+	<result property="year" column="year"/>
+	<result property="month" column="month"/>
+	<result property="subj_code" column="subj_code"/>
+	<result property="amount" column="amount"/>
+	<result property="remark" column="remark"/>
+	<result property="subj_name" column="subj_name"/>
+	<result property="subj_level" column="subj_level"/>
+	<result property="last_month_carried" column="last_month_carried"/>
+	<result property="budg_value" column="budg_value"/>
+	<result property="carried_next_month" column="carried_next_month"/>
+	<result property="year_sum" column="year_sum"/>
+	<result property="plan_num" column="plan_num"/>
+	<result property="item" column="item"/>
+	<result property="month_1" column="month_1"/>
+	<result property="month_2" column="month_2"/>
+	<result property="month_3" column="month_3"/>
+	<result property="month_4" column="month_4"/>
+	<result property="month_5" column="month_5"/>
+	<result property="month_6" column="month_6"/>
+	<result property="month_7" column="month_7"/>
+	<result property="month_8" column="month_8"/>
+	<result property="month_9" column="month_9"/>
+	<result property="month_10" column="month_10"/>
+	<result property="month_11" column="month_11"/>
+	<result property="month_12" column="month_12"/>
+	</resultMap>
+	
+	<select id="query" parameterType="java.util.Map" resultMap="budgMedElseIncomeExeMap" >
+ 	with hosExecute as ( select group_id , hos_id ,copy_code , year , month , subj_code , sum(amount) amount
+         from BUDG_ELSE_INCOME_EXECUTE
+         where 
+         	group_id = #{group_id} 
+         	and hos_id = #{hos_id} 
+         	and copy_code = #{copy_code} 
+         	and year = #{year}    
+         group by group_id , hos_id ,copy_code , year , month , subj_code 
+   ), 
+   budgValue as( <!-- 预算值 -->
+   		select 
+	    '2' as b_no,bhm.group_id,bhm.hos_id,bhm.copy_code,'预算值' as item,bhm.budg_year year,bhm.subj_code,asj.subj_name,asj.subj_level,
+	   
+	    sum(case when bhm.MONTH='01' then nvl(bhm.budg_value,0) else 0 end) month_1,
+	    sum(case when bhm.MONTH='02' then nvl(bhm.budg_value,0) else 0 end) month_2,
+	    sum(case when bhm.MONTH='03' then nvl(bhm.budg_value,0) else 0 end) month_3,
+	    sum(case when bhm.MONTH='04' then nvl(bhm.budg_value,0) else 0 end) month_4,
+	    sum(case when bhm.MONTH='05' then nvl(bhm.budg_value,0) else 0 end) month_5,
+	    sum(case when bhm.MONTH='06' then nvl(bhm.budg_value,0) else 0 end) month_6,
+	    sum(case when bhm.MONTH='07' then nvl(bhm.budg_value,0) else 0 end) month_7,
+	    sum(case when bhm.MONTH='08' then nvl(bhm.budg_value,0) else 0 end) month_8,
+	    sum(case when bhm.MONTH='09' then nvl(bhm.budg_value,0) else 0 end) month_9,
+	    sum(case when bhm.MONTH='10' then nvl(bhm.budg_value,0) else 0 end) month_10,
+	    sum(case when bhm.MONTH='11' then nvl(bhm.budg_value,0) else 0 end) month_11,
+	    sum(case when bhm.MONTH='12' then nvl(bhm.budg_value,0) else 0 end) month_12,
+	   sum(bhm.budg_value) year_sum
+	    from budg_else_income bhm
+	    left join budg_income_subj asj 
+	    	on  
+	    		bhm.group_id = asj.group_id 
+	    		and bhm.hos_id = asj.hos_id 
+	    		and bhm.copy_code = asj.copy_code 
+	    		and bhm.subj_code = asj.subj_code 
+	    		and bhm.budg_year=asj.budg_year
+	    where 
+	    	bhm.group_id = #{group_id} 
+	    	and bhm.hos_id = #{hos_id} 
+	    	and bhm.copy_code = #{copy_code} 
+	    	and bhm.budg_year = #{year}      
+	    group by bhm.group_id,bhm.hos_id,bhm.copy_code,bhm.budg_year,bhm.subj_code,asj.subj_name,asj.subj_level
+   ),
+   executeValue as( <!-- 执行数据 -->
+   		select 
+    '4' as b_no,bie.group_id,bie.hos_id,bie.copy_code,'执行数据' as item,bie.year,bie.subj_code,asj.subj_name,asj.subj_level,
+    sum(case when bie.MONTH='01' then bie.amount else 0 end) month_1,
+    sum(case when bie.MONTH='02' then bie.amount else 0 end) month_2,
+    sum(case when bie.MONTH='03' then bie.amount else 0 end) month_3,
+    sum(case when bie.MONTH='04' then bie.amount else 0 end) month_4,
+    sum(case when bie.MONTH='05' then bie.amount else 0 end) month_5,
+    sum(case when bie.MONTH='06' then bie.amount else 0 end) month_6,
+    sum(case when bie.MONTH='07' then bie.amount else 0 end) month_7,
+    sum(case when bie.MONTH='08' then bie.amount else 0 end) month_8,
+    sum(case when bie.MONTH='09' then bie.amount else 0 end) month_9,
+    sum(case when bie.MONTH='10' then bie.amount else 0 end) month_10,
+    sum(case when bie.MONTH='11' then bie.amount else 0 end) month_11,
+    sum(case when bie.MONTH='12' then bie.amount else 0 end) month_12,
+    sum(bie.amount) year_sum
+    from hosExecute bie
+    left join budg_income_subj asj 
+    	on  
+    		bie.group_id = asj.group_id 
+    		and bie.hos_id = asj.hos_id 
+    		and bie.copy_code = asj.copy_code 
+    		and bie.year=asj.budg_year
+      		and bie.subj_code = asj.subj_code 
+     group by bie.group_id,bie.hos_id,bie.copy_code,bie.year,bie.subj_code,asj.subj_name,asj.subj_level
+   ),
+   
+   baseData as ( <!-- 基础数据  (已排序,可直接展示) -->
+	   select * from(
+			 select 
+			    '1' as b_no,bhm.group_id,bhm.hos_id,bhm.copy_code,'上月结转' as item,bhm.budg_year year,bhm.subj_code,asj.subj_name,asj.subj_level,
+			   
+			    sum(case when bhm.MONTH='01' then nvl(bhm.last_month_carried,0) else 0 end) month_1,
+			    sum(case when bhm.MONTH='02' then nvl(bhm.last_month_carried,0) else 0 end) month_2,
+			    sum(case when bhm.MONTH='03' then nvl(bhm.last_month_carried,0) else 0 end) month_3,
+			    sum(case when bhm.MONTH='04' then nvl(bhm.last_month_carried,0) else 0 end) month_4,
+			    sum(case when bhm.MONTH='05' then nvl(bhm.last_month_carried,0) else 0 end) month_5,
+			    sum(case when bhm.MONTH='06' then nvl(bhm.last_month_carried,0) else 0 end) month_6,
+			    sum(case when bhm.MONTH='07' then nvl(bhm.last_month_carried,0) else 0 end) month_7,
+			    sum(case when bhm.MONTH='08' then nvl(bhm.last_month_carried,0) else 0 end) month_8,
+			    sum(case when bhm.MONTH='09' then nvl(bhm.last_month_carried,0) else 0 end) month_9,
+			    sum(case when bhm.MONTH='10' then nvl(bhm.last_month_carried,0) else 0 end) month_10,
+			    sum(case when bhm.MONTH='11' then nvl(bhm.last_month_carried,0) else 0 end) month_11,
+			    sum(case when bhm.MONTH='12' then nvl(bhm.last_month_carried,0) else 0 end) month_12,
+			    0 as year_sum
+			    from budg_else_income bhm
+			    left join budg_income_subj asj 
+			    	on  
+			    		bhm.group_id = asj.group_id 
+			    		and bhm.hos_id = asj.hos_id 
+			    		and bhm.copy_code = asj.copy_code 
+			    		and bhm.budg_year=asj.budg_year
+			      		and bhm.subj_code = asj.subj_code 
+			  	where 
+			  		bhm.group_id  = #{group_id} 
+			  		and bhm.hos_id = #{hos_id} 
+			  		and bhm.copy_code = #{copy_code} 
+			  		and bhm.budg_year = #{year}    
+			    group by bhm.group_id,bhm.hos_id,bhm.copy_code,bhm.budg_year,bhm.subj_code,asj.subj_name,asj.subj_level
+	     union all
+	   			select * from budgValue
+	     union all
+		   select 
+		    '3' as b_no,bhm.group_id,bhm.hos_id,bhm.copy_code,'结转下月' as item,bhm.budg_year year,bhm.subj_code,asj.subj_name,asj.subj_level,
+		   
+		    sum(case when bhm.MONTH='01' then nvl(bhm.carried_next_month,0) else 0 end) month_1,
+		    sum(case when bhm.MONTH='02' then nvl(bhm.carried_next_month,0) else 0 end) month_2,
+		    sum(case when bhm.MONTH='03' then nvl(bhm.carried_next_month,0) else 0 end) month_3,
+		    sum(case when bhm.MONTH='04' then nvl(bhm.carried_next_month,0) else 0 end) month_4,
+		    sum(case when bhm.MONTH='05' then nvl(bhm.carried_next_month,0) else 0 end) month_5,
+		    sum(case when bhm.MONTH='06' then nvl(bhm.carried_next_month,0) else 0 end) month_6,
+		    sum(case when bhm.MONTH='07' then nvl(bhm.carried_next_month,0) else 0 end) month_7,
+		    sum(case when bhm.MONTH='08' then nvl(bhm.carried_next_month,0) else 0 end) month_8,
+		    sum(case when bhm.MONTH='09' then nvl(bhm.carried_next_month,0) else 0 end) month_9,
+		    sum(case when bhm.MONTH='10' then nvl(bhm.carried_next_month,0) else 0 end) month_10,
+		    sum(case when bhm.MONTH='11' then nvl(bhm.carried_next_month,0) else 0 end) month_11,
+		    sum(case when bhm.MONTH='12' then nvl(bhm.carried_next_month,0) else 0 end) month_12,
+		   	0 as year_sum
+		    from budg_else_income bhm
+		    left join budg_income_subj asj 
+		    	on  
+		    		bhm.group_id = asj.group_id 
+		    		and bhm.hos_id = asj.hos_id 
+		    		and bhm.copy_code = asj.copy_code 
+		    		and bhm.budg_year=asj.budg_year
+		      		and bhm.subj_code = asj.subj_code 
+		    where 
+		    	bhm.group_id = #{group_id} 
+		    	and bhm.hos_id = #{hos_id} 
+		    	and bhm.copy_code = #{copy_code} 
+		    	and bhm.budg_year = #{year}    
+		    group by bhm.group_id,bhm.hos_id,bhm.copy_code,bhm.budg_year,bhm.subj_code,asj.subj_name,asj.subj_level
+	    union all
+	    	select * from executeValue
+		union all
+		    select 
+		    '5' as b_no,t.group_id,t.hos_id,t.copy_code,'进度' as item,t.year,t.subj_code,t.subj_name,t.subj_level,
+		    case b.month_1 when 0 then 0 else t.month_1/b.month_1*100 end month_1 ,
+		    case b.month_2 when 0 then 0 else t.month_2/b.month_2*100 end month_2 ,
+		    case b.month_3 when 0 then 0 else t.month_3/b.month_3*100 end month_3 ,
+		    case b.month_4 when 0 then 0 else t.month_4/b.month_4*100 end month_4 ,
+		    case b.month_5 when 0 then 0 else t.month_5/b.month_5*100 end month_5 ,
+		    case b.month_6 when 0 then 0 else t.month_6/b.month_6*100 end month_6 ,
+		    case b.month_7 when 0 then 0 else t.month_7/b.month_7*100 end month_7 ,
+		    case b.month_8 when 0 then 0 else t.month_8/b.month_8*100 end month_8 ,
+		    case b.month_9 when 0 then 0 else t.month_9/b.month_9*100 end month_9 ,
+		    case b.month_10 when 0 then 0 else t.month_10/b.month_10*100 end month_10 ,
+		    case b.month_11 when 0 then 0 else t.month_11/b.month_11*100 end month_11 ,
+		    case b.month_12 when 0 then 0 else t.month_12/b.month_12*100 end month_12 ,
+		    case b.year_sum when 0 then 0 else t.year_sum/b.year_sum*100 end year_sum 
+		    from executeValue t
+		    left join budgValue b
+		    	on
+		    		t.group_id = b.group_id 
+		    		and t.hos_id = b.hos_id 
+		    		and t.copy_code = b.copy_code 
+		    		and t.year = b.year 
+		    		and t.subj_code = b.subj_code 
+	  )a
+		where                    
+			a.group_id = #{group_id,jdbcType=INTEGER}
+			AND a.hos_id = #{hos_id,jdbcType=INTEGER}
+			AND a.copy_code = #{copy_code,jdbcType=VARCHAR}
+			<if test="year != null and year != ''">
+			AND a.year = #{year,jdbcType=VARCHAR}
+			</if>
+			<if test="month != null and month != ''">
+			AND a.month = #{month,jdbcType=VARCHAR}
+			</if>
+			<if test="subj_code != null and subj_code != ''">
+			AND a.subj_code = #{subj_code,jdbcType=VARCHAR}
+			</if>
+			<if test="subj_level != null and subj_level != ''">
+			AND a.subj_level = #{subj_level,jdbcType=VARCHAR}
+			</if>
+		order by a.group_id,a.hos_id,a.copy_code,a.year,a.subj_code, b_no asc
+   ) ,
+   sumBudg as ( <!-- 预算值 合计 -->
+   		<if test="budg_flag != -1 ">
+		select null b_no ,null group_id ,null hos_id ,null copy_code , '预算值合计' item ,  null year , null subj_code ,
+			null subj_name , -1 subj_level ,
+			nvl(sum(month_1),0) month_1 , nvl(sum(month_2),0) month_2 , nvl(sum(month_3),0) month_3 , 
+			nvl(sum(month_4),0) month_4 , nvl(sum(month_5),0) month_5 , nvl(sum(month_6),0) month_6 , 
+			nvl(sum(month_7),0) month_7 , nvl(sum(month_8),0) month_8 , nvl(sum(month_9),0) month_9 , 
+			nvl(sum(month_10),0) month_10 , nvl(sum(month_11),0) month_11 , nvl(sum(month_12),0) month_12 ,
+			nvl(sum(year_sum),0) year_sum  
+		from budgValue
+		group by group_id,hos_id,copy_code,year
+		</if>
+		<if test="budg_flag == -1 ">
+		select null b_no ,null group_id ,null hos_id ,null copy_code , '预算值合计' item ,  null year , null subj_code ,
+			null subj_name , -1 subj_level ,
+			0 month_1 , 0 month_2 ,0 month_3 , 0 month_4 , 0 month_5 ,0 month_6 ,0 month_7 , 0 month_8 ,0 month_9 , 
+			0 month_10, 0 month_11 ,0 month_12 , 0 year_sum 
+		from dual
+		</if>
+   ),
+   sumExecute as ( <!-- 执行数据 合计 -->
+   		<if test="flag != -1 ">
+		select null b_no ,null group_id ,null hos_id ,null copy_code , '执行数据合计' item ,  null year , null subj_code ,
+			null subj_name , -1 subj_level ,
+			nvl(sum(month_1),0) month_1 , nvl(sum(month_2),0) month_2 , nvl(sum(month_3),0) month_3 , 
+			nvl(sum(month_4),0) month_4 , nvl(sum(month_5),0) month_5 , nvl(sum(month_6),0) month_6 , 
+			nvl(sum(month_7),0) month_7 , nvl(sum(month_8),0) month_8 , nvl(sum(month_9),0) month_9 , 
+			nvl(sum(month_10),0) month_10 , nvl(sum(month_11),0) month_11 , nvl(sum(month_12),0) month_12 ,
+			nvl(sum(year_sum),0) year_sum 
+		from executeValue
+		group by group_id,hos_id,copy_code,year
+		</if>
+		<if test="flag == -1 ">
+		select null b_no ,null group_id ,null hos_id ,null copy_code , '执行数据合计' item ,  null year , null subj_code ,
+			null subj_name , -1 subj_level ,
+			0 month_1 , 0 month_2 ,0 month_3 , 0 month_4 , 0 month_5 ,0 month_6 ,0 month_7 , 0 month_8 ,0 month_9 , 
+			0 month_10, 0 month_11 ,0 month_12 , 0 year_sum 
+		from dual
+		</if>
+   )
+   		<!-- 预算值 合计行 -->
+   		select * from sumBudg
+	union all
+		<!-- 执行数据 合计行 -->
+		select * from sumExecute
+	union all
+		<!-- 总进度 -->
+		select a.b_no , a.group_id , a.hos_id , a.copy_code , '总进度' item ,  a.year , a.subj_code , a.subj_name , a.subj_level , 
+			case a.month_1 when 0 then 0 else nvl(b.month_1,0)/a.month_1*100 end month_1 ,
+		    case a.month_2 when 0 then 0 else nvl(b.month_2,0)/a.month_2*100 end month_2 ,
+		    case a.month_3 when 0 then 0 else nvl(b.month_3,0)/a.month_3*100 end month_3 ,
+		    case a.month_4 when 0 then 0 else nvl(b.month_4,0)/a.month_4*100 end month_4 ,
+		    case a.month_5 when 0 then 0 else nvl(b.month_5,0)/a.month_5*100 end month_5 ,
+		    case a.month_6 when 0 then 0 else nvl(b.month_6,0)/a.month_6*100 end month_6 ,
+		    case a.month_7 when 0 then 0 else nvl(b.month_7,0)/a.month_7*100 end month_7 ,
+		    case a.month_8 when 0 then 0 else nvl(b.month_8,0)/a.month_8*100 end month_8 ,
+		    case a.month_9 when 0 then 0 else nvl(b.month_9,0)/a.month_9*100 end month_9 ,
+		    case a.month_10 when 0 then 0 else nvl(b.month_10,0)/a.month_10*100 end month_10 ,
+		    case a.month_11 when 0 then 0 else nvl(b.month_11,0)/a.month_11*100 end month_11 ,
+		    case a.month_12 when 0 then 0 else nvl(b.month_12,0)/a.month_12*100 end month_12 ,
+		    case a.year_sum when 0 then 0 else nvl(b.year_sum,0)/a.year_sum*100 end year_sum 
+		from sumBudg   a
+		left join sumExecute b
+			on
+	    		a.subj_level = b.subj_level 
+		
+	union all	
+		<!-- 展示表格内数据 -->
+		select * from baseData
+ 
+	</select>
+	
+	<!-- 查询 所查 预算年度 是否有 执行数据 ( flag 标识 (-1:表示 所查预算年度 没有执行数据) 解决  没有执行数据，前台合计行 展现数据 窜行问题) -->
+	<select id="queryExecuteDataExist" resultType="java.lang.Integer"  parameterType="java.util.Map" >
+	
+		SELECT count(1) FROM BUDG_ELSE_INCOME_EXECUTE 
+		where                    
+		group_id = #{group_id,jdbcType=INTEGER}
+		AND hos_id = #{hos_id,jdbcType=INTEGER}
+		AND copy_code = #{copy_code,jdbcType=VARCHAR}
+		AND year = #{year,jdbcType=VARCHAR}
+	</select>
+	
+	<!-- 查询 所查 预算年度 是否有数据 ( budg_flag 标识 (-1:表示 所查预算年度 没有数据) 解决  没有数据，前台合计行 展现数据 窜行问题) -->
+	<select id="queryBudgDataExist" resultType="java.lang.Integer"  parameterType="java.util.Map" >
+	
+		SELECT count(1) FROM BUDG_ELSE_INCOME 
+		where                    
+		group_id = #{group_id,jdbcType=INTEGER}
+		AND hos_id = #{hos_id,jdbcType=INTEGER}
+		AND copy_code = #{copy_code,jdbcType=VARCHAR}
+		AND budg_year = #{year,jdbcType=VARCHAR}
+	</select>
+</mapper>
+

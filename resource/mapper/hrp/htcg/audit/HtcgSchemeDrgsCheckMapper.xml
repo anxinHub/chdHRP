@@ -1,0 +1,971 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.htcg.dao.audit.HtcgSchemeDrgsCheckMapper">
+
+	<resultMap id="schemeDrgsCheck"
+		type="com.chd.hrp.htcg.entity.audit.HtcgSchemeDrgsCheck">
+		<result property="group_id" column="group_id" />
+		<result property="hos_id" column="hos_id" />
+		<result property="copy_code" column="copy_code" />
+		<result property="scheme_code" column="scheme_code" />
+		<result property="scheme_name" column="scheme_name" />
+		<result property="drgs_code" column="drgs_code" />
+		<result property="drgs_name" column="drgs_name" />
+		<result property="icd_rule_code" column="icd_rule_code" />
+		<result property="icd_rule_name" column="icd_rule_name" />
+		<result property="drgs_day" column="drgs_day" />
+		<result property="mr_rule_code" column="mr_rule_code" />
+		<result property="mr_rule_name" column="mr_rule_name" />
+		<result property="recipe_merge_code" column="recipe_merge_code" />
+		<result property="recipe_merge_name" column="recipe_merge_name" />
+		<result property="recipe_group_code" column="recipe_group_code" />
+		<result property="recipe_group_name" column="recipe_group_name" />
+	</resultMap>
+	<!-- 查询 -->
+	<select id="queryHtcgSchemeDrgsCheck" resultMap="schemeDrgsCheck"
+		parameterType="java.util.Map">
+		select
+		hsd.group_id,
+		hsd.hos_id,
+		hsd.copy_code,
+		hsd.scheme_code,
+		hs.scheme_name,
+		hsd.drgs_code,
+		hd.drgs_name,
+		htcg_get_rule_name(hsd.group_id, hsd.hos_id, hsd.copy_code, hsd.scheme_code, hsd.drgs_code) as
+		icd_rule_name,
+		hsmr.mr_rule_code,
+		hmrd.mr_rule_name,
+		hsdd.drgs_day,
+		hsrmr.recipe_merge_code,
+		hrmrd.recipe_merge_name,
+		hsrgr.recipe_group_code,
+		hrgrd.recipe_group_name
+		from htcg_scheme_drgs hsd
+		left join htcg_scheme hs
+		on hsd.group_id = hs.group_id
+		and hsd.hos_id = hs.hos_id
+		and hsd.copy_code = hs.copy_code
+		and hsd.scheme_code = hs.scheme_code
+		left join htcg_drgs hd
+		on hsd.group_id = hd.group_id
+		and hsd.hos_id = hd.hos_id
+		and hsd.copy_code = hd.copy_code
+		and hsd.drgs_code = hd.drgs_code
+		left join htcg_scheme_mr_rule hsmr
+		on hsd.group_id = hsmr.group_id
+		and hsd.hos_id = hsmr.hos_id
+		and hsd.copy_code = hsmr.copy_code
+		and hsd.scheme_code = hsmr.scheme_code
+		and hsd.drgs_code = hsmr.drgs_code
+		left join htcg_mr_rule_dict hmrd
+		on hsmr.mr_rule_code = hmrd.mr_rule_code
+		left join htcg_scheme_drgs_day hsdd
+		on hsd.group_id = hsdd.group_id
+		and hsd.hos_id = hsdd.hos_id
+		and hsd.copy_code = hsdd.copy_code
+		and hsd.scheme_code = hsdd.scheme_code
+		and hsd.drgs_code = hsdd.drgs_code
+		left join htcg_scheme_recipe_merge_rule hsrmr
+		on hsd.group_id = hsrmr.group_id
+		and hsd.hos_id = hsrmr.hos_id
+		and hsd.copy_code = hsrmr.copy_code
+		and hsd.scheme_code = hsrmr.scheme_code
+		and hsd.drgs_code = hsrmr.drgs_code
+		left join htcg_recipe_merge_rule_dict hrmrd
+		on hsrmr.recipe_merge_code = hrmrd.recipe_merge_code
+		left join htcg_scheme_recipe_group_rule hsrgr
+		on hsd.group_id = hsrgr.group_id
+		and hsd.hos_id = hsrgr.hos_id
+		and hsd.copy_code = hsrgr.copy_code
+		and hsd.scheme_code = hsrgr.scheme_code
+		left join htcg_recipe_group_rule_dict hrgrd
+		on hsrgr.recipe_group_code = hrgrd.recipe_group_code
+		<where>
+			hsd.group_id = #{group_id}
+			and hsd.hos_id = #{hos_id}
+			and hsd.copy_code = #{copy_code}
+			<if test="scheme_code != null and scheme_code != ''">
+				and hsd.scheme_code = #{scheme_code}
+			</if>
+		</where>
+		order by
+		hsd.group_id,hsd.hos_id,hsd.copy_code,hsd.scheme_code,hsd.drgs_code
+	</select>
+
+
+	<insert id="addSchemeDrgsCheck" parameterType="java.util.Map">
+
+		DECLARE
+		v_seq_max INTEGER;
+		v_seq_max_new INTEGER;
+		v_flag INTEGER := 0;
+		v_group_id NUMBER(18) := #{group_id};
+		v_hos_id NUMBER(18) := #{hos_id};
+		v_copy_code varchar(20) := #{copy_code};
+		v_scheme_code varchar(20) := #{scheme_code};
+		v_seq_max_flag INTEGER := #{seq_max_flag};
+		BEGIN
+		select count(1) into v_flag
+		from htcg_scheme_confirm
+		where group_id = v_group_id
+		and hos_id = v_hos_id
+		and copy_code = v_copy_code
+		and scheme_code = v_scheme_code;
+
+		if 0 = v_flag then
+		insert into htcg_scheme_confirm
+		(group_id, hos_id, copy_code, is_confirm, scheme_code)
+		values
+		(v_group_id, v_hos_id, v_copy_code, 1, v_scheme_code);
+		else
+		update htcg_scheme_confirm
+		set is_confirm = 1
+		where group_id = v_group_id
+		and hos_id = v_hos_id
+		and copy_code = v_copy_code
+		and scheme_code = v_scheme_code;
+		end if;
+
+		select nvl(max(scheme_seq_no), 0) into v_seq_max
+		from htcg_seq_table
+		where group_id = v_group_id
+		and hos_id = v_hos_id
+		and copy_code = v_copy_code
+		and scheme_code = v_scheme_code;
+
+		if (1 = v_seq_max_flag) then
+		v_seq_max_new := v_seq_max;
+		else
+		v_seq_max_new := v_seq_max + 1;
+		insert into htcg_seq_table
+		(group_id,
+		hos_id,
+		copy_code,
+		scheme_seq_no,
+		scheme_note,
+		scheme_code)
+		values
+		(v_group_id, v_hos_id, v_copy_code, v_seq_max_new, '', v_scheme_code);
+		end if;
+
+		v_flag := 0;
+		select count(1) into v_flag
+		from htcg_scheme_seq
+		where group_id = v_group_id
+		and hos_id = v_hos_id
+		and copy_code = v_copy_code
+		and scheme_code = v_scheme_code
+		and scheme_seq_no = v_seq_max_new;
+
+		if 1 = v_flag then
+		delete from htcg_clp_step_rule_seq
+		where group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code and
+		scheme_code = v_scheme_code and scheme_seq_no=v_seq_max_new;
+
+		delete from htcg_scheme_drgs_day_seq
+		where group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code and
+		scheme_code = v_scheme_code and scheme_seq_no=v_seq_max_new;
+
+		delete from htcg_scheme_period_conf_seq
+		where group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code and
+		scheme_code = v_scheme_code and scheme_seq_no=v_seq_max_new;
+
+		delete from htcg_scheme_path_conf_seq
+		where group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code and
+		scheme_code = v_scheme_code and scheme_seq_no=v_seq_max_new;
+
+		delete from HTCG_SCHEME_RECIPE_GP_RE_SEQ
+		where group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code and
+		scheme_code = v_scheme_code and scheme_seq_no=v_seq_max_new;
+
+		delete from htcg_scheme_icd9_rule_seq
+		where group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code and
+		scheme_code = v_scheme_code and scheme_seq_no=v_seq_max_new;
+
+		delete from htcg_scheme_icd10_rule_seq
+		where group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code and
+		scheme_code = v_scheme_code and scheme_seq_no=v_seq_max_new;
+
+		delete from htcg_scheme_mr_rule_seq
+		where group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code and
+		scheme_code = v_scheme_code and scheme_seq_no=v_seq_max_new;
+
+		delete from HTCG_SCHEME_RECIPE_ME_RE_SEQ
+		where group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code and
+		scheme_code = v_scheme_code and scheme_seq_no=v_seq_max_new;
+
+		delete from htcg_scheme_similar_tt_seq
+		where group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code and
+		scheme_code = v_scheme_code and scheme_seq_no=v_seq_max_new;
+
+		delete from htcg_scheme_general_re_seq
+		where group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code and
+		scheme_code = v_scheme_code and scheme_seq_no=v_seq_max_new;
+
+		delete from htcg_scheme_drgs_seq
+		where group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code and
+		scheme_code = v_scheme_code and scheme_seq_no=v_seq_max_new;
+
+
+		insert into htcg_scheme_seq
+		select
+		group_id,hos_id,copy_code,v_seq_max_new,scheme_code,scheme_name,spell_code,wbx_code,scheme_note,is_stop
+		FROM htcg_scheme WHERE group_id=v_group_id and hos_id=v_hos_id and
+		copy_code=v_copy_code and scheme_code = v_scheme_code
+		and not exists( select 1 from htcg_scheme_seq b
+		where b.group_id=group_id and b.hos_id=hos_id and b.copy_code=copy_code
+		and b.scheme_code=scheme_code and scheme_seq_no=v_seq_max_new );
+		else
+		insert into htcg_scheme_seq
+		select
+		group_id,hos_id,copy_code,v_seq_max_new,scheme_code,scheme_name,spell_code,wbx_code,scheme_note,is_stop
+		from htcg_scheme
+		where group_id=v_group_id and hos_id=v_hos_id and copy_code=v_copy_code and
+		scheme_code = v_scheme_code;
+
+
+		insert into htcg_scheme_drgs_seq
+		select group_id,hos_id,copy_code,v_seq_max_new,scheme_code,drgs_code from
+		htcg_scheme_drgs where group_id=v_group_id and hos_id=v_hos_id and
+		copy_code=v_copy_code and scheme_code = v_scheme_code;
+
+
+		insert into htcg_scheme_path_conf_seq
+		select
+		group_id,hos_id,copy_code,v_seq_max_new,scheme_code,mr_group,mr_sample,clp_step,recipe_p_merge,recipe_d_merge,recipe_p_group,recipe_d_group
+		from htcg_scheme_path_conf where group_id=v_group_id and
+		hos_id=v_hos_id and copy_code=v_copy_code and scheme_code =
+		v_scheme_code;
+
+
+		insert into htcg_scheme_period_conf_seq
+		select
+		group_id,hos_id,copy_code,v_seq_max_new,scheme_code,month_flag,quarter_flag,half_year_flag,year_flag
+		from htcg_scheme_period_conf where group_id=v_group_id and
+		hos_id=v_hos_id and copy_code=v_copy_code and scheme_code =
+		v_scheme_code;
+
+
+		insert into htcg_scheme_icd10_rule_seq
+		select
+		group_id,hos_id,copy_code,v_seq_max_new,scheme_code,drgs_code,icd10_code,icd_rule_code
+		from htcg_scheme_icd10_rule where group_id=v_group_id and
+		hos_id=v_hos_id and copy_code=v_copy_code and scheme_code =
+		v_scheme_code;
+
+
+		insert into htcg_scheme_icd9_rule_seq
+		select
+		group_id,hos_id,copy_code,v_seq_max_new,scheme_code,drgs_code,icd9_code,icd_rule_code
+		from htcg_scheme_icd9_rule where group_id=v_group_id and
+		hos_id=v_hos_id and copy_code=v_copy_code and scheme_code =
+		v_scheme_code;
+
+
+		insert into htcg_scheme_general_re_seq
+		select
+		group_id,hos_id,copy_code,v_seq_max_new,scheme_code,drgs_code,general_rule_code
+		from htcg_scheme_general_rule where group_id=v_group_id and
+		hos_id=v_hos_id and copy_code=v_copy_code and scheme_code =
+		v_scheme_code;
+
+
+		insert into htcg_scheme_mr_rule_seq
+		select
+		group_id,hos_id,copy_code,v_seq_max_new,scheme_code,drgs_code,mr_rule_code,mr_rule_count
+		from htcg_scheme_mr_rule where group_id=v_group_id and hos_id=v_hos_id
+		and copy_code=v_copy_code and scheme_code = v_scheme_code;
+
+
+		insert into htcg_clp_step_rule_seq
+		select
+		group_id,hos_id,copy_code,v_seq_max_new,scheme_code,clp_step_code,beg_date,end_date,place
+		from htcg_clp_step_rule where group_id=v_group_id and hos_id=v_hos_id
+		and copy_code=v_copy_code and scheme_code = v_scheme_code;
+
+
+		insert into htcg_scheme_drgs_day_seq
+		select
+		group_id,hos_id,copy_code,v_seq_max_new,scheme_code,drgs_code,drgs_day
+		from
+		htcg_scheme_drgs_day where group_id=v_group_id and hos_id=v_hos_id and
+		copy_code=v_copy_code and scheme_code = v_scheme_code;
+
+
+		insert into htcg_scheme_recipe_me_re_seq
+		select
+		group_id,hos_id,copy_code,v_seq_max_new,scheme_code,drgs_code,recipe_merge_code
+		from htcg_scheme_recipe_merge_rule where group_id=v_group_id and
+		hos_id=v_hos_id and copy_code=v_copy_code and scheme_code =
+		v_scheme_code;
+
+
+		insert into htcg_scheme_similar_tt_seq
+		select
+		group_id,hos_id,copy_code,v_seq_max_new,scheme_code,drgs_code,charge_nature_code,charge_code,similar_code
+		from htcg_scheme_similar_treat where group_id=v_group_id and
+		hos_id=v_hos_id and copy_code=v_copy_code and scheme_code =
+		v_scheme_code;
+
+
+		insert into htcg_scheme_recipe_gp_re_seq
+		select
+		group_id,hos_id,copy_code,v_seq_max_new,scheme_code,recipe_group_code,total_percent
+		from htcg_scheme_recipe_group_rule where group_id=v_group_id and
+		hos_id=v_hos_id and copy_code=v_copy_code and scheme_code =
+		v_scheme_code;
+		end if;
+		END;
+
+
+
+		<!-- declare @group_id NUMBER(18) declare @hos_id NUMBER(18) declare @copy_code 
+			nvarchar(20) declare @seq_max int declare @seq_max_new int declare @scheme_code 
+			nvarchar(20) declare @seq_max_flag int set @group_id= #{group_id} set @hos_id= 
+			#{hos_id} set @copy_code= #{copy_code} set @scheme_code = #{scheme_code} 
+			set @seq_max_flag = #{seq_max_flag} if not exists(select 1 from htcg_scheme_confirm 
+			where group_id = @group_id and hos_id = @hos_id and copy_code = @copy_code 
+			and scheme_code = @scheme_code) begin insert into htcg_scheme_confirm(group_id,hos_id,copy_code,is_confirm,scheme_code) 
+			values(@group_id,@hos_id,@copy_code,1,@scheme_code) end else begin update 
+			htcg_scheme_confirm set is_confirm = 1 where group_id = @group_id and hos_id 
+			= @hos_id and copy_code = @copy_code and scheme_code = @scheme_code end select 
+			@seq_max = isnull(max(scheme_seq_no),0) from htcg_seq_table where group_id 
+			= @group_id and hos_id = @hos_id and copy_code = @copy_code and scheme_code 
+			= @scheme_code if(@seq_max_flag = 1) begin set @seq_max_new = @seq_max end 
+			else begin set @seq_max_new = @seq_max + 1 insert into htcg_seq_table(group_id,hos_id,copy_code,scheme_seq_no,scheme_note,scheme_code) 
+			values(@group_id,@hos_id,@copy_code,@seq_max_new,'',@scheme_code) end if 
+			exists(select 1 from htcg_scheme_seq where group_id=@group_id and hos_id=@hos_id 
+			and copy_code=@copy_code and scheme_code = @scheme_code and scheme_seq_no=@seq_max_new) 
+			begin delete from htcg_clp_step_rule_seq where group_id=@group_id and hos_id=@hos_id 
+			and copy_code=@copy_code and scheme_code = @scheme_code and scheme_seq_no=@seq_max_new 
+			delete from htcg_scheme_drgs_day_seq where group_id=@group_id and hos_id=@hos_id 
+			and copy_code=@copy_code and scheme_code = @scheme_code and scheme_seq_no=@seq_max_new 
+			delete from htcg_scheme_period_conf_seq where group_id=@group_id and hos_id=@hos_id 
+			and copy_code=@copy_code and scheme_code = @scheme_code and scheme_seq_no=@seq_max_new 
+			delete from htcg_scheme_path_conf_seq where group_id=@group_id and hos_id=@hos_id 
+			and copy_code=@copy_code and scheme_code = @scheme_code and scheme_seq_no=@seq_max_new 
+			delete from htcg_scheme_recipe_group_rule_seq where group_id=@group_id and 
+			hos_id=@hos_id and copy_code=@copy_code and scheme_code = @scheme_code and 
+			scheme_seq_no=@seq_max_new delete from htcg_scheme_icd9_rule_seq where group_id=@group_id 
+			and hos_id=@hos_id and copy_code=@copy_code and scheme_code = @scheme_code 
+			and scheme_seq_no=@seq_max_new delete from htcg_scheme_icd10_rule_seq where 
+			group_id=@group_id and hos_id=@hos_id and copy_code=@copy_code and scheme_code 
+			= @scheme_code and scheme_seq_no=@seq_max_new delete from htcg_scheme_mr_rule_seq 
+			where group_id=@group_id and hos_id=@hos_id and copy_code=@copy_code and 
+			scheme_code = @scheme_code and scheme_seq_no=@seq_max_new delete from htcg_scheme_recipe_merge_rule_seq 
+			where group_id=@group_id and hos_id=@hos_id and copy_code=@copy_code and 
+			scheme_code = @scheme_code and scheme_seq_no=@seq_max_new delete from htcg_scheme_similar_treat_seq 
+			where group_id=@group_id and hos_id=@hos_id and copy_code=@copy_code and 
+			scheme_code = @scheme_code and scheme_seq_no=@seq_max_new delete from htcg_scheme_general_rule_seq 
+			where group_id=@group_id and hos_id=@hos_id and copy_code=@copy_code and 
+			scheme_code = @scheme_code and scheme_seq_no=@seq_max_new delete from htcg_scheme_drgs_seq 
+			where group_id=@group_id and hos_id=@hos_id and copy_code=@copy_code and 
+			scheme_code = @scheme_code and scheme_seq_no=@seq_max_new insert into htcg_scheme_seq 
+			select group_id,hos_id,copy_code,@seq_max_new,scheme_code,scheme_name,spell_code,wbx_code,scheme_note,is_stop 
+			FROM htcg_scheme WHERE group_id=@group_id and hos_id=@hos_id and copy_code=@copy_code 
+			and scheme_code = @scheme_code and not exists( select 1 from htcg_scheme_seq 
+			b where b.group_id=group_id and b.hos_id=hos_id and b.copy_code=copy_code 
+			and b.scheme_code=scheme_code and scheme_seq_no=@seq_max_new ) end else begin 
+			insert into htcg_scheme_seq select group_id,hos_id,copy_code,@seq_max_new,scheme_code,scheme_name,spell_code,wbx_code,scheme_note,is_stop 
+			from htcg_scheme where group_id=@group_id and hos_id=@hos_id and copy_code=@copy_code 
+			and scheme_code = @scheme_code end insert into htcg_scheme_drgs_seq select 
+			group_id,hos_id,copy_code,@seq_max_new,scheme_code,drgs_code from htcg_scheme_drgs 
+			where group_id=@group_id and hos_id=@hos_id and copy_code=@copy_code and 
+			scheme_code = @scheme_code insert into htcg_scheme_path_conf_seq select group_id,hos_id,copy_code,@seq_max_new,scheme_code,mr_group,mr_sample,clp_step,recipe_p_merge,recipe_d_merge,recipe_p_group,recipe_d_group 
+			from htcg_scheme_path_conf where group_id=@group_id and hos_id=@hos_id and 
+			copy_code=@copy_code and scheme_code = @scheme_code insert into htcg_scheme_period_conf_seq 
+			select group_id,hos_id,copy_code,@seq_max_new,scheme_code,month_flag,quarter_flag,half_year_flag,year_flag 
+			from htcg_scheme_period_conf where group_id=@group_id and hos_id=@hos_id 
+			and copy_code=@copy_code and scheme_code = @scheme_code insert into htcg_scheme_icd10_rule_seq 
+			select group_id,hos_id,copy_code,@seq_max_new,scheme_code,drgs_code,icd10_code,icd_rule_code 
+			from htcg_scheme_icd10_rule where group_id=@group_id and hos_id=@hos_id and 
+			copy_code=@copy_code and scheme_code = @scheme_code insert into htcg_scheme_icd9_rule_seq 
+			select group_id,hos_id,copy_code,@seq_max_new,scheme_code,drgs_code,icd9_code,icd_rule_code 
+			from htcg_scheme_icd9_rule where group_id=@group_id and hos_id=@hos_id and 
+			copy_code=@copy_code and scheme_code = @scheme_code insert into htcg_scheme_general_rule_seq 
+			select group_id,hos_id,copy_code,@seq_max_new,scheme_code,drgs_code,general_rule_code 
+			from htcg_scheme_general_rule where group_id=@group_id and hos_id=@hos_id 
+			and copy_code=@copy_code and scheme_code = @scheme_code insert into htcg_scheme_mr_rule_seq 
+			select group_id,hos_id,copy_code,@seq_max_new,scheme_code,drgs_code,mr_rule_code,mr_rule_count 
+			from htcg_scheme_mr_rule where group_id=@group_id and hos_id=@hos_id and 
+			copy_code=@copy_code and scheme_code = @scheme_code insert into htcg_clp_step_rule_seq 
+			select group_id,hos_id,copy_code,@seq_max_new,scheme_code,clp_step_code,beg_date,end_date,place 
+			from htcg_clp_step_rule where group_id=@group_id and hos_id=@hos_id and copy_code=@copy_code 
+			and scheme_code = @scheme_code insert into htcg_scheme_drgs_day_seq select 
+			group_id,hos_id,copy_code,@seq_max_new,scheme_code,drgs_code,drgs_day from 
+			htcg_scheme_drgs_day where group_id=@group_id and hos_id=@hos_id and copy_code=@copy_code 
+			and scheme_code = @scheme_code insert into htcg_scheme_recipe_merge_rule_seq 
+			select group_id,hos_id,copy_code,@seq_max_new,scheme_code,drgs_code,recipe_merge_code 
+			from htcg_scheme_recipe_merge_rule where group_id=@group_id and hos_id=@hos_id 
+			and copy_code=@copy_code and scheme_code = @scheme_code insert into htcg_scheme_similar_treat_seq 
+			select group_id,hos_id,copy_code,@seq_max_new,scheme_code,drgs_code,charge_nature_code,charge_code,similar_code 
+			from htcg_scheme_similar_treat where group_id=@group_id and hos_id=@hos_id 
+			and copy_code=@copy_code and scheme_code = @scheme_code insert into htcg_scheme_recipe_group_rule_seq 
+			select group_id,hos_id,copy_code,@seq_max_new,scheme_code,recipe_group_code,total_percent 
+			from htcg_scheme_recipe_group_rule where group_id=@group_id and hos_id=@hos_id 
+			and copy_code=@copy_code and scheme_code = @scheme_code -->
+
+	</insert>
+
+	<insert id="addHtcgSchemeConfirm" useGeneratedKeys="true">
+		insert into htcg_scheme_confirm
+		(group_id,
+		hos_id,
+		copy_code,
+		scheme_code,
+		is_confirm)
+		values
+		(#{group_id},
+		#{hos_id},
+		#{copy_code},
+		#{scheme_code},
+		#{is_confirm})
+	</insert>
+	<update id="updateHtcgSchemeDrgsCheck" parameterType="java.util.Map">
+		update htcg_scheme_confirm
+		set is_confirm = #{is_confirm}
+		where group_id = #{group_id}
+		and hos_id = #{hos_id}
+		and copy_code = #{copy_code}
+		and scheme_code = #{scheme_code}
+	</update>
+
+	<select id="queryHtcgSchemeConfirmByCode" parameterType="java.util.Map"
+		resultType="java.util.Map">
+		select
+		group_id,
+		hos_id,
+		copy_code,
+		scheme_code,
+		is_confirm
+		from htcg_scheme_confirm
+		where group_id = #{group_id}
+		and hos_id = #{hos_id}
+		and copy_code = #{copy_code}
+		and scheme_code = #{scheme_code}
+		order by group_id,hos_id,copy_code,scheme_code
+	</select>
+
+	<insert id="addHtcgSeqTable" useGeneratedKeys="true">
+		insert into htcg_seq_table
+		(group_id,
+		hos_id,
+		copy_code,
+		scheme_code,
+		scheme_seq_no,
+		scheme_note
+		)
+		values
+		(#{group_id},
+		#{hos_id},
+		#{copy_code},
+		#{scheme_code},
+		#{scheme_seq_no},
+		#{scheme_note})
+
+	</insert>
+	<select id="queryHtcgSeqTableMaxSeqNo" parameterType="java.util.Map"
+		resultType="java.lang.Integer">
+		select nvl(max(scheme_seq_no),0) scheme_seq_no
+		from htcg_seq_table
+		where group_id = #{group_id}
+		and hos_id = #{hos_id}
+		and copy_code = #{copy_code}
+		and scheme_code = #{scheme_code}
+		order by group_id, hos_id, copy_code, scheme_code, scheme_seq_no
+	</select>
+
+	<select id="flagHtcgSchemeDrgsCheckDrgsCheck" resultType="java.util.Map">
+		select
+		(case when (cut=0) then 0 else 1 end) seq_max_flag
+		from (select count(1) cut from htcg_seq_table
+		where group_id = #{group_id}
+		and hos_id = #{hos_id}
+		and copy_code = #{copy_code}
+		and scheme_code = #{scheme_code})
+	</select>
+
+	<insert id="addbatchHtcgSchemeConfirmSeq" parameterType="java.util.Map">
+		declare
+		p_group_id number(18);
+		p_hos_id varchar2(18);
+		p_copy_code varchar2(18);
+		p_scheme_seq_no number(18);
+		p_scheme_code varchar2(120);
+		begin
+		p_group_id := #{group_id};
+		p_hos_id := #{hos_id};
+		p_copy_code := #{copy_code};
+		p_scheme_seq_no := #{scheme_seq_no};
+		p_scheme_code := #{scheme_code};
+
+		delete from htcg_scheme_seq
+		where group_id = p_group_id
+		and hos_id = p_hos_id
+		and copy_code = p_copy_code
+		and scheme_seq_no = p_scheme_seq_no
+		and scheme_code = p_scheme_code;
+
+		insert into htcg_scheme_seq
+		(group_id,
+		hos_id,
+		copy_code,
+		scheme_seq_no,
+		scheme_code,
+		scheme_name,
+		spell_code,
+		wbx_code,
+		scheme_note,
+		is_stop)
+		select group_id,
+		hos_id,
+		copy_code,
+		p_scheme_seq_no,
+		scheme_code,
+		scheme_name,
+		spell_code,
+		wbx_code,
+		scheme_note,
+		is_stop
+		from htcg_scheme
+		where group_id = p_group_id
+		and hos_id = p_hos_id
+		and copy_code = p_copy_code
+		and scheme_code = p_scheme_code;
+
+		delete from htcg_scheme_path_conf_seq
+		where group_id = p_group_id
+		and hos_id = p_hos_id
+		and copy_code = p_copy_code
+		and scheme_seq_no = p_scheme_seq_no
+		and scheme_code = p_scheme_code;
+		insert into htcg_scheme_path_conf_seq
+		(group_id,
+		hos_id,
+		copy_code,
+		scheme_seq_no,
+		scheme_code,
+		mr_group,
+		mr_sample,
+		clp_step,
+		recipe_p_merge,
+		recipe_d_merge,
+		recipe_p_group,
+		recipe_d_group)
+		select group_id,
+		hos_id,
+		copy_code,
+		p_scheme_seq_no,
+		scheme_code,
+		mr_group,
+		mr_sample,
+		clp_step,
+		recipe_p_merge,
+		recipe_d_merge,
+		recipe_p_group,
+		recipe_d_group
+		from htcg_scheme_path_conf
+		where group_id = p_group_id
+		and hos_id = p_hos_id
+		and copy_code = p_copy_code
+		and scheme_code = p_scheme_code;
+
+		delete htcg_scheme_period_conf_seq
+		where group_id = p_group_id
+		and hos_id = p_hos_id
+		and copy_code = p_copy_code
+		and scheme_seq_no = p_scheme_seq_no
+		and scheme_code = p_scheme_code;
+		insert into htcg_scheme_period_conf_seq
+		(group_id,
+		hos_id,
+		copy_code,
+		scheme_seq_no,
+		scheme_code,
+		month_flag,
+		quarter_flag,
+		half_year_flag,
+		year_flag)
+		select group_id,
+		hos_id,
+		copy_code,
+		p_scheme_seq_no,
+		scheme_code,
+		month_flag,
+		quarter_flag,
+		half_year_flag,
+		year_flag
+		from htcg_scheme_period_conf
+		where group_id = p_group_id
+		and hos_id = p_hos_id
+		and copy_code = p_copy_code
+		and scheme_code = p_scheme_code;
+
+		delete htcg_scheme_drgs_seq
+		where group_id = p_group_id
+		and hos_id = p_hos_id
+		and copy_code = p_copy_code
+		and scheme_seq_no = p_scheme_seq_no
+		and scheme_code = p_scheme_code;
+		insert into htcg_scheme_drgs_seq
+		(group_id, hos_id, copy_code, scheme_seq_no, scheme_code, drgs_code)
+		select group_id,
+		hos_id,
+		copy_code,
+		p_scheme_seq_no,
+		scheme_code,
+		drgs_code
+		from htcg_scheme_drgs
+		where group_id = p_group_id
+		and hos_id = p_hos_id
+		and copy_code = p_copy_code
+		and scheme_code = p_scheme_code;
+
+		delete htcg_scheme_icd10_rule_seq
+		where group_id = p_group_id
+		and hos_id = p_hos_id
+		and copy_code = p_copy_code
+		and scheme_seq_no = p_scheme_seq_no
+		and scheme_code = p_scheme_code;
+		insert into htcg_scheme_icd10_rule_seq
+		(group_id,
+		hos_id,
+		copy_code,
+		scheme_seq_no,
+		scheme_code,
+		drgs_code,
+		icd10_code,
+		icd_rule_code)
+		select group_id,
+		hos_id,
+		copy_code,
+		p_scheme_seq_no,
+		scheme_code,
+		drgs_code,
+		icd10_code,
+		icd_rule_code
+		from htcg_scheme_icd10_rule
+		where group_id = p_group_id
+		and hos_id = p_hos_id
+		and copy_code = p_copy_code
+		and scheme_code = p_scheme_code;
+
+		delete htcg_scheme_icd9_rule_seq
+		where group_id = p_group_id
+		and hos_id = p_hos_id
+		and copy_code = p_copy_code
+		and scheme_seq_no = p_scheme_seq_no
+		and scheme_code = p_scheme_code;
+
+		insert into htcg_scheme_icd9_rule_seq
+		(group_id,
+		hos_id,
+		copy_code,
+		scheme_seq_no,
+		scheme_code,
+		drgs_code,
+		icd9_code,
+		icd_rule_code)
+		select group_id,
+		hos_id,
+		copy_code,
+		p_scheme_seq_no,
+		scheme_code,
+		drgs_code,
+		icd9_code,
+		icd_rule_code
+		from htcg_scheme_icd9_rule
+		where group_id = p_group_id
+		and hos_id = p_hos_id
+		and copy_code = p_copy_code
+		and scheme_code = p_scheme_code;
+
+		delete htcg_scheme_general_reuls
+		where group_id = p_group_id
+		and hos_id = p_hos_id
+		and copy_code = p_copy_code
+		and scheme_seq_no = p_scheme_seq_no
+		and scheme_code = p_scheme_code;
+		insert into htcg_scheme_general_reuls 
+		(group_id,
+		hos_id,
+		copy_code,
+		scheme_seq_no,
+		scheme_code,
+		drgs_code,
+		general_rule_code)
+		select group_id,
+		hos_id,
+		copy_code,
+		p_scheme_seq_no,
+		scheme_code,
+		drgs_code,
+		general_rule_code
+		from htcg_scheme_general_rule
+		where group_id = p_group_id
+		and hos_id = p_hos_id
+		and copy_code = p_copy_code
+		and scheme_code = p_scheme_code;
+
+		delete htcg_scheme_mr_rule_seq
+		where group_id = p_group_id
+		and hos_id = p_hos_id
+		and copy_code = p_copy_code
+		and scheme_seq_no = p_scheme_seq_no
+		and scheme_code = p_scheme_code;
+
+		insert into htcg_scheme_mr_rule_seq
+		(group_id,
+		hos_id,
+		copy_code,
+		scheme_seq_no,
+		scheme_code,
+		drgs_code,
+		mr_rule_code,
+		mr_rule_count)
+		select group_id,
+		hos_id,
+		copy_code,
+		p_scheme_seq_no,
+		scheme_code,
+		drgs_code,
+		mr_rule_code,
+		mr_rule_count
+		from htcg_scheme_mr_rule
+		where group_id = p_group_id
+		and hos_id = p_hos_id
+		and copy_code = p_copy_code
+		and scheme_code = p_scheme_code;
+
+		delete htcg_clp_step_rule_seq
+		where group_id = p_group_id
+		and hos_id = p_hos_id
+		and copy_code = p_copy_code
+		and scheme_seq_no = p_scheme_seq_no
+		and scheme_code = p_scheme_code;
+		insert into htcg_clp_step_rule_seq
+		(group_id,
+		hos_id,
+		copy_code,
+		scheme_seq_no,
+		scheme_code,
+		clp_step_code,
+		beg_date,
+		end_date,
+		place)
+		select group_id,
+		hos_id,
+		copy_code,
+		p_scheme_seq_no,
+		scheme_code,
+		clp_step_code,
+		beg_date,
+		end_date,
+		place
+		from htcg_clp_step_rule
+		where group_id = p_group_id
+		and hos_id = p_hos_id
+		and copy_code = p_copy_code
+		and scheme_code = p_scheme_code;
+
+		delete htcg_scheme_drgs_day_seq
+		where group_id = p_group_id
+		and hos_id = p_hos_id
+		and copy_code = p_copy_code
+		and scheme_seq_no = p_scheme_seq_no
+		and scheme_code = p_scheme_code;
+		insert into htcg_scheme_drgs_day_seq
+		(group_id,
+		hos_id,
+		copy_code,
+		scheme_seq_no,
+		scheme_code,
+		drgs_code,
+		drgs_day)
+		select group_id,
+		hos_id,
+		copy_code,
+		p_scheme_seq_no,
+		scheme_code,
+		drgs_code,
+		drgs_day
+		from htcg_scheme_drgs_day
+		where group_id = p_group_id
+		and hos_id = p_hos_id
+		and copy_code = p_copy_code
+		and scheme_code = p_scheme_code;
+
+		delete htcg_scheme_recipe_merge_rules
+		where group_id = p_group_id
+		and hos_id = p_hos_id
+		and copy_code = p_copy_code
+		and scheme_seq_no = p_scheme_seq_no
+		and scheme_code = p_scheme_code;
+		insert into htcg_scheme_recipe_merge_rules
+		(group_id,
+		hos_id,
+		copy_code,
+		scheme_seq_no,
+		scheme_code,
+		drgs_code,
+		recipe_merge_code)
+		select group_id,
+		hos_id,
+		copy_code,
+		p_scheme_seq_no,
+		scheme_code,
+		drgs_code,
+		recipe_merge_code
+		from htcg_scheme_recipe_merge_rule
+		where group_id = p_group_id
+		and hos_id = p_hos_id
+		and copy_code = p_copy_code
+		and scheme_code = p_scheme_code;
+
+		delete htcg_scheme_similar_treats
+		where group_id = p_group_id
+		and hos_id = p_hos_id
+		and copy_code = p_copy_code
+		and scheme_seq_no = p_scheme_seq_no
+		and scheme_code = p_scheme_code;
+		insert into htcg_scheme_similar_treats
+		(group_id,
+		hos_id,
+		copy_code,
+		scheme_seq_no,
+		scheme_code,
+		drgs_code,
+		charge_nature_code,
+		charge_code,
+		similar_code)
+		select group_id,
+		hos_id,
+		copy_code,
+		p_scheme_seq_no,
+		scheme_code,
+		drgs_code,
+		charge_nature_code,
+		charge_code,
+		similar_code
+		from htcg_scheme_similar_treat
+		where group_id = p_group_id
+		and hos_id = p_hos_id
+		and copy_code = p_copy_code
+		and scheme_code = p_scheme_code;
+		delete htcg_scheme_recipe_group_rules
+		where group_id = p_group_id
+		and hos_id = p_hos_id
+		and copy_code = p_copy_code
+		and scheme_seq_no = p_scheme_seq_no
+		and scheme_code = p_scheme_code;
+		insert into htcg_scheme_recipe_group_rules
+		(group_id,
+		hos_id,
+		copy_code,
+		scheme_seq_no,
+		scheme_code,
+		recipe_group_code,
+		total_percent)
+		select group_id,
+		hos_id,
+		copy_code,
+		p_scheme_seq_no,
+		scheme_code,
+		recipe_group_code,
+		total_percent
+		from htcg_scheme_recipe_group_rule
+		where group_id = p_group_id
+		and hos_id = p_hos_id
+		and copy_code = p_copy_code
+		and scheme_code = p_scheme_code;
+
+		end;
+	   <!-- SELECT * FROM HTCG_SCHEME_CONFIRM;
+		    SELECT * FROM HTCG_SEQ_TABLE;
+		    SELECT * FROM HTCG_SCHEME_SEQ;
+		    SELECT * FROM HTCG_SCHEME_PATH_CONF_SEQ;
+		    SELECT * FROM HTCG_SCHEME_PERIOD_CONF_SEQ;
+		    SELECT * FROM HTCG_SCHEME_DRGS_SEQ;
+		    SELECT * FROM HTCG_SCHEME_ICD10_RULE_SEQ;
+		    SELECT * FROM HTCG_SCHEME_ICD9_RULE_SEQ; 
+			SELECT * FROM HTCG_SCHEME_GENERAL_REUL_SEQ;
+		    SELECT * FROM HTCG_SCHEME_MR_RULE_SEQ; 
+			SELECT * FROM HTCG_CLP_STEP_RULE_SEQ;
+		    SELECT * FROM HTCG_SCHEME_DRGS_DAY_SEQ; 
+			SELECT * FROM HTCG_SCHEME_RECIPE_MERGE_RULES;
+			SELECT * FROM HTCG_SCHEME_SIMILAR_TREATS; 
+			SELECT * FROM HTCG_SCHEME_RECIPE_GROUP_RULES; -->
+	</insert>
+	
+	<select id="querySchemeDrgsCheckReport" resultMap="schemeDrgsCheck"
+		parameterType="java.util.Map">
+		select
+		hsd.group_id,
+		hsd.hos_id,
+		hsd.copy_code,
+		hsd.scheme_code,
+		hs.scheme_name,
+		hsd.drgs_code,
+		hd.drgs_name,
+		htcg_get_rule_name(hsd.group_id, hsd.hos_id, hsd.copy_code, hsd.scheme_code, hsd.drgs_code) as
+		icd_rule_name,
+		hsmr.mr_rule_code,
+		hmrd.mr_rule_name,
+		hsdd.drgs_day,
+		hsrmr.recipe_merge_code,
+		hrmrd.recipe_merge_name,
+		hsrgr.recipe_group_code,
+		hrgrd.recipe_group_name
+		from htcg_scheme_drgs hsd
+		left join htcg_scheme hs
+		on hsd.group_id = hs.group_id
+		and hsd.hos_id = hs.hos_id
+		and hsd.copy_code = hs.copy_code
+		and hsd.scheme_code = hs.scheme_code
+		left join htcg_drgs hd
+		on hsd.group_id = hd.group_id
+		and hsd.hos_id = hd.hos_id
+		and hsd.copy_code = hd.copy_code
+		and hsd.drgs_code = hd.drgs_code
+		left join htcg_scheme_mr_rule hsmr
+		on hsd.group_id = hsmr.group_id
+		and hsd.hos_id = hsmr.hos_id
+		and hsd.copy_code = hsmr.copy_code
+		and hsd.scheme_code = hsmr.scheme_code
+		and hsd.drgs_code = hsmr.drgs_code
+		left join htcg_mr_rule_dict hmrd
+		on hsmr.mr_rule_code = hmrd.mr_rule_code
+		left join htcg_scheme_drgs_day hsdd
+		on hsd.group_id = hsdd.group_id
+		and hsd.hos_id = hsdd.hos_id
+		and hsd.copy_code = hsdd.copy_code
+		and hsd.scheme_code = hsdd.scheme_code
+		and hsd.drgs_code = hsdd.drgs_code
+		left join htcg_scheme_recipe_merge_rule hsrmr
+		on hsd.group_id = hsrmr.group_id
+		and hsd.hos_id = hsrmr.hos_id
+		and hsd.copy_code = hsrmr.copy_code
+		and hsd.scheme_code = hsrmr.scheme_code
+		and hsd.drgs_code = hsrmr.drgs_code
+		left join htcg_recipe_merge_rule_dict hrmrd
+		on hsrmr.recipe_merge_code = hrmrd.recipe_merge_code
+		left join htcg_scheme_recipe_group_rule hsrgr
+		on hsd.group_id = hsrgr.group_id
+		and hsd.hos_id = hsrgr.hos_id
+		and hsd.copy_code = hsrgr.copy_code
+		and hsd.scheme_code = hsrgr.scheme_code
+		left join htcg_recipe_group_rule_dict hrgrd
+		on hsrgr.recipe_group_code = hrgrd.recipe_group_code
+		<where>
+			hsd.group_id = #{group_id}
+			and hsd.hos_id = #{hos_id}
+			and hsd.copy_code = #{copy_code}
+			<if test="scheme_code != null and scheme_code != ''">
+				and hsd.scheme_code = #{scheme_code}
+			</if>
+		</where>
+		order by hsd.group_id,hsd.hos_id,hsd.copy_code,hsd.scheme_code,hsd.drgs_code
+	</select>
+</mapper>
+	

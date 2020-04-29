@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.hip.dao.HipDataJobMapper">
+	
+	<resultMap id="BaseResultMap" type="com.chd.hrp.hip.entity.HipDataJob">
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="mod_code" column="mod_code"/>
+		<result property="id" column="id"/>
+		<result property="job_code" column="job_code"/>
+		<result property="name" column="name"/>
+		<result property="cron" column="cron"/>
+		<result property="state" column="state"/>
+		<result property="period" column="period"/>
+		<result property="ptype" column="ptype"/>
+		<result property="type_id" column="type_id"/>
+		<result property="type_name" column="type_name"/>
+		<result property="note" column="note"/>
+		<result property="is_stop" column="is_stop"/>
+	</resultMap>
+
+	<select id="queryDataJobByPage" parameterType="java.util.Map" resultMap="BaseResultMap">
+				
+		select j.id,j.job_code,j.name,j.cron,j.state,j.period,j.ptype,j.type_id,t.type_name,j.note,j.group_id,j.hos_id 
+		 from hip_data_job j left join hip_data_type t on j.group_id=t.group_id and j.hos_id=t.hos_id and j.type_id=t.type_id
+		where j.group_id=#{group_id} and j.hos_id=#{hos_id} and j.mod_code=#{mod_code}
+		<if test="name != null and name != ''">
+			and j.name like '%${name}%'
+		</if>		
+		<if test="state != null and state != ''">
+			and j.state=#{state}
+		</if>
+		order by j.job_code
+	</select>
+	
+	<select id="queryByCode" parameterType="java.util.Map" resultMap="BaseResultMap">	
+		select hdj.id,hdj.job_code,hdj.name,hdj.cron,hdj.state,hdj.period,hdj.type_id,hdj.ptype,hdt.type_code||' '||hdt.type_name type_name,hdj.note,hdt.is_stop 
+		from HIP_DATA_JOB hdj
+		left join hip_data_type hdt 
+			on hdj.type_id=hdt.type_id 
+			and hdj.group_id=hdt.group_id
+			and hdj.hos_id=hdt.hos_id
+			and hdj.mod_code=hdt.mod_code
+		<where>
+			 hdj.id=#{id} 
+			 and hdj.group_id=#{group_id} 
+			 and hdj.hos_id=#{hos_id} 
+			 and hdj.mod_code=#{mod_code}
+		</where>
+			
+	</select>
+	
+
+	
+	
+	<select id="queryDataType" parameterType="java.util.Map" resultType="java.util.Map">
+				
+		select a.type_id as id,a.type_code||' '||a.type_name as text 
+		  from hip_data_type a		
+		where a.group_id=#{group_id} and a.hos_id=#{hos_id}
+		<if test="mod_code != null and mod_code != ''">
+			and a.mod_code=#{mod_code}
+		</if>
+		<if test="is_stop != null and is_stop != ''">
+			and a.is_stop=0
+		</if>
+		order by a.type_code
+			
+	</select>
+	<select id="queryDataJob" parameterType="java.util.Map" resultMap="BaseResultMap">
+		select 
+			id,job_code,group_id,hos_id,name,cron,
+			type_id,state,period,ptype,note,mod_code
+		 from HIP_DATA_JOB	
+		where type_id in(
+			select type_id from hip_data_type where is_stop=0
+		)
+		<if test="state!= null and state != ''">
+			and state=#{state}
+		</if>
+	</select>
+	<select id="queryMaxId" parameterType="java.util.Map" resultType="java.lang.Integer">
+				
+		select nvl(max(id),0) from hip_data_job a		
+		where a.group_id=#{group_id} and a.hos_id=#{hos_id} and mod_code=#{mod_code}
+			
+	</select>
+	<select id="queryByUniqueness" parameterType="java.util.Map" resultMap="BaseResultMap">
+				
+		select id,name,job_code from hip_data_job a		
+		where a.group_id=#{group_id} and a.hos_id=#{hos_id} and job_code=#{job_code}
+		<if test="id != null and id != ''">
+			and id != #{id}
+		</if>
+	</select>
+
+	
+	<insert id="addDataJob" parameterType="java.util.Map" >
+		INSERT INTO HIP_DATA_JOB (
+			ID,JOB_CODE,GROUP_ID,HOS_ID,NAME,CRON,TYPE_ID,STATE,PERIOD,PTYPE,NOTE,MOD_CODE
+		) VALUES (
+			#{id},
+			#{job_code},
+			#{group_id},
+			#{hos_id}, 
+			#{name},
+			#{cron},
+			#{type_id},
+			#{state},
+			#{period},
+			#{ptype},
+			#{note},
+			#{mod_code}
+		)
+	
+	</insert>
+	
+	
+	<update id="updateJob" parameterType="java.util.Map">	
+		UPDATE HIP_DATA_JOB 
+		<set>
+			<if test="state != null">
+				state = #{state},
+			</if>
+			<if test="type_id != null">
+				type_id = #{type_id},
+			</if>
+			<if test="name != null and name != ''">
+				name = #{name},
+			</if>
+			<if test="job_code != null and job_code != ''">
+				job_code = #{job_code},
+			</if>
+			<if test="cron != null and cron != ''">
+				cron = #{cron},
+			</if>
+			<if test="note != null and note != ''">
+				note = #{note},
+			</if>
+			<if test="period != null and period != ''">
+				period = #{period},
+			</if>
+			<if test="ptype != null and ptype != ''">
+				ptype = #{ptype},
+			</if>
+		</set>
+		<where>                     
+			 group_id=#{group_id} 
+			 and hos_id=#{hos_id} 
+			 and mod_code=#{mod_code}
+			 and id = #{id} 
+		</where>  
+	</update>
+	<delete id="deleteDataJob" parameterType="java.util.List">
+		DELETE FROM HIP_DATA_JOB 
+		<where>
+			<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+				id = #{item.id}
+				group_id = #{item.group_id}
+				hos_id = #{item.hos_id}
+			</foreach>
+	    </where>  
+	</delete>
+	
+</mapper>
+

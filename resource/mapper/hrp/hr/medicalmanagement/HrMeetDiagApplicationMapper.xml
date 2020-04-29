@@ -1,0 +1,395 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.hr.dao.medicalmanagement.HrMeetDiagApplicationMapper">
+	<resultMap id="hrMeetDiagApplication" type="com.chd.hrp.hr.entity.medicalmanagement.HrMeetDiagApplication">
+	<result property="group_id" column="group_id"/>
+	<result property="hos_id" column="hos_id"/>
+	<result property="bill_no" column="bill_no"/>
+	<result property="app_date" column="app_date"/>
+	<result property="dept_id" column="dept_id"/>
+	<result property="dept_name" column="dept_name"/>
+	<result property="case_no" column="case_no"/>
+	<result property="patient" column="patient"/>
+	<result property="bed_no" column="bed_no"/>
+	<result property="diagnose" column="diagnose"/>
+	<result property="reason" column="reason"/>
+	<result property="is_commit" column="is_commit"/>
+	<result property="commit_name" column="commit_name"/>
+	</resultMap>
+
+
+
+	<insert id="add" useGeneratedKeys="true" >
+	
+		INSERT INTO HR_MEET_DIAG_APP (
+		<trim suffix="" suffixOverrides=",">
+		group_id,
+		hos_id,
+		bill_no,
+		case_no,
+		dept_id,
+		patient,
+		bed_no,
+		app_date,
+		diagnose,
+		reason,
+		is_commit,
+		</trim>
+		) VALUES (
+		<trim suffix="" suffixOverrides=",">
+		#{group_id,jdbcType=INTEGER},
+		#{hos_id,jdbcType=INTEGER},
+		#{bill_no,jdbcType=VARCHAR},
+		#{case_no,jdbcType=VARCHAR},
+		#{dept_id,jdbcType=INTEGER},
+		#{patient,jdbcType=VARCHAR},
+		#{bed_no,jdbcType=VARCHAR},
+		to_date(#{app_date},'YYYY/MM/DD'),
+	   #{diagnose,jdbcType=VARCHAR},
+		#{reason,jdbcType=VARCHAR},
+		#{is_commit,jdbcType=INTEGER},
+		</trim>		
+		)
+	
+	</insert>
+	
+	<select id="query" parameterType="java.util.Map" resultMap="hrMeetDiagApplication" >
+	SELECT 
+    het.group_id,
+    het.hos_id,
+    het.bill_no,
+    het.case_no,
+    het.patient,
+    het.bed_no,
+    het.app_date,
+    het.dept_id,
+    hd.dept_name,
+    het.diagnose,
+    het.reason,
+    het.is_commit,
+    case when het.is_commit = 0 then '新建' when het.is_commit = 1
+    then '已提交' <!-- when het.is_commit = 2
+    then '已审核' -->  else '' end commit_name 
+    FROM HR_MEET_DIAG_APP het 
+    left join hos_dept hd on het.dept_id=hd.dept_id and het.group_id=hd.group_id and het.hos_id=hd.hos_id
+		<where>                     
+		AND het.group_id = #{group_id,jdbcType=INTEGER}
+		AND het.hos_id = #{hos_id,jdbcType=INTEGER}
+		<if test="dept_id != null and dept_id != ''">
+		AND het.dept_id = #{dept_id,jdbcType=INTEGER}
+		</if>
+		<if test="bill_no != null and bill_no != ''">
+		AND het.bill_no like '%${bill_no}%'
+		</if>
+		<if test="case_no != null and case_no != ''">
+		AND het.case_no like '%${case_no}%'
+		</if>
+		<if test="patient != null and patient != ''">
+		AND het.patient like '%${patient}%'
+		</if>
+		<if test="bed_no != null and bed_no != ''">
+		AND het.bed_no like '%${case_no}%'
+		</if>
+		<if test="apply_date != null and apply_date != ''">
+		AND het.app_date &gt;= to_date(#{apply_date},'YYYY-MM-DD')
+		</if>
+		<if test="end_date != null and end_date != ''">
+		AND het.app_date &lt;= to_date(#{end_date},'YYYY-MM-DD')
+		</if>
+		<if test="diagnose != null and diagnose != ''">
+		AND het.diagnose = #{diagnose,jdbcType=DATE}
+		</if>
+		<if test="reason != null and reason != ''">
+		AND het.reason = #{reason,jdbcType=INTEGER}
+		</if>
+		<if test="state != null and state != ''">
+		AND het.is_commit = #{state,jdbcType=INTEGER}
+		</if>
+		
+		</where>   
+		order by het.bill_no asc
+	</select>
+	
+	<select id="queryByCodeExec" resultMap="hrMeetDiagApplication"  parameterType="java.util.Map" >
+	
+		SELECT 
+		het.group_id,
+		het.hos_id,
+		het.bill_no,
+		het.emp_id,
+		he.emp_name,
+		het.case_no,
+		het.patient,
+		het.bed_no,
+		het.app_date,
+		het.diagnose,
+		het.reason,
+		het.is_commit,
+		het.note
+		FROM HR_MEET_DIAG_APP het left join hos_emp he on het.emp_id=he.emp_id 
+		and het.group_id=he.group_id and het.hos_id=he.hos_id
+		WHERE 
+		het.group_id = #{group_id,jdbcType=INTEGER}   and 
+		het.hos_id = #{hos_id,jdbcType=INTEGER}   and 
+		het.bill_no = #{bill_no,jdbcType=VARCHAR}   and 
+		het.emp_id = #{emp_id,jdbcType=INTEGER}   and 
+		het.case_no = #{case_no,jdbcType=VARCHAR} 
+	
+	</select>
+	
+<select id="queryHistroy" resultMap="hrMeetDiagApplication"  parameterType="java.util.Map">
+
+select hed.bill_no,hed.app_date,hed.diagnose from  HR_MEET_DIAG_APP hed
+where 
+	hed.group_id = #{group_id,jdbcType=INTEGER}   and 
+	hed.hos_id = #{hos_id,jdbcType=INTEGER}   and 
+hed.dept_id=#{dept_id,jdbcType=INTEGER} 
+and hed.case_no=#{case_no,jdbcType=VARCHAR} 
+</select>
+<!--提交全院大会诊申请 -->
+	<update id="confirmHrMeetDiag" parameterType="java.util.Map">
+		
+			UPDATE HR_MEET_DIAG_APP
+			<trim prefix="SET" suffixOverrides=",">
+
+				is_commit = #{is_commit,jdbcType=INTEGER}
+			</trim>
+			<where>
+				AND group_id = #{group_id,jdbcType=INTEGER}
+				AND hos_id = #{hos_id,jdbcType=INTEGER}
+				AND bill_no = #{bill_no,jdbcType=VARCHAR}
+				AND dept_id = #{dept_id,jdbcType=INTEGER}
+				AND case_no = #{case_no,jdbcType=VARCHAR}
+				AND app_date = #{app_date,jdbcType=DATE}
+			</where>
+	
+	</update>
+	<!--撤销全院大会诊申请 -->
+	<update id="reConfirmHrHrMeetDiag" parameterType="java.util.Map">
+		
+			UPDATE HR_MEET_DIAG_APP
+			<trim prefix="SET" suffixOverrides=",">
+
+				is_commit = #{is_commit,jdbcType=INTEGER}
+			</trim>
+			<where>
+				AND group_id = #{group_id,jdbcType=INTEGER}
+				AND hos_id = #{hos_id,jdbcType=INTEGER}
+				AND bill_no = #{bill_no,jdbcType=VARCHAR}
+				AND dept_id = #{dept_id,jdbcType=INTEGER}
+				AND case_no = #{case_no,jdbcType=VARCHAR}
+				AND app_date = #{app_date,jdbcType=DATE}
+			</where>
+		
+	
+	</update>
+	<!--审核 -->
+	<update id="auditHrMeetDiag" parameterType="java.util.Map">
+		
+			UPDATE HR_MEET_DIAG_APP
+			<trim prefix="SET" suffixOverrides=",">
+
+				is_commit = #{is_commit,jdbcType=INTEGER}
+			</trim>
+			<where>
+				AND group_id = #{group_id,jdbcType=INTEGER}
+				AND hos_id = #{hos_id,jdbcType=INTEGER}
+				AND bill_no = #{bill_no,jdbcType=VARCHAR}
+				AND dept_id = #{dept_id,jdbcType=INTEGER}
+				AND case_no = #{case_no,jdbcType=VARCHAR}
+				AND app_date = #{app_date,jdbcType=DATE}
+			</where>
+	
+	</update>
+	<!--销审 -->
+	<update id="unauditHrHrMeetDiag" parameterType="java.util.Map">
+		
+			UPDATE HR_MEET_DIAG_APP
+			<trim prefix="SET" suffixOverrides=",">
+
+				is_commit = #{is_commit,jdbcType=INTEGER}
+			</trim>
+			<where>
+				AND group_id = #{group_id,jdbcType=INTEGER}
+				AND hos_id = #{hos_id,jdbcType=INTEGER}
+				AND bill_no = #{bill_no,jdbcType=VARCHAR}
+				AND dept_id = #{dept_id,jdbcType=INTEGER}
+				AND case_no = #{case_no,jdbcType=VARCHAR}
+				AND app_date = #{app_date,jdbcType=DATE}
+			</where>
+		
+	
+	</update>
+	<!--未通过 -->
+	<update id="dispassHrHrMeetDiag" parameterType="java.util.Map">
+		
+			UPDATE HR_MEET_DIAG_APP
+			<trim prefix="SET" suffixOverrides=",">
+
+				is_commit = #{is_commit,jdbcType=INTEGER}
+			</trim>
+			<where>
+				AND group_id = #{group_id,jdbcType=INTEGER}
+				AND hos_id = #{hos_id,jdbcType=INTEGER}
+				AND bill_no = #{bill_no,jdbcType=VARCHAR}
+				AND dept_id = #{dept_id,jdbcType=INTEGER}
+				AND case_no = #{case_no,jdbcType=VARCHAR}
+				AND app_date = #{app_date,jdbcType=DATE}
+			</where>
+	
+	</update>
+	
+		<select id="queryByCode" resultMap="hrMeetDiagApplication"  parameterType="java.util.Map" >
+	
+		SELECT 
+		het.group_id,
+		het.hos_id,
+		het.bill_no,
+		het.dept_id,
+		hd.dept_name,
+		het.case_no,
+		het.patient,
+		het.bed_no,
+		het.app_date,
+		het.diagnose,
+		het.reason,
+		het.is_commit
+		FROM HR_MEET_DIAG_APP het 
+	 left join hos_dept hd on het.dept_id=hd.dept_id and het.group_id=hd.group_id and het.hos_id=hd.hos_id
+		WHERE 
+		het.group_id = #{group_id,jdbcType=INTEGER}   and 
+		het.hos_id = #{hos_id,jdbcType=INTEGER}   and 
+		het.bill_no = #{bill_no,jdbcType=VARCHAR}  
+	
+	</select>
+  <select id="queryByCodeAdd" resultMap="hrMeetDiagApplication"  parameterType="java.util.Map" >
+	
+	SELECT 
+		het.group_id,
+		het.hos_id,
+		het.bill_no,
+		het.case_no,
+		het.patient,
+		het.bed_no,
+		het.app_date,
+		het.diagnose,
+		het.dept_id,
+		het.reason,
+		het.is_commit
+		FROM HR_MEET_DIAG_APP het
+		WHERE 
+		het.group_id = #{group_id,jdbcType=INTEGER}   and 
+		het.hos_id = #{hos_id,jdbcType=INTEGER}   and 
+		het.bill_no = #{bill_no,jdbcType=VARCHAR}  
+	
+	</select>
+	<delete id="deleteMeetDiagApplication" parameterType="java.util.List">
+		DELETE FROM HR_MEET_DIAG_APP 
+		<where>
+				<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+				 group_id = #{map.group_id,jdbcType=INTEGER}
+				AND hos_id = #{map.hos_id,jdbcType=INTEGER}
+				<if test="item.bill_no != null and item.bill_no != ''">
+				AND bill_no = #{item.bill_no,jdbcType=VARCHAR}
+				</if>
+				<if test="item.dept_id != null and item.dept_id != ''">
+				AND dept_id = #{item.dept_id,jdbcType=INTEGER}
+				</if>
+				<if test="item.case_no != null and item.case_no != ''">
+				AND case_no = #{item.case_no,jdbcType=VARCHAR}
+				</if>
+				<if test="item.app_date != null and item.app_date != ''">
+				AND app_date = #{item.app_date,jdbcType=DATE}
+				</if>
+			</foreach>
+	    </where>  
+	</delete>
+	
+		<update id="update" parameterType="java.util.Map">
+	
+		UPDATE HR_MEET_DIAG_APP 
+		<trim prefix="SET"  suffixOverrides=","> 
+		patient = #{patient,jdbcType=VARCHAR},
+		bed_no = #{bed_no,jdbcType=VARCHAR},
+		diagnose = #{diagnose,jdbcType=DATE},
+		reason = #{reason,jdbcType=INTEGER},
+		</trim>
+		<where>                     
+		AND group_id = #{group_id,jdbcType=INTEGER}
+		AND hos_id = #{hos_id,jdbcType=INTEGER}
+		AND bill_no = #{bill_no,jdbcType=VARCHAR}
+		AND dept_id = #{dept_id,jdbcType=INTEGER}
+		AND case_no = #{case_no,jdbcType=VARCHAR}
+		AND app_date = to_date(#{app_date},'YYYY-MM-DD')
+		</where>  
+	</update>
+	<update id="updateCaseNuM"  parameterType="java.util.Map">
+	
+		UPDATE HR_MEET_DIAG_APP 
+		<trim prefix="SET"  suffixOverrides=","> 
+		reason = #{reason,jdbcType=INTEGER},
+		</trim>
+		<where>                     
+		AND group_id = #{group_id,jdbcType=INTEGER}
+		AND hos_id = #{hos_id,jdbcType=INTEGER}
+		AND bill_no = #{bill_no,jdbcType=VARCHAR}
+		AND emp_id = #{emp_id,jdbcType=INTEGER}
+		AND case_no = #{case_no,jdbcType=VARCHAR}
+		</where>  </update>
+			<select id="queryMeetDiagAppByPrint" parameterType="java.util.Map" resultType="java.util.Map">
+	SELECT 
+    het.group_id,
+    het.hos_id,
+    het.bill_no,
+    het.case_no,
+    het.patient,
+    het.bed_no,
+    het.app_date,
+    het.dept_id,
+    hd.dept_name,
+    het.diagnose,
+    het.reason,
+    het.is_commit,
+    case when het.is_commit = 0 then '新建' when het.is_commit = 1
+    then '已提交' <!-- when het.is_commit = 2
+    then '已审核' -->  else '' end commit_name 
+    FROM HR_MEET_DIAG_APP het 
+    left join hos_dept hd on het.dept_id=hd.dept_id and het.group_id=hd.group_id and het.hos_id=hd.hos_id
+		<where>                     
+		AND het.group_id = #{group_id,jdbcType=INTEGER}
+		AND het.hos_id = #{hos_id,jdbcType=INTEGER}
+		<if test="dept_id != null and dept_id != ''">
+		AND het.dept_id = #{dept_id,jdbcType=INTEGER}
+		</if>
+		<if test="bill_no != null and bill_no != ''">
+		AND het.bill_no like '%${bill_no}%'
+		</if>
+		<if test="case_no != null and case_no != ''">
+		AND het.case_no like '%${case_no}%'
+		</if>
+		<if test="patient != null and patient != ''">
+		AND het.patient like '%${case_no}%'
+		</if>
+		<if test="bed_no != null and bed_no != ''">
+		AND het.bed_no like '%${case_no}%'
+		</if>
+		<if test="apply_date != null and apply_date != ''">
+		AND het.app_date &gt;= to_date(#{apply_date},'YYYY-MM-DD')
+		</if>
+		<if test="end_date != null and end_date != ''">
+		AND het.app_date &lt;= to_date(#{end_date},'YYYY-MM-DD')
+		</if>
+		<if test="diagnose != null and diagnose != ''">
+		AND het.diagnose = #{diagnose,jdbcType=DATE}
+		</if>
+		<if test="reason != null and reason != ''">
+		AND het.reason = #{reason,jdbcType=INTEGER}
+		</if>
+		<if test="is_commit != null and is_commit != ''">
+		AND het.is_commit = #{is_commit,jdbcType=INTEGER}
+		</if>
+		
+		</where>   
+		order by het.group_id asc
+		</select>
+</mapper>

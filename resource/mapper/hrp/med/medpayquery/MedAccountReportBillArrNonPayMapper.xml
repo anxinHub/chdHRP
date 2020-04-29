@@ -1,0 +1,432 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.chd.hrp.med.dao.medpayquery.MedAccountReportBillArrNonPayMapper">
+	<resultMap id="medAccountReportBillArrNonPayMap" type="java.util.Map" >
+		<result property="group_id" column="group_id"/>
+		<result property="hos_id" column="hos_id"/>
+		<result property="copy_code" column="copy_code"/>
+		<result property="bill_id" column="bill_id"/>
+		<result property="bill_no" column="bill_no"/>
+		<result property="bill_date" column="bill_date"/>
+		<result property="sup_id" column="sup_id"/>
+		<result property="sup_name" column="sup_name"/>
+		<result property="emp_name" column="emp_name"/>
+		<result property="store_name" column="store_name"/>
+		<result property="bill_money" column="bill_money"/><!-- 发票金额:来源发票明细 -->
+		<result property="payable_money" column="payable_money"/><!-- 应付金额:来源发票明细 -->
+		<result property="coupon_money" column="coupon_money"/><!-- 优惠金额=发票金额-应付金额 -->
+		<result property="payed_money" column="payed_money"/><!-- 已付金额:来源付款明细  -->
+		<result property="nopay_money" column="nopay_money"/><!-- 未付金额=应付金额-已付金额 -->
+	</resultMap>
+	
+	<!-- 票到款未付明细表 查询 -->
+	<select id="queryMedAccountReportBillArrNonPay" resultMap="medAccountReportBillArrNonPayMap">
+		with a_table as(
+		     SELECT
+		        temp.group_id,temp.hos_id,temp.copy_code,temp.bill_id,temp.bill_no,temp.bill_date,
+		        temp.sup_id,temp.sup_name,temp.emp_name,temp.store_name,
+		        temp.bill_money,<!-- 发票金额:来源发票明细 -->
+		        nvl(temp.payable_money,0) as payable_money,<!-- 应付金额:来源发票明细 -->
+		        nvl(temp.coupon_money,0) as coupon_money,<!-- 优惠金额=发票金额-应付金额 -->
+		        nvl(temp2.payed_money,0) as payed_money,<!-- 已付金额=付款表付款金额+入库预付  -->
+		        nvl(temp.payable_money,0)-nvl(temp2.payed_money,0) as nopay_money<!-- 未付金额=应付金额-已付金额 -->
+		    FROM (
+		         <!-- 查询发票明细 -->
+		         SELECT 
+		            mbd.group_id, mbd.hos_id, mbd.copy_code, mbd.bill_id, mbd.bill_no,mbm.bill_date, 
+		            mim.sup_id, hsd.sup_name, hed.emp_name, hsdd.store_name,SUM(nvl(mbd.bill_money, 0)) AS bill_money, 
+		            SUM(nvl(mbd.payable_money, 0)) AS payable_money,
+		            SUM(nvl(mbd.bill_money, 0))-SUM(nvl(mbd.payable_money, 0)) AS coupon_money
+		         FROM MED_BILL_MAIN mbm
+		         LEFT JOIN MED_BILL_DETAIL mbd 
+		         ON 
+		         	mbm.group_id = #{group_id}
+		            AND mbm.hos_id = #{hos_id}
+		            AND mbm.copy_code = #{copy_code}
+		            AND mbm.bill_id = mbd.bill_id
+		            AND mbm.bill_no = mbd.bill_no
+		            AND mbm.state = 2 
+		         LEFT JOIN MED_IN_MAIN mim 
+		         ON 
+		         	mbd.group_id = #{group_id}
+		            AND mbd.hos_id = #{hos_id}
+		            AND mbd.copy_code = #{copy_code}
+		            AND mbd.in_id = mim.in_id
+		            AND mim.bus_type_code = 2 
+		         LEFT JOIN HOS_SUP_DICT hsd 
+		         ON 
+		         	mim.group_id = #{group_id}
+		            AND mim.hos_id = #{hos_id}
+		            AND mim.sup_id = hsd.sup_id
+		            AND mim.sup_no = hsd.sup_no
+		         LEFT JOIN HOS_SUP hs 
+		         ON 
+		         	hsd.sup_id = hs.sup_id
+		            AND hsd.sup_code = hs.sup_code 
+		         LEFT JOIN HOS_SUP_TYPE hst 
+		         ON 
+		         	hs.type_code = hst.type_code
+		            AND hst.is_stop = 0 
+		         LEFT JOIN HOS_EMP_DICT hed 
+		         ON 
+		         	mim.group_id = #{group_id}
+		            AND mim.hos_id = #{hos_id}
+		            AND mim.stocker = hed.emp_id
+		            AND hed.is_stop = 0 
+		         LEFT JOIN HOS_STORE_DICT hsdd 
+		         ON 
+		         	mim.group_id = #{group_id}
+		            AND mim.hos_id = #{hos_id}
+		            AND mim.store_id = hsdd.store_id
+		            AND mim.store_no = hsdd.store_no
+		         left join med_store_detail msd on mbm.group_id=msd.group_id
+			          and mbm.hos_id=msd.hos_id
+			          and hsdd.store_id=msd.store_id
+		         WHERE 
+		         	  mbm.group_id = #{group_id}
+		              AND mbm.hos_id = #{hos_id}
+		              AND mbm.copy_code = #{copy_code}
+		              AND mbm.state = 2
+		              AND mim.bus_type_code = 2
+		              <if test="begin_date != null and begin_date != '' and end_date != null and end_date != '' ">
+		               	  AND to_char(mbm.bill_date, 'yyyy-MM-dd') BETWEEN #{begin_date} AND #{end_date}
+		              </if>
+		              
+		              <if test="sup_id != null and sup_id != '' ">
+			              	AND mim.sup_id = #{sup_id}
+		              </if>
+		                <if test="set_id != null and set_id != '' ">
+			              	AND msd.set_id = #{set_id}
+		              </if>
+		              
+		              <if test="store_id != null and store_id != '' ">
+						  	AND hsdd.store_id = #{store_id} 
+		              </if>
+		              
+		              <if test="dept_id != null and dept_id != '' ">
+						  	AND mim.app_dept = #{dept_id}
+		              </if>
+		              <if test="stocker != null and stocker != '' ">
+					  		AND mim.stocker = #{stocker}
+		              </if>
+		              
+		              <if test="sup_type_code != null and sup_type_code != ''">
+					  		AND hst.type_code = #{sup_type_code}
+		              </if>
+		            GROUP BY mbd.group_id, mbd.hos_id, mbd.copy_code, mbd.bill_id, mbd.bill_no, mbm.bill_date, mim.sup_id, hsd.sup_name, hed.emp_name, hsdd.store_name
+		    ) temp left join(
+			        <!-- 查询已付款发票:已付金额 -->       
+			        SELECT 
+			            mbd.group_id, mbd.hos_id,mbd.copy_code, mbd.bill_id,mbd.bill_no,mbm.sup_id,
+			            sum(nvl(mpd.pay_money, 0)) as payed_money
+<!-- 			            sum(nvl(mppd.pre_pay_money,0))+sum(nvl(mpd.payed_money,0)) as payed_money已付=入库预付+付款表付款金额 -->
+			        FROM MED_BILL_MAIN mbm
+			        LEFT JOIN MED_BILL_DETAIL mbd 
+			        ON 
+			        	mbm.group_id = #{group_id}
+			            AND mbm.hos_id = #{hos_id}
+			            AND mbm.copy_code = #{copy_code}
+			            AND mbm.bill_id = mbd.bill_id
+			            AND mbm.bill_no = mbd.bill_no
+			            AND mbm.state = 2 
+			        LEFT JOIN MED_PAY_DETAIL mpd 
+			        ON 
+			        	mbd.group_id = #{group_id}
+			            AND mbd.hos_id = #{hos_id}
+			            AND mbd.copy_code = #{copy_code}
+			            AND mbd.bill_id = mpd.bill_id
+			            AND mbd.bill_detail_id = mpd.bill_detail_id 
+			        LEFT JOIN MED_PAY_MAIN mpm 
+			        ON 
+			        	mpd.group_id = #{group_id}
+			            AND mpd.hos_id = #{hos_id}
+			            AND mpd.copy_code = #{copy_code}
+			            AND mpd.pay_id = mpm.pay_id
+			            AND mpm.state = 2
+			            AND mpm.pay_bill_type = 0
+			        LEFT JOIN MED_PRE_PAY_DETAIL mppd
+			        ON
+			            mbd.group_id = #{group_id}
+			            and mbd.hos_id = #{hos_id}
+			            and mbd.copy_code = #{copy_code}
+			            and mbd.in_id = mppd.in_id
+			            and mbd.in_detail_id = mppd.in_detail_id
+			        LEFT JOIN MED_PRE_PAY_MAIN mppm
+			        ON
+			            mppd.group_id = #{group_id}
+			            and mppd.hos_id = #{hos_id}
+			            and mppd.copy_code = #{copy_code}
+			            and mppd.pre_pay_id = mppm.pre_pay_id
+			            and mppd.pre_pay_no = mppm.pre_pay_no
+			            and mppm.state = 2
+			            and mppm.pay_bill_type = 0
+			        WHERE     
+			            mbm.group_id = #{group_id}
+			            AND mbm.hos_id = #{hos_id}
+			            AND mbm.copy_code = #{copy_code}
+			            <if test="begin_date != null and begin_date != '' and end_date != null and end_date != '' ">
+				            AND to_char(mbm.bill_date, 'yyyy-MM-dd') BETWEEN #{begin_date} AND #{end_date}
+			            </if>
+			            AND mbm.state = 2
+			            AND 
+			            	mbd.bill_detail_id in (
+			                    <!-- 已付款的发票明细ID -->
+			                    select a.bill_detail_id from med_pay_detail a
+			                    left join med_bill_detail b
+			                    on
+			                         a.group_id = b.group_id
+			                         and a.hos_id = b.hos_id
+			                         and a.copy_code = b.copy_code
+			                         and a.bill_id = b.bill_id
+			                         and a.bill_detail_id = b.bill_detail_id
+			                )
+			        group by mbd.group_id, mbd.hos_id, mbd.copy_code, mbd.bill_id, mbd.bill_no,mbm.sup_id 
+		    ) temp2 ON
+		        temp.group_id = temp2.group_id
+		      and temp.hos_id = temp2.hos_id
+		      and temp.copy_code = temp2.copy_code
+		      and temp.bill_id = temp2.bill_id
+		      and temp.bill_no = temp2.bill_no
+		      and temp.sup_id = temp2.sup_id
+		      ORDER BY temp.bill_date,temp.bill_no
+		)
+			SELECT
+		        a.group_id,a.hos_id,a.copy_code,a.bill_id,to_char(a.bill_no) bill_no,a.bill_date,a.sup_id,a.sup_name,a.emp_name,
+		        a.store_name,a.bill_money,a.payable_money,a.coupon_money,a.payed_money,a.nopay_money
+			FROM a_table a
+			UNION ALL
+			SELECT NULL AS group_id,NULL AS hos_id,NULL AS copy_code,NULL AS bill_id,to_char('合计') AS bill_no,
+			       NULL AS bill_date,NULL AS sup_id,NULL AS sup_name,NULL AS emp_name,NULL AS store_name,
+			       sum(b.bill_money) as bill_money,sum(b.payable_money) as payable_money,sum(b.coupon_money) as coupon_money,
+			       sum(b.payed_money) as payed_money,sum(b.nopay_money) as nopay_money
+			FROM a_table b 
+		
+	</select>
+	
+	<select id="queryMedAccountReportBillArrNonPayMain" resultMap="medAccountReportBillArrNonPayMap">
+		with a_table as(
+		     SELECT
+		        temp.group_id,temp.hos_id,temp.copy_code,temp.bill_id,temp.bill_no,temp.bill_date,
+		        temp.sup_id,temp.sup_name,temp.emp_name,temp.store_name,
+		        temp.bill_money,<!-- 发票金额:来源发票明细 -->
+		        nvl(temp.payable_money,0) as payable_money,<!-- 应付金额:来源发票明细 -->
+		        nvl(temp.coupon_money,0) as coupon_money,<!-- 优惠金额=发票金额-应付金额 -->
+		        nvl(temp2.payed_money,0) as payed_money,<!-- 已付金额=付款表付款金额+入库预付  -->
+		        nvl(temp.payable_money,0)-nvl(temp2.payed_money,0) as nopay_money<!-- 未付金额=应付金额-已付金额 -->
+		    FROM (
+		         <!-- 查询发票明细 -->
+		         SELECT 
+		            mbd.group_id, mbd.hos_id, mbd.copy_code, mbd.bill_id, mbd.bill_no,mbm.bill_date, 
+		            mim.sup_id, hsd.sup_name, hed.emp_name, hsdd.store_name,SUM(nvl(mbd.bill_money, 0)) AS bill_money, 
+		            SUM(nvl(mbd.payable_money, 0)) AS payable_money,
+		            SUM(nvl(mbd.bill_money, 0))-SUM(nvl(mbd.payable_money, 0)) AS coupon_money
+		         FROM MED_BILL_MAIN mbm
+		         LEFT JOIN MED_BILL_DETAIL mbd 
+		         ON 
+		         	mbm.group_id = #{group_id}
+		            AND mbm.hos_id = #{hos_id}
+		            AND mbm.copy_code = #{copy_code}
+		            AND mbm.bill_id = mbd.bill_id
+		            AND mbm.bill_no = mbd.bill_no
+		            AND mbm.state = 2 
+		         LEFT JOIN MED_IN_MAIN mim 
+		         ON 
+		         	mbd.group_id = #{group_id}
+		            AND mbd.hos_id = #{hos_id}
+		            AND mbd.copy_code = #{copy_code}
+		            AND mbd.in_id = mim.in_id
+		            AND mim.bus_type_code = 2 
+		         LEFT JOIN HOS_SUP_DICT hsd 
+		         ON 
+		         	mim.group_id = #{group_id}
+		            AND mim.hos_id = #{hos_id}
+		            AND mim.sup_id = hsd.sup_id
+		            AND mim.sup_no = hsd.sup_no
+		         LEFT JOIN HOS_SUP hs 
+		         ON 
+		         	hsd.sup_id = hs.sup_id
+		            AND hsd.sup_code = hs.sup_code 
+		         LEFT JOIN HOS_SUP_TYPE hst 
+		         ON 
+		         	hs.type_code = hst.type_code
+		            AND hst.is_stop = 0 
+		         LEFT JOIN HOS_EMP_DICT hed 
+		         ON 
+		         	mim.group_id = #{group_id}
+		            AND mim.hos_id = #{hos_id}
+		            AND mim.stocker = hed.emp_id
+		            AND hed.is_stop = 0 
+		         LEFT JOIN HOS_STORE_DICT hsdd 
+		         ON 
+		         	mim.group_id = #{group_id}
+		            AND mim.hos_id = #{hos_id}
+		            AND mim.store_id = hsdd.store_id
+		            AND mim.store_no = hsdd.store_no
+		         left join med_store_detail msd on mbm.group_id=msd.group_id
+			          and mbm.hos_id=msd.hos_id
+			          and hsdd.store_id=msd.store_id
+		         WHERE 
+		         	  mbm.group_id = #{group_id}
+		              AND mbm.hos_id = #{hos_id}
+		              AND mbm.copy_code = #{copy_code}
+		              AND mbm.state = 2
+		              AND mim.bus_type_code = 2
+		              <if test="begin_date != null and begin_date != '' and end_date != null and end_date != '' ">
+		               	  AND to_char(mbm.bill_date, 'yyyy-MM-dd') BETWEEN #{begin_date} AND #{end_date}
+		              </if>
+		              
+		              <if test="sup_id != null and sup_id != '' ">
+			              	AND mim.sup_id = #{sup_id}
+		              </if>
+		                <if test="set_id != null and set_id != '' ">
+			              	AND msd.set_id = #{set_id}
+		              </if>
+		              
+		              <if test="store_id != null and store_id != '' ">
+						  	AND hsdd.store_id = #{store_id} 
+		              </if>
+		              
+		              <if test="dept_id != null and dept_id != '' ">
+						  	AND mim.app_dept = #{dept_id}
+		              </if>
+		              <if test="stocker != null and stocker != '' ">
+					  		AND mim.stocker = #{stocker}
+		              </if>
+		              
+		              <if test="sup_type_code != null and sup_type_code != ''">
+					  		AND hst.type_code = #{sup_type_code}
+		              </if>
+		            GROUP BY mbd.group_id, mbd.hos_id, mbd.copy_code, mbd.bill_id, mbd.bill_no, mbm.bill_date, mim.sup_id, hsd.sup_name, hed.emp_name, hsdd.store_name
+		    ) temp left join(
+			        <!-- 查询已付款发票:已付金额 -->       
+			        SELECT 
+			            mbd.group_id, mbd.hos_id,mbd.copy_code, mbd.bill_id,mbd.bill_no,mbm.sup_id,
+			            sum(nvl(mpd.pay_money, 0)) as payed_money
+<!-- 			            sum(nvl(mppd.pre_pay_money,0))+sum(nvl(mpd.payed_money,0)) as payed_money已付=入库预付+付款表付款金额 -->
+			        FROM MED_BILL_MAIN mbm
+			        LEFT JOIN MED_BILL_DETAIL mbd 
+			        ON 
+			        	mbm.group_id = #{group_id}
+			            AND mbm.hos_id = #{hos_id}
+			            AND mbm.copy_code = #{copy_code}
+			            AND mbm.bill_id = mbd.bill_id
+			            AND mbm.bill_no = mbd.bill_no
+			            AND mbm.state = 2 
+			        LEFT JOIN MED_PAY_DETAIL mpd 
+			        ON 
+			        	mbd.group_id = #{group_id}
+			            AND mbd.hos_id = #{hos_id}
+			            AND mbd.copy_code = #{copy_code}
+			            AND mbd.bill_id = mpd.bill_id
+			            AND mbd.bill_detail_id = mpd.bill_detail_id 
+			        LEFT JOIN MED_PAY_MAIN mpm 
+			        ON 
+			        	mpd.group_id = #{group_id}
+			            AND mpd.hos_id = #{hos_id}
+			            AND mpd.copy_code = #{copy_code}
+			            AND mpd.pay_id = mpm.pay_id
+			            AND mpm.state = 2
+			            AND mpm.pay_bill_type = 0
+			        LEFT JOIN MED_PRE_PAY_DETAIL mppd
+			        ON
+			            mbd.group_id = #{group_id}
+			            and mbd.hos_id = #{hos_id}
+			            and mbd.copy_code = #{copy_code}
+			            and mbd.in_id = mppd.in_id
+			            and mbd.in_detail_id = mppd.in_detail_id
+			        LEFT JOIN MED_PRE_PAY_MAIN mppm
+			        ON
+			            mppd.group_id = #{group_id}
+			            and mppd.hos_id = #{hos_id}
+			            and mppd.copy_code = #{copy_code}
+			            and mppd.pre_pay_id = mppm.pre_pay_id
+			            and mppd.pre_pay_no = mppm.pre_pay_no
+			            and mppm.state = 2
+			            and mppm.pay_bill_type = 0
+			        WHERE     
+			            mbm.group_id = #{group_id}
+			            AND mbm.hos_id = #{hos_id}
+			            AND mbm.copy_code = #{copy_code}
+			            <if test="begin_date != null and begin_date != '' and end_date != null and end_date != '' ">
+				            AND to_char(mbm.bill_date, 'yyyy-MM-dd') BETWEEN #{begin_date} AND #{end_date}
+			            </if>
+			            AND mbm.state = 2
+			            AND 
+			            	mbd.bill_detail_id in (
+			                    <!-- 已付款的发票明细ID -->
+			                    select a.bill_detail_id from med_pay_detail a
+			                    left join med_bill_detail b
+			                    on
+			                         a.group_id = b.group_id
+			                         and a.hos_id = b.hos_id
+			                         and a.copy_code = b.copy_code
+			                         and a.bill_id = b.bill_id
+			                         and a.bill_detail_id = b.bill_detail_id
+			                )
+			        group by mbd.group_id, mbd.hos_id, mbd.copy_code, mbd.bill_id, mbd.bill_no,mbm.sup_id 
+		    ) temp2 ON
+		        temp.group_id = temp2.group_id
+		      and temp.hos_id = temp2.hos_id
+		      and temp.copy_code = temp2.copy_code
+		      and temp.bill_id = temp2.bill_id
+		      and temp.bill_no = temp2.bill_no
+		      and temp.sup_id = temp2.sup_id
+		      ORDER BY temp.bill_date,temp.bill_no
+		)
+		select a.group_id, a.hos_id, a.copy_code,  a.sup_id, to_char(a.sup_name) as sup_name, a.emp_name, a.store_name
+      		, sum(a.bill_money) as bill_money, sum(a.payable_money) as payable_money, sum(a.coupon_money) as coupon_money, sum(a.payed_money) as payed_money, sum(a.nopay_money) as nopay_money
+    	from a_table a
+     	group by a.group_id, a.hos_id, a.copy_code,  a.sup_id, a.sup_name, a.emp_name, a.store_name
+			UNION ALL
+			SELECT NULL AS group_id,NULL AS hos_id,NULL AS copy_code,NULL AS sup_id,to_char('合计') AS sup_name,NULL AS emp_name,NULL AS store_name,
+			       sum(b.bill_money) as bill_money,sum(b.payable_money) as payable_money,sum(b.coupon_money) as coupon_money,
+			       sum(b.payed_money) as payed_money,sum(b.nopay_money) as nopay_money
+			FROM a_table b 
+		
+	</select>
+	
+	
+	<!-- 发票报表 -->
+	<select id="queryMedPayBillDetail" parameterType="java.util.Map" resultType="java.util.Map">
+		with b_tmp as (
+			select  distinct bill_no, sup_id, sup_no, group_id, hos_id , copy_code,sum(bill_money) bill_money
+        	from med_bill_main 
+        	<where>
+				<if test="group_id != null and group_id !='' ">
+					and group_id = #{group_id,jdbcType=INTEGER}
+				</if>
+				<if test="hos_id != null and hos_id !='' ">
+					and hos_id = #{hos_id,jdbcType=INTEGER}
+				</if>
+				<if test="copy_code != null and copy_code !='' ">
+					and copy_code = #{copy_code ,jdbcType=VARCHAR}
+				</if>
+				and state = 2
+				<if test="begin_date != null and begin_date != '' and end_date != null and end_date != '' ">
+		           	AND to_char(chk_date, 'yyyy-MM-dd') between #{begin_date} and #{end_date}
+		        </if>
+				<if test="sup_id != null and sup_id !='' ">
+					and sup_id = #{sup_id,jdbcType=INTEGER}
+				</if>
+				<if test="bill_no != null and bill_no !='' ">
+					and bill_no like '%${bill_no}%'
+				</if>
+			</where>
+          	group by bill_no, sup_id, sup_no, group_id, hos_id , copy_code
+		)
+		
+		 select mm.group_id,mm.hos_id,mm.copy_code,hsd.sup_code || ' ' || hsd.sup_name as sup_name,mm.bill_money,mm.bill_no,mm.countnum
+	     from (
+	     	select group_id, hos_id, copy_code, sup_id, sup_no, 
+	        	wm_concat(to_char(bill_no)||' ') as bill_no,count(0) countnum,sum(bill_money) bill_money
+	        from b_tmp
+	        group by group_id, hos_id, copy_code, sup_id, sup_no
+	     ) mm
+      	 left join hos_sup_dict hsd on mm.group_id = hsd.group_id
+    		and mm.hos_id = hsd.hos_id
+    		and mm.sup_id = hsd.sup_id
+    		and mm.sup_no = hsd.sup_no 
+        order by hsd.sup_code
+	</select>
+</mapper>

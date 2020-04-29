@@ -1,0 +1,197 @@
+﻿<!doctype html>
+<html>
+<head>
+    <title>Spread.Sheets - Dirty Items</title>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+
+    <link href="../../../external/spreadjs/css/gc.spread.sheets.excel2013white.10.1.0.css" rel="stylesheet" type="text/css" />
+
+    <script src="../../../external/external/jquery-1.8.2.min.js" type="text/javascript"></script>
+
+    <script type="text/javascript" src="../../../external/spreadjs/gc.spread.sheets.all.10.1.0.min.js"></script>
+
+    <style type="text/css">
+    /*css_begin*/
+        input[type="button"] {
+            width: 170px;
+        }
+    /*css_end*/
+    </style>
+
+    <script id="scriptInit" type="text/javascript">
+        /*code_begin*/
+        var spreadNS = GC.Spread.Sheets;
+
+        $(document).ready(function () {
+            var spread = new GC.Spread.Sheets.Workbook(document.getElementById("ss"), { sheetCount: 1 });
+            initSpread(spread);
+        });
+
+        function initSpread(spread) {
+            var sheet = spread.getSheet(0);
+            sheet.suspendPaint();
+
+            for (var r = 0; r < 30; r++) {
+                sheet.setText(r, 0, "A" + (r + 1));
+            }
+
+            for (var c = 1; c < 20; c++) {
+                sheet.setText(0, c, String.fromCharCode(65 + c) + "1");
+            }
+
+            sheet.resumePaint();
+            sheet.clearPendingChanges();
+
+            var $taResult = $("#taResult");
+
+            function getChangedCellData(dirtyItem) {
+                return ["Cell (", dirtyItem.row, ",", dirtyItem.col, ") changed from ", dirtyItem.oldValue, " to ", dirtyItem.newValue].join("");
+            }
+
+            function getDirtyCellData(dirtyItem) {
+                return ["Cell (", dirtyItem.row, ",", dirtyItem.col, ") oldValue: ", dirtyItem.oldValue, " newValue: ", dirtyItem.newValue].join("");
+            }
+
+            function appendResult(txt) {
+                $taResult.val($taResult.val() + txt + "\n");
+            }
+
+            spread.bind(spreadNS.Events.CellChanged, function (event, data) {
+                var row = data.row, col = data.col;
+                if (row === undefined || col === undefined) {
+                    return;
+                }
+                if (sheet.hasPendingChanges(row, col)) {
+                    var dirtyDataArray = sheet.getDirtyCells(row, col);
+                    if (dirtyDataArray.length > 0) {
+                        appendResult(getChangedCellData(dirtyDataArray[0]));
+                    }
+                }
+            })
+
+            spread.bind(spreadNS.Events.RowChanged, function (event, data) {
+                var row = data.row, count = data.count, propName = data.propertyName;
+                if (row === undefined || count === undefined || propName === undefined) {
+                    return;
+                }
+                if (propName === "addRows" || propName === "deleteRows") {
+                    appendResult(propName + " @ " + row + (count > 1 ? " count: " + count : ""));
+                }
+            })
+
+            $("#btnInsertRow").click(function () {
+                var sels = sheet.getSelections();
+                var len = sels.length;
+                if (len > 0) {
+                    var s = sels[0];
+                    sheet.addRows(s.row, 1);
+                }
+            })
+            $("#btnDeleteRow").click(function () {
+                var sels = sheet.getSelections();
+                var len = sels.length;
+                if (len > 0) {
+                    var s = sels[0];
+                    sheet.deleteRows(s.row, s.rowCount);
+                }
+            })
+
+            $("#btnGetSelectionDirtyCells").click(function () {
+                var sels = sheet.getSelections();
+                var len = sels.length;
+                if (len > 0) {
+                    var s = sels[0];
+                    var row = s.row, col = s.col;
+                    if (row < 0) {
+                        row = 0;
+                    }
+                    if (col < 0) {
+                        col = 0;
+                    }
+
+                    var cells = sheet.getDirtyCells(row, col, s.rowCount, s.colCount);
+
+                    if (cells.length > 0) {
+                        appendResult("Dirty Cells:\n" + cells.map(function (item) { return getDirtyCellData(item); }).join("\n"));
+                    }
+                }
+            })
+
+            $("#btnGetDirtyCells").click(function () {
+                var cells = sheet.getDirtyCells();
+                if (cells.length > 0) {
+                    appendResult("Dirty Cells:\n" + cells.map(function (item) { return getDirtyCellData(item); }).join("\n"));
+                }
+            })
+
+            $("#btnGetDirtyRows").click(function () {
+                var rows = sheet.getDirtyRows();
+
+                if (rows.length > 0) {
+                    appendResult("Dirty rows @ " + rows.map(function (item) { return item.row; }).join(", "));
+                }
+            })
+
+            $("#btnGetInsertRows").click(function () {
+                var rows = sheet.getInsertRows();
+
+                if (rows.length > 0) {
+                    appendResult("Inserted rows @ " + rows.map(function (item) { return item.row; }).join(", "));
+                }
+            })
+
+            $("#btnGetDeleteRows").click(function () {
+                var rows = sheet.getDeletedRows();
+
+                if (rows.length > 0) {
+                    appendResult("Deleted rows @ " + rows.map(function (item) { return item.row; }).join(", "));
+                }
+            })
+
+            $("#btnClearPendingChanges").click(function () {
+                sheet.clearPendingChanges();
+            })
+
+            $("#btnSetRowCount").click(function () {
+                sheet.setRowCount(60);
+            });
+
+            $("#btnSetColumnCount").click(function () {
+                sheet.setColumnCount(16);
+            });
+        };
+        /*code_end*/
+    </script>
+
+</head>
+<body class="demo-single">
+    <div class="sample-turtorial">
+        <div id="ss" style="width: 100%; height: 320px; border: 1px solid gray;"></div>
+
+        <div class="demo-options">
+            <div class="option-row">
+                <input type="button" id="btnInsertRow" value="Insert Row" title="Insert an new row at selected row" />
+                <input type="button" id="btnDeleteRow" value="Delete Rows" title="Deleted seleted rows" />
+                <input type="button" id="btnClearPendingChanges" value="Clear Pending Changes" title="Clear pending changes" />
+            </div>
+            <div class="option-row">
+                <input type="button" id="btnSetRowCount" value="Set Row Count" title="Set row count to 60" />
+                <input type="button" id="btnSetColumnCount" value="Set Column Count" title="Set column count to 16" />
+            </div>
+            <div class="option-row">
+                <input type="button" id="btnGetDirtyRows" value="Get Dirty Rows" />
+                <input type="button" id="btnGetDirtyCells" value="Get All Dirty Cells" />
+                <input type="button" id="btnGetSelectionDirtyCells" value="Get Selection Dirty Cells" />
+            </div>
+            <div class="option-row">
+                <input type="button" id="btnGetInsertRows" value="Get Insert Rows" />
+                <input type="button" id="btnGetDeleteRows" value="Get Delete Rows" />
+            </div>
+            <div class="option-row">
+                <textarea id="taResult" style="width:100%;padding:0;float:right;height:80px;background:none"></textarea>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

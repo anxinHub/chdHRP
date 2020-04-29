@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chd.hrp.ass.dao.repair.assfaulttype.AssFaultTypeMapper">
+	<resultMap type="java.util.Map" id="AssFaultTypeTree">
+		<result property="pId" column="pId" />
+		<result property="id" column="id" />
+		<result property="name" column="name" />
+	</resultMap>
+
+	<select id="queryAssFaultTypeByCode"  parameterType="java.util.Map"  resultType="java.util.Map">
+		select group_id,
+		hos_id,
+		copy_code,
+		fau_code,
+		fau_name,
+		super_code,
+		is_stop,
+		is_last,
+		spell_code,
+		wbx_code
+		from ass_fault_type
+		where group_id = #{group_id}
+		and hos_id = #{hos_id}
+		and copy_code = #{copy_code}
+		and fau_code= #{fau_code}
+	</select>
+	<select id="queryAssFaultTypeSuperIsExists" parameterType="java.util.Map" resultType="java.util.Map">
+		select group_id,
+		hos_id,
+		copy_code,
+		fau_code,
+		fau_name,
+		super_code,
+		is_stop,
+		is_last,
+		spell_code,
+		wbx_code
+		from ass_fault_type
+		where group_id = #{group_id}
+		and hos_id = #{hos_id}
+		and copy_code = #{copy_code}
+		and fau_code= #{super_code}
+	</select>
+	<select id="queryAssFaultTypeSuperAll" parameterType="java.util.Map"
+		resultType="java.util.Map">
+		select fau_code as id, fau_name as name, super_code as pId, spell_code,
+		wbx_code
+		from ass_fault_type
+		where group_id = #{group_id}
+		and hos_id = #{hos_id}
+		and copy_code = #{copy_code}
+		and is_stop = 0
+		start with fau_code = #{super_code}
+		connect by prior super_code = fau_code
+		order by fau_code
+	</select>
+	<select id="queryAssRepUserFaultBySuperCod" resultType="java.util.Map">
+		 select group_id, hos_id, copy_code, user_id, fau_code
+		      from ass_rep_user_fault
+		     where group_id = #{group_id}
+		       and hos_id = #{hos_id}
+		       and copy_code = #{copy_code}
+		       and fau_code = #{super_code}
+	</select>
+	<insert id="extendsBySuperCode" parameterType="java.util.Map" >
+		 begin
+		 insert into ass_rep_user_fault
+		   (group_id, hos_id, copy_code, user_id, fau_code)
+		    select group_id, hos_id, copy_code, user_id, #{fau_code}
+		      from ass_rep_user_fault
+		     where group_id = #{group_id}
+		       and hos_id = #{hos_id}
+		       and copy_code = #{copy_code}
+		       and fau_code = #{super_code} ;
+		       
+		  delete ass_rep_user_fault
+		     where group_id = #{group_id}
+		       and hos_id = #{hos_id}
+		       and copy_code = #{copy_code}
+		       and fau_code = #{super_code} ;
+		   end;
+	</insert>
+	<select id="queryAssFaultType" parameterType="java.util.Map"
+		resultType="java.util.Map">
+		select group_id,
+		hos_id,
+		copy_code,
+		fau_code,
+		fau_name,
+		super_code,
+		is_stop,
+		is_last,
+		spell_code,
+		wbx_code
+		from ass_fault_type
+		where group_id = #{group_id}
+		and hos_id = #{hos_id}
+		and copy_code = #{copy_code}
+		<if test="fau_code != null and fau_code != ''">
+			and fau_code like '${fau_code}%'
+		</if>
+		<if test="fau_name != null and fau_name != ''">
+			and fau_name like '%${fau_name}%'
+		</if>
+		<if test="is_stop != null and is_stop != ''">
+			and is_stop = #{is_stop}
+		</if>
+	</select>
+	<insert id="addFaultType" parameterType="java.util.Map">
+		begin
+		insert into ass_fault_type
+		(group_id,
+		hos_id,
+		copy_code,
+		fau_code,
+		fau_name,
+		super_code,
+		is_stop,
+		is_last,
+		spell_code,
+		wbx_code
+		)
+		values
+		(
+		#{group_id,jdbcType=INTEGER},
+		#{hos_id,jdbcType=INTEGER},
+		#{copy_code,jdbcType=VARCHAR},
+		#{fau_code,jdbcType=VARCHAR},
+		#{fau_name,jdbcType=VARCHAR},
+		#{super_code,jdbcType=VARCHAR},
+		#{is_stop},
+		1,
+		#{spell_code},
+		#{wbx_code}
+
+		);
+		update ass_fault_type
+		set is_last = 0
+		where group_id = #{group_id}
+		and hos_id = #{hos_id}
+		and copy_code =#{copy_code}
+		and fau_code = #{super_code};
+		end;
+	</insert>
+	<select id="queryAssFaultTypeTree" resultMap="AssFaultTypeTree"
+		parameterType="java.util.Map">
+		select
+		fau_code as id ,
+		fau_name as name ,
+		super_code pId ,
+		spell_code,
+		wbx_code
+		from ass_fault_type
+		where group_id =#{group_id}
+		and hos_id = #{hos_id}
+		and copy_code =#{copy_code}
+		start with super_code =#{super_code}
+		connect by prior fau_code = super_code
+		order by fau_code
+	</select>
+
+	<update id="update" parameterType="java.util.Map">
+	begin 
+		update ass_fault_type
+		set
+		fau_name = #{fau_name},
+		spell_code = #{spell_code},
+		wbx_code = #{wbx_code}
+		where group_id = #{group_id}
+		and hos_id = #{hos_id}
+		and copy_code = #{copy_code}
+		and fau_code = #{fau_code};
+		
+		update ass_fault_type
+		set
+		is_stop = #{is_stop}
+		where group_id = #{group_id}
+		and hos_id = #{hos_id}
+		and copy_code = #{copy_code}
+		and fau_code like '%${fau_code}%';
+	end;
+	</update>
+
+	<select id="queryAssExists" parameterType="java.util.Map"
+		resultType="Integer">
+		select count(*)
+		from sys_dict_use
+		where table_code = 'ass_fault_type'
+		and column_code = 'fau_code'
+
+	</select>
+	<delete id="deleteAssFaultTypeBatch" parameterType="java.util.List">
+		delete ass_fault_type
+		where
+		<foreach collection="list" index="index" item="item" open="("
+			separator="or" close=")">
+			group_id = #{item.group_id,jdbcType=INTEGER}
+			and
+			hos_id = #{item.hos_id,jdbcType=INTEGER}
+			and copy_code
+			=#{item.copy_code,jdbcType=VARCHAR}
+			and fau_code like
+			'${item.fau_code}%'
+		</foreach>
+	</delete>
+	<delete id="deleteAssRepUserFaultTypeBatch" parameterType="java.util.List">
+		delete ass_rep_user_fault
+		where
+		<foreach collection="list" index="index" item="item" open="(" separator="or" close=")">
+				group_id = #{item.group_id,jdbcType=INTEGER}
+			and	hos_id = #{item.hos_id,jdbcType=INTEGER}
+			and copy_code=#{item.copy_code,jdbcType=VARCHAR}
+			and fau_code like '${item.fau_code}%'
+		</foreach>
+	</delete>
+</mapper>
